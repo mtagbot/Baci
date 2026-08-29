@@ -1,0 +1,817 @@
+/* ============================================================
+ * ui-modern.css — v4.30.0 High-End UI Overlay (2026 design)
+ * Loaded AFTER style.css — upgrades the whole system visually
+ * without breaking any existing class names or page markup.
+ * 100% self-hosted, no CDN. RTL-first. Fully responsive.
+ * ============================================================ */
+
+/* ---------- 1) Design tokens ---------- */
+:root {
+    /* Palette (light, airy, professional) */
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --primary-soft: rgba(79, 70, 229, 0.09);
+    --primary-ring: rgba(79, 70, 229, 0.22);
+    --accent: #0ea5e9;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+
+    --bg-body: #f4f6fb;
+    --bg-card: #ffffff;
+    --bg-header: rgba(255, 255, 255, 0.86);
+    --text-main: #101828;
+    --text-muted: #667085;
+    --border-color: #e6e9f0;
+    --table-header: #f7f8fc;
+    --table-hover: #f4f6ff;
+    --input-bg: #ffffff;
+
+    /* Elevation — soft colored shadows */
+    --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+    --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.07), 0 1px 2px rgba(16, 24, 40, 0.05);
+    --shadow-md: 0 6px 16px -6px rgba(16, 24, 40, 0.12), 0 2px 6px -2px rgba(16, 24, 40, 0.06);
+    --shadow-lg: 0 16px 40px -12px rgba(16, 24, 40, 0.18);
+    --shadow-primary: 0 8px 20px -8px var(--primary-ring);
+
+    /* Geometry */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+
+    /* Motion */
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Respect user settings from settings.php (header injects --primary via :root inline) */
+
+/* ---------- 2) Base & typography ---------- */
+html { scroll-behavior: smooth; }
+body {
+    background:
+        radial-gradient(1200px 500px at 85% -10%, rgba(79, 70, 229, 0.06), transparent 60%),
+        radial-gradient(900px 420px at -10% 110%, rgba(14, 165, 233, 0.05), transparent 55%),
+        var(--bg-body);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+::selection { background: var(--primary-ring); }
+
+/* Thin modern scrollbars */
+* { scrollbar-width: thin; scrollbar-color: #c7cdda transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: #c7cdda; border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: #9aa3b5; border: 2px solid transparent; background-clip: content-box; }
+
+/* Page content entrance */
+@media (prefers-reduced-motion: no-preference) {
+    main.flex-1 > * { animation: uiFadeUp .35s var(--ease) both; }
+    @keyframes uiFadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}
+
+/* ---------- 3) Header / navbar — glass ---------- */
+header.navbar {
+    background: var(--bg-header) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    backdrop-filter: blur(14px) saturate(1.4);
+    border-bottom: 1px solid var(--border-color) !important;
+    box-shadow: var(--shadow-xs);
+    position: relative;
+    z-index: 50;
+}
+header.navbar h1 { letter-spacing: -0.01em; }
+header.navbar img { border-radius: var(--radius-sm); }
+
+/* ---------- 4) Sidebar — v4.37.0 modern nav (no emojis, marker accents) ---------- */
+.sidebar {
+    background: linear-gradient(180deg, #ffffff, #fafbff) !important;
+    border-left: 1px solid var(--border-color) !important;
+}
+.sidebar-scroll { padding-inline-end: 6px; }
+
+/* Section titles: small caps-like labels with a soft rule */
+.sidebar-section-title {
+    font-size: 0.64rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.14em;
+    color: #98a2b3 !important;
+    border-bottom: none !important;
+    margin: 1.05rem .4rem .35rem !important;
+    padding-bottom: 0 !important;
+    position: relative;
+    opacity: 1;
+}
+.sidebar-section-title::after { content: '▾'; font-size: .6rem; opacity: .7; }
+.sidebar-section-title:first-child { margin-top: .2rem !important; }
+
+/* Items: clean rows with a rounded leading marker dot */
+.sidebar-item {
+    position: relative;
+    display: flex !important;
+    align-items: center;
+    gap: .6rem;
+    border-radius: 10px !important;
+    padding: .58rem .7rem .58rem .5rem !important;
+    font-weight: 600 !important;
+    color: #475467 !important;
+    line-height: 1.5;
+    transition: background-color .16s var(--ease), color .16s var(--ease), padding .16s var(--ease) !important;
+}
+.sidebar-item::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 999px;
+    background: #cdd5e1;
+    flex: none;
+    transition: background-color .16s var(--ease), transform .16s var(--ease), box-shadow .16s var(--ease);
+}
+.sidebar-item:hover {
+    background: var(--primary-soft) !important;
+    color: var(--primary) !important;
+    transform: none;
+}
+.sidebar-item:hover::before { background: var(--primary); transform: scale(1.25); }
+.sidebar-item.active {
+    background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 72%, #7c3aed)) !important;
+    color: #fff !important;
+    font-weight: 800 !important;
+    box-shadow: var(--shadow-primary) !important;
+}
+.sidebar-item.active::before {
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25);
+    transform: scale(1.15);
+}
+
+/* ---------- 5) Cards ---------- */
+.card {
+    border-radius: var(--radius-lg) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: var(--shadow-sm) !important;
+    transition: box-shadow .22s var(--ease), transform .22s var(--ease), border-color .22s var(--ease) !important;
+}
+.card:hover { box-shadow: var(--shadow-md) !important; }
+.page-hero {
+    background: linear-gradient(135deg, var(--primary-soft), rgba(14, 165, 233, 0.07)) !important;
+    border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--border-color)) !important;
+    border-radius: var(--radius-lg) !important;
+}
+.soft-panel {
+    background: #f8f9fd !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-md) !important;
+}
+.stats-mini {
+    border-radius: var(--radius-md) !important;
+    background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 60%, #0ea5e9)) !important;
+    box-shadow: var(--shadow-primary) !important;
+}
+
+/* ---------- 6) Buttons — tactile, focus-visible ---------- */
+.btn {
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0;
+    gap: .4rem;
+    transition: transform .15s var(--spring), box-shadow .18s var(--ease), background-color .18s var(--ease), border-color .18s var(--ease), filter .18s var(--ease) !important;
+    will-change: transform;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0) scale(0.98) !important; }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-ring) !important; }
+.btn-primary {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 92%, #fff), var(--primary)) !important;
+    box-shadow: var(--shadow-primary), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+}
+.btn-primary:hover { filter: brightness(1.06); background: var(--primary) !important; }
+.btn-success { box-shadow: 0 8px 20px -8px rgba(16, 185, 129, 0.45) !important; }
+.btn-danger { box-shadow: 0 8px 20px -8px rgba(239, 68, 68, 0.45) !important; }
+.btn-warning { box-shadow: 0 8px 20px -8px rgba(245, 158, 11, 0.45) !important; }
+.btn-outline { border: 1.5px solid var(--border-color) !important; background: var(--bg-card) !important; }
+.btn-outline:hover { border-color: var(--primary) !important; color: var(--primary) !important; background: var(--primary-soft) !important; }
+.btn-secondary { background: #eef1f6 !important; color: #344054 !important; box-shadow: none !important; }
+.btn-secondary:hover { background: #e4e8f0 !important; }
+.btn[disabled], .btn.disabled { opacity: .55; pointer-events: none; }
+
+/* ---------- 7) Forms — clear, touch-friendly ---------- */
+.form-input, .form-select, .form-textarea {
+    border-radius: 10px !important;
+    border: 1.5px solid var(--border-color) !important;
+    background: var(--input-bg) !important;
+    transition: border-color .16s var(--ease), box-shadow .16s var(--ease), background-color .16s var(--ease) !important;
+    min-height: 34px;
+}
+.form-input:hover, .form-select:hover, .form-textarea:hover { border-color: #cdd4e0 !important; }
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3.5px var(--primary-ring) !important;
+    background: #fff !important;
+}
+.form-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%23667085' d='M6 8L0 .9.9 0 6 6.1 11.1 0l.9.9z'/></svg>") !important;
+    background-repeat: no-repeat !important;
+    background-position: left 0.7rem center !important;
+    padding-left: 2rem !important;
+}
+label { user-select: none; }
+input[type="checkbox"], input[type="radio"] {
+    width: 16px; height: 16px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+input[type="file"].form-input { padding: .5rem !important; cursor: pointer; }
+input[type="file"]::file-selector-button {
+    border: 0; border-radius: 8px; padding: .4rem .8rem; margin-inline-end: .6rem;
+    background: var(--primary-soft); color: var(--primary); font-weight: 700; cursor: pointer;
+    transition: background .18s var(--ease);
+    font-family: inherit;
+}
+input[type="file"]::file-selector-button:hover { background: var(--primary-ring); }
+
+/* ---------- 8) Tables — pro data grid look ---------- */
+.table-container {
+    border-radius: var(--radius-md) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: var(--shadow-xs);
+    background: var(--bg-card);
+    overscroll-behavior-x: contain;
+}
+th {
+    background: var(--table-header) !important;
+    color: #475467 !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.02em !important;
+    text-transform: none !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    white-space: nowrap;
+}
+td { color: var(--text-main); }
+tbody tr { transition: background-color .12s var(--ease); }
+tbody tr:nth-child(even) td { background: #fafbfe; }
+tbody tr:hover td { background: var(--table-hover) !important; }
+.table-container thead th { position: sticky; top: 0; z-index: 2; box-shadow: 0 1px 0 var(--border-color); }
+
+/* ---------- 9) Badges — soft pill ---------- */
+.badge { border-radius: 999px !important; font-weight: 700 !important; line-height: 1.4; }
+.badge-success { background: #ecfdf3 !important; color: #067647 !important; border-color: #abefc6 !important; }
+.badge-warning { background: #fffaeb !important; color: #b54708 !important; border-color: #fedf89 !important; }
+.badge-danger  { background: #fef3f2 !important; color: #b42318 !important; border-color: #fecdca !important; }
+.badge-info    { background: #eff8ff !important; color: #175cd3 !important; border-color: #b2ddff !important; }
+
+/* ---------- 10) Wizard steps ---------- */
+.wizard-steps { border-radius: var(--radius-md) !important; box-shadow: var(--shadow-xs); gap: .35rem; }
+.wizard-step { border-bottom-width: 3px !important; border-radius: 8px 8px 0 0; }
+.wizard-step.active { background: var(--primary-soft); }
+.wizard-step.completed { background: rgba(16, 185, 129, 0.07); }
+
+/* ---------- 11) Modals — blur + spring in ---------- */
+.modal-backdrop {
+    background: rgba(16, 24, 40, 0.5) !important;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+}
+.modal-backdrop[style*="flex"] .modal-card { animation: uiModalIn .28s var(--spring) both; }
+@keyframes uiModalIn { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+.modal-card { border-radius: var(--radius-lg) !important; box-shadow: var(--shadow-lg) !important; }
+
+/* Hover tooltip card */
+.student-hover-tooltip {
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-lg) !important;
+    animation: uiFadeUp .18s var(--ease) both;
+}
+
+/* ---------- 12) Flash messages — toast look ---------- */
+.flash-message {
+    border-radius: var(--radius-md) !important;
+    border-width: 1px !important;
+    box-shadow: var(--shadow-md) !important;
+    animation: uiFadeUp .3s var(--ease) both;
+}
+
+/* ---------- 13) User dropdown ---------- */
+.user-menu-dropdown {
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow-lg) !important;
+    animation: uiFadeUp .18s var(--ease) both;
+}
+
+/* ---------- 14) Filters row ---------- */
+.filter-more { border-radius: var(--radius-md) !important; background: #fafbfe; }
+.filter-more summary { transition: color .15s var(--ease); }
+.filter-more summary:hover { color: var(--primary-hover); }
+
+/* ---------- 15) Integrated hub (iframe tabs) ---------- */
+.integrated-tabs { border-radius: var(--radius-md) !important; }
+.integrated-hub iframe { border-radius: var(--radius-md) !important; box-shadow: var(--shadow-xs); }
+
+/* ---------- 16) Avatars ---------- */
+.avatar-lg { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7), var(--shadow-xs); }
+
+/* ---------- 17) Loading states (used by ui-modern.js) ---------- */
+.ui-loading-bar {
+    position: fixed; top: 0; right: 0; left: 0; height: 3px; z-index: 9999;
+    background: linear-gradient(90deg, var(--primary), var(--accent), var(--primary));
+    background-size: 200% 100%;
+    animation: uiLoadingSlide 1s linear infinite;
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s var(--ease);
+}
+.ui-loading-bar.on { opacity: 1; }
+@keyframes uiLoadingSlide { from { background-position: 200% 0; } to { background-position: 0 0; } }
+
+.ui-skeleton {
+    position: relative; overflow: hidden; background: #eef0f6 !important; color: transparent !important;
+    border-radius: 8px;
+}
+.ui-skeleton::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.65), transparent);
+    animation: uiShimmer 1.2s infinite;
+}
+@keyframes uiShimmer { from { transform: translateX(100%); } to { transform: translateX(-100%); } }
+
+/* Button busy spinner */
+.btn.ui-busy { pointer-events: none; opacity: .75; position: relative; }
+.btn.ui-busy::after {
+    content: ''; width: 14px; height: 14px; margin-inline-start: .45rem;
+    border: 2px solid rgba(255,255,255,.45); border-top-color: #fff; border-radius: 50%;
+    animation: uiSpin .7s linear infinite; display: inline-block; vertical-align: -2px;
+}
+.btn-outline.ui-busy::after, .btn-secondary.ui-busy::after { border-color: rgba(0,0,0,.2); border-top-color: var(--text-main); }
+@keyframes uiSpin { to { transform: rotate(360deg); } }
+
+/* ---------- 18) Back-to-top ---------- */
+.ui-backtop {
+    position: fixed; bottom: 18px; left: 18px; z-index: 900;
+    width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--border-color);
+    background: var(--bg-card); color: var(--primary); font-size: 18px; font-weight: 900;
+    box-shadow: var(--shadow-md); cursor: pointer; display: none; align-items: center; justify-content: center;
+    transition: transform .18s var(--spring), box-shadow .18s var(--ease);
+}
+.ui-backtop:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.ui-backtop.show { display: flex; }
+
+/* ---------- 19) Responsive refinements ---------- */
+/* Comfortable touch targets on coarse pointers */
+@media (pointer: coarse) {
+    .btn { min-height: 40px; }
+    .form-input, .form-select { min-height: 40px; }
+    .sidebar-item { padding-top: .65rem !important; padding-bottom: .65rem !important; }
+    input[type="checkbox"], input[type="radio"] { width: 19px; height: 19px; }
+}
+
+/* Tablet */
+@media (max-width: 1024px) {
+    .card { border-radius: var(--radius-md) !important; }
+}
+
+/* v4.34.0: FIX broken mobile menu.
+ * style.css has two conflicting rules: an old @media(max-width:768px) block
+ * turns the sidebar into a 24vh full-width horizontal strip, fighting the
+ * newer @media(max-width:900px) fixed drawer. Below 768px the old rule won
+ * (width:100%!important / height:24vh) and the menu rendered as a squashed
+ * horizontal bar. These overrides (loaded after style.css) restore a proper
+ * full-height slide-in drawer on ALL mobile sizes. */
+@media (max-width: 900px) {
+    .sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: min(84vw, 320px) !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        max-height: none !important;
+        z-index: 3000 !important;
+        transform: translateX(105%);
+        transition: transform .28s var(--spring);
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        padding: 1rem !important;
+    }
+    body.sidebar-open .sidebar { transform: translateX(0); }
+    /* vertical scroll inside the drawer — kill the old horizontal strip */
+    .sidebar .sidebar-scroll {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 2px !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        height: 100% !important;
+        align-items: stretch !important;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 2rem;
+    }
+    /* bring back section titles (old rule hid them) */
+    .sidebar .sidebar-section-title {
+        display: flex !important;
+        margin: .8rem .2rem .3rem !important;
+    }
+    .sidebar .sidebar-item {
+        white-space: normal !important;
+        width: 100%;
+        padding: .7rem .8rem !important;
+        font-size: .85rem !important;
+        margin-bottom: 2px !important;
+        flex: none !important;
+    }
+    /* v4.35.0: compact single-line mobile header (≈56px).
+     * The old override (max-height:none) let wrapped items grow the header
+     * to half the screen. Now: one slim row = hamburger | logo+title | user. */
+    header.navbar {
+        display: grid !important;
+        /* v4.67.0: هدر حالا ۲ فرزند دارد — گروه (☰+لوگو+نام) و گروه کاربر */
+        grid-template-columns: minmax(0, 1fr) auto !important;
+        align-items: center !important;
+        gap: .5rem !important;
+        height: 56px !important;
+        min-height: 56px !important;
+        max-height: 56px !important;
+        padding: 0 .7rem !important;
+        overflow: visible !important; /* keep the user dropdown visible */
+        flex-wrap: nowrap !important;
+    }
+    /* middle group: logo + school name in ONE line */
+    header.navbar > .flex.items-center:first-of-type {
+        min-width: 0 !important;
+        gap: .5rem !important;
+        flex-wrap: nowrap !important;
+        overflow: hidden !important;
+    }
+    header.navbar img { height: 32px !important; width: 32px !important; flex: none; }
+    header.navbar h1 {
+        font-size: .95rem !important;
+        margin: 0 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        line-height: 1.4 !important;
+    }
+    /* hide the panel-type subtitle under the title */
+    header.navbar h1 + span.text-xs { display: none !important; }
+    /* hide the long date text */
+    header.navbar span.text-sm.font-medium { display: none !important; }
+    /* trailing group: compact icon-only user button */
+    header.navbar > .flex.items-center:last-child {
+        gap: .35rem !important;
+        flex-wrap: nowrap !important;
+        justify-content: flex-end !important;
+    }
+    header.navbar .user-menu-btn {
+        padding: .4rem .55rem !important;
+        font-size: 0 !important;
+        line-height: 1 !important;
+    }
+    header.navbar .user-menu-btn::before { content: '👤'; font-size: 1.05rem; }
+    header.navbar .user-menu-dropdown { position: fixed; top: 60px; left: 8px; right: 8px; width: auto; min-width: 0; }
+    header.navbar .hamburger-btn { padding: .4rem .6rem !important; font-size: 1rem !important; }
+    /* app shell heights follow the 56px header */
+    body > .flex { height: calc(100vh - 56px) !important; height: calc(100dvh - 56px) !important; }
+    main.flex-1 { height: auto !important; min-height: 0 !important; flex: 1 1 auto !important; width: 100% !important; }
+    /* dark overlay closes the drawer on tap (needs pointer events) */
+    body.sidebar-open::after { pointer-events: auto !important; }
+}
+
+/* Mobile — refined drawer + sticky topbar */
+@media (max-width: 900px) {
+    .sidebar {
+        border-radius: 0 var(--radius-xl) var(--radius-xl) 0 !important;
+        box-shadow: var(--shadow-lg) !important;
+    }
+    body.sidebar-open::after { -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); background: rgba(16,24,40,.45) !important; }
+    .hamburger-btn { border-radius: 10px !important; box-shadow: var(--shadow-xs); }
+    .table-container { border-radius: var(--radius-md) !important; }
+    /* horizontal scroll affordance */
+    .table-container { background:
+        linear-gradient(to left, var(--bg-card) 30%, transparent),
+        linear-gradient(to right, var(--bg-card) 30%, transparent) 100% 0,
+        radial-gradient(farthest-side at 100% 50%, rgba(16,24,40,.14), transparent),
+        radial-gradient(farthest-side at 0% 50%, rgba(16,24,40,.14), transparent) 100% 0;
+        background-repeat: no-repeat; background-size: 60px 100%, 60px 100%, 18px 100%, 18px 100%;
+        background-attachment: local, local, scroll, scroll;
+    }
+}
+
+@media (max-width: 640px) {
+    .card { padding: .8rem !important; }
+    .modal-card { width: 96vw !important; border-radius: var(--radius-md) !important; }
+    .wizard-step { font-size: .7rem !important; padding: .4rem .2rem !important; }
+    .flash-message { font-size: 12px !important; }
+    .page-hero { border-radius: var(--radius-md) !important; }
+    .ui-backtop { bottom: 12px; left: 12px; width: 36px; height: 36px; }
+}
+
+/* ---------- 20) Accessibility & motion ---------- */
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+.btn:focus-visible, .form-input:focus-visible, .form-select:focus-visible { outline: none; }
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    html { scroll-behavior: auto; }
+}
+
+/* ---------- 21) Auth / Login pages (v4.32.0 — split-screen redesign) ---------- */
+body.auth-page main.flex-1 {
+    position: relative;
+    background:
+        radial-gradient(900px 600px at 110% -20%, color-mix(in srgb, var(--primary) 32%, transparent), transparent 55%),
+        radial-gradient(800px 550px at -15% 115%, rgba(14, 165, 233, 0.28), transparent 55%),
+        linear-gradient(140deg, #0f1330, #171d45 45%, #1b2258);
+    overflow-y: auto !important;
+}
+body.auth-page main.flex-1::before {
+    content: '';
+    position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1.4px);
+    background-size: 26px 26px;
+    mask-image: radial-gradient(70% 70% at 50% 40%, #000 0%, transparent 100%);
+    -webkit-mask-image: radial-gradient(70% 70% at 50% 40%, #000 0%, transparent 100%);
+}
+
+.auth-wrap {
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+}
+.auth-card {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #ffffff;
+    box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    animation: uiFadeUp .5s var(--ease) both;
+    padding: 0;
+    border: 0;
+}
+
+/* Brand side (right in RTL) */
+.auth-brand {
+    position: relative;
+    padding: 2.4rem 1.8rem;
+    color: #fff;
+    background:
+        radial-gradient(420px 300px at 90% -10%, rgba(255,255,255,0.16), transparent 60%),
+        radial-gradient(300px 260px at 0% 110%, rgba(0,0,0,0.25), transparent 60%),
+        linear-gradient(155deg, var(--primary), color-mix(in srgb, var(--primary) 55%, #7c3aed) 55%, color-mix(in srgb, var(--primary) 40%, #0ea5e9));
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1rem;
+    overflow: hidden;
+}
+.auth-brand::after {
+    content: '';
+    position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,0.15) 1px, transparent 1.4px);
+    background-size: 22px 22px;
+    opacity: .5;
+}
+.auth-brand > * { position: relative; z-index: 1; }
+.auth-logo {
+    width: 76px; height: 76px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 34px;
+    box-shadow: 0 14px 30px -12px rgba(0,0,0,.4);
+}
+.auth-logo img { width: 100%; height: 100%; object-fit: cover; border-radius: 20px; }
+.auth-brand-title { font-size: 1.3rem; font-weight: 900; line-height: 1.7; letter-spacing: -0.01em; }
+.auth-brand-sub { font-size: .74rem; opacity: .85; line-height: 2; }
+.auth-brand-features { display: flex; flex-direction: column; gap: .55rem; margin-top: .5rem; }
+.auth-feature {
+    display: flex; align-items: center; gap: .6rem;
+    font-size: .72rem; font-weight: 600;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 12px;
+    padding: .55rem .8rem;
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+}
+.auth-feature .fi { font-size: 1rem; }
+
+/* Form side */
+.auth-form-side { padding: 2.2rem 2.2rem 1.6rem; display: flex; flex-direction: column; }
+.auth-form-title { font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin-bottom: .2rem; }
+.auth-form-sub { font-size: .72rem; color: var(--text-muted); margin-bottom: 1.1rem; }
+
+/* Segmented tabs */
+.auth-tabs {
+    display: flex; gap: 4px;
+    background: #eef0f7;
+    border-radius: 13px;
+    padding: 4px;
+    margin-bottom: 1.25rem;
+}
+.auth-tab {
+    flex: 1; border: 0; cursor: pointer; background: transparent;
+    padding: .6rem .3rem; border-radius: 10px;
+    font-size: .73rem; font-weight: 700; color: var(--text-muted);
+    font-family: inherit;
+    transition: background .18s var(--ease), color .18s var(--ease), box-shadow .18s var(--ease), transform .18s var(--ease);
+    white-space: nowrap;
+}
+.auth-tab:hover { color: var(--text-main); }
+.auth-tab.active {
+    background: #fff; color: var(--primary);
+    box-shadow: 0 2px 8px rgba(16, 24, 40, 0.12);
+}
+
+/* Fields with leading icon */
+.auth-field { margin-bottom: .95rem; }
+.auth-field > label { display: block; font-size: .72rem; font-weight: 700; color: #475467; margin-bottom: .35rem; }
+.auth-input-wrap { position: relative; }
+.auth-input-wrap .auth-icon {
+    position: absolute; inset-inline-start: .8rem; top: 50%; transform: translateY(-50%);
+    font-size: .95rem; opacity: .5; pointer-events: none;
+}
+.auth-input-wrap .form-input { padding-inline-start: 2.4rem !important; min-height: 44px; font-size: .92rem; border-radius: 12px !important; }
+.auth-input-wrap .form-select { min-height: 44px; border-radius: 12px !important; }
+.auth-input-wrap .auth-eye {
+    position: absolute; inset-inline-end: .5rem; top: 50%; transform: translateY(-50%);
+    border: 0; background: transparent; cursor: pointer; font-size: 1rem; opacity: .5;
+    padding: .35rem; border-radius: 8px; line-height: 1;
+    transition: opacity .15s var(--ease), background .15s var(--ease);
+}
+.auth-input-wrap .auth-eye:hover { opacity: 1; background: var(--primary-soft); }
+
+/* Captcha box */
+.auth-captcha {
+    display: flex; align-items: center; gap: .7rem;
+    background: #f7f8fd;
+    border: 1.5px dashed color-mix(in srgb, var(--primary) 35%, var(--border-color));
+    border-radius: 12px;
+    padding: .65rem .8rem;
+    margin-bottom: 1.15rem;
+}
+.auth-captcha .auth-captcha-q {
+    font-family: monospace; font-size: 1.05rem; font-weight: 800;
+    color: var(--primary);
+    background: #fff; border: 1px solid var(--border-color); border-radius: 8px;
+    padding: .35rem .7rem; white-space: nowrap; letter-spacing: .05em;
+    user-select: none;
+}
+.auth-captcha .form-input { flex: 1; min-height: 40px; text-align: center; font-family: monospace; }
+.auth-captcha .auth-captcha-label { font-size: .68rem; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
+
+.auth-submit { width: 100%; min-height: 48px; font-size: .95rem !important; font-weight: 800 !important; border-radius: 13px !important; }
+.auth-foot { text-align: center; margin-top: auto; padding-top: 1.1rem; }
+.auth-foot a { font-size: .72rem; color: var(--text-muted); font-weight: 700; text-decoration: none; transition: color .15s var(--ease); }
+.auth-foot a:hover { color: var(--primary); }
+
+.auth-panel { animation: uiFadeUp .3s var(--ease) both; }
+
+/* Responsive: brand becomes compact header band */
+@media (max-width: 860px) {
+    .auth-wrap { max-width: 480px; }
+    .auth-card { grid-template-columns: 1fr; border-radius: 20px; }
+    .auth-brand { padding: 1.5rem 1.4rem; flex-direction: row; align-items: center; gap: .9rem; justify-content: flex-start; }
+    .auth-logo { width: 54px; height: 54px; border-radius: 14px; font-size: 24px; flex-shrink: 0; }
+    .auth-logo img { border-radius: 14px; }
+    .auth-brand-title { font-size: 1rem; }
+    .auth-brand-sub { font-size: .66rem; }
+    .auth-brand-features { display: none; }
+    .auth-form-side { padding: 1.5rem 1.2rem 1.2rem; }
+}
+@media (max-width: 480px) {
+    .auth-tab { font-size: .66rem; padding: .55rem .15rem; }
+    .auth-captcha { flex-wrap: wrap; }
+    .auth-card { border-radius: 16px; }
+}
+
+/* ---------- 22) Print unchanged ---------- */
+@media print {
+    .ui-loading-bar, .ui-backtop { display: none !important; }
+    body { background: #fff !important; }
+}
+
+
+/* ---------- 23) v4.37.0 fixes ---------- */
+/* (3) Breathing room at the end of the main scroll area so the footer/last
+ * rows are never clipped on desktop & tablet. */
+main.flex-1 { padding-bottom: 3.5rem !important; scroll-padding-bottom: 3.5rem; }
+main.flex-1 > :last-child { margin-bottom: 1.5rem; }
+/* keep inner table scroller from eating the page end */
+.table-container { max-height: min(58vh, 580px) !important; }
+@media print { main.flex-1 { padding-bottom: 0 !important; } }
+
+/* (1) Mobile: hide per-row main buttons — everything lives in the ⋮ menu */
+@media (max-width: 900px) {
+    .row-act-main { display: none !important; }
+    .row-menu-btn { padding: .5rem .8rem !important; font-size: 1.05rem !important; }
+}
+
+/* ---------- 24) v4.41.0 fixes ---------- */
+/* (a) Sidebar section collapse: must beat `.sidebar-item{display:flex!important}`
+   from section 4, otherwise clicking a section title hides nothing. */
+.sidebar-item.menu-collapsed { display: none !important; }
+.sidebar-section-title { cursor: pointer; user-select: none; }
+.sidebar-section-title::after { transition: transform .2s var(--ease); display: inline-block; }
+.sidebar-section-title.collapsed::after { transform: rotate(-90deg); }
+
+/* (b) v4.42.0 — User dropdown: SIMPLE & BULLETPROOF.
+   v4.41.0 moved the desktop dropdown to position:fixed; combined with the
+   navbar's backdrop-filter (which becomes the containing block for fixed
+   descendants) this could break opening entirely on some browsers.
+   Rollback: dropdown stays position:absolute inside .user-menu-wrap exactly
+   like the original design, and we only lift the header stacking order. */
+
+/* Header must sit above ALL page content (hover tooltip = 2000).
+   Kept below the mobile drawer (3000) and modals. */
+header.navbar {
+    position: relative !important;
+    z-index: 2500 !important;
+    /* backdrop-filter creates containing-block traps for fixed children —
+       remove it; the header background is opaque enough without blur. */
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    /* v4.43.0 — ROOT CAUSE FIX (found by user):
+       the <header> itself has the `flex` class and is a direct child of
+       <body>, so style.css's `body > .flex { overflow: hidden }` (meant for
+       the layout wrapper) ALSO clips the header — cutting off the dropdown
+       that hangs below the header edge. Only the header is released here;
+       the layout wrapper keeps overflow:hidden so the desktop-app layout
+       (internal pane scrolling) is untouched. */
+    overflow: visible !important;
+}
+.user-menu-wrap { position: relative !important; }
+
+/* Base state — same geometry as the original style.css design */
+.user-menu-dropdown {
+    position: absolute !important;
+    top: calc(100% + 8px) !important;
+    left: 0 !important;
+    right: auto !important;
+    min-width: 220px;
+    z-index: 6000 !important;
+    animation: none !important;      /* no fade tricks — reliability first */
+}
+
+/* OPEN state — guaranteed to win against anything else */
+body.user-menu-open .user-menu-dropdown {
+    display: flex !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    pointer-events: auto !important;
+}
+
+/* Mobile: full-width panel fixed right under the 56px header (as in v4.35) */
+@media (max-width: 900px) {
+    header.navbar .user-menu-dropdown {
+        position: fixed !important;
+        top: 60px !important;
+        left: 8px !important;
+        right: 8px !important;
+        width: auto !important;
+        min-width: 0 !important;
+        z-index: 6000 !important;
+    }
+}
+
+/* ============================================================
+ * v4.66.0 — Collapsible sidebar on DESKTOP & TABLET (all panels,
+ * all roles: admin / teacher / student / deputy / counselor…).
+ * The same ☰ button that opens the mobile drawer now, above 900px,
+ * toggles body.sidebar-collapsed to slide the sidebar away so the
+ * user can focus on the page content. State persists (localStorage).
+ * ============================================================ */
+@media (min-width: 901px) {
+    /* style.css hides .hamburger-btn on desktop — bring it back as the collapse toggle */
+    header.navbar .hamburger-btn {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        border-radius: 10px !important;
+        box-shadow: var(--shadow-xs);
+        transition: background .15s ease, transform .15s ease;
+    }
+    header.navbar .hamburger-btn:hover { transform: scale(1.06); }
+    body.sidebar-collapsed header.navbar .hamburger-btn { background: var(--primary) !important; color: #fff !important; border-color: var(--primary) !important; }
+
+    .sidebar {
+        transition: width .25s ease, min-width .25s ease, padding .25s ease, opacity .18s ease, border .25s ease;
+    }
+    body.sidebar-collapsed .sidebar {
+        width: 0 !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        border-left-width: 0 !important;
+        border-right-width: 0 !important;
+        overflow: hidden !important;
+        opacity: 0;
+        pointer-events: none;
+    }
+}
