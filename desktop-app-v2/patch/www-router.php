@@ -1,6 +1,7 @@
 <?php
 // File: router.php — PHP built-in server router for SchoolDesk Pro.
 // Serves static assets directly and routes everything else like Apache would.
+require __DIR__ . '/desk-prepend.php'; // session/cookie self-healing (desktop only)
 $uri = urldecode(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
 $file = __DIR__ . $uri;
 

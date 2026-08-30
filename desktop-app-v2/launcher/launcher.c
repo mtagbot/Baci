@@ -112,14 +112,26 @@ static int find_browser(char *out, DWORD outsz) {
 
 /* launch browser in app mode; returns process handle (or NULL) */
 static HANDLE launch_app_window(const char *browser, const char *url) {
+  /* profile dir: app folder when writable, %TEMP% otherwise */
+  char prof[MAX_PATH * 2];
+  snprintf(prof, sizeof(prof), "%s\\data\\browser-profile", g_dir);
+  CreateDirectoryA(prof, NULL);
+  DWORD attrs = GetFileAttributesA(prof);
+  if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+    char tmp[MAX_PATH];
+    if (GetTempPathA(sizeof(tmp), tmp) > 0) {
+      snprintf(prof, sizeof(prof), "%sSchoolDeskPro-profile", tmp);
+      CreateDirectoryA(prof, NULL);
+    }
+  }
   char cmd[MAX_PATH * 4];
   snprintf(cmd, sizeof(cmd),
            "\"%s\" --app=%s "
-           "--user-data-dir=\"%s\\data\\browser-profile\" "
+           "--user-data-dir=\"%s\" "
            "--no-first-run --no-default-browser-check --disable-sync "
            "--disable-features=Translate,msImplicitSignin "
            "--window-size=1280,860",
-           browser, url, g_dir);
+           browser, url, prof);
   STARTUPINFOA si;
   PROCESS_INFORMATION pi;
   memset(&si, 0, sizeof(si));
