@@ -2,326 +2,346 @@
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
 <title>SchoolDesk — پنل مدیریت مدرسه</title>
 <style>
-@font-face{font-family:'Vazirmatn';src:url('/fonts/vazir.woff2') format('woff2');font-weight:400;font-display:swap}
-@font-face{font-family:'Vazirmatn';src:url('/fonts/vazir-bold.woff2') format('woff2');font-weight:700;font-display:swap}
-:root{
-  --bg:#f1f5f9;--card:#ffffff;--line:#e2e8f0;--txt:#0f172a;--muted:#64748b;
-  --pri:#4f46e5;--pri2:#6d28d9;--ok:#059669;--warn:#d97706;--bad:#dc2626;
-  --r:14px;--sh:0 1px 3px rgba(15,23,42,.08),0 8px 24px -12px rgba(15,23,42,.18);
-}
+@font-face{font-family:'Vazirmatn';src:url('/fonts/vazir.woff') format('woff');font-weight:normal}
+@font-face{font-family:'Vazirmatn';src:url('/fonts/vazir-bold.woff') format('woff');font-weight:bold}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
-body{font-family:'Vazirmatn',Tahoma,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+body{font-family:'Vazirmatn',Tahoma,sans-serif;background:#eef1f6;color:#0f172a;font-size:14px;overflow:hidden}
 button,input,select{font-family:inherit;font-size:inherit}
+::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:#c7cdd8;border-radius:6px}
 
-/* layout */
 .app{display:flex;height:100vh;overflow:hidden}
-.side{width:228px;flex-shrink:0;background:linear-gradient(180deg,#1e1b4b,#312e81);color:#e0e7ff;display:flex;flex-direction:column;padding:18px 12px}
-.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:14px}
-.logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#818cf8,#c084fc);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px;color:#fff;box-shadow:0 4px 14px -4px rgba(129,140,248,.7)}
+.side{width:230px;background:#232059;background:linear-gradient(180deg,#1e1b4b,#312e81);color:#e0e7ff;display:flex;flex-direction:column;padding:16px 12px;flex-shrink:0}
+.brand{padding:4px 8px 16px;border-bottom:1px solid rgba(255,255,255,.14);margin-bottom:12px}
+.brand table{border-collapse:collapse}
+.logo{width:38px;height:38px;border-radius:11px;background:#818cf8;background:linear-gradient(135deg,#818cf8,#c084fc);text-align:center;line-height:38px;font-weight:bold;font-size:17px;color:#fff}
 .brand b{font-size:15px;display:block}
-.brand small{font-size:10.5px;opacity:.65}
-.nav{flex:1;display:flex;flex-direction:column;gap:3px}
-.nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:right;background:none;border:0;color:#c7d2fe;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:13.5px;transition:background .15s}
+.brand small{font-size:10.5px;color:#c7d2fe}
+.nav{flex:1 1 auto;overflow-y:auto}
+.nav button{display:block;width:100%;text-align:right;background:none;border:0;color:#c7d2fe;padding:10px 12px;border-radius:9px;cursor:pointer;font-size:13.5px;margin-bottom:3px}
 .nav button:hover{background:rgba(255,255,255,.08)}
-.nav button.on{background:rgba(255,255,255,.14);color:#fff;font-weight:700}
-.nav svg{width:18px;height:18px;flex-shrink:0}
-.sidefoot{font-size:10.5px;opacity:.55;padding:10px 8px 0;border-top:1px solid rgba(255,255,255,.12)}
+.nav button.on{background:rgba(255,255,255,.16);color:#fff;font-weight:bold}
+.nav .ic{display:inline-block;width:20px;text-align:center;margin-left:8px;font-family:'Segoe UI Symbol','Vazirmatn',sans-serif}
+.sidefoot{font-size:10.5px;color:#a5b4fc;padding:10px 8px 0;border-top:1px solid rgba(255,255,255,.14)}
 
-.main{flex:1;display:flex;flex-direction:column;min-width:0}
-.top{background:var(--card);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:14px}
-.top h1{font-size:16.5px}
-.top .sub{font-size:11.5px;color:var(--muted)}
-.spacer{flex:1}
-.syncpill{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:12px;cursor:pointer;user-select:none}
-.dot{width:9px;height:9px;border-radius:50%;background:#94a3b8;flex-shrink:0}
-.dot.ok{background:var(--ok);box-shadow:0 0 0 4px rgba(5,150,105,.15)}
-.dot.off{background:var(--warn);box-shadow:0 0 0 4px rgba(217,119,6,.15)}
-.dot.sync{background:var(--pri);animation:pulse 1s infinite}
-@keyframes pulse{50%{opacity:.35}}
-.content{flex:1;overflow:auto;padding:22px}
+.main{flex:1 1 auto;display:flex;flex-direction:column;min-width:0}
+.top{background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 22px;position:relative}
+.top h1{font-size:16.5px;display:inline-block}
+.top .sub{font-size:11.5px;color:#64748b}
+.syncpill{position:absolute;left:22px;top:14px;background:#eef1f6;border:1px solid #e2e8f0;border-radius:999px;padding:6px 14px;font-size:12px;cursor:pointer}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#94a3b8;margin-left:7px;vertical-align:middle}
+.dot.ok{background:#059669}
+.dot.off{background:#d97706}
+.dot.sync{background:#4f46e5}
+.content{flex:1 1 auto;overflow:auto;padding:20px 22px}
 
-/* cards & stats */
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:20px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);position:relative;overflow:hidden}
-.stat::after{content:'';position:absolute;inset-inline-start:0;top:0;bottom:0;width:4px;background:var(--pri)}
-.stat.c2::after{background:var(--pri2)} .stat.c3::after{background:var(--ok)} .stat.c4::after{background:var(--warn)}
-.stat b{font-size:26px;display:block;margin-top:2px}
-.stat span{font-size:12px;color:var(--muted)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:18px;margin-bottom:18px}
+.stats{margin:-7px -7px 13px}
+.stats:after{content:"";display:table;clear:both}
+.stat{float:right;width:24%;min-width:170px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:15px 18px;margin:7px .5%;border-right:4px solid #4f46e5;box-shadow:0 1px 3px rgba(15,23,42,.07)}
+.stat.c2{border-right-color:#7c3aed}.stat.c3{border-right-color:#059669}.stat.c4{border-right-color:#d97706}
+.stat b{font-size:25px;display:block;margin-top:2px}
+.stat span{font-size:12px;color:#64748b}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 1px 3px rgba(15,23,42,.07);padding:18px;margin-bottom:16px}
 .card h3{font-size:14.5px;margin-bottom:12px}
+.card.tbl{padding:2px 8px}
 
-/* table */
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{font-size:11.5px;color:var(--muted);text-align:right;padding:8px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
-td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
-tr:hover td{background:#f8fafc}
-.empty{color:var(--muted);text-align:center;padding:34px 0;font-size:13px}
+table.g{width:100%;border-collapse:collapse;font-size:13px}
+.g th{font-size:11.5px;color:#64748b;text-align:right;padding:9px 10px;border-bottom:2px solid #e2e8f0;white-space:nowrap}
+.g td{padding:8px 10px;border-bottom:1px solid #eef1f6;vertical-align:middle}
+.g tr:hover td{background:#f8fafc}
+.empty{color:#64748b;text-align:center;padding:32px 0;font-size:13px}
 
-/* controls */
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
-.in{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 12px;min-width:130px;outline:none;transition:border .15s, box-shadow .15s}
-.in:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
-.btn{border:0;border-radius:10px;padding:9px 16px;cursor:pointer;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:7px;transition:filter .15s;color:#fff;background:var(--pri)}
-.btn:hover{filter:brightness(1.08)}
-.btn.gray{background:#e2e8f0;color:var(--txt)}
-.btn.green{background:var(--ok)} .btn.red{background:var(--bad)} .btn.ghost{background:none;color:var(--pri);border:1.5px solid var(--pri)}
-.btn.sm{padding:5px 11px;font-size:12px;border-radius:8px}
-.badge{display:inline-block;border-radius:999px;padding:2.5px 10px;font-size:11px;font-weight:700}
-.badge.g{background:#d1fae5;color:#065f46}.badge.o{background:#fef3c7;color:#92400e}.badge.r{background:#fee2e2;color:#991b1b}.badge.b{background:#e0e7ff;color:#3730a3}
+.row{margin-bottom:13px}
+.row:after{content:"";display:table;clear:both}
+.row .it{float:right;margin-left:10px;margin-bottom:6px}
+.row .left{float:left;margin-left:0}
+.in{border:1px solid #d7dde8;background:#fff;border-radius:9px;padding:8px 12px;min-width:120px;outline:none}
+.in:focus{border-color:#4f46e5}
+.btn{border:0;border-radius:9px;padding:9px 16px;cursor:pointer;font-weight:bold;font-size:13px;color:#fff;background:#4f46e5}
+.btn:hover{background:#4338ca}
+.btn.gray{background:#e2e8f0;color:#0f172a}.btn.gray:hover{background:#d3dae5}
+.btn.green{background:#059669}.btn.green:hover{background:#047857}
+.btn.red{background:#dc2626}.btn.red:hover{background:#b91c1c}
+.btn.amber{background:#d97706}.btn.amber:hover{background:#b45309}
+.btn.ghost{background:none;color:#4f46e5;border:1.5px solid #4f46e5}
+.btn.sm{padding:4px 10px;font-size:12px;border-radius:7px}
+.badge{display:inline-block;border-radius:999px;padding:2.5px 10px;font-size:11px;font-weight:bold}
+.badge.g{background:#d1fae5;color:#065f46}.badge.o{background:#fef3c7;color:#92400e}
+.badge.r{background:#fee2e2;color:#991b1b}.badge.b{background:#e0e7ff;color:#3730a3}
+.badge.s{background:#f1f5f9;color:#64748b}
 
-/* modal */
-.overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(2px)}
-.overlay.show{display:flex}
-.modal{background:#fff;border-radius:16px;box-shadow:0 24px 60px -12px rgba(15,23,42,.4);width:min(560px,92vw);max-height:88vh;overflow:auto;padding:22px;animation:up .18s ease}
-@keyframes up{from{transform:translateY(14px);opacity:0}}
-.modal h3{margin-bottom:16px;font-size:15.5px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.f label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:5px}
+.overlay{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(15,23,42,.45);display:none;z-index:50}
+.overlay.show{display:block}
+.modal{background:#fff;border-radius:15px;box-shadow:0 24px 60px rgba(15,23,42,.4);width:560px;max-width:92%;max-height:86%;overflow:auto;padding:22px;margin:6% auto 0}
+.modal h3{margin-bottom:14px;font-size:15.5px}
+.grid2{margin:-6px}
+.grid2:after{content:"";display:table;clear:both}
+.grid2 .f{float:right;width:50%;padding:6px}
+.grid2 .f.w100{width:100%}
+.f label{display:block;font-size:11.5px;font-weight:bold;color:#64748b;margin-bottom:5px}
 .f .in{width:100%}
-.mfoot{display:flex;gap:10px;justify-content:flex-start;margin-top:18px}
+.mfoot{margin-top:16px}
+.mfoot .btn{margin-left:8px}
 
-/* toast */
-#toast{position:fixed;bottom:22px;right:50%;transform:translateX(50%);background:#0f172a;color:#fff;padding:11px 22px;border-radius:12px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:99;box-shadow:var(--sh)}
-#toast.show{opacity:1}
+#toast{position:fixed;bottom:22px;right:50%;margin-right:-140px;width:280px;text-align:center;background:#0f172a;color:#fff;padding:11px 18px;border-radius:11px;font-size:13px;display:none;z-index:99}
+.hide{display:none}
+.note{font-size:12px;color:#64748b;line-height:2}
+.qerr{color:#dc2626;font-size:11px}
+.ltr{direction:ltr;text-align:left}
+.mono{font-family:Consolas,monospace}
 
-.hide{display:none!important}
-.note{font-size:12px;color:var(--muted);line-height:1.9}
-.qerr{color:var(--bad);font-size:11px}
-@media(max-width:760px){.side{width:64px}.side b,.side small,.side .nav span,.sidefoot{display:none}.brand{justify-content:center}}
+@media print{
+  .side,.top,.row,.noprint{display:none!important}
+  body{overflow:visible;background:#fff}
+  .app,.main,.content{display:block;height:auto;overflow:visible}
+  .card{border:none;box-shadow:none}
+}
 </style>
 </head>
 <body>
 <div class="app">
-  <aside class="side">
+  <div class="side noprint">
     <div class="brand">
-      <div class="logo">م</div>
-      <div><b>SchoolDesk</b><small id="brandSchool">پنل مدیریت مدرسه</small></div>
+      <table><tr><td><div class="logo">م</div></td><td style="padding-right:10px"><b>SchoolDesk</b><small id="brandSchool">پنل مدیریت مدرسه</small></td></tr></table>
     </div>
-    <nav class="nav" id="nav">
-      <button data-v="dash" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>داشبورد</span></button>
-      <button data-v="students"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>دانش‌آموزان</span></button>
-      <button data-v="classes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg><span>کلاس‌ها</span></button>
-      <button data-v="teachers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg><span>دبیران</span></button>
-      <button data-v="queue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg><span>صف همگام‌سازی</span><span id="qbadge" class="badge o hide" style="margin-inline-start:auto">0</span></button>
-      <button data-v="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>تنظیمات اتصال</span></button>
-    </nav>
-    <div class="sidefoot">نسخه <span id="ver">—</span> · پورتابل<br>ذخیره‌سازی محلی + همگام‌سازی خودکار</div>
-  </aside>
+    <div class="nav" id="nav">
+      <button data-v="dash" class="on"><span class="ic">◈</span>داشبورد</button>
+      <button data-v="students"><span class="ic">◉</span>دانش‌آموزان</button>
+      <button data-v="classes"><span class="ic">▦</span>کلاس‌ها</button>
+      <button data-v="teachers"><span class="ic">✎</span>دبیران</button>
+      <button data-v="attendance"><span class="ic">✓</span>حضور و غیاب</button>
+      <button data-v="attreport"><span class="ic">▤</span>گزارش حضور</button>
+      <button data-v="queue"><span class="ic">⇄</span>صف همگام‌سازی <span id="qbadge" class="badge o hide">0</span></button>
+      <button data-v="settings"><span class="ic">⚙</span>تنظیمات اتصال</button>
+    </div>
+    <div class="sidefoot">نسخه <span id="ver">—</span> · پورتابل<br>ذخیره محلی + همگام‌سازی خودکار</div>
+  </div>
 
   <div class="main">
-    <div class="top">
-      <div>
-        <h1 id="pageTitle">داشبورد</h1>
-        <div class="sub" id="pageSub">نمای کلی اطلاعات مدرسه</div>
-      </div>
-      <div class="spacer"></div>
-      <div class="syncpill" id="syncPill" title="برای همگام‌سازی فوری کلیک کنید">
-        <span class="dot" id="syncDot"></span><span id="syncTxt">در حال بررسی...</span>
-      </div>
+    <div class="top noprint">
+      <h1 id="pageTitle">داشبورد</h1>
+      <div class="sub" id="pageSub">نمای کلی اطلاعات مدرسه</div>
+      <div class="syncpill" id="syncPill" title="کلیک = همگام‌سازی فوری"><span class="dot" id="syncDot"></span><span id="syncTxt">در حال بررسی...</span></div>
     </div>
 
     <div class="content">
       <!-- dashboard -->
-      <section id="v-dash">
+      <div id="v-dash">
         <div class="stats">
           <div class="stat"><span>دانش‌آموزان فعال</span><b id="stStudents">—</b></div>
           <div class="stat c2"><span>کلاس‌ها</span><b id="stClasses">—</b></div>
-          <div class="stat c3"><span>دبیران</span><b id="stTeachers">—</b></div>
-          <div class="stat c4"><span>تغییرات در صف ارسال</span><b id="stQueue">—</b></div>
+          <div class="stat c3"><span>حاضرین امروز</span><b id="stPresent">—</b></div>
+          <div class="stat c4"><span>تغییرات در صف</span><b id="stQueue">—</b></div>
         </div>
-        <div class="card">
-          <h3>وضعیت سامانه</h3>
-          <div class="note" id="dashNote">در حال بارگذاری...</div>
-        </div>
+        <div class="card"><h3>وضعیت سامانه</h3><div class="note" id="dashNote">در حال بارگذاری...</div></div>
         <div class="card" id="firstRun">
           <h3>شروع سریع</h3>
-          <div class="note">
-            ۱) از منوی «تنظیمات اتصال»، آدرس سایت مدرسه و نام کاربری/رمز مدیر را وارد کنید.<br>
-            ۲) نرم‌افزار به‌صورت خودکار داده‌ها را دریافت و هر ۳۰ ثانیه همگام‌سازی می‌کند.<br>
-            ۳) بدون اینترنت هم می‌توانید کار کنید — همه تغییرات در صف نگه‌داری و بعداً ارسال می‌شوند.
-          </div>
+          <div class="note">۱) از منوی «تنظیمات اتصال»، آدرس سایت مدرسه و نام کاربری/رمز مدیر را وارد کنید.<br>
+          ۲) نرم‌افزار خودکار داده‌ها را دریافت و هر ۳۰ ثانیه همگام‌سازی می‌کند.<br>
+          ۳) بدون اینترنت هم کار کنید — تغییرات در صف نگه‌داری و بعداً ارسال می‌شوند.<br>
+          ۴) بستن پنجره برنامه را نمی‌بندد؛ از کنار ساعت (Tray) دوباره باز یا خارج شوید.</div>
         </div>
-      </section>
+      </div>
 
       <!-- students -->
-      <section id="v-students" class="hide">
+      <div id="v-students" class="hide">
         <div class="row">
-          <input class="in" id="stuSearch" placeholder="جستجو: نام، نام خانوادگی یا کد ملی" style="flex:1;min-width:200px">
-          <select class="in" id="stuClassFilter"><option value="">همه کلاس‌ها</option></select>
-          <button class="btn" onclick="openStudent()">افزودن دانش‌آموز</button>
+          <span class="it"><input class="in" id="stuSearch" placeholder="جستجو: نام یا کد ملی" style="width:230px"></span>
+          <span class="it"><select class="in" id="stuClassFilter"><option value="">همه کلاس‌ها</option></select></span>
+          <span class="it left"><button class="btn" onclick="openStudent()">افزودن دانش‌آموز</button></span>
         </div>
-        <div class="card" style="padding:0 6px">
-          <table>
-            <thead><tr><th>#</th><th>نام و نام خانوادگی</th><th>کد ملی</th><th>نام پدر</th><th>پایه</th><th>کلاس</th><th>تلفن</th><th></th></tr></thead>
-            <tbody id="stuBody"></tbody>
-          </table>
+        <div class="card tbl">
+          <table class="g"><thead><tr><th>#</th><th>نام و نام خانوادگی</th><th>کد ملی</th><th>نام پدر</th><th>پایه</th><th>کلاس</th><th>تلفن</th><th></th></tr></thead><tbody id="stuBody"></tbody></table>
           <div class="empty hide" id="stuEmpty">دانش‌آموزی یافت نشد</div>
         </div>
-      </section>
+      </div>
 
       <!-- classes -->
-      <section id="v-classes" class="hide">
-        <div class="row">
-          <div class="spacer"></div>
-          <button class="btn" onclick="openClass()">افزودن کلاس</button>
-        </div>
-        <div class="card" style="padding:0 6px">
-          <table>
-            <thead><tr><th>#</th><th>نام کلاس</th><th>پایه</th><th>سال تحصیلی</th><th>تعداد دانش‌آموز</th><th></th></tr></thead>
-            <tbody id="clsBody"></tbody>
-          </table>
+      <div id="v-classes" class="hide">
+        <div class="row"><span class="it left"><button class="btn" onclick="openClass()">افزودن کلاس</button></span></div>
+        <div class="card tbl">
+          <table class="g"><thead><tr><th>#</th><th>نام کلاس</th><th>پایه</th><th>سال تحصیلی</th><th>تعداد دانش‌آموز</th><th></th></tr></thead><tbody id="clsBody"></tbody></table>
           <div class="empty hide" id="clsEmpty">کلاسی ثبت نشده است</div>
         </div>
-      </section>
+      </div>
 
       <!-- teachers -->
-      <section id="v-teachers" class="hide">
+      <div id="v-teachers" class="hide">
         <div class="row">
-          <input class="in" id="tchSearch" placeholder="جستجو: نام یا کد ملی" style="flex:1;min-width:200px">
-          <button class="btn" onclick="openTeacher()">افزودن دبیر</button>
+          <span class="it"><input class="in" id="tchSearch" placeholder="جستجو: نام یا کد ملی" style="width:230px"></span>
+          <span class="it left"><button class="btn" onclick="openTeacher()">افزودن دبیر</button></span>
         </div>
-        <div class="card" style="padding:0 6px">
-          <table>
-            <thead><tr><th>#</th><th>نام و نام خانوادگی</th><th>کد ملی</th><th>کد پرسنلی</th><th>موبایل</th><th></th></tr></thead>
-            <tbody id="tchBody"></tbody>
-          </table>
+        <div class="card tbl">
+          <table class="g"><thead><tr><th>#</th><th>نام و نام خانوادگی</th><th>کد ملی</th><th>کد پرسنلی</th><th>موبایل</th><th></th></tr></thead><tbody id="tchBody"></tbody></table>
           <div class="empty hide" id="tchEmpty">دبیری یافت نشد</div>
         </div>
-      </section>
+      </div>
+
+      <!-- attendance -->
+      <div id="v-attendance" class="hide">
+        <div class="row">
+          <span class="it"><input class="in ltr mono" id="attDate" style="width:120px" placeholder="1404/06/08"></span>
+          <span class="it"><button class="btn gray" onclick="attToday()">امروز</button></span>
+          <span class="it"><select class="in" id="attClassFilter"><option value="">همه کلاس‌ها</option></select></span>
+          <span class="it"><span id="attSummary" class="note"></span></span>
+          <span class="it left"><button class="btn green" onclick="attAllPresent()">همه حاضر</button></span>
+        </div>
+        <div class="card tbl">
+          <table class="g"><thead><tr><th>#</th><th>نام و نام خانوادگی</th><th>کلاس</th><th>وضعیت</th><th>ساعت ثبت</th><th style="width:290px">ثبت</th></tr></thead><tbody id="attBody"></tbody></table>
+          <div class="empty hide" id="attEmpty">دانش‌آموزی یافت نشد</div>
+        </div>
+      </div>
+
+      <!-- attendance report -->
+      <div id="v-attreport" class="hide">
+        <div class="row noprint">
+          <span class="it"><input class="in ltr mono" id="repMonth" style="width:100px" placeholder="1404/06"></span>
+          <span class="it"><select class="in" id="repClassFilter"><option value="">همه کلاس‌ها</option></select></span>
+          <span class="it"><button class="btn" onclick="loadAttReport()">نمایش گزارش</button></span>
+          <span class="it left"><button class="btn gray" onclick="window.print()">چاپ گزارش</button></span>
+        </div>
+        <div class="card">
+          <h3 id="repTitle">گزارش ماهانه حضور و غیاب</h3>
+          <table class="g"><thead><tr><th>#</th><th>نام و نام خانوادگی</th><th>کلاس</th><th>حاضر</th><th>تاخیر</th><th>غایب</th></tr></thead><tbody id="repBody"></tbody></table>
+          <div class="empty hide" id="repEmpty">داده‌ای برای این ماه ثبت نشده است</div>
+        </div>
+      </div>
 
       <!-- queue -->
-      <section id="v-queue" class="hide">
+      <div id="v-queue" class="hide">
         <div class="card">
           <h3>صف همگام‌سازی با سرور</h3>
-          <div class="note" style="margin-bottom:12px">تغییراتی که هنوز به سرور سایت ارسال نشده‌اند اینجا نمایش داده می‌شوند. ارسال به‌صورت خودکار در پس‌زمینه انجام می‌شود؛ نیازی به اقدام شما نیست.</div>
+          <div class="note" style="margin-bottom:10px">تغییراتی که هنوز به سرور نرفته‌اند اینجا هستند. ارسال خودکار در پس‌زمینه انجام می‌شود؛ نیازی به اقدام شما نیست.</div>
           <button class="btn ghost sm" onclick="syncNow()">همگام‌سازی فوری</button>
         </div>
-        <div class="card" style="padding:0 6px">
-          <table>
-            <thead><tr><th>#</th><th>مورد</th><th>عملیات</th><th>زمان ثبت</th><th>تلاش‌ها</th><th>آخرین خطا</th></tr></thead>
-            <tbody id="qBody"></tbody>
-          </table>
+        <div class="card tbl">
+          <table class="g"><thead><tr><th>#</th><th>مورد</th><th>عملیات</th><th>زمان ثبت</th><th>تلاش‌ها</th><th>آخرین خطا</th></tr></thead><tbody id="qBody"></tbody></table>
           <div class="empty hide" id="qEmpty">صف خالی است — همه تغییرات با سرور همگام شده‌اند ✓</div>
         </div>
-      </section>
+      </div>
 
       <!-- settings -->
-      <section id="v-settings" class="hide">
+      <div id="v-settings" class="hide">
         <div class="card" style="max-width:600px">
           <h3>اتصال به سرور سایت مدرسه</h3>
-          <div class="note" style="margin-bottom:14px">آدرس سایت (همان‌جایی که پنل مدیریت آنلاین را باز می‌کنید) و مشخصات ورود مدیر را وارد کنید. یک کلید امن ساخته می‌شود و رمز شما ذخیره نمی‌گردد.</div>
-          <div class="f" style="margin-bottom:12px"><label>آدرس سایت</label><input class="in" id="setUrl" placeholder="https://school.example.com" dir="ltr" style="text-align:left"></div>
+          <div class="note" style="margin-bottom:13px">آدرس سایت و مشخصات ورود مدیر را وارد کنید. یک کلید امن ساخته می‌شود و رمز شما ذخیره نمی‌گردد.</div>
+          <div class="f" style="margin-bottom:11px"><label>آدرس سایت</label><input class="in ltr" id="setUrl" placeholder="https://school.example.com"></div>
           <div class="grid2">
-            <div class="f"><label>نام کاربری مدیر</label><input class="in" id="setUser" dir="ltr" style="text-align:left"></div>
-            <div class="f"><label>رمز عبور</label><input class="in" id="setPass" type="password" dir="ltr" style="text-align:left"></div>
+            <div class="f"><label>نام کاربری مدیر</label><input class="in ltr" id="setUser"></div>
+            <div class="f"><label>رمز عبور</label><input class="in ltr" id="setPass" type="password"></div>
           </div>
-          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-top:12px"><input type="checkbox" id="setInsecure"> پذیرش گواهی SSL نامعتبر (برای سرورهای بدون گواهی معتبر)</label>
-          <div class="mfoot">
-            <button class="btn green" onclick="saveSettings()">اتصال و دریافت اطلاعات</button>
-          </div>
-          <div class="note" id="setState" style="margin-top:10px"></div>
+          <label style="display:block;font-size:12px;color:#64748b;margin-top:11px"><input type="checkbox" id="setInsecure"> پذیرش گواهی SSL نامعتبر</label>
+          <div class="mfoot"><button class="btn green" onclick="saveSettings()">اتصال و دریافت اطلاعات</button></div>
+          <div class="note" id="setState" style="margin-top:8px"></div>
         </div>
         <div class="card" style="max-width:600px">
           <h3>درباره</h3>
           <div class="note">SchoolDesk — کلاینت دسکتاپ پورتابل سامانه مدیریت مدرسه<br>
           پایگاه‌داده محلی: SQLite (فایل schooldesk.db کنار برنامه)<br>
-          سازگار با ویندوز ۷ / ۸ / ۱۰ / ۱۱ — بدون نیاز به نصب یا Runtime</div>
+          سازگار با ویندوز ۷ / ۸ / ۱۰ / ۱۱ — بدون نیاز به نصب یا Runtime<br>
+          خروج کامل: کلیک راست روی آیکون برنامه کنار ساعت ویندوز ← خروج</div>
         </div>
-      </section>
+      </div>
     </div>
   </div>
 </div>
 
 <!-- student modal -->
-<div class="overlay" id="mStudent">
-  <div class="modal">
-    <h3 id="mStuTitle">افزودن دانش‌آموز</h3>
-    <input type="hidden" id="fStuUuid">
-    <div class="grid2">
-      <div class="f"><label>نام *</label><input class="in" id="fStuFirst"></div>
-      <div class="f"><label>نام خانوادگی *</label><input class="in" id="fStuLast"></div>
-      <div class="f"><label>کد ملی *</label><input class="in" id="fStuNid" dir="ltr" style="text-align:left"></div>
-      <div class="f"><label>نام پدر</label><input class="in" id="fStuFather"></div>
-      <div class="f"><label>پایه</label><select class="in" id="fStuGrade"><option value="">—</option><option>هفتم</option><option>هشتم</option><option>نهم</option></select></div>
-      <div class="f"><label>کلاس</label><select class="in" id="fStuClass"><option value="">—</option></select></div>
-      <div class="f"><label>تلفن دانش‌آموز</label><input class="in" id="fStuPhone" dir="ltr" style="text-align:left"></div>
-      <div class="f"><label>تلفن پدر</label><input class="in" id="fStuFPhone" dir="ltr" style="text-align:left"></div>
-    </div>
-    <div class="mfoot">
-      <button class="btn green" onclick="saveStudent()">ذخیره</button>
-      <button class="btn gray" onclick="hide('mStudent')">انصراف</button>
-    </div>
+<div class="overlay" id="mStudent"><div class="modal">
+  <h3 id="mStuTitle">افزودن دانش‌آموز</h3>
+  <input type="hidden" id="fStuUuid">
+  <div class="grid2">
+    <div class="f"><label>نام *</label><input class="in" id="fStuFirst"></div>
+    <div class="f"><label>نام خانوادگی *</label><input class="in" id="fStuLast"></div>
+    <div class="f"><label>کد ملی *</label><input class="in ltr" id="fStuNid"></div>
+    <div class="f"><label>نام پدر</label><input class="in" id="fStuFather"></div>
+    <div class="f"><label>پایه</label><select class="in" id="fStuGrade"><option value="">—</option><option>هفتم</option><option>هشتم</option><option>نهم</option></select></div>
+    <div class="f"><label>کلاس</label><select class="in" id="fStuClass"><option value="">—</option></select></div>
+    <div class="f"><label>تلفن دانش‌آموز</label><input class="in ltr" id="fStuPhone"></div>
+    <div class="f"><label>تلفن پدر</label><input class="in ltr" id="fStuFPhone"></div>
   </div>
-</div>
+  <div class="mfoot"><button class="btn green" onclick="saveStudent()">ذخیره</button><button class="btn gray" onclick="hideM('mStudent')">انصراف</button></div>
+</div></div>
 
 <!-- class modal -->
-<div class="overlay" id="mClass">
-  <div class="modal">
-    <h3 id="mClsTitle">افزودن کلاس</h3>
-    <input type="hidden" id="fClsUuid">
-    <div class="grid2">
-      <div class="f"><label>نام کلاس *</label><input class="in" id="fClsName" placeholder="مثلاً هفتم ۱"></div>
-      <div class="f"><label>پایه</label><select class="in" id="fClsGrade"><option value="">—</option><option>هفتم</option><option>هشتم</option><option>نهم</option></select></div>
-    </div>
-    <div class="mfoot">
-      <button class="btn green" onclick="saveClass()">ذخیره</button>
-      <button class="btn gray" onclick="hide('mClass')">انصراف</button>
-    </div>
+<div class="overlay" id="mClass"><div class="modal">
+  <h3 id="mClsTitle">افزودن کلاس</h3>
+  <input type="hidden" id="fClsUuid">
+  <div class="grid2">
+    <div class="f"><label>نام کلاس *</label><input class="in" id="fClsName" placeholder="مثلاً هفتم ۱"></div>
+    <div class="f"><label>پایه</label><select class="in" id="fClsGrade"><option value="">—</option><option>هفتم</option><option>هشتم</option><option>نهم</option></select></div>
   </div>
-</div>
+  <div class="mfoot"><button class="btn green" onclick="saveClass()">ذخیره</button><button class="btn gray" onclick="hideM('mClass')">انصراف</button></div>
+</div></div>
 
 <!-- teacher modal -->
-<div class="overlay" id="mTeacher">
-  <div class="modal">
-    <h3 id="mTchTitle">افزودن دبیر</h3>
-    <input type="hidden" id="fTchUuid">
-    <div class="grid2">
-      <div class="f"><label>نام و نام خانوادگی *</label><input class="in" id="fTchName"></div>
-      <div class="f"><label>کد ملی</label><input class="in" id="fTchNid" dir="ltr" style="text-align:left"></div>
-      <div class="f"><label>کد پرسنلی</label><input class="in" id="fTchCode" dir="ltr" style="text-align:left"></div>
-      <div class="f"><label>موبایل</label><input class="in" id="fTchMobile" dir="ltr" style="text-align:left"></div>
-    </div>
-    <div class="mfoot">
-      <button class="btn green" onclick="saveTeacher()">ذخیره</button>
-      <button class="btn gray" onclick="hide('mTeacher')">انصراف</button>
-    </div>
+<div class="overlay" id="mTeacher"><div class="modal">
+  <h3 id="mTchTitle">افزودن دبیر</h3>
+  <input type="hidden" id="fTchUuid">
+  <div class="grid2">
+    <div class="f"><label>نام و نام خانوادگی *</label><input class="in" id="fTchName"></div>
+    <div class="f"><label>کد ملی</label><input class="in ltr" id="fTchNid"></div>
+    <div class="f"><label>کد پرسنلی</label><input class="in ltr" id="fTchCode"></div>
+    <div class="f"><label>موبایل</label><input class="in ltr" id="fTchMobile"></div>
   </div>
-</div>
+  <div class="mfoot"><button class="btn green" onclick="saveTeacher()">ذخیره</button><button class="btn gray" onclick="hideM('mTeacher')">انصراف</button></div>
+</div></div>
 
 <div id="toast"></div>
 
 <script>
 'use strict';
-var $=function(id){return document.getElementById(id)};
-var curView='dash', classCache=[], toastT=null;
+/* ---------- IE11-safe helpers ---------- */
+function $(id){return document.getElementById(id)}
+function each(list,fn){for(var i=0;i<list.length;i++)fn(list[i],i)}
+function setHide(el,cond){if(typeof el==='string')el=$(el);if(cond)el.className+=el.className.indexOf('hide')<0?' hide':'';else el.className=el.className.replace(/\s*\bhide\b/g,'')}
 var FA=['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
 function fa(n){return String(n==null?'':n).replace(/[0-9]/g,function(d){return FA[+d]})}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-function toast(m){var t=$('toast');t.textContent=m;t.className='show';clearTimeout(toastT);toastT=setTimeout(function(){t.className=''},2600)}
+var toastT=null;
+function toast(m){var t=$('toast');t.innerHTML=esc(m);t.style.display='block';clearTimeout(toastT);toastT=setTimeout(function(){t.style.display='none'},2600)}
 function uuid(){var s='';for(var i=0;i<32;i++){s+='0123456789abcdef'[Math.floor(Math.random()*16)];if(i==7||i==11||i==15||i==19)s+='-'}return s}
-function show(id){$(id).classList.add('show')}
-function hide(id){$(id).classList.remove('show')}
-function api(path,body){
-  return fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{}).then(function(r){return r.json()});
+function showM(id){$(id).className='overlay show'}
+function hideM(id){$(id).className='overlay'}
+/* XHR-based api() — IE11 has no fetch/Promise */
+function api(path,body,cb,errcb){
+  var x=new XMLHttpRequest();
+  x.open(body?'POST':'GET',path,true);
+  if(body)x.setRequestHeader('Content-Type','application/json');
+  x.onreadystatechange=function(){
+    if(x.readyState!==4)return;
+    if(x.status>=200&&x.status<600&&x.responseText){
+      var j=null;try{j=JSON.parse(x.responseText)}catch(e){}
+      if(j){cb&&cb(j);return}
+    }
+    errcb&&errcb();
+  };
+  x.send(body?JSON.stringify(body):null);
 }
+function debounce(fn,ms){var t;return function(){clearTimeout(t);t=setTimeout(fn,ms)}}
 
 /* ---------- navigation ---------- */
-var titles={dash:['داشبورد','نمای کلی اطلاعات مدرسه'],students:['دانش‌آموزان','مدیریت دانش‌آموزان — تغییرات به‌صورت خودکار با سرور همگام می‌شود'],
- classes:['کلاس‌ها','مدیریت کلاس‌های مدرسه'],teachers:['دبیران','مدیریت دبیران'],queue:['صف همگام‌سازی','تغییرات در انتظار ارسال به سرور'],settings:['تنظیمات اتصال','پیکربندی ارتباط با سرور سایت مدرسه']};
-document.querySelectorAll('#nav button').forEach(function(b){
+var curView='dash', classCache=[];
+var titles={dash:['داشبورد','نمای کلی اطلاعات مدرسه'],
+ students:['دانش‌آموزان','مدیریت دانش‌آموزان — تغییرات خودکار با سرور همگام می‌شود'],
+ classes:['کلاس‌ها','مدیریت کلاس‌های مدرسه'],
+ teachers:['دبیران','مدیریت دبیران'],
+ attendance:['حضور و غیاب','ثبت روزانه حضور، تاخیر و غیبت — آفلاین هم کار می‌کند'],
+ attreport:['گزارش حضور','جمع‌بندی ماهانه حضور و غیاب'],
+ queue:['صف همگام‌سازی','تغییرات در انتظار ارسال به سرور'],
+ settings:['تنظیمات اتصال','پیکربندی ارتباط با سرور سایت مدرسه']};
+var views=['dash','students','classes','teachers','attendance','attreport','queue','settings'];
+each(document.getElementById('nav').getElementsByTagName('button'),function(b){
   b.onclick=function(){
-    document.querySelectorAll('#nav button').forEach(function(x){x.classList.remove('on')});
-    b.classList.add('on');
-    curView=b.dataset.v;
-    ['dash','students','classes','teachers','queue','settings'].forEach(function(v){
-      $('v-'+v).classList.toggle('hide',v!==curView);
-    });
-    $('pageTitle').textContent=titles[curView][0];
-    $('pageSub').textContent=titles[curView][1];
+    each(document.getElementById('nav').getElementsByTagName('button'),function(x){x.className=x.className.replace(/\s*\bon\b/g,'')});
+    b.className+=' on';
+    curView=b.getAttribute('data-v');
+    each(views,function(v){setHide('v-'+v,v!==curView)});
+    $('pageTitle').innerHTML=titles[curView][0];
+    $('pageSub').innerHTML=titles[curView][1];
     refreshView();
   };
 });
@@ -329,61 +349,70 @@ function refreshView(){
   if(curView==='students')loadStudents();
   else if(curView==='classes')loadClasses();
   else if(curView==='teachers')loadTeachers();
+  else if(curView==='attendance')loadAttendance();
+  else if(curView==='attreport'){if(!$('repMonth').value)$('repMonth').value=todayJalali().substr(0,7);loadAttReport();}
   else if(curView==='queue')loadQueue();
   loadState();
 }
+var lastToday='';
+function todayJalali(){return lastToday||''}
 
 /* ---------- state / dashboard ---------- */
 function loadState(){
-  api('/api/state').then(function(s){
-    $('ver').textContent=fa(s.version);
-    $('stStudents').textContent=fa(s.students);
-    $('stClasses').textContent=fa(s.classes);
-    $('stTeachers').textContent=fa(s.teachers);
-    $('stQueue').textContent=fa(s.queue);
-    if(s.school_name)$('brandSchool').textContent=s.school_name;
-    var qb=$('qbadge');qb.textContent=fa(s.queue);qb.classList.toggle('hide',!(s.queue>0));
+  api('/api/state',null,function(s){
+    $('ver').innerHTML=fa(s.version);
+    $('stStudents').innerHTML=fa(s.students);
+    $('stClasses').innerHTML=fa(s.classes);
+    $('stQueue').innerHTML=fa(s.queue);
+    if(s.school_name)$('brandSchool').innerHTML=esc(s.school_name);
+    var qb=$('qbadge');qb.innerHTML=fa(s.queue);setHide(qb,!(s.queue>0));
     var dot=$('syncDot'),txt=$('syncTxt');
     dot.className='dot';
-    if(s.sync_state==='ok'){dot.classList.add('ok');txt.textContent='همگام با سرور'+(s.last_sync?' · '+fa(s.last_sync.substr(11,5)):'');}
-    else if(s.sync_state==='syncing'){dot.classList.add('sync');txt.textContent='در حال همگام‌سازی...';}
-    else if(s.sync_state==='unconfigured'){txt.textContent='اتصال پیکربندی نشده';}
-    else{dot.classList.add('off');txt.textContent='آفلاین — '+fa(s.queue)+' تغییر در صف';}
-    $('firstRun').classList.toggle('hide',s.configured);
+    if(s.sync_state==='ok'){dot.className='dot ok';txt.innerHTML='همگام با سرور'+(s.last_sync?' · '+fa(s.last_sync.substr(11,5)):'');}
+    else if(s.sync_state==='syncing'){dot.className='dot sync';txt.innerHTML='در حال همگام‌سازی...';}
+    else if(s.sync_state==='unconfigured'){txt.innerHTML='اتصال پیکربندی نشده';}
+    else{dot.className='dot off';txt.innerHTML='آفلاین — '+fa(s.queue)+' تغییر در صف';}
+    setHide('firstRun',s.configured);
     var n='حالت کار: <b>'+(s.configured?'متصل به سرور':'محلی (بدون پیکربندی سرور)')+'</b><br>';
     n+='آخرین همگام‌سازی موفق: <b>'+(s.last_sync?fa(s.last_sync):'هنوز انجام نشده')+'</b><br>';
     n+='وضعیت: '+esc(s.sync_msg||'—')+'<br>';
     n+='تغییرات در انتظار ارسال: <b>'+fa(s.queue)+'</b> مورد';
     $('dashNote').innerHTML=n;
-    if(s.server_url)$('setUrl').value=$('setUrl').value||s.server_url;
+    if(s.server_url&&!$('setUrl').value)$('setUrl').value=s.server_url;
     $('setState').innerHTML=s.configured?'<span class="badge g">متصل</span> '+esc(s.server_url):'<span class="badge o">پیکربندی نشده</span>';
-  }).catch(function(){});
+  });
+  api('/api/attendance',null,function(r){
+    lastToday=r.date||'';
+    var p=0;each(r.items||[],function(x){if(x.att_status==='present'||x.att_status==='late')p++});
+    $('stPresent').innerHTML=fa(p);
+  });
 }
 
 /* ---------- students ---------- */
 function loadStudents(){
-  var q=encodeURIComponent($('stuSearch').value.trim());
+  var q=encodeURIComponent($('stuSearch').value.replace(/^\s+|\s+$/g,''));
   var c=encodeURIComponent($('stuClassFilter').value);
-  api('/api/students?q='+q+'&class='+c).then(function(r){
-    var tb=$('stuBody');tb.innerHTML='';
-    (r.items||[]).forEach(function(s,i){
-      var tr=document.createElement('tr');
-      tr.innerHTML='<td>'+fa(i+1)+'</td><td><b>'+esc(s.first_name)+' '+esc(s.last_name)+'</b></td>'+
-        '<td style="font-family:monospace">'+fa(s.national_id)+'</td><td>'+esc(s.father_name||'—')+'</td>'+
+  api('/api/students?q='+q+'&class='+c,null,function(r){
+    var h='',items=r.items||[];
+    each(items,function(s,i){
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(s.first_name)+' '+esc(s.last_name)+'</b></td>'+
+        '<td class="mono">'+fa(s.national_id)+'</td><td>'+esc(s.father_name||'—')+'</td>'+
         '<td>'+esc(s.grade_level||'—')+'</td><td><span class="badge b">'+esc(s.class_name||'—')+'</span></td>'+
-        '<td style="font-family:monospace">'+fa(s.phone||'—')+'</td>'+
-        '<td style="white-space:nowrap"><button class="btn gray sm">ویرایش</button> <button class="btn red sm">حذف</button></td>';
-      tr.querySelector('.gray').onclick=function(){openStudent(s)};
-      tr.querySelector('.red').onclick=function(){delEntity('student',s.uuid,s.first_name+' '+s.last_name)};
-      tb.appendChild(tr);
+        '<td class="mono">'+fa(s.phone||'—')+'</td>'+
+        '<td style="white-space:nowrap"><button class="btn gray sm" onclick="editStudent('+i+')">ویرایش</button> '+
+        '<button class="btn red sm" onclick="delStudent('+i+')">حذف</button></td></tr>';
     });
-    $('stuEmpty').classList.toggle('hide',(r.items||[]).length>0);
+    window._stu=items;
+    $('stuBody').innerHTML=h;
+    setHide('stuEmpty',items.length>0);
   });
 }
-$('stuSearch').oninput=debounce(loadStudents,300);
+function editStudent(i){openStudent(window._stu[i])}
+function delStudent(i){var s=window._stu[i];delEntity('student',s.uuid,s.first_name+' '+s.last_name)}
+$('stuSearch').onkeyup=debounce(loadStudents,300);
 $('stuClassFilter').onchange=loadStudents;
 function openStudent(s){
-  $('mStuTitle').textContent=s?'ویرایش دانش‌آموز':'افزودن دانش‌آموز';
+  $('mStuTitle').innerHTML=s?'ویرایش دانش‌آموز':'افزودن دانش‌آموز';
   $('fStuUuid').value=s?s.uuid:'';
   $('fStuFirst').value=s?s.first_name||'':'';
   $('fStuLast').value=s?s.last_name||'':'';
@@ -393,150 +422,221 @@ function openStudent(s){
   fillClassSelect('fStuClass',s?s.class_name||'':'');
   $('fStuPhone').value=s?s.phone||'':'';
   $('fStuFPhone').value=s?s.father_phone||'':'';
-  show('mStudent');
+  showM('mStudent');
 }
 function saveStudent(){
-  var u=$('fStuUuid').value, isNew=!u;
-  if(!$('fStuFirst').value.trim()||!$('fStuLast').value.trim()||!$('fStuNid').value.trim())return toast('نام، نام خانوادگی و کد ملی الزامی است');
+  var u=$('fStuUuid').value,isNew=!u;
+  if(!$('fStuFirst').value||!$('fStuLast').value||!$('fStuNid').value)return toast('نام، نام خانوادگی و کد ملی الزامی است');
   api('/api/mutate',{entity:'student',op:isNew?'create':'update',payload:{
-    uuid:isNew?uuid():u, first_name:$('fStuFirst').value.trim(), last_name:$('fStuLast').value.trim(),
-    national_id:$('fStuNid').value.trim(), father_name:$('fStuFather').value.trim(),
-    grade_level:$('fStuGrade').value, class_name:$('fStuClass').value,
-    phone:$('fStuPhone').value.trim(), father_phone:$('fStuFPhone').value.trim()
-  }}).then(function(r){
-    if(r.ok){hide('mStudent');toast('ذخیره شد — در پس‌زمینه با سرور همگام می‌شود');loadStudents();loadState();}
+    uuid:isNew?uuid():u,first_name:$('fStuFirst').value,last_name:$('fStuLast').value,
+    national_id:$('fStuNid').value,father_name:$('fStuFather').value,
+    grade_level:$('fStuGrade').value,class_name:$('fStuClass').value,
+    phone:$('fStuPhone').value,father_phone:$('fStuFPhone').value
+  }},function(r){
+    if(r.ok){hideM('mStudent');toast('ذخیره شد — در پس‌زمینه با سرور همگام می‌شود');loadStudents();loadState();}
     else toast(r.msg||'خطا در ذخیره');
   });
 }
 
 /* ---------- classes ---------- */
 function loadClasses(){
-  api('/api/classes').then(function(r){
+  api('/api/classes',null,function(r){
     classCache=r.items||[];
-    var tb=$('clsBody');tb.innerHTML='';
-    classCache.forEach(function(cl,i){
-      var tr=document.createElement('tr');
-      tr.innerHTML='<td>'+fa(i+1)+'</td><td><b>'+esc(cl.name)+'</b></td><td>'+esc(cl.grade||'—')+'</td>'+
+    var h='';
+    each(classCache,function(cl,i){
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(cl.name)+'</b></td><td>'+esc(cl.grade||'—')+'</td>'+
         '<td>'+fa(cl.academic_year||'—')+'</td><td>'+fa(cl.student_count)+' نفر</td>'+
-        '<td style="white-space:nowrap"><button class="btn gray sm">ویرایش</button> <button class="btn red sm">حذف</button></td>';
-      tr.querySelector('.gray').onclick=function(){openClass(cl)};
-      tr.querySelector('.red').onclick=function(){delEntity('class',cl.uuid,cl.name)};
-      tb.appendChild(tr);
+        '<td style="white-space:nowrap"><button class="btn gray sm" onclick="editClass('+i+')">ویرایش</button> '+
+        '<button class="btn red sm" onclick="delClass('+i+')">حذف</button></td></tr>';
     });
-    $('clsEmpty').classList.toggle('hide',classCache.length>0);
-    var sel=$('stuClassFilter'),old=sel.value;
-    sel.innerHTML='<option value="">همه کلاس‌ها</option>';
-    classCache.forEach(function(cl){var o=document.createElement('option');o.value=cl.name;o.textContent=cl.name;sel.appendChild(o)});
-    sel.value=old;
+    $('clsBody').innerHTML=h;
+    setHide('clsEmpty',classCache.length>0);
+    each(['stuClassFilter','attClassFilter','repClassFilter'],function(id){
+      var sel=$(id),old=sel.value,o='<option value="">همه کلاس‌ها</option>';
+      each(classCache,function(cl){o+='<option value="'+esc(cl.name)+'">'+esc(cl.name)+'</option>'});
+      sel.innerHTML=o;sel.value=old;
+    });
   });
 }
+function editClass(i){openClass(classCache[i])}
+function delClass(i){var c=classCache[i];delEntity('class',c.uuid,c.name)}
 function fillClassSelect(id,val){
-  var sel=$(id);sel.innerHTML='<option value="">—</option>';
-  classCache.forEach(function(cl){var o=document.createElement('option');o.value=cl.name;o.textContent=cl.name;sel.appendChild(o)});
-  sel.value=val;
+  var sel=$(id),o='<option value="">—</option>';
+  each(classCache,function(cl){o+='<option value="'+esc(cl.name)+'">'+esc(cl.name)+'</option>'});
+  sel.innerHTML=o;sel.value=val;
 }
 function openClass(cl){
-  $('mClsTitle').textContent=cl?'ویرایش کلاس':'افزودن کلاس';
+  $('mClsTitle').innerHTML=cl?'ویرایش کلاس':'افزودن کلاس';
   $('fClsUuid').value=cl?cl.uuid:'';
   $('fClsName').value=cl?cl.name||'':'';
   $('fClsGrade').value=cl?cl.grade||'':'';
-  show('mClass');
+  showM('mClass');
 }
 function saveClass(){
   var u=$('fClsUuid').value,isNew=!u;
-  if(!$('fClsName').value.trim())return toast('نام کلاس الزامی است');
+  if(!$('fClsName').value)return toast('نام کلاس الزامی است');
   api('/api/mutate',{entity:'class',op:isNew?'create':'update',payload:{
-    uuid:isNew?uuid():u,name:$('fClsName').value.trim(),grade:$('fClsGrade').value,academic_year:''
-  }}).then(function(r){
-    if(r.ok){hide('mClass');toast('ذخیره شد');loadClasses();loadState();}
+    uuid:isNew?uuid():u,name:$('fClsName').value,grade:$('fClsGrade').value,academic_year:''
+  }},function(r){
+    if(r.ok){hideM('mClass');toast('ذخیره شد');loadClasses();loadState();}
     else toast(r.msg||'خطا');
   });
 }
 
 /* ---------- teachers ---------- */
 function loadTeachers(){
-  var q=encodeURIComponent($('tchSearch').value.trim());
-  api('/api/teachers?q='+q).then(function(r){
-    var tb=$('tchBody');tb.innerHTML='';
-    (r.items||[]).forEach(function(t,i){
-      var tr=document.createElement('tr');
-      tr.innerHTML='<td>'+fa(i+1)+'</td><td><b>'+esc(t.full_name)+'</b></td>'+
-        '<td style="font-family:monospace">'+fa(t.national_id||'—')+'</td>'+
-        '<td style="font-family:monospace">'+fa(t.personnel_code||'—')+'</td>'+
-        '<td style="font-family:monospace">'+fa(t.mobile||'—')+'</td>'+
-        '<td style="white-space:nowrap"><button class="btn gray sm">ویرایش</button> <button class="btn red sm">حذف</button></td>';
-      tr.querySelector('.gray').onclick=function(){openTeacher(t)};
-      tr.querySelector('.red').onclick=function(){delEntity('teacher',t.uuid,t.full_name)};
-      tb.appendChild(tr);
+  var q=encodeURIComponent($('tchSearch').value.replace(/^\s+|\s+$/g,''));
+  api('/api/teachers?q='+q,null,function(r){
+    var h='',items=r.items||[];
+    each(items,function(t,i){
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(t.full_name)+'</b></td>'+
+        '<td class="mono">'+fa(t.national_id||'—')+'</td><td class="mono">'+fa(t.personnel_code||'—')+'</td>'+
+        '<td class="mono">'+fa(t.mobile||'—')+'</td>'+
+        '<td style="white-space:nowrap"><button class="btn gray sm" onclick="editTeacher('+i+')">ویرایش</button> '+
+        '<button class="btn red sm" onclick="delTeacher('+i+')">حذف</button></td></tr>';
     });
-    $('tchEmpty').classList.toggle('hide',(r.items||[]).length>0);
+    window._tch=items;
+    $('tchBody').innerHTML=h;
+    setHide('tchEmpty',items.length>0);
   });
 }
-$('tchSearch').oninput=debounce(loadTeachers,300);
+function editTeacher(i){openTeacher(window._tch[i])}
+function delTeacher(i){var t=window._tch[i];delEntity('teacher',t.uuid,t.full_name)}
+$('tchSearch').onkeyup=debounce(loadTeachers,300);
 function openTeacher(t){
-  $('mTchTitle').textContent=t?'ویرایش دبیر':'افزودن دبیر';
+  $('mTchTitle').innerHTML=t?'ویرایش دبیر':'افزودن دبیر';
   $('fTchUuid').value=t?t.uuid:'';
   $('fTchName').value=t?t.full_name||'':'';
   $('fTchNid').value=t?t.national_id||'':'';
   $('fTchCode').value=t?t.personnel_code||'':'';
   $('fTchMobile').value=t?t.mobile||'':'';
-  show('mTeacher');
+  showM('mTeacher');
 }
 function saveTeacher(){
   var u=$('fTchUuid').value,isNew=!u;
-  if(!$('fTchName').value.trim())return toast('نام دبیر الزامی است');
+  if(!$('fTchName').value)return toast('نام دبیر الزامی است');
   api('/api/mutate',{entity:'teacher',op:isNew?'create':'update',payload:{
-    uuid:isNew?uuid():u,full_name:$('fTchName').value.trim(),national_id:$('fTchNid').value.trim(),
-    personnel_code:$('fTchCode').value.trim(),mobile:$('fTchMobile').value.trim()
-  }}).then(function(r){
-    if(r.ok){hide('mTeacher');toast('ذخیره شد');loadTeachers();loadState();}
+    uuid:isNew?uuid():u,full_name:$('fTchName').value,national_id:$('fTchNid').value,
+    personnel_code:$('fTchCode').value,mobile:$('fTchMobile').value
+  }},function(r){
+    if(r.ok){hideM('mTeacher');toast('ذخیره شد');loadTeachers();loadState();}
     else toast(r.msg||'خطا');
+  });
+}
+
+/* ---------- attendance ---------- */
+function attToday(){$('attDate').value='';loadAttendance()}
+function loadAttendance(){
+  var d=encodeURIComponent($('attDate').value.replace(/[۰-۹]/g,function(c){return FA.indexOf(c)}));
+  var c=encodeURIComponent($('attClassFilter').value);
+  api('/api/attendance?date='+d+'&class='+c,null,function(r){
+    lastToday=lastToday||r.date;
+    if(!$('attDate').value)$('attDate').value=r.date;
+    var h='',items=r.items||[],np=0,nl=0,na=0,nn=0;
+    each(items,function(s,i){
+      var st=s.att_status,pill;
+      if(st==='present'){pill='<span class="badge g">حاضر</span>';np++}
+      else if(st==='late'){pill='<span class="badge o">تاخیر '+(s.minutes_late?fa(s.minutes_late)+'ʼ':'')+'</span>';nl++}
+      else if(st==='absent'){pill='<span class="badge r">غایب</span>';na++}
+      else{pill='<span class="badge s">ثبت نشده</span>';nn++}
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(s.first_name)+' '+esc(s.last_name)+'</b></td>'+
+        '<td><span class="badge b">'+esc(s.class_name||'—')+'</span></td><td>'+pill+'</td>'+
+        '<td class="mono">'+fa(s.scan_time||'—')+'</td>'+
+        '<td><button class="btn green sm" onclick="attSet('+i+',\'present\')">حاضر</button> '+
+        '<button class="btn amber sm" onclick="attLate('+i+')">تاخیر</button> '+
+        '<button class="btn red sm" onclick="attSet('+i+',\'absent\')">غایب</button> '+
+        '<button class="btn gray sm" onclick="attSet('+i+',\'clear\')">پاک</button></td></tr>';
+    });
+    window._att=items;
+    $('attBody').innerHTML=h;
+    setHide('attEmpty',items.length>0);
+    $('attSummary').innerHTML='حاضر: <b>'+fa(np)+'</b> · تاخیر: <b>'+fa(nl)+'</b> · غایب: <b>'+fa(na)+'</b> · ثبت‌نشده: <b>'+fa(nn)+'</b>';
+  });
+}
+$('attDate').onkeyup=debounce(loadAttendance,500);
+$('attClassFilter').onchange=loadAttendance;
+function attSet(i,st,ml){
+  var s=window._att[i];
+  api('/api/attendance-set',{student_uuid:s.uuid,date_jalali:$('attDate').value,status:st,minutes_late:ml||0},function(r){
+    if(r.ok)loadAttendance();else toast(r.msg||'خطا');
+  });
+}
+function attLate(i){
+  var m=prompt('چند دقیقه تاخیر؟','10');
+  if(m===null)return;
+  attSet(i,'late',parseInt(m.replace(/[۰-۹]/g,function(c){return FA.indexOf(c)}),10)||0);
+}
+function attAllPresent(){
+  if(!confirm('همه دانش‌آموزانِ «ثبت‌نشده» این لیست حاضر ثبت شوند؟'))return;
+  var list=[];each(window._att||[],function(s){if(!s.att_status)list.push(s)});
+  if(!list.length)return toast('مورد ثبت‌نشده‌ای نیست');
+  var done=0;
+  each(list,function(s){
+    api('/api/attendance-set',{student_uuid:s.uuid,date_jalali:$('attDate').value,status:'present',minutes_late:0},function(){
+      done++;if(done===list.length){toast(fa(done)+' نفر حاضر ثبت شد');loadAttendance();loadState();}
+    });
+  });
+}
+
+/* ---------- attendance report ---------- */
+function loadAttReport(){
+  var m=encodeURIComponent($('repMonth').value.replace(/[۰-۹]/g,function(c){return FA.indexOf(c)}));
+  var c=encodeURIComponent($('repClassFilter').value);
+  api('/api/attendance-report?month='+m+'&class='+c,null,function(r){
+    $('repTitle').innerHTML='گزارش ماهانه حضور و غیاب — '+fa(r.month);
+    var h='',any=false;
+    each(r.items||[],function(s,i){
+      if(s.present||s.late||s.absent)any=true;
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(s.first_name)+' '+esc(s.last_name)+'</b></td>'+
+        '<td>'+esc(s.class_name||'—')+'</td>'+
+        '<td><span class="badge g">'+fa(s.present)+'</span></td>'+
+        '<td><span class="badge o">'+fa(s.late)+'</span></td>'+
+        '<td><span class="badge r">'+fa(s.absent)+'</span></td></tr>';
+    });
+    $('repBody').innerHTML=h;
+    setHide('repEmpty',any);
   });
 }
 
 /* ---------- shared ---------- */
 function delEntity(entity,u,label){
   if(!confirm('«'+label+'» حذف شود؟'))return;
-  api('/api/mutate',{entity:entity,op:'delete',payload:{uuid:u}}).then(function(r){
+  api('/api/mutate',{entity:entity,op:'delete',payload:{uuid:u}},function(r){
     if(r.ok){toast('حذف شد');refreshView();}
     else toast(r.msg||'خطا');
   });
 }
 function loadQueue(){
-  api('/api/queue').then(function(r){
-    var tb=$('qBody');tb.innerHTML='';
-    var ops={create:'ایجاد',update:'ویرایش',delete:'حذف'};
-    var ents={student:'دانش‌آموز','class':'کلاس',teacher:'دبیر'};
-    (r.items||[]).forEach(function(x,i){
-      var tr=document.createElement('tr');
-      tr.innerHTML='<td>'+fa(i+1)+'</td><td><b>'+esc(ents[x.entity]||x.entity)+'</b> '+esc(x.title||'')+'</td>'+
+  api('/api/queue',null,function(r){
+    var ops={create:'ایجاد',update:'ویرایش','delete':'حذف',set:'ثبت'};
+    var ents={student:'دانش‌آموز','class':'کلاس',teacher:'دبیر',attendance:'حضورغیاب'};
+    var h='',items=r.items||[];
+    each(items,function(x,i){
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(ents[x.entity]||x.entity)+'</b> '+esc(x.title||'')+'</td>'+
         '<td><span class="badge '+(x.op==='delete'?'r':x.op==='create'?'g':'b')+'">'+(ops[x.op]||x.op)+'</span></td>'+
         '<td>'+fa(x.created_at)+'</td><td>'+fa(x.tries)+'</td>'+
-        '<td class="qerr">'+esc(x.last_error||'—')+'</td>';
-      tb.appendChild(tr);
+        '<td class="qerr">'+esc(x.last_error||'—')+'</td></tr>';
     });
-    $('qEmpty').classList.toggle('hide',(r.items||[]).length>0);
+    $('qBody').innerHTML=h;
+    setHide('qEmpty',items.length>0);
   });
 }
 function syncNow(){
-  api('/api/sync-now',{}).then(function(){toast('همگام‌سازی آغاز شد');setTimeout(loadState,1200);setTimeout(loadQueue,2500)});
+  api('/api/sync-now',{},function(){toast('همگام‌سازی آغاز شد');setTimeout(loadState,1200);setTimeout(function(){if(curView==='queue')loadQueue()},2600)});
 }
 $('syncPill').onclick=syncNow;
 
 /* ---------- settings ---------- */
 function saveSettings(){
-  var u=$('setUrl').value.trim();
+  var u=$('setUrl').value.replace(/^\s+|\s+$/g,'');
   if(!u)return toast('آدرس سایت را وارد کنید');
   if(!/^https?:\/\//.test(u)){u='https://'+u;$('setUrl').value=u;}
   toast('در حال اتصال به سرور...');
-  api('/api/settings',{server_url:u,username:$('setUser').value.trim(),password:$('setPass').value,insecure:$('setInsecure').checked})
-  .then(function(r){
-    if(r.ok){toast('اتصال برقرار شد — دریافت اطلاعات آغاز شد');$('setPass').value='';setTimeout(function(){loadState();},1500);}
+  api('/api/settings',{server_url:u,username:$('setUser').value,password:$('setPass').value,insecure:$('setInsecure').checked},function(r){
+    if(r.ok){toast('اتصال برقرار شد — دریافت اطلاعات آغاز شد');$('setPass').value='';setTimeout(loadState,1500);}
     else toast(r.msg||'خطا در اتصال');
   });
 }
-
-function debounce(fn,ms){var t;return function(){clearTimeout(t);t=setTimeout(fn,ms)}}
 
 /* boot */
 loadClasses();

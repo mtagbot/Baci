@@ -22,7 +22,7 @@
 #include "sqlite3.h"
 #include "blobs.h" /* generated: BLOB_UI_HTML, BLOB_FONT_REG, BLOB_FONT_BOLD */
 
-#define APP_VERSION "1.0.0"
+#define APP_VERSION "1.1.0"
 #define SYNC_PERIOD_TICKS 60 /* x500ms = 30s */
 
 #ifdef _WIN32
@@ -36,8 +36,11 @@
 #define SLEEP_MS(ms) usleep((ms) * 1000)
 #endif
 
-static volatile int g_quit = 0;
-static volatile int g_sync_req = 0;
+volatile int g_quit = 0;
+volatile int g_sync_req = 0;
+#ifdef _WIN32
+int webwin_run(const char *url); /* webwin.c — native window host */
+#endif
 static char g_db_path[1024];
 static sqlite3 *g_db = NULL; /* main (UI) thread connection */
 
@@ -63,6 +66,35 @@ static void exe_dir(char *out, size_t cap) {
   if (p) *p = 0;
   snprintf(out, cap, "%s", buf);
 #endif
+}
+
+/* ---- Jalali date (same algorithm as jdf.php gregorian_to_jalali) ---- */
+static void greg_to_jalali(int gy, int gm, int gd, int *jy, int *jm, int *jd) {
+  int g_d_m[] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+  int gy2 = (gm > 2) ? (gy + 1) : gy;
+  long days = 355666L + (365L * gy) + ((gy2 + 3) / 4) - ((gy2 + 99) / 100) +
+              ((gy2 + 399) / 400) + gd + g_d_m[gm - 1];
+  *jy = -1595 + (int) (33 * (days / 12053));
+  days %= 12053;
+  *jy += 4 * (int) (days / 1461);
+  days %= 1461;
+  if (days > 365) { *jy += (int) ((days - 1) / 365); days = (days - 1) % 365; }
+  if (days < 186) { *jm = 1 + (int) (days / 31); *jd = 1 + (int) (days % 31); }
+  else { *jm = 7 + (int) ((days - 186) / 30); *jd = 1 + (int) ((days - 186) % 30); }
+}
+
+static void jalali_today(char *out, size_t cap) { /* "1404/06/08" */
+  time_t t = time(NULL);
+  struct tm *lt = localtime(&t);
+  int jy, jm, jd;
+  greg_to_jalali(lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday, &jy, &jm, &jd);
+  snprintf(out, cap, "%04d/%02d/%02d", jy, jm, jd);
+}
+
+static void now_hm(char *out, size_t cap) { /* "08:31" */
+  time_t t = time(NULL);
+  struct tm *lt = localtime(&t);
+  snprintf(out, cap, "%02d:%02d", lt->tm_hour, lt->tm_min);
 }
 
 /* JSON string escaper (for values we build ourselves) */
@@ -107,6 +139,10 @@ static void db_init(sqlite3 *db) {
       "CREATE TABLE IF NOT EXISTS teachers(id INTEGER PRIMARY KEY AUTOINCREMENT,"
       " server_id INTEGER, uuid TEXT UNIQUE, full_name TEXT, national_id TEXT,"
       " personnel_code TEXT, mobile TEXT, status TEXT DEFAULT '1', deleted INTEGER DEFAULT 0);"
+      "CREATE TABLE IF NOT EXISTS attendance(id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      " uuid TEXT UNIQUE, student_uuid TEXT, date_jalali TEXT, status TEXT,"
+      " minutes_late INTEGER DEFAULT 0, scan_time TEXT, deleted INTEGER DEFAULT 0,"
+      " UNIQUE(student_uuid, date_jalali));"
       "CREATE TABLE IF NOT EXISTS queue(id INTEGER PRIMARY KEY AUTOINCREMENT,"
       " entity TEXT, op TEXT, payload TEXT,"
       " created_at TEXT DEFAULT (datetime('now','localtime')),"
@@ -388,7 +424,8 @@ static int sync_pull(sqlite3 *db, const char *api, const char *key, int insecure
 
   const char *rb[1] = { resp };
   sqlite3_exec(db, "BEGIN", 0, 0, 0);
-  sqlite3_exec(db, "DELETE FROM students; DELETE FROM classes; DELETE FROM teachers;", 0, 0, 0);
+  sqlite3_exec(db, "DELETE FROM students; DELETE FROM classes; DELETE FROM teachers;"
+                   " DELETE FROM attendance;", 0, 0, 0);
   db_exec_b(db,
       "INSERT INTO students(server_id,uuid,national_id,first_name,last_name,father_name,"
       "grade_level,class_name,phone,father_phone,status) SELECT"
@@ -411,6 +448,13 @@ static int sync_pull(sqlite3 *db, const char *api, const char *key, int insecure
       " json_extract(value,'$.full_name'), json_extract(value,'$.national_id'),"
       " json_extract(value,'$.personnel_code'), json_extract(value,'$.mobile'),"
       " COALESCE(json_extract(value,'$.status'),'1') FROM json_each(?1,'$.teachers')",
+      1, rb);
+  db_exec_b(db,
+      "INSERT OR IGNORE INTO attendance(uuid,student_uuid,date_jalali,status,minutes_late,scan_time)"
+      " SELECT json_extract(value,'$.uuid'), json_extract(value,'$.student_uuid'),"
+      " json_extract(value,'$.date_jalali'), json_extract(value,'$.status'),"
+      " COALESCE(json_extract(value,'$.minutes_late'),0), json_extract(value,'$.scan_time')"
+      " FROM json_each(?1,'$.attendance')",
       1, rb);
   sqlite3_exec(db, "COMMIT", 0, 0, 0);
 
@@ -697,6 +741,117 @@ static void api_queue(struct mg_connection *c) {
   free(body); free(json);
 }
 
+/* ---- attendance: list one day (students joined with that day's records) ---- */
+static void api_attendance(struct mg_connection *c, struct mg_http_message *hm) {
+  char date[24] = "", cls[128] = "";
+  mg_http_get_var(&hm->query, "date", date, sizeof(date));
+  mg_http_get_var(&hm->query, "class", cls, sizeof(cls));
+  if (date[0] == 0) jalali_today(date, sizeof(date));
+  const char *b[2] = { date, cls };
+  char *json = db_text(g_db,
+      "SELECT COALESCE(json_group_array(json_object('uuid',s.uuid,"
+      "'first_name',s.first_name,'last_name',s.last_name,'class_name',s.class_name,"
+      "'att_status',a.status,'minutes_late',a.minutes_late,'scan_time',a.scan_time)),'[]')"
+      " FROM (SELECT * FROM students WHERE deleted=0 AND (?2='' OR class_name=?2)"
+      "       ORDER BY class_name, last_name, first_name) s"
+      " LEFT JOIN attendance a ON a.student_uuid=s.uuid AND a.date_jalali=?1 AND a.deleted=0",
+      2, b);
+  if (!json) { reply_json(c, 500, "{\"ok\":false}"); return; }
+  char de[32];
+  json_esc(date, de, sizeof(de));
+  size_t cap = strlen(json) + 96;
+  char *body = (char *) malloc(cap);
+  snprintf(body, cap, "{\"ok\":true,\"date\":\"%s\",\"items\":%s}", de, json);
+  reply_json(c, 200, body);
+  free(body); free(json);
+}
+
+/* ---- attendance: set one student's status for a date ---- */
+static void api_attendance_set(struct mg_connection *c, struct mg_http_message *hm) {
+  struct mg_str js = mg_str_n(hm->body.ptr, hm->body.len);
+  char *stu = mg_json_get_str(js, "$.student_uuid");
+  char *date = mg_json_get_str(js, "$.date_jalali");
+  char *status = mg_json_get_str(js, "$.status"); /* present|late|absent|clear */
+  long mlate = mg_json_get_long(js, "$.minutes_late", 0);
+  if (!stu || !status) {
+    free(stu); free(date); free(status);
+    reply_json(c, 400, "{\"ok\":false,\"msg\":\"درخواست نامعتبر\"}");
+    return;
+  }
+  char today[24];
+  if (!date || !*date) { jalali_today(today, sizeof(today)); }
+  else snprintf(today, sizeof(today), "%s", date);
+  char hm2[8], ml[16], au[80];
+  now_hm(hm2, sizeof(hm2));
+  snprintf(ml, sizeof(ml), "%ld", mlate);
+  /* deterministic uuid per (student,date) keeps ops idempotent */
+  snprintf(au, sizeof(au), "att-%.36s-%s", stu, today);
+  for (char *p = au; *p; p++) if (*p == '/') *p = '-';
+
+  int ok;
+  if (!strcmp(status, "clear")) {
+    const char *b[2] = { stu, today };
+    ok = db_exec_b(g_db,
+        "DELETE FROM attendance WHERE student_uuid=?1 AND date_jalali=?2", 2, b) == 0;
+  } else {
+    const char *b[6] = { au, stu, today, status, ml, hm2 };
+    ok = db_exec_b(g_db,
+        "INSERT INTO attendance(uuid,student_uuid,date_jalali,status,minutes_late,scan_time)"
+        " VALUES(?1,?2,?3,?4,?5,?6)"
+        " ON CONFLICT(student_uuid,date_jalali) DO UPDATE SET"
+        " status=?4, minutes_late=?5, scan_time=?6, deleted=0", 6, b) == 0;
+  }
+  if (ok) {
+    const char *qb[6] = { au, stu, today, status, ml, hm2 };
+    db_exec_b(g_db,
+        "INSERT INTO queue(entity,op,payload) VALUES('attendance','set',"
+        " json_object('uuid',?1,'student_uuid',?2,'date_jalali',?3,'status',?4,"
+        " 'minutes_late',CAST(?5 AS INTEGER),'scan_time',?6,"
+        " 'server_id',(SELECT server_id FROM students WHERE uuid=?2)))", 6, qb);
+    g_sync_req = 1;
+    reply_json(c, 200, "{\"ok\":true}");
+  } else {
+    reply_json(c, 500, "{\"ok\":false,\"msg\":\"خطا در ذخیره محلی\"}");
+  }
+  free(stu); free(date); free(status);
+}
+
+/* ---- attendance: monthly summary per student ---- */
+static void api_attendance_report(struct mg_connection *c, struct mg_http_message *hm) {
+  char month[24] = "", cls[128] = ""; /* month = "1404/06" */
+  mg_http_get_var(&hm->query, "month", month, sizeof(month));
+  mg_http_get_var(&hm->query, "class", cls, sizeof(cls));
+  if (month[0] == 0) {
+    char d[24];
+    jalali_today(d, sizeof(d));
+    memcpy(month, d, 7);
+    month[7] = 0;
+  }
+  char like[32];
+  snprintf(like, sizeof(like), "%s/%%", month);
+  const char *b[2] = { like, cls };
+  char *json = db_text(g_db,
+      "SELECT COALESCE(json_group_array(json_object('uuid',s.uuid,"
+      "'first_name',s.first_name,'last_name',s.last_name,'class_name',s.class_name,"
+      "'present',(SELECT COUNT(*) FROM attendance a WHERE a.student_uuid=s.uuid AND a.deleted=0"
+      "  AND a.date_jalali LIKE ?1 AND a.status='present'),"
+      "'late',(SELECT COUNT(*) FROM attendance a WHERE a.student_uuid=s.uuid AND a.deleted=0"
+      "  AND a.date_jalali LIKE ?1 AND a.status='late'),"
+      "'absent',(SELECT COUNT(*) FROM attendance a WHERE a.student_uuid=s.uuid AND a.deleted=0"
+      "  AND a.date_jalali LIKE ?1 AND a.status='absent'))),'[]')"
+      " FROM (SELECT * FROM students WHERE deleted=0 AND (?2='' OR class_name=?2)"
+      " ORDER BY class_name, last_name) s",
+      2, b);
+  if (!json) { reply_json(c, 500, "{\"ok\":false}"); return; }
+  char me[32];
+  json_esc(month, me, sizeof(me));
+  size_t cap = strlen(json) + 96;
+  char *body = (char *) malloc(cap);
+  snprintf(body, cap, "{\"ok\":true,\"month\":\"%s\",\"items\":%s}", me, json);
+  reply_json(c, 200, body);
+  free(body); free(json);
+}
+
 /* Connect & login to the site server, obtain API key */
 static void api_settings(struct mg_connection *c, struct mg_http_message *hm) {
   struct mg_str js = mg_str_n(hm->body.ptr, hm->body.len);
@@ -773,6 +928,12 @@ static void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
     api_list(c, hm, "teachers");
   } else if (mg_http_match_uri(hm, "/api/mutate")) {
     api_mutate(c, hm);
+  } else if (mg_http_match_uri(hm, "/api/attendance")) {
+    api_attendance(c, hm);
+  } else if (mg_http_match_uri(hm, "/api/attendance-set")) {
+    api_attendance_set(c, hm);
+  } else if (mg_http_match_uri(hm, "/api/attendance-report")) {
+    api_attendance_report(c, hm);
   } else if (mg_http_match_uri(hm, "/api/queue")) {
     api_queue(c);
   } else if (mg_http_match_uri(hm, "/api/settings")) {
@@ -791,6 +952,14 @@ static void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
 /* ------------------------------------------------------------------ */
 /* Entry                                                               */
 /* ------------------------------------------------------------------ */
+
+#ifdef _WIN32
+static DWORD WINAPI http_thread(LPVOID arg) {
+  struct mg_mgr *mgr = (struct mg_mgr *) arg;
+  while (!g_quit) mg_mgr_poll(mgr, 100);
+  return 0;
+}
+#endif
 
 static int app_main(void) {
   char dir[1024];
@@ -831,24 +1000,25 @@ static int app_main(void) {
   pthread_create(&th, NULL, sync_thread, NULL);
 #endif
 
-  /* open the UI in the default browser */
   char open_url[160];
   snprintf(open_url, sizeof(open_url), "http://127.0.0.1:%d/", port);
+
 #ifdef _WIN32
-  ShellExecuteA(NULL, "open", open_url, NULL, NULL, SW_SHOWNORMAL);
+  /* Run the HTTP server on a worker thread; the native window (message
+   * loop) owns the main thread. */
+  HANDLE hs = CreateThread(NULL, 0, http_thread, &mgr, 0, NULL);
+  webwin_run(open_url); /* blocks until exit from tray menu */
+  g_quit = 1;
+  WaitForSingleObject(hs, 3000);
+  WaitForSingleObject(th, 3000);
 #else
   printf("SchoolDesk running at %s\n", open_url);
   fflush(stdout);
-#endif
-
   while (!g_quit) mg_mgr_poll(&mgr, 100);
-
-  mg_mgr_free(&mgr);
-#ifdef _WIN32
-  WaitForSingleObject(th, 3000);
-#else
   pthread_join(th, NULL);
 #endif
+
+  mg_mgr_free(&mgr);
   sqlite3_close(g_db);
   return 0;
 }

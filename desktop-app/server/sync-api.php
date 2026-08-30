@@ -41,6 +41,21 @@ foreach ([
     "CREATE INDEX idx_students_desk_uuid ON students(desk_uuid)",
     "CREATE INDEX idx_classes_desk_uuid  ON classes(desk_uuid)",
     "CREATE INDEX idx_teachers_desk_uuid ON teachers(desk_uuid)",
+    "CREATE TABLE IF NOT EXISTS student_attendance (
+        id int(11) NOT NULL AUTO_INCREMENT,
+        student_id int(11) NOT NULL,
+        academic_year varchar(20) DEFAULT NULL,
+        date_jalali varchar(10) NOT NULL,
+        status enum('present','absent','late') NOT NULL DEFAULT 'present',
+        minutes_late int(11) DEFAULT 0,
+        scan_time varchar(10) DEFAULT NULL,
+        source enum('manual','qr','auto') NOT NULL DEFAULT 'manual',
+        created_at_jalali varchar(30) DEFAULT NULL,
+        PRIMARY KEY (id),
+        UNIQUE KEY uniq_student_date (student_id, date_jalali)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+    "ALTER TABLE student_attendance ADD COLUMN scan_time varchar(10) DEFAULT NULL",
+    "ALTER TABLE student_attendance ADD COLUMN source enum('manual','qr','auto') NOT NULL DEFAULT 'manual'",
 ] as $ddl) { try { DB::execute($ddl); } catch (Exception $e) {} }
 
 /* ---------------- login ---------------- */
@@ -94,9 +109,21 @@ if ($action === 'pull') {
         "SELECT id, desk_uuid AS uuid, full_name, national_id, personnel_code, mobile, status
          FROM teachers WHERE status = 1 ORDER BY full_name");
 
+    // attendance: last 60 days only (keeps payload small)
+    $attendance = [];
+    try {
+        $attendance = DB::fetchAll(
+            "SELECT CONCAT('srv-', a.id) AS uuid, s.desk_uuid AS student_uuid, a.date_jalali,
+                    a.status, a.minutes_late, a.scan_time
+             FROM student_attendance a JOIN students s ON s.id = a.student_id
+             WHERE s.desk_uuid IS NOT NULL
+             ORDER BY a.id DESC LIMIT 5000");
+    } catch (Exception $e) {}
+
     $school = function_exists('get_setting') ? get_setting('report_header_line2', get_setting('school_name', '')) : '';
     sd_out(['ok' => true, 'students' => $students, 'classes' => $classes,
-            'teachers' => $teachers, 'school_name' => $school, 'year' => $year]);
+            'teachers' => $teachers, 'attendance' => $attendance,
+            'school_name' => $school, 'year' => $year]);
 }
 
 /* ---------------- push ---------------- */
@@ -201,6 +228,34 @@ if ($action === 'push') {
                     }
                     $res['ok'] = true;
                 }
+            } elseif ($entity === 'attendance') {
+                $stuUuid = trim($p['student_uuid'] ?? '');
+                $date = trim($p['date_jalali'] ?? '');
+                $status = trim($p['status'] ?? '');
+                if ($stuUuid === '' || $date === '') throw new Exception('اطلاعات حضورغیاب ناقص است');
+                $stu = DB::fetch("SELECT id FROM students WHERE desk_uuid = ?", [$stuUuid]);
+                if (!$stu) throw new Exception('دانش‌آموز هنوز روی سرور ساخته نشده (در تلاش بعدی ارسال می‌شود)');
+                if ($status === 'clear' || $status === '') {
+                    DB::execute("DELETE FROM student_attendance WHERE student_id = ? AND date_jalali = ?",
+                                [$stu['id'], $date]);
+                } else {
+                    if (!in_array($status, ['present', 'late', 'absent'])) throw new Exception('وضعیت نامعتبر');
+                    $ml = (int)($p['minutes_late'] ?? 0);
+                    $stime = trim($p['scan_time'] ?? '');
+                    $ex = DB::fetch("SELECT id FROM student_attendance WHERE student_id = ? AND date_jalali = ?",
+                                    [$stu['id'], $date]);
+                    if ($ex) {
+                        DB::execute("UPDATE student_attendance SET status=?, minutes_late=?, scan_time=?, source='manual' WHERE id=?",
+                                    [$status, $ml, $stime, $ex['id']]);
+                    } else {
+                        DB::execute("INSERT INTO student_attendance (student_id, academic_year, date_jalali, status, minutes_late, scan_time, source, created_at_jalali)
+                                     VALUES (?, ?, ?, ?, ?, ?, 'manual', ?)",
+                                    [$stu['id'], $year, $date, $status, $ml, $stime,
+                                     function_exists('jdate') ? jdate('Y/m/d H:i') : date('Y/m/d H:i')]);
+                    }
+                }
+                $res['ok'] = true;
+                $res['server_id'] = (int)$stu['id'];
             } else {
                 throw new Exception('نوع موجودیت ناشناخته');
             }

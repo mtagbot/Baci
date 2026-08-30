@@ -28,8 +28,9 @@ def dump(name, data, text=False):
     return "\n".join(out)
 
 html = open(os.path.join(src, "ui", "index.html"), "rb").read()
-reg  = open(os.path.join(tp, "Vazirmatn-Regular.woff2"), "rb").read()
-bold = open(os.path.join(tp, "Vazirmatn-Bold.woff2"), "rb").read()
+# .woff (not woff2): the embedded MSHTML control on Win7/8 doesn't do woff2
+reg  = open(os.path.join(tp, "Vazirmatn-Regular.woff"), "rb").read()
+bold = open(os.path.join(tp, "Vazirmatn-Bold.woff"), "rb").read()
 
 with open(os.path.join(tp, "blobs.h"), "w") as f:
     f.write("/* generated — do not edit */\n")
@@ -44,16 +45,18 @@ CFLAGS="-Os -DNDEBUG -DMG_ENABLE_MD5=0 -DMG_ENABLE_SSI=0 -DMG_ENABLE_DIRLIST=0 \
  -DSQLITE_DEFAULT_MEMSTATUS=0 -DSQLITE_OMIT_DEPRECATED -DSQLITE_OMIT_PROGRESS_CALLBACK \
  -DSQLITE_LIKE_DOESNT_MATCH_BLOBS -DSQLITE_MAX_EXPR_DEPTH=0 -I$TP -I$SRC"
 
-WINLIBS="-lws2_32 -lwinhttp -lshell32 -ladvapi32"
+WINLIBS="-lws2_32 -lwinhttp -lshell32 -ladvapi32 -lole32 -loleaut32 -luuid -lgdi32 -luser32"
+RES=""
+[ -f "$TP/app.res" ] && RES="$TP/app.res"
 
 echo "== Building x64 (Windows 7+ 64-bit) =="
 python3 -m ziglang cc -target x86_64-windows-gnu $CFLAGS \
-  "$SRC/main.c" "$TP/mongoose.c" "$TP/sqlite3.c" $WINLIBS \
+  "$SRC/main.c" "$SRC/webwin.c" "$TP/mongoose.c" "$TP/sqlite3.c" $RES $WINLIBS \
   -Wl,--subsystem,windows -o "$OUT/SchoolDesk-x64.exe"
 
 echo "== Building x86 (Windows 7+ 32-bit / old PCs) =="
 python3 -m ziglang cc -target x86-windows-gnu $CFLAGS \
-  "$SRC/main.c" "$TP/mongoose.c" "$TP/sqlite3.c" $WINLIBS \
+  "$SRC/main.c" "$SRC/webwin.c" "$TP/mongoose.c" "$TP/sqlite3.c" $RES $WINLIBS \
   -Wl,--subsystem,windows -o "$OUT/SchoolDesk-x86.exe"
 
 ls -la "$OUT"
