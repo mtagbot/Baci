@@ -615,3 +615,303 @@ CREATE TABLE IF NOT EXISTS "online_exam_webcam_snapshots" (
 
 -- Desktop seed: current academic year default
 INSERT OR IGNORE INTO "settings" ("key_name", "key_value") VALUES ('current_academic_year', '1404/1405');
+
+-- === DESK SYNC INFRASTRUCTURE ===
+
+CREATE TABLE IF NOT EXISTS "desk_change_log" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "tbl" TEXT NOT NULL,
+  "rid" TEXT NOT NULL,
+  "op" TEXT NOT NULL,
+  "ts" INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_dcl_tbl ON "desk_change_log" ("tbl","rid");
+CREATE TABLE IF NOT EXISTS "desk_sync_suppress" ("flag" INTEGER);
+
+CREATE TABLE IF NOT EXISTS "student_attendance" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "student_id" INTEGER NOT NULL,
+  "academic_year" TEXT DEFAULT NULL,
+  "date_jalali" TEXT NOT NULL,
+  "status" TEXT NOT NULL DEFAULT 'absent',
+  "minutes_late" INTEGER NOT NULL DEFAULT 0,
+  "note" TEXT DEFAULT NULL,
+  "notified_chats" INTEGER NOT NULL DEFAULT 0,
+  "review_status" TEXT NOT NULL DEFAULT 'pending',
+  "created_by_admin_id" INTEGER DEFAULT NULL,
+  "created_by_teacher_id" INTEGER DEFAULT NULL,
+  "created_at_jalali" TEXT NOT NULL,
+  "updated_at_jalali" TEXT DEFAULT NULL,
+  "scan_time" TEXT DEFAULT NULL,
+  "source" TEXT NOT NULL DEFAULT 'manual',
+  UNIQUE ("student_id", "date_jalali")
+);
+CREATE TABLE IF NOT EXISTS "student_qr_tags" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "student_id" INTEGER NOT NULL,
+  "token" TEXT NOT NULL,
+  "created_at_jalali" TEXT NOT NULL,
+  UNIQUE ("student_id"),
+  UNIQUE ("token")
+);
+CREATE TRIGGER IF NOT EXISTS trg_sync_academic_years_i AFTER INSERT ON "academic_years"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('academic_years', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_academic_years_u AFTER UPDATE ON "academic_years"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('academic_years', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_academic_years_d AFTER DELETE ON "academic_years"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('academic_years', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_admins_i AFTER INSERT ON "admins"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('admins', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_admins_u AFTER UPDATE ON "admins"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('admins', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_admins_d AFTER DELETE ON "admins"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('admins', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_teachers_i AFTER INSERT ON "teachers"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('teachers', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_teachers_u AFTER UPDATE ON "teachers"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('teachers', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_teachers_d AFTER DELETE ON "teachers"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('teachers', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_discipline_titles_i AFTER INSERT ON "discipline_titles"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('discipline_titles', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_discipline_titles_u AFTER UPDATE ON "discipline_titles"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('discipline_titles', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_discipline_titles_d AFTER DELETE ON "discipline_titles"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('discipline_titles', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_classes_i AFTER INSERT ON "classes"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('classes', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_classes_u AFTER UPDATE ON "classes"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('classes', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_classes_d AFTER DELETE ON "classes"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('classes', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_subjects_i AFTER INSERT ON "subjects"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('subjects', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_subjects_u AFTER UPDATE ON "subjects"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('subjects', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_subjects_d AFTER DELETE ON "subjects"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('subjects', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_class_schedules_i AFTER INSERT ON "class_schedules"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('class_schedules', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_class_schedules_u AFTER UPDATE ON "class_schedules"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('class_schedules', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_class_schedules_d AFTER DELETE ON "class_schedules"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('class_schedules', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_students_i AFTER INSERT ON "students"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('students', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_students_u AFTER UPDATE ON "students"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('students', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_students_d AFTER DELETE ON "students"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('students', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_student_discipline_records_i AFTER INSERT ON "student_discipline_records"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('student_discipline_records', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_student_discipline_records_u AFTER UPDATE ON "student_discipline_records"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('student_discipline_records', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_student_discipline_records_d AFTER DELETE ON "student_discipline_records"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('student_discipline_records', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_reports_i AFTER INSERT ON "reports"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('reports', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_reports_u AFTER UPDATE ON "reports"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('reports', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_reports_d AFTER DELETE ON "reports"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('reports', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_report_grades_i AFTER INSERT ON "report_grades"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('report_grades', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_report_grades_u AFTER UPDATE ON "report_grades"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('report_grades', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_report_grades_d AFTER DELETE ON "report_grades"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('report_grades', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_report_locks_i AFTER INSERT ON "report_locks"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('report_locks', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_report_locks_u AFTER UPDATE ON "report_locks"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('report_locks', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_report_locks_d AFTER DELETE ON "report_locks"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('report_locks', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_schedules_i AFTER INSERT ON "exam_schedules"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_schedules', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_schedules_u AFTER UPDATE ON "exam_schedules"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_schedules', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_schedules_d AFTER DELETE ON "exam_schedules"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_schedules', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_designs_i AFTER INSERT ON "exam_designs"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_designs', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_designs_u AFTER UPDATE ON "exam_designs"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_designs', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_designs_d AFTER DELETE ON "exam_designs"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_designs', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_question_bank_i AFTER INSERT ON "exam_question_bank"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_question_bank', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_question_bank_u AFTER UPDATE ON "exam_question_bank"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_question_bank', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_question_bank_d AFTER DELETE ON "exam_question_bank"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_question_bank', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_assignments_i AFTER INSERT ON "exam_assignments"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_assignments', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_assignments_u AFTER UPDATE ON "exam_assignments"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_assignments', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_assignments_d AFTER DELETE ON "exam_assignments"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_assignments', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_student_seating_i AFTER INSERT ON "exam_student_seating"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_student_seating', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_student_seating_u AFTER UPDATE ON "exam_student_seating"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_student_seating', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_student_seating_d AFTER DELETE ON "exam_student_seating"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_student_seating', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_exam_categories_i AFTER INSERT ON "online_exam_categories"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_exam_categories', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_exam_categories_u AFTER UPDATE ON "online_exam_categories"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_exam_categories', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_exam_categories_d AFTER DELETE ON "online_exam_categories"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_exam_categories', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_question_categories_i AFTER INSERT ON "online_question_categories"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_question_categories', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_question_categories_u AFTER UPDATE ON "online_question_categories"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_question_categories', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_question_categories_d AFTER DELETE ON "online_question_categories"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_question_categories', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_question_bank_i AFTER INSERT ON "online_question_bank"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_question_bank', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_question_bank_u AFTER UPDATE ON "online_question_bank"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_question_bank', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_question_bank_d AFTER DELETE ON "online_question_bank"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_question_bank', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_exams_i AFTER INSERT ON "online_exams"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_exams', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_exams_u AFTER UPDATE ON "online_exams"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_exams', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_exams_d AFTER DELETE ON "online_exams"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_exams', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_questions_i AFTER INSERT ON "online_questions"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_questions', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_questions_u AFTER UPDATE ON "online_questions"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_questions', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_questions_d AFTER DELETE ON "online_questions"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_questions', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_exam_attempts_i AFTER INSERT ON "online_exam_attempts"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_exam_attempts', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_exam_attempts_u AFTER UPDATE ON "online_exam_attempts"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_exam_attempts', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_exam_attempts_d AFTER DELETE ON "online_exam_attempts"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_exam_attempts', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_exam_answers_i AFTER INSERT ON "online_exam_answers"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_exam_answers', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_exam_answers_u AFTER UPDATE ON "online_exam_answers"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_exam_answers', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_online_exam_answers_d AFTER DELETE ON "online_exam_answers"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('online_exam_answers', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_grade_messages_i AFTER INSERT ON "grade_messages"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('grade_messages', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_grade_messages_u AFTER UPDATE ON "grade_messages"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('grade_messages', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_grade_messages_d AFTER DELETE ON "grade_messages"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('grade_messages', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_counseling_requests_i AFTER INSERT ON "counseling_requests"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('counseling_requests', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_counseling_requests_u AFTER UPDATE ON "counseling_requests"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('counseling_requests', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_counseling_requests_d AFTER DELETE ON "counseling_requests"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('counseling_requests', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_settings_i AFTER INSERT ON "settings"
+WHEN NEW.key_name NOT LIKE 'desk_%' AND NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('settings', NEW.key_name, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_settings_u AFTER UPDATE ON "settings"
+WHEN NEW.key_name NOT LIKE 'desk_%' AND NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('settings', NEW.key_name, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_settings_d AFTER DELETE ON "settings"
+WHEN OLD.key_name NOT LIKE 'desk_%' AND NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('settings', OLD.key_name, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_student_attendance_i AFTER INSERT ON "student_attendance"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('student_attendance', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_student_attendance_u AFTER UPDATE ON "student_attendance"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('student_attendance', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_student_attendance_d AFTER DELETE ON "student_attendance"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('student_attendance', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_student_qr_tags_i AFTER INSERT ON "student_qr_tags"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('student_qr_tags', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_student_qr_tags_u AFTER UPDATE ON "student_qr_tags"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('student_qr_tags', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_student_qr_tags_d AFTER DELETE ON "student_qr_tags"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('student_qr_tags', OLD.id, 'D', strftime('%s','now')); END;
