@@ -40,7 +40,7 @@ with open(os.path.join(tp, "blobs.h"), "w") as f:
 print("blobs.h:", os.path.getsize(os.path.join(tp, "blobs.h")), "bytes")
 EOF
 
-CFLAGS="-Os -DNDEBUG -DMG_ENABLE_MD5=0 -DMG_ENABLE_SSI=0 -DMG_ENABLE_DIRLIST=0 \
+CFLAGS="-O2 -DNDEBUG -DMG_ENABLE_MD5=0 -DMG_ENABLE_SSI=0 -DMG_ENABLE_DIRLIST=0 \
  -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_ENABLE_JSON1 -DSQLITE_THREADSAFE=1 \
  -DSQLITE_DEFAULT_MEMSTATUS=0 -DSQLITE_OMIT_DEPRECATED -DSQLITE_OMIT_PROGRESS_CALLBACK \
  -DSQLITE_LIKE_DOESNT_MATCH_BLOBS -DSQLITE_MAX_EXPR_DEPTH=0 -I$TP -I$SRC"
@@ -52,11 +52,11 @@ RES=""
 echo "== Building x64 (Windows 7+ 64-bit) =="
 python3 -m ziglang cc -target x86_64-windows-gnu $CFLAGS \
   "$SRC/main.c" "$SRC/webwin.c" "$TP/mongoose.c" "$TP/sqlite3.c" $RES $WINLIBS \
-  -Wl,--subsystem,windows -o "$OUT/SchoolDesk-x64.exe"
+  -Wl,--subsystem,windows -s -o "$OUT/SchoolDesk-x64.exe"
 
 echo "== Building x86 (Windows 7+ 32-bit / old PCs) =="
 python3 -m ziglang cc -target x86-windows-gnu $CFLAGS \
   "$SRC/main.c" "$SRC/webwin.c" "$TP/mongoose.c" "$TP/sqlite3.c" $RES $WINLIBS \
-  -Wl,--subsystem,windows -o "$OUT/SchoolDesk-x86.exe"
+  -Wl,--subsystem,windows -s -o "$OUT/SchoolDesk-x86.exe"
 
 ls -la "$OUT"

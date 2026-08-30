@@ -22,8 +22,8 @@
 #include "sqlite3.h"
 #include "blobs.h" /* generated: BLOB_UI_HTML, BLOB_FONT_REG, BLOB_FONT_BOLD */
 
-#define APP_VERSION "1.3.0"
-#define SYNC_PERIOD_TICKS 60 /* x500ms = 30s */
+#define APP_VERSION "1.4.0"
+#define SYNC_PERIOD_TICKS 30 /* x500ms = 15s (etag makes idle pulls ~free) */
 
 #ifdef _WIN32
 #include <windows.h>
@@ -237,6 +237,31 @@ static int parse_url(const char *url, int *https, char *host, size_t hcap,
 }
 
 #ifdef _WIN32
+#ifndef WINHTTP_OPTION_DECOMPRESSION
+#define WINHTTP_OPTION_DECOMPRESSION 118
+#endif
+#ifndef WINHTTP_DECOMPRESSION_FLAG_GZIP
+#define WINHTTP_DECOMPRESSION_FLAG_GZIP 0x00000001
+#define WINHTTP_DECOMPRESSION_FLAG_DEFLATE 0x00000002
+#endif
+
+/* --- persistent connection cache: reusing the TCP+TLS connection cuts
+ *     per-request latency from ~0.5-2s (handshake) to a few ms --- */
+static CRITICAL_SECTION g_http_cs;
+static HINTERNET g_http_ses = NULL, g_http_con = NULL;
+static char g_http_key[360];
+static int g_http_init_done = 0;
+
+static void http_init(void) {
+  if (!g_http_init_done) { InitializeCriticalSection(&g_http_cs); g_http_init_done = 1; }
+}
+
+static void http_drop_conn(void) { /* call with lock held */
+  if (g_http_con) { WinHttpCloseHandle(g_http_con); g_http_con = NULL; }
+  if (g_http_ses) { WinHttpCloseHandle(g_http_ses); g_http_ses = NULL; }
+  g_http_key[0] = 0;
+}
+
 /* one HTTP round-trip; on 3xx *loc receives the absolute Location header */
 static int http_post_once(const char *url, const char *body, int insecure,
                           char **out, size_t *outlen, char *loc, size_t loccap) {
@@ -251,22 +276,38 @@ static int http_post_once(const char *url, const char *body, int insecure,
   MultiByteToWideChar(CP_UTF8, 0, host, -1, whost, 256);
   MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, 1024);
 
-  HINTERNET ses = WinHttpOpen(L"SchoolDesk/1.0",
-                              WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-                              WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
-  if (!ses) return -1;
-  /* enable TLS 1.1/1.2 explicitly (Windows 7 compat) */
-  DWORD protos = 0x00000080 /*TLS1*/ | 0x00000200 /*TLS1.1*/ | 0x00000800 /*TLS1.2*/;
-  WinHttpSetOption(ses, WINHTTP_OPTION_SECURE_PROTOCOLS, &protos, sizeof(protos));
-  WinHttpSetTimeouts(ses, 8000, 8000, 15000, 20000);
+  http_init();
+  EnterCriticalSection(&g_http_cs);
 
-  HINTERNET con = WinHttpConnect(ses, whost, (INTERNET_PORT) port, 0);
-  if (con) {
-    HINTERNET req = WinHttpOpenRequest(con, L"POST", wpath, NULL,
+  char want_key[360];
+  snprintf(want_key, sizeof(want_key), "%d|%s|%d", https, host, port);
+  if (strcmp(want_key, g_http_key) != 0) http_drop_conn();
+
+  for (int attempt = 0; attempt < 2 && status < 0; attempt++) {
+    if (!g_http_ses) {
+      g_http_ses = WinHttpOpen(L"SchoolDesk/1.0",
+                               WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                               WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+      if (!g_http_ses) break;
+      /* enable TLS 1.1/1.2 explicitly (Windows 7 compat) */
+      DWORD protos = 0x00000080 /*TLS1*/ | 0x00000200 /*TLS1.1*/ | 0x00000800 /*TLS1.2*/;
+      WinHttpSetOption(g_http_ses, WINHTTP_OPTION_SECURE_PROTOCOLS, &protos, sizeof(protos));
+      WinHttpSetTimeouts(g_http_ses, 8000, 8000, 15000, 20000);
+    }
+    if (!g_http_con) {
+      g_http_con = WinHttpConnect(g_http_ses, whost, (INTERNET_PORT) port, 0);
+      if (!g_http_con) { http_drop_conn(); continue; }
+      snprintf(g_http_key, sizeof(g_http_key), "%s", want_key);
+    }
+    HINTERNET req = WinHttpOpenRequest(g_http_con, L"POST", wpath, NULL,
                                        WINHTTP_NO_REFERER,
                                        WINHTTP_DEFAULT_ACCEPT_TYPES,
                                        https ? WINHTTP_FLAG_SECURE : 0);
     if (req) {
+      /* transparent gzip/deflate (Win 8.1+; silently ignored on Win 7,
+       * where the server then answers uncompressed) */
+      DWORD dec = WINHTTP_DECOMPRESSION_FLAG_GZIP | WINHTTP_DECOMPRESSION_FLAG_DEFLATE;
+      WinHttpSetOption(req, WINHTTP_OPTION_DECOMPRESSION, &dec, sizeof(dec));
       /* handle redirects OURSELVES: WinHTTP drops the POST body when
        * auto-following (http->https or www redirects broke login) */
       DWORD rp = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
@@ -278,6 +319,9 @@ static int http_post_once(const char *url, const char *body, int insecure,
         WinHttpSetOption(req, WINHTTP_OPTION_SECURITY_FLAGS, &f, sizeof(f));
       }
       DWORD blen = (DWORD) strlen(body);
+      /* NOTE: no manual Accept-Encoding header — WINHTTP_OPTION_DECOMPRESSION
+       * adds it itself where supported (Win 8.1+) and decompresses
+       * transparently; Windows 7 then simply receives plain JSON. */
       if (WinHttpSendRequest(req, L"Content-Type: application/json\r\n",
                              (DWORD) -1L, (LPVOID) body, blen, blen, 0) &&
           WinHttpReceiveResponse(req, NULL)) {
@@ -305,12 +349,20 @@ static int http_post_once(const char *url, const char *body, int insecure,
         } while (got > 0);
         buf[len] = 0;
         *out = buf; *outlen = len;
+      } else {
+        /* stale keep-alive connection? drop it and retry once */
+        WinHttpCloseHandle(req);
+        http_drop_conn();
+        continue;
       }
       WinHttpCloseHandle(req);
+    } else {
+      http_drop_conn();
+      continue;
     }
-    WinHttpCloseHandle(con);
+    break; /* success or HTTP-level status obtained */
   }
-  WinHttpCloseHandle(ses);
+  LeaveCriticalSection(&g_http_cs);
   return status;
 }
 
@@ -356,7 +408,7 @@ static int http_post(const char *url, const char *body, int insecure,
   fclose(f);
   char cmd[2048];
   snprintf(cmd, sizeof(cmd),
-           "curl -s -m 25 -L --post301 --post302 --post303 %s -X POST "
+           "curl -s -m 25 -L --post301 --post302 --post303 --compressed %s -X POST "
            "-H 'Content-Type: application/json' "
            "--data-binary @%s -w '\\n%%{http_code}' '%s' 2>/dev/null",
            insecure ? "-k" : "", tmpl, url);
@@ -403,7 +455,7 @@ static int sync_push_batch(sqlite3 *db, const char *api, const char *key, int in
   const char *kb[1] = { key };
   char *ops = db_text(db,
       "SELECT json_group_array(json_object('op_id',id,'entity',entity,'op',op,"
-      "'payload',json(payload))) FROM (SELECT * FROM queue ORDER BY id LIMIT 40)",
+      "'payload',json(payload))) FROM (SELECT * FROM queue ORDER BY id LIMIT 200)",
       0, NULL);
   (void) kb;
   if (!ops || !strcmp(ops, "[]")) { free(ops); return 0; }
@@ -422,6 +474,8 @@ static int sync_push_batch(sqlite3 *db, const char *api, const char *key, int in
   if (st != 200 || !resp) { free(resp); return -1; }
 
   const char *rb[1] = { resp };
+  /* our push changed server data — force a full pull afterwards */
+  meta_set(db, "pull_etag", "");
   /* remove acknowledged ops */
   db_exec_b(db,
       "DELETE FROM queue WHERE id IN (SELECT json_extract(value,'$.op_id')"
@@ -462,9 +516,17 @@ static int sync_push_batch(sqlite3 *db, const char *api, const char *key, int in
 }
 
 static int sync_pull(sqlite3 *db, const char *api, const char *key, int insecure) {
-  char kesc[256], body[512];
+  char kesc[256], body[640];
   json_esc(key, kesc, sizeof(kesc));
-  snprintf(body, sizeof(body), "{\"action\":\"pull\",\"api_key\":\"%s\"}", kesc);
+  /* send the fingerprint of our last snapshot: the server answers with a
+   * tiny {unchanged:true} when nothing changed — near-zero traffic */
+  char *tag = meta_get(db, "pull_etag");
+  if (tag && *tag)
+    snprintf(body, sizeof(body),
+             "{\"action\":\"pull\",\"api_key\":\"%s\",\"etag\":\"%.64s\"}", kesc, tag);
+  else
+    snprintf(body, sizeof(body), "{\"action\":\"pull\",\"api_key\":\"%s\"}", kesc);
+  free(tag);
   char *resp = NULL;
   size_t rlen = 0;
   int st = http_post(api, body, insecure, &resp, &rlen);
@@ -473,6 +535,15 @@ static int sync_pull(sqlite3 *db, const char *api, const char *key, int insecure
   struct mg_str js = mg_str_n(resp, rlen);
   bool okv = false;
   if (!mg_json_get_bool(js, "$.ok", &okv) || !okv) { free(resp); return -1; }
+
+  bool unchanged = false;
+  if (mg_json_get_bool(js, "$.unchanged", &unchanged) && unchanged) {
+    char *now = db_text(db, "SELECT datetime('now','localtime')", 0, NULL);
+    meta_set(db, "last_sync", now ? now : "");
+    free(now);
+    free(resp);
+    return 0;
+  }
 
   const char *rb[1] = { resp };
   sqlite3_exec(db, "BEGIN", 0, 0, 0);
@@ -522,8 +593,10 @@ static int sync_pull(sqlite3 *db, const char *api, const char *key, int insecure
 
   char *sname = mg_json_get_str(js, "$.school_name");
   char *year = mg_json_get_str(js, "$.year");
+  char *netag = mg_json_get_str(js, "$.etag");
   if (sname) { meta_set(db, "school_name", sname); free(sname); }
   if (year) { meta_set(db, "year", year); free(year); }
+  if (netag) { meta_set(db, "pull_etag", netag); free(netag); }
 
   char *now = db_text(db, "SELECT datetime('now','localtime')", 0, NULL);
   meta_set(db, "last_sync", now ? now : "");
@@ -580,11 +653,11 @@ static void *sync_thread(void *arg) {
   sqlite3 *db = NULL;
   if (db_open(&db) != 0) goto out;
   db_init(db);
-  int tick = SYNC_PERIOD_TICKS - 4; /* first sync ~2s after start */
+  int tick = SYNC_PERIOD_TICKS * 2 - 4; /* first sync ~1s after start */
   while (!g_quit) {
-    SLEEP_MS(500);
+    SLEEP_MS(250); /* react to UI changes within a quarter second */
     tick++;
-    if (g_sync_req || tick >= SYNC_PERIOD_TICKS) {
+    if (g_sync_req || tick >= SYNC_PERIOD_TICKS * 2) {
       g_sync_req = 0;
       tick = 0;
       do_sync(db);
@@ -1131,6 +1204,7 @@ static void api_settings(struct mg_connection *c, struct mg_http_message *hm) {
   meta_set(g_db, "server_url", url);
   meta_set(g_db, "api_key", key ? key : "");
   meta_set(g_db, "insecure", insecure ? "1" : "0");
+  meta_set(g_db, "pull_etag", ""); /* force a full snapshot on next sync */
   if (sname) meta_set(g_db, "school_name", sname);
   g_sync_req = 1;
   reply_json(c, 200, "{\"ok\":true}");
@@ -1193,7 +1267,7 @@ static void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
 #ifdef _WIN32
 static DWORD WINAPI http_thread(LPVOID arg) {
   struct mg_mgr *mgr = (struct mg_mgr *) arg;
-  while (!g_quit) mg_mgr_poll(mgr, 100);
+  while (!g_quit) mg_mgr_poll(mgr, 20);
   return 0;
 }
 #endif
@@ -1251,7 +1325,7 @@ static int app_main(void) {
 #else
   printf("SchoolDesk running at %s\n", open_url);
   fflush(stdout);
-  while (!g_quit) mg_mgr_poll(&mgr, 100);
+  while (!g_quit) mg_mgr_poll(&mgr, 20);
   pthread_join(th, NULL);
 #endif
 

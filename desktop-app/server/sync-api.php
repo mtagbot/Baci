@@ -26,14 +26,23 @@ header('Content-Type: application/json; charset=utf-8');
 
 function sd_out($arr) {
     while (ob_get_level() > 0) { @ob_end_clean(); }
-    echo json_encode($arr, JSON_UNESCAPED_UNICODE);
+    $json = json_encode($arr, JSON_UNESCAPED_UNICODE);
+    /* gzip: shrinks big pulls ~10x — client advertises support explicitly */
+    if (isset($_SERVER['HTTP_ACCEPT_ENCODING']) &&
+        strpos($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip') !== false &&
+        function_exists('gzencode') && strlen($json) > 1024) {
+        $gz = @gzencode($json, 1);
+        if ($gz !== false) { header('Content-Encoding: gzip'); $json = $gz; }
+    }
+    header('Content-Length: ' . strlen($json));
+    echo $json;
     exit;
 }
 function sd_fail($msg) { sd_out(['ok' => false, 'msg' => $msg]); }
 
 /* GET ping: open https://site/sync-api.php in a browser to verify install */
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    sd_out(['ok' => true, 'ping' => 'sync-api ready', 'version' => '1.3.0',
+    sd_out(['ok' => true, 'ping' => 'sync-api ready', 'version' => '1.4.0',
             'php' => PHP_VERSION, 'time' => date('Y-m-d H:i:s')]);
 }
 
@@ -42,7 +51,10 @@ $in = json_decode($raw, true);
 if (!is_array($in)) sd_fail('درخواست نامعتبر (JSON دریافت نشد)');
 $action = $in['action'] ?? '';
 
-/* ---- ensure schema bits (safe / idempotent) ---- */
+/* ---- ensure schema bits (safe / idempotent) ----
+ * Heavy DDL (ALTERs raise costly exceptions when columns exist) runs only
+ * on login — pull/push every 30s skip it entirely for speed. */
+if ($action === 'login') {
 try { DB::execute("CREATE TABLE IF NOT EXISTS desk_api_keys (
     id INT AUTO_INCREMENT PRIMARY KEY,
     admin_id INT NOT NULL,
@@ -74,6 +86,7 @@ foreach ([
     "ALTER TABLE student_attendance ADD COLUMN scan_time varchar(10) DEFAULT NULL",
     "ALTER TABLE student_attendance ADD COLUMN source enum('manual','qr','auto') NOT NULL DEFAULT 'manual'",
 ] as $ddl) { try { DB::execute($ddl); } catch (Exception $e) {} }
+} /* end login-only DDL */
 
 /* ---------------- login ---------------- */
 if ($action === 'login') {
@@ -95,20 +108,44 @@ $key = trim($in['api_key'] ?? '');
 if ($key === '') sd_fail('کلید API ارسال نشده');
 $keyRow = DB::fetch("SELECT * FROM desk_api_keys WHERE api_key = ?", [$key]);
 if (!$keyRow) sd_fail('کلید API نامعتبر است — دوباره از تنظیمات متصل شوید');
-DB::execute("UPDATE desk_api_keys SET last_used = NOW() WHERE id = ?", [$keyRow['id']]);
+/* update last_used lazily (once per ~10 min) — saves a write on every call */
+try {
+    if (empty($keyRow['last_used']) || strtotime($keyRow['last_used']) < time() - 600)
+        DB::execute("UPDATE desk_api_keys SET last_used = NOW() WHERE id = ?", [$keyRow['id']]);
+} catch (Exception $e) {}
 
 $year = function_exists('get_current_academic_year') ? get_current_academic_year() : '';
 
 /* backfill uuids for rows created on the website itself */
 function sd_backfill($table) {
-    $rows = DB::fetchAll("SELECT id FROM {$table} WHERE desk_uuid IS NULL OR desk_uuid = '' LIMIT 500");
-    foreach ($rows as $r) {
-        DB::execute("UPDATE {$table} SET desk_uuid = ? WHERE id = ?", [bin2hex(random_bytes(16)), $r['id']]);
-    }
+    /* single UPDATE instead of row-by-row round trips */
+    try {
+        DB::execute("UPDATE {$table} SET desk_uuid = MD5(CONCAT(id, '-', RAND(), '-', UUID()))
+                     WHERE desk_uuid IS NULL OR desk_uuid = ''");
+    } catch (Exception $e) {}
 }
 
 /* ---------------- pull ---------------- */
 if ($action === 'pull') {
+    /* cheap change-fingerprint: if nothing changed since the client's last
+     * pull, answer with a tiny {unchanged:true} instead of the full snapshot */
+    $etag = '';
+    try {
+        $fp = [];
+        foreach (['students', 'classes', 'teachers', 'student_attendance',
+                  'reports', 'report_grades'] as $t) {
+            try {
+                $r = DB::fetch("SELECT COUNT(*) c, COALESCE(MAX(id),0) m FROM {$t}");
+                $fp[] = $r['c'] . ':' . $r['m'];
+            } catch (Exception $e) { $fp[] = 'x'; }
+        }
+        $etag = md5(implode('|', $fp));
+    } catch (Exception $e) {}
+    $clientTag = (string) ($in['etag'] ?? '');
+    if ($etag !== '' && $clientTag !== '' && $clientTag === $etag) {
+        sd_out(['ok' => true, 'unchanged' => true, 'etag' => $etag]);
+    }
+
     sd_backfill('students'); sd_backfill('classes'); sd_backfill('teachers');
 
     $students = DB::fetchAll(
@@ -163,7 +200,7 @@ if ($action === 'pull') {
     sd_out(['ok' => true, 'students' => $students, 'classes' => $classes,
             'teachers' => $teachers, 'attendance' => $attendance,
             'grades' => $grades, 'subjects' => $subjects,
-            'school_name' => $school, 'year' => $year]);
+            'school_name' => $school, 'year' => $year, 'etag' => $etag]);
 }
 
 /* ---------------- push ---------------- */
