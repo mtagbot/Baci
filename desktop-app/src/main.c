@@ -22,7 +22,7 @@
 #include "sqlite3.h"
 #include "blobs.h" /* generated: BLOB_UI_HTML, BLOB_FONT_REG, BLOB_FONT_BOLD */
 
-#define APP_VERSION "1.2.0"
+#define APP_VERSION "1.3.0"
 #define SYNC_PERIOD_TICKS 60 /* x500ms = 30s */
 
 #ifdef _WIN32
@@ -237,11 +237,13 @@ static int parse_url(const char *url, int *https, char *host, size_t hcap,
 }
 
 #ifdef _WIN32
-static int http_post(const char *url, const char *body, int insecure,
-                     char **out, size_t *outlen) {
+/* one HTTP round-trip; on 3xx *loc receives the absolute Location header */
+static int http_post_once(const char *url, const char *body, int insecure,
+                          char **out, size_t *outlen, char *loc, size_t loccap) {
   int https = 0, port = 0, status = -1;
   char host[256], path[1024];
   *out = NULL; *outlen = 0;
+  if (loc && loccap) loc[0] = 0;
   if (parse_url(url, &https, host, sizeof(host), &port, path, sizeof(path)))
     return -1;
 
@@ -256,7 +258,7 @@ static int http_post(const char *url, const char *body, int insecure,
   /* enable TLS 1.1/1.2 explicitly (Windows 7 compat) */
   DWORD protos = 0x00000080 /*TLS1*/ | 0x00000200 /*TLS1.1*/ | 0x00000800 /*TLS1.2*/;
   WinHttpSetOption(ses, WINHTTP_OPTION_SECURE_PROTOCOLS, &protos, sizeof(protos));
-  WinHttpSetTimeouts(ses, 8000, 8000, 20000, 30000);
+  WinHttpSetTimeouts(ses, 8000, 8000, 15000, 20000);
 
   HINTERNET con = WinHttpConnect(ses, whost, (INTERNET_PORT) port, 0);
   if (con) {
@@ -265,6 +267,10 @@ static int http_post(const char *url, const char *body, int insecure,
                                        WINHTTP_DEFAULT_ACCEPT_TYPES,
                                        https ? WINHTTP_FLAG_SECURE : 0);
     if (req) {
+      /* handle redirects OURSELVES: WinHTTP drops the POST body when
+       * auto-following (http->https or www redirects broke login) */
+      DWORD rp = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
+      WinHttpSetOption(req, WINHTTP_OPTION_REDIRECT_POLICY, &rp, sizeof(rp));
       if (insecure && https) {
         DWORD f = SECURITY_FLAG_IGNORE_UNKNOWN_CA |
                   SECURITY_FLAG_IGNORE_CERT_CN_INVALID |
@@ -280,11 +286,19 @@ static int http_post(const char *url, const char *body, int insecure,
                             WINHTTP_HEADER_NAME_BY_INDEX, &st, &stl,
                             WINHTTP_NO_HEADER_INDEX);
         status = (int) st;
+        if (status >= 301 && status <= 308 && loc && loccap) {
+          wchar_t wloc[1024];
+          DWORD wl = sizeof(wloc);
+          if (WinHttpQueryHeaders(req, WINHTTP_QUERY_LOCATION,
+                                  WINHTTP_HEADER_NAME_BY_INDEX, wloc, &wl,
+                                  WINHTTP_NO_HEADER_INDEX))
+            WideCharToMultiByte(CP_UTF8, 0, wloc, -1, loc, (int) loccap, NULL, NULL);
+        }
         size_t cap = 65536, len = 0;
         char *buf = (char *) malloc(cap);
         DWORD got = 0;
         do {
-          if (len + 16384 > cap) { cap *= 2; buf = (char *) realloc(buf, cap); }
+          if (len + 16384 + 1 > cap) { cap *= 2; buf = (char *) realloc(buf, cap); }
           got = 0;
           if (!WinHttpReadData(req, buf + len, 16384, &got)) break;
           len += got;
@@ -299,6 +313,37 @@ static int http_post(const char *url, const char *body, int insecure,
   WinHttpCloseHandle(ses);
   return status;
 }
+
+/* follows up to 3 redirects (keeping method+body), returns final status */
+static int http_post(const char *url, const char *body, int insecure,
+                     char **out, size_t *outlen) {
+  char cur[1200], loc[1200];
+  snprintf(cur, sizeof(cur), "%s", url);
+  int status = -1;
+  for (int hop = 0; hop < 4; hop++) {
+    status = http_post_once(cur, body, insecure, out, outlen, loc, sizeof(loc));
+    if (status >= 301 && status <= 308 && loc[0]) {
+      if (!strncmp(loc, "http://", 7) || !strncmp(loc, "https://", 8)) {
+        snprintf(cur, sizeof(cur), "%s", loc);
+      } else if (loc[0] == '/') { /* relative redirect: keep scheme+host */
+        int https = 0, port = 0;
+        char host[256], path[1024];
+        if (parse_url(cur, &https, host, sizeof(host), &port, path, sizeof(path)))
+          return status;
+        if ((https && port == 443) || (!https && port == 80))
+          snprintf(cur, sizeof(cur), "%s://%s%s", https ? "https" : "http", host, loc);
+        else
+          snprintf(cur, sizeof(cur), "%s://%s:%d%s", https ? "https" : "http", host, port, loc);
+      } else {
+        return status;
+      }
+      if (*out) { free(*out); *out = NULL; *outlen = 0; }
+      continue;
+    }
+    return status;
+  }
+  return status;
+}
 #else
 /* Linux debug build: use system curl (sandbox testing only) */
 static int http_post(const char *url, const char *body, int insecure,
@@ -311,7 +356,8 @@ static int http_post(const char *url, const char *body, int insecure,
   fclose(f);
   char cmd[2048];
   snprintf(cmd, sizeof(cmd),
-           "curl -s -m 25 %s -X POST -H 'Content-Type: application/json' "
+           "curl -s -m 25 -L --post301 --post302 --post303 %s -X POST "
+           "-H 'Content-Type: application/json' "
            "--data-binary @%s -w '\\n%%{http_code}' '%s' 2>/dev/null",
            insecure ? "-k" : "", tmpl, url);
   FILE *p = popen(cmd, "r");
@@ -1075,6 +1121,13 @@ static void api_settings(struct mg_connection *c, struct mg_http_message *hm) {
   }
   char *key = mg_json_get_str(rj, "$.api_key");
   char *sname = mg_json_get_str(rj, "$.school_name");
+  if (!key || !*key) { /* ok:true but no key — e.g. ping JSON via a redirect */
+    free(key); free(sname); free(resp); free(url); free(user); free(pass);
+    reply_json(c, 200,
+        "{\"ok\":false,\"msg\":\"سرور پاسخ داد اما کلید ورود صادر نشد — احتمالا آدرس به صفحه دیگری هدایت می‌شود. "
+        "آدرس دقیق سایت (با https و www اگر دارد) را وارد کنید\"}");
+    return;
+  }
   meta_set(g_db, "server_url", url);
   meta_set(g_db, "api_key", key ? key : "");
   meta_set(g_db, "insecure", insecure ? "1" : "0");

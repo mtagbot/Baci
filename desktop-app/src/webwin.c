@@ -30,6 +30,7 @@ extern volatile int g_sync_req;  /* from main.c */
 static HWND g_hwnd = NULL;
 static IWebBrowser2 *g_wb = NULL;
 static IOleObject *g_ole = NULL;
+static IOleInPlaceActiveObject *g_ao = NULL; /* keyboard accelerator routing */
 static char g_nav_url[256];
 
 /* ------------------------------------------------------------------ */
@@ -107,6 +108,30 @@ static IOleInPlaceSiteVtbl g_ip_vtbl = {
   IP_DeactivateAndUndo, IP_OnPosRectChange
 };
 
+/* ---- run a JS snippet inside the hosted page (keyboard bridge) ---- */
+static void exec_script(const wchar_t *code) {
+  IWebBrowser2 *wb = g_wb;
+  if (!wb) return;
+  IDispatch *dd = NULL;
+  if (FAILED(IWebBrowser2_get_Document(wb, &dd)) || !dd) return;
+  IHTMLDocument2 *doc = NULL;
+  if (SUCCEEDED(IDispatch_QueryInterface(dd, &IID_IHTMLDocument2, (void **) &doc)) && doc) {
+    IHTMLWindow2 *win = NULL;
+    if (SUCCEEDED(IHTMLDocument2_get_parentWindow(doc, &win)) && win) {
+      BSTR c = SysAllocString(code), l = SysAllocString(L"JavaScript");
+      VARIANT v;
+      VariantInit(&v);
+      IHTMLWindow2_execScript(win, c, l, &v);
+      VariantClear(&v);
+      SysFreeString(c);
+      SysFreeString(l);
+      IHTMLWindow2_Release(win);
+    }
+    IHTMLDocument2_Release(doc);
+  }
+  IDispatch_Release(dd);
+}
+
 /* ---- IDocHostUIHandler: kill context menu / borders, force modern look ---- */
 static HRESULT STDMETHODCALLTYPE UI_QueryInterface(IDocHostUIHandler *self, REFIID riid, void **ppv) {
   (void) self; return Site_QueryInterface(&g_host.site, riid, ppv);
@@ -115,7 +140,11 @@ static ULONG STDMETHODCALLTYPE UI_AddRef(IDocHostUIHandler *self) { (void) self;
 static ULONG STDMETHODCALLTYPE UI_Release(IDocHostUIHandler *self) { (void) self; return 1; }
 static HRESULT STDMETHODCALLTYPE UI_ShowContextMenu(IDocHostUIHandler *self, DWORD id, POINT *pt,
     IUnknown *pu, IDispatch *pd) {
-  (void) self; (void) id; (void) pt; (void) pu; (void) pd;
+  (void) self; (void) pt; (void) pu; (void) pd;
+  /* allow the standard copy/cut/paste menu on text inputs (2) and on
+   * selected text (4); suppress the full IE menu everywhere else */
+  if (id == 2 /*CONTEXT_MENU_CONTROL*/ || id == 4 /*CONTEXT_MENU_TEXTSELECT*/)
+    return S_FALSE;
   return S_OK; /* S_OK = we handled it -> no IE context menu */
 }
 static HRESULT STDMETHODCALLTYPE UI_GetHostInfo(IDocHostUIHandler *self, DOCHOSTUIINFO *info) {
@@ -138,8 +167,46 @@ static HRESULT STDMETHODCALLTYPE UI_OnFrameWindowActivate(IDocHostUIHandler *sel
 static HRESULT STDMETHODCALLTYPE UI_ResizeBorder(IDocHostUIHandler *self, LPCRECT rc, IOleInPlaceUIWindow *w, BOOL f) {
   (void) self; (void) rc; (void) w; (void) f; return S_OK;
 }
+/* forward an app-level shortcut into the page: window.sdKey('name') */
+static void bridge_key(const wchar_t *name) {
+  wchar_t js[128];
+  _snwprintf(js, 128, L"try{window.sdKey&&window.sdKey('%s')}catch(e){}", name);
+  js[127] = 0;
+  exec_script(js);
+}
+
 static HRESULT STDMETHODCALLTYPE UI_TranslateAccelerator(IDocHostUIHandler *self, LPMSG msg, const GUID *g, DWORD cmd) {
-  (void) self; (void) msg; (void) g; (void) cmd; return S_FALSE;
+  (void) self; (void) g; (void) cmd;
+  /* App-level shortcuts: intercept BEFORE MSHTML so IE dialogs never
+   * appear; forward them into the page as window.sdKey('...').
+   * Everything else — Ctrl+C/X/V/A/Z/Y, Tab, arrows, Home/End,
+   * Delete, Enter... — passes through to MSHTML so text editing
+   * behaves exactly like any Windows program. */
+  if (msg && msg->message == WM_KEYDOWN) {
+    int ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+    if (ctrl) {
+      switch (msg->wParam) {
+        case 'S': bridge_key(L"save");   return S_OK; /* save open form   */
+        case 'N': bridge_key(L"new");    return S_OK; /* new record       */
+        case 'F': bridge_key(L"find");   return S_OK; /* focus search box */
+        case 'P': bridge_key(L"print");  return S_OK; /* app print        */
+        case 'R': bridge_key(L"refresh");return S_OK; /* reload view data */
+        case 'O': case 'L': case 'J': case 'H': case 'E':
+          return S_OK; /* IE open/url/downloads/history/search — block */
+      }
+      if (msg->wParam >= '1' && msg->wParam <= '9') { /* Ctrl+1..9 views */
+        wchar_t nm[8] = { L'v', L'i', L'e', L'w', (wchar_t) msg->wParam, 0 };
+        bridge_key(nm);
+        return S_OK;
+      }
+    }
+    if (msg->wParam == VK_F5) { bridge_key(L"refresh"); return S_OK; }
+    if (msg->wParam == VK_F1) { bridge_key(L"help"); return S_OK; }
+    if (msg->wParam == VK_F3) { bridge_key(L"find"); return S_OK; }
+    if (msg->wParam == VK_F4 || msg->wParam == VK_F6 || msg->wParam == VK_F10)
+      return S_OK; /* IE address dropdown / pane cycle / menu — block */
+  }
+  return S_FALSE;
 }
 static HRESULT STDMETHODCALLTYPE UI_GetOptionKeyPath(IDocHostUIHandler *self, LPOLESTR *k, DWORD d) {
   (void) self; (void) d; *k = NULL; return E_NOTIMPL;
@@ -195,6 +262,9 @@ static int browser_create(const char *url) {
   if (FAILED(IOleObject_QueryInterface(g_ole, &IID_IWebBrowser2, (void **) &g_wb)))
     return -1;
   IWebBrowser2_put_Silent(g_wb, VARIANT_TRUE); /* no script error popups */
+  /* keyboard: Ctrl+C/V/X/A/Z, Tab, arrows, Home/End... must be routed
+   * through the control's TranslateAccelerator in the message loop */
+  IOleObject_QueryInterface(g_ole, &IID_IOleInPlaceActiveObject, (void **) &g_ao);
 
   wchar_t wurl[256];
   MultiByteToWideChar(CP_UTF8, 0, url, -1, wurl, 256);
@@ -248,6 +318,11 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_SIZE:
       browser_resize();
       return 0;
+    case WM_SETFOCUS: { /* hand keyboard focus to the embedded browser */
+      HWND child = GetWindow(h, GW_CHILD);
+      if (child) SetFocus(child);
+      return 0;
+    }
     case WM_CLOSE: /* minimize to tray instead of exit */
       ShowWindow(h, SW_HIDE);
       return 0;
@@ -363,10 +438,22 @@ int webwin_run(const char *url) {
 
   MSG m;
   while (GetMessageW(&m, NULL, 0, 0) > 0) {
+    /* Route keystrokes to the embedded MSHTML control FIRST so every
+     * standard shortcut works exactly like a native Windows app:
+     *   Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+A / Ctrl+Z / Ctrl+Y
+     *   Tab / Shift+Tab (field navigation), arrows, Home/End/PgUp/PgDn,
+     *   Delete/Backspace, Enter, F5 (refresh) ... */
+    if (g_ao && (m.message == WM_KEYDOWN || m.message == WM_KEYUP ||
+                 m.message == WM_SYSKEYDOWN || m.message == WM_SYSKEYUP ||
+                 m.message == WM_CHAR || m.message == WM_SYSCHAR)) {
+      if (IOleInPlaceActiveObject_TranslateAccelerator(g_ao, &m) == S_OK)
+        continue; /* handled by the browser control */
+    }
     TranslateMessage(&m);
     DispatchMessageW(&m);
   }
 
+  if (g_ao) IOleInPlaceActiveObject_Release(g_ao);
   if (g_wb) IWebBrowser2_Release(g_wb);
   if (g_ole) { IOleObject_Close(g_ole, OLECLOSE_NOSAVE); IOleObject_Release(g_ole); }
   OleUninitialize();

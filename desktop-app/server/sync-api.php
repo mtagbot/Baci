@@ -33,7 +33,7 @@ function sd_fail($msg) { sd_out(['ok' => false, 'msg' => $msg]); }
 
 /* GET ping: open https://site/sync-api.php in a browser to verify install */
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    sd_out(['ok' => true, 'ping' => 'sync-api ready', 'version' => '1.2.0',
+    sd_out(['ok' => true, 'ping' => 'sync-api ready', 'version' => '1.3.0',
             'php' => PHP_VERSION, 'time' => date('Y-m-d H:i:s')]);
 }
 

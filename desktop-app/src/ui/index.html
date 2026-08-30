@@ -119,7 +119,7 @@ table.g{width:100%;border-collapse:collapse;font-size:13px}
       <button data-v="queue"><span class="ic">⇄</span>صف همگام‌سازی <span id="qbadge" class="badge o hide">0</span></button>
       <button data-v="settings"><span class="ic">⚙</span>تنظیمات اتصال</button>
     </div>
-    <div class="sidefoot">نسخه <span id="ver">—</span> · پورتابل<br>ذخیره محلی + همگام‌سازی خودکار</div>
+    <div class="sidefoot">نسخه <span id="ver">—</span> · پورتابل<br>ذخیره محلی + همگام‌سازی خودکار<br><a href="javascript:void(0)" onclick="showM('mKeys')" style="color:#94a3b8">میانبرهای صفحه‌کلید (F1)</a></div>
   </div>
 
   <div class="main">
@@ -332,6 +332,31 @@ table.g{width:100%;border-collapse:collapse;font-size:13px}
   <div class="mfoot"><button class="btn green" onclick="saveTeacher()">ذخیره</button><button class="btn gray" onclick="hideM('mTeacher')">انصراف</button></div>
 </div></div>
 
+<!-- keyboard shortcuts help -->
+<div class="overlay" id="mKeys"><div class="modal" style="max-width:560px">
+  <h3>میانبرهای صفحه‌کلید</h3>
+  <table class="g" style="margin-top:6px">
+    <tbody>
+      <tr><td class="mono ltr">Ctrl + C / X / V</td><td>کپی / برش / چسباندن (در همه فیلدها)</td></tr>
+      <tr><td class="mono ltr">Ctrl + A</td><td>انتخاب همه</td></tr>
+      <tr><td class="mono ltr">Ctrl + Z / Y</td><td>واگرد / از نو در فیلدهای متنی</td></tr>
+      <tr><td class="mono ltr">Ctrl + S</td><td>ذخیره فرم باز (افزودن/ویرایش)</td></tr>
+      <tr><td class="mono ltr">Ctrl + N</td><td>مورد جدید در بخش فعلی (دانش‌آموز/کلاس/دبیر/درس)</td></tr>
+      <tr><td class="mono ltr">Ctrl + F یا F3</td><td>پرش به کادر جستجو</td></tr>
+      <tr><td class="mono ltr">Ctrl + P</td><td>چاپ (گزارش حضور / کارنامه)</td></tr>
+      <tr><td class="mono ltr">F5 یا Ctrl + R</td><td>تازه‌سازی اطلاعات بخش فعلی</td></tr>
+      <tr><td class="mono ltr">F9</td><td>همگام‌سازی فوری با سرور</td></tr>
+      <tr><td class="mono ltr">Ctrl + 1 ... 9</td><td>پرش بین بخش‌ها (۱=داشبورد، ۲=دانش‌آموزان، ...)</td></tr>
+      <tr><td class="mono ltr">Enter</td><td>ذخیره فرم باز / ثبت نمره</td></tr>
+      <tr><td class="mono ltr">Esc</td><td>بستن پنجره باز (فرم/راهنما)</td></tr>
+      <tr><td class="mono ltr">Tab / Shift+Tab</td><td>حرکت بین فیلدها</td></tr>
+      <tr><td class="mono ltr">↑ / ↓</td><td>حرکت بین ردیف‌ها در جدول ثبت نمرات</td></tr>
+      <tr><td class="mono ltr">F1</td><td>نمایش همین راهنما</td></tr>
+    </tbody>
+  </table>
+  <div class="mfoot"><button class="btn gray" onclick="hideM('mKeys')">بستن (Esc)</button></div>
+</div></div>
+
 <div id="toast"></div>
 
 <script>
@@ -346,21 +371,26 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){retur
 var toastT=null;
 function toast(m){var t=$('toast');t.innerHTML=esc(m);t.style.display='block';clearTimeout(toastT);toastT=setTimeout(function(){t.style.display='none'},2600)}
 function uuid(){var s='';for(var i=0;i<32;i++){s+='0123456789abcdef'[Math.floor(Math.random()*16)];if(i==7||i==11||i==15||i==19)s+='-'}return s}
-function showM(id){$(id).className='overlay show'}
+function showM(id,focusId){
+  $(id).className='overlay show';
+  if(focusId)setTimeout(function(){try{$(focusId).focus()}catch(e){}},60);
+}
 function hideM(id){$(id).className='overlay'}
 /* XHR-based api() — IE11 has no fetch/Promise */
 function api(path,body,cb,errcb){
-  var x=new XMLHttpRequest();
+  var x=new XMLHttpRequest(),done=false;
   x.open(body?'POST':'GET',path,true);
   if(body)x.setRequestHeader('Content-Type','application/json');
   x.onreadystatechange=function(){
-    if(x.readyState!==4)return;
+    if(x.readyState!==4||done)return;
+    done=true;
     if(x.status>=200&&x.status<600&&x.responseText){
       var j=null;try{j=JSON.parse(x.responseText)}catch(e){}
       if(j){cb&&cb(j);return}
     }
     errcb&&errcb();
   };
+  try{x.timeout=60000;x.ontimeout=function(){if(done)return;done=true;errcb&&errcb()}}catch(e){}
   x.send(body?JSON.stringify(body):null);
 }
 function debounce(fn,ms){var t;return function(){clearTimeout(t);t=setTimeout(fn,ms)}}
@@ -468,7 +498,7 @@ function openStudent(s){
   fillClassSelect('fStuClass',s?s.class_name||'':'');
   $('fStuPhone').value=s?s.phone||'':'';
   $('fStuFPhone').value=s?s.father_phone||'':'';
-  showM('mStudent');
+  showM('mStudent','fStuFirst');
 }
 function saveStudent(){
   var u=$('fStuUuid').value,isNew=!u;
@@ -516,7 +546,7 @@ function openClass(cl){
   $('fClsUuid').value=cl?cl.uuid:'';
   $('fClsName').value=cl?cl.name||'':'';
   $('fClsGrade').value=cl?cl.grade||'':'';
-  showM('mClass');
+  showM('mClass','fClsName');
 }
 function saveClass(){
   var u=$('fClsUuid').value,isNew=!u;
@@ -556,7 +586,7 @@ function openTeacher(t){
   $('fTchNid').value=t?t.national_id||'':'';
   $('fTchCode').value=t?t.personnel_code||'':'';
   $('fTchMobile').value=t?t.mobile||'':'';
-  showM('mTeacher');
+  showM('mTeacher','fTchName');
 }
 function saveTeacher(){
   var u=$('fTchUuid').value,isNew=!u;
@@ -668,8 +698,8 @@ function loadGrades(){
       var sc=(s.score==null?'':String(s.score));
       h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(s.first_name)+' '+esc(s.last_name)+'</b></td>'+
         '<td><span class="badge b">'+esc(s.class_name||'—')+'</span></td>'+
-        '<td><input class="in mono" style="width:80px;min-width:0;text-align:center" value="'+esc(sc)+'"'+
-        ' onkeydown="if(event.keyCode===13){gradeSave(this,'+i+');return false}" onblur="gradeSave(this,'+i+')"></td>'+
+        '<td><input class="in mono gsc" data-i="'+i+'" style="width:80px;min-width:0;text-align:center" value="'+esc(sc)+'"'+
+        ' onkeydown="return grKey(event,this,'+i+')" onblur="gradeSave(this,'+i+')"></td>'+
         '<td>'+(s.avg!=null?'<b>'+fa(s.avg)+'</b>':'—')+'</td>'+
         '<td>'+fa(s.cnt||0)+' درس</td></tr>';
     });
@@ -681,6 +711,21 @@ function loadGrades(){
 $('grMonth').onchange=loadGrades;
 $('grClassFilter').onchange=loadGrades;
 $('grSubject').onchange=loadGrades;
+/* Enter = save + go next row; Up/Down = move between score boxes */
+function grKey(ev,inp,i){
+  var k=ev.keyCode;
+  if(k===13||k===40||k===38){
+    gradeSave(inp,i);
+    var boxes=document.getElementsByTagName('input'),list=[],j;
+    for(j=0;j<boxes.length;j++)if(boxes[j].className.indexOf('gsc')>=0)list.push(boxes[j]);
+    var pos=-1;
+    for(j=0;j<list.length;j++)if(list[j]===inp){pos=j;break}
+    var next=(k===38)?pos-1:pos+1;
+    if(next>=0&&next<list.length){list[next].focus();try{list[next].select()}catch(e){}}
+    return false;
+  }
+  return true;
+}
 function gradeSave(inp,i){
   var s=window._gr[i],subj=$('grSubject').value;
   if(!subj)return toast('ابتدا درس را انتخاب کنید');
@@ -807,6 +852,97 @@ function testServer(){
 
 /* boot */
 loadClasses();
+/* ---------- keyboard shortcuts ---------- */
+var MODALS=['mStudent','mClass','mTeacher','mKeys'];
+function openModalId(){
+  for(var i=0;i<MODALS.length;i++)if($(MODALS[i]).className.indexOf('show')>=0)return MODALS[i];
+  return null;
+}
+function gotoView(v){
+  var btns=document.getElementById('nav').getElementsByTagName('button');
+  for(var i=0;i<btns.length;i++)if(btns[i].getAttribute('data-v')===v){btns[i].onclick();return}
+}
+function kbSave(){ /* Ctrl+S / Enter: save whatever form is open */
+  var m=openModalId();
+  if(m==='mStudent')saveStudent();
+  else if(m==='mClass')saveClass();
+  else if(m==='mTeacher')saveTeacher();
+  else if(m==='mKeys')hideM('mKeys');
+  else if(curView==='settings')saveSettings();
+  else toast('فرمی برای ذخیره باز نیست');
+}
+function kbNew(){ /* Ctrl+N: context-aware new record */
+  if(openModalId())return;
+  if(curView==='students')openStudent();
+  else if(curView==='classes')openClass();
+  else if(curView==='teachers')openTeacher();
+  else if(curView==='grades')addSubject();
+  else toast('در این بخش مورد جدیدی تعریف نمی‌شود');
+}
+function kbFind(){ /* Ctrl+F / F3: jump to the search box of this view */
+  var id=curView==='students'?'stuSearch':curView==='teachers'?'tchSearch':null;
+  if(!id&&curView!=='students'){gotoView('students');id='stuSearch'}
+  if(id){$(id).focus();try{$(id).select()}catch(e){}}
+}
+function kbPrint(){
+  if(curView==='attreport'||curView==='repcard')window.print();
+  else toast('چاپ در بخش «گزارش حضور» و «کارنامه» در دسترس است');
+}
+function kbRefresh(){refreshView();toast('تازه‌سازی شد')}
+function kbEsc(){
+  var m=openModalId();
+  if(m){hideM(m);return true}
+  return false;
+}
+/* called from the native window (webwin.c) for keys MSHTML would hijack */
+window.sdKey=function(name){
+  if(name==='save')kbSave();
+  else if(name==='new')kbNew();
+  else if(name==='find')kbFind();
+  else if(name==='print')kbPrint();
+  else if(name==='refresh')kbRefresh();
+  else if(name==='help')showM('mKeys');
+  else if(name&&name.indexOf('view')===0){
+    var n=+name.substr(4);
+    if(n>=1&&n<=views.length)gotoView(views[n-1]);
+  }
+};
+/* browser-level handler: covers fallback mode + keys MSHTML passes through */
+document.onkeydown=function(ev){
+  ev=ev||window.event;
+  var k=ev.keyCode,ctrl=ev.ctrlKey;
+  var tag=(ev.target||ev.srcElement||{}).tagName||'';
+  var typing=(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA');
+  if(k===27){if(kbEsc())return false;return true}                 /* Esc */
+  if(k===112){window.sdKey('help');return false}                  /* F1  */
+  if(k===114){window.sdKey('find');return false}                  /* F3  */
+  if(k===116){window.sdKey('refresh');return false}               /* F5  */
+  if(k===120){syncNow();return false}                             /* F9  */
+  if(ctrl&&!ev.altKey){
+    if(k===83){window.sdKey('save');return false}                 /* Ctrl+S */
+    if(k===78){window.sdKey('new');return false}                  /* Ctrl+N */
+    if(k===70){window.sdKey('find');return false}                 /* Ctrl+F */
+    if(k===80){window.sdKey('print');return false}                /* Ctrl+P */
+    if(k===82){window.sdKey('refresh');return false}              /* Ctrl+R */
+    if(k>=49&&k<=57){window.sdKey('view'+(k-48));return false}    /* Ctrl+1..9 */
+  }
+  if(k===13&&openModalId()&&openModalId()!=='mKeys'&&tag!=='TEXTAREA'){kbSave();return false} /* Enter in form */
+  if(k===13&&!typing)return true;
+  return true;
+};
+/* Enter inside settings fields = connect */
+each(['setUrl','setUser','setPass'],function(id){
+  $(id).onkeydown=function(ev){ev=ev||window.event;if(ev.keyCode===13){saveSettings();return false}return true};
+});
+/* Enter in search boxes should not submit anything, just filter */
+each(['stuSearch','tchSearch'],function(id){
+  $(id).onkeydown=function(ev){ev=ev||window.event;if(ev.keyCode===13)return false;return true};
+});
+/* clicking the dark backdrop closes the form (like pressing Esc) */
+each(MODALS,function(id){
+  $(id).onclick=function(ev){ev=ev||window.event;var t=ev.target||ev.srcElement;if(t===$(id))hideM(id)};
+});
+
 loadState();
 setInterval(loadState,5000);
 </script>
