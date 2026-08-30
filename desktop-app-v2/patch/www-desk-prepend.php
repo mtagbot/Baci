@@ -14,6 +14,39 @@
  */
 if (PHP_SAPI === 'cli-server') {
 
+    /* ---- 0) race-proof captcha (desktop only) ----
+     * The single-user desktop runs several requests in parallel (favicon,
+     * heartbeat, a second tab...). If any of them regenerates the captcha,
+     * the answer the user is typing gets silently invalidated. Fix: keep
+     * the last few generated answers and accept any of them (they expire
+     * after 15 minutes). Defined here so includes/functions.php skips its
+     * own versions (both are wrapped in function_exists checks).
+     */
+    function generate_captcha() {
+        $n1 = rand(2, 9);
+        $n2 = rand(2, 9);
+        $_SESSION['captcha_ans'] = $n1 + $n2; // keep legacy key in sync
+        $pool = $_SESSION['captcha_pool'] ?? [];
+        $pool[] = ['a' => $n1 + $n2, 't' => time()];
+        if (count($pool) > 8) $pool = array_slice($pool, -8);
+        $_SESSION['captcha_pool'] = $pool;
+        return tr_num("$n1 + $n2 = ?", 'fa');
+    }
+    function verify_captcha($ans) {
+        $given = (int) tr_num((string) $ans, 'en');
+        $pool = $_SESSION['captcha_pool'] ?? [];
+        if (isset($_SESSION['captcha_ans'])) $pool[] = ['a' => (int) $_SESSION['captcha_ans'], 't' => time()];
+        if (!$pool) return true; // nothing generated yet — matches legacy behaviour
+        foreach ($pool as $p) {
+            if ((int) $p['a'] === $given && time() - (int) $p['t'] < 900) {
+                unset($_SESSION['captcha_pool']); // one-shot: no replay
+                unset($_SESSION['captcha_ans']);
+                return true;
+            }
+        }
+        return false;
+    }
+
     /* ---- 1) session storage must actually be writable ---- */
     $sp = ini_get('session.save_path');
     $ok = false;

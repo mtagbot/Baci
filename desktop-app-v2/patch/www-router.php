@@ -16,6 +16,14 @@ if ($uri !== '/' && file_exists($file) && !is_dir($file) && !preg_match('/\.php$
     return false;
 }
 
+// MISSING asset-like URL (favicon.ico, images, css, js, fonts...) -> plain 404.
+// Critical: it must NOT fall through to index.php — index.php regenerates the
+// login captcha and would silently invalidate the one the user is answering.
+if (preg_match('/\.(ico|png|jpe?g|gif|svg|webp|css|js|map|woff2?|ttf|eot|txt|json|xml)$/i', $uri)) {
+    http_response_code(404);
+    exit;
+}
+
 // existing php file -> run it
 if (preg_match('/\.php$/i', $uri) && file_exists($file)) {
     chdir(dirname($file));
