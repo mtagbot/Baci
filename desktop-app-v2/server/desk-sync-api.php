@@ -22,6 +22,7 @@ require_once __DIR__ . '/includes/db.php';
 header('Content-Type: application/json; charset=utf-8');
 
 const SYNC_TABLES = [
+    'admins',
     'academic_years','teachers','discipline_titles','classes','subjects',
     'class_schedules','students','student_discipline_records','reports',
     'report_grades','report_locks','exam_schedules','exam_designs',
@@ -29,7 +30,11 @@ const SYNC_TABLES = [
     'online_exam_categories','online_question_categories','online_question_bank',
     'online_exams','online_questions','online_exam_attempts','online_exam_answers',
     'grade_messages','counseling_requests','student_attendance','student_qr_tags',
+    'settings',
 ];
+
+/* settings uses a string primary key; everything else uses `id` */
+function pk_col($t) { return $t === 'settings' ? 'key_name' : 'id'; }
 
 function jout($data) { echo json_encode($data, JSON_UNESCAPED_UNICODE); exit; }
 function jfail($msg) { jout(['ok' => false, 'error' => $msg]); }
@@ -94,18 +99,21 @@ function ensure_infra($pdo) {
 
     foreach (SYNC_TABLES as $t) {
         if (!table_exists($pdo, $t)) continue;
+        $pk = pk_col($t);
         foreach (['i' => 'INSERT', 'u' => 'UPDATE', 'd' => 'DELETE'] as $suf => $evt) {
             $trg = "desk_sync_{$t}_{$suf}";
             $ref = ($evt === 'DELETE') ? 'OLD' : 'NEW';
+            $cond = "@desk_sync_suppress IS NULL";
+            if ($t === 'settings') $cond .= " AND $ref.key_name NOT LIKE 'desk\\_%'";
             try {
                 $exists = $pdo->query("SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
                     WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME = " . $pdo->quote($trg))->fetchColumn();
                 if ($exists) continue;
                 $pdo->exec("CREATE TRIGGER `$trg` AFTER $evt ON `$t` FOR EACH ROW
                     BEGIN
-                        IF @desk_sync_suppress IS NULL THEN
+                        IF $cond THEN
                             INSERT INTO desk_change_log (tbl, rid, op, ts)
-                            VALUES ('$t', $ref.id, '" . substr($evt, 0, 1) . "', UNIX_TIMESTAMP());
+                            VALUES ('$t', $ref.`$pk`, '" . substr($evt, 0, 1) . "', UNIX_TIMESTAMP());
                         END IF;
                     END");
             } catch (Exception $e) { /* no TRIGGER privilege → poll-only mode still works for push */ }
@@ -131,9 +139,11 @@ if ($action === 'snapshot') {
     $tbl = (string)($in['tbl'] ?? '');
     if (!in_array($tbl, SYNC_TABLES, true)) jfail('bad table');
     if (!table_exists($pdo, $tbl)) jout(['ok' => true, 'rows' => [], 'log_max' => 0]);
-    $after = (int)($in['after'] ?? 0);
+    $pk = pk_col($tbl);
+    $after = $in['after'] ?? 0;
     $limit = min(1000, max(1, (int)($in['limit'] ?? 400)));
-    $st = $pdo->prepare("SELECT * FROM `$tbl` WHERE id > ? ORDER BY id ASC LIMIT $limit");
+    $extra = ($tbl === 'settings') ? " AND key_name NOT LIKE 'desk\\_%'" : '';
+    $st = $pdo->prepare("SELECT * FROM `$tbl` WHERE `$pk` > ?$extra ORDER BY `$pk` ASC LIMIT $limit");
     $st->execute([$after]);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);
     $logMax = 0;
@@ -158,7 +168,8 @@ if ($action === 'pull') {
     foreach ($latest as $r) {
         $c = ['tbl' => $r['tbl'], 'rid' => $r['rid'], 'op' => $r['op'], 'ts' => (int)$r['ts']];
         if ($r['op'] !== 'D' && table_exists($pdo, $r['tbl'])) {
-            $st2 = $pdo->prepare("SELECT * FROM `{$r['tbl']}` WHERE id = ?");
+            $pk = pk_col($r['tbl']);
+            $st2 = $pdo->prepare("SELECT * FROM `{$r['tbl']}` WHERE `$pk` = ?");
             $st2->execute([$r['rid']]);
             $row = $st2->fetch(PDO::FETCH_ASSOC);
             if ($row) { $c['op'] = 'U'; $c['row'] = $row; } else { $c['op'] = 'D'; }
@@ -179,9 +190,11 @@ if ($action === 'push') {
         if (!in_array($tbl, SYNC_TABLES, true) || !table_exists($pdo, $tbl)) continue;
         $rid = $c['rid'] ?? null;
         if ($rid === null) continue;
+        $pk = pk_col($tbl);
+        if ($tbl === 'settings' && strpos((string)$rid, 'desk_') === 0) continue;
         try {
             if (($c['op'] ?? '') === 'D' || empty($c['row'])) {
-                $st = $pdo->prepare("DELETE FROM `$tbl` WHERE id = ?");
+                $st = $pdo->prepare("DELETE FROM `$tbl` WHERE `$pk` = ?");
                 $st->execute([$rid]);
             } else {
                 $row  = $c['row'];
@@ -190,7 +203,7 @@ if ($action === 'push') {
                 $cl = '`' . implode('`,`', $cols) . '`';
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $up = [];
-                foreach ($cols as $col) if ($col !== 'id') $up[] = "`$col` = VALUES(`$col`)";
+                foreach ($cols as $col) if ($col !== $pk) $up[] = "`$col` = VALUES(`$col`)";
                 $sql = "INSERT INTO `$tbl` ($cl) VALUES ($ph)"
                      . ($up ? " ON DUPLICATE KEY UPDATE " . implode(',', $up) : "");
                 $st = $pdo->prepare($sql);

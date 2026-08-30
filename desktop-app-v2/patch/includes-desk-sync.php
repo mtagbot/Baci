@@ -21,6 +21,7 @@
 
 if (!defined('DESK_SYNC_TABLES')) {
     define('DESK_SYNC_TABLES', json_encode([
+        'admins',
         'academic_years','teachers','discipline_titles','classes','subjects',
         'class_schedules','students','student_discipline_records','reports',
         'report_grades','report_locks','exam_schedules','exam_designs',
@@ -28,6 +29,7 @@ if (!defined('DESK_SYNC_TABLES')) {
         'online_exam_categories','online_question_categories','online_question_bank',
         'online_exams','online_questions','online_exam_attempts','online_exam_answers',
         'grade_messages','counseling_requests','student_attendance','student_qr_tags',
+        'settings',
     ]));
 }
 
@@ -143,12 +145,23 @@ class DeskSync {
 
     /* ---------------- apply one remote change locally ---------------- */
 
+    private static function pkCol($tbl) {
+        return $tbl === 'settings' ? 'key_name' : 'id';
+    }
+
+    /* settings keys that must stay local (sync/runtime state, not school data) */
+    private static function settingsLocal($key) {
+        return strpos((string)$key, 'desk_') === 0;
+    }
+
     private static function applyChange($c) {
         $tbl = $c['tbl']; $rid = $c['rid']; $op = $c['op'];
         $tables = json_decode(DESK_SYNC_TABLES, true);
         if (!in_array($tbl, $tables, true)) return;
+        if ($tbl === 'settings' && self::settingsLocal($rid)) return;
+        $pk = self::pkCol($tbl);
         if ($op === 'D' || empty($c['row'])) {
-            DB::execute("DELETE FROM \"$tbl\" WHERE id = ?", [$rid]);
+            DB::execute("DELETE FROM \"$tbl\" WHERE \"$pk\" = ?", [$rid]);
             return;
         }
         $row  = $c['row'];
@@ -170,14 +183,16 @@ class DeskSync {
         $latest = []; $maxId = 0;
         foreach ($rows as $r) {
             $maxId = max($maxId, (int)$r['id']);
-            if (!in_array($r['tbl'], $tables, true)) continue;  // e.g. settings — not pushed
+            if (!in_array($r['tbl'], $tables, true)) continue;
+            if ($r['tbl'] === 'settings' && self::settingsLocal($r['rid'])) continue;
             $latest[$r['tbl'] . '|' . $r['rid']] = $r;          // later entries overwrite
         }
         $changes = [];
         foreach ($latest as $r) {
             $c = ['tbl' => $r['tbl'], 'rid' => $r['rid'], 'op' => $r['op'], 'ts' => (int)$r['ts']];
             if ($r['op'] !== 'D') {
-                $row = DB::fetch("SELECT * FROM \"{$r['tbl']}\" WHERE id = ?", [$r['rid']]);
+                $pk = self::pkCol($r['tbl']);
+                $row = DB::fetch("SELECT * FROM \"{$r['tbl']}\" WHERE \"$pk\" = ?", [$r['rid']]);
                 if ($row) { $c['op'] = 'U'; $c['row'] = $row; }
                 else      { $c['op'] = 'D'; }
             }
@@ -216,18 +231,20 @@ class DeskSync {
                 $state = json_decode(self::getCfg('desk_sync_state', '{}'), true) ?: [];
                 $tables = json_decode(DESK_SYNC_TABLES, true);
                 $ti  = (int)($state['ti'] ?? 0);
-                $aft = (int)($state['after'] ?? 0);
+                $aft = $state['after'] ?? 0;
                 while ($ti < count($tables)) {
                     $tbl = $tables[$ti];
+                    $pk  = self::pkCol($tbl);
+                    if ($aft === 0 && $pk !== 'id') $aft = '';
                     $res = self::call('snapshot', ['tbl' => $tbl, 'after' => $aft, 'limit' => self::BATCH]);
                     $rows = $res['rows'] ?? [];
                     if ($rows) {
                         self::suppress(true);
                         try {
                             foreach ($rows as $row) {
-                                if (!isset($row['id'])) continue;
-                                self::applyChange(['tbl' => $tbl, 'rid' => $row['id'], 'op' => 'U', 'row' => $row]);
-                                $aft = max($aft, (int)$row['id']);
+                                if (!isset($row[$pk])) continue;
+                                self::applyChange(['tbl' => $tbl, 'rid' => $row[$pk], 'op' => 'U', 'row' => $row]);
+                                $aft = ($pk === 'id') ? max((int)$aft, (int)$row[$pk]) : max((string)$aft, (string)$row[$pk]);
                                 $pulled++;
                             }
                         } finally { self::suppress(false); }
