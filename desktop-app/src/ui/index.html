@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SchoolDesk — پنل مدیریت مدرسه</title>
+<style>
+@font-face{font-family:'Vazirmatn';src:url('/fonts/vazir.woff2') format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'Vazirmatn';src:url('/fonts/vazir-bold.woff2') format('woff2');font-weight:700;font-display:swap}
+:root{
+  --bg:#f1f5f9;--card:#ffffff;--line:#e2e8f0;--txt:#0f172a;--muted:#64748b;
+  --pri:#4f46e5;--pri2:#6d28d9;--ok:#059669;--warn:#d97706;--bad:#dc2626;
+  --r:14px;--sh:0 1px 3px rgba(15,23,42,.08),0 8px 24px -12px rgba(15,23,42,.18);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Vazirmatn',Tahoma,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+button,input,select{font-family:inherit;font-size:inherit}
+
+/* layout */
+.app{display:flex;height:100vh;overflow:hidden}
+.side{width:228px;flex-shrink:0;background:linear-gradient(180deg,#1e1b4b,#312e81);color:#e0e7ff;display:flex;flex-direction:column;padding:18px 12px}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:14px}
+.logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#818cf8,#c084fc);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px;color:#fff;box-shadow:0 4px 14px -4px rgba(129,140,248,.7)}
+.brand b{font-size:15px;display:block}
+.brand small{font-size:10.5px;opacity:.65}
+.nav{flex:1;display:flex;flex-direction:column;gap:3px}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:right;background:none;border:0;color:#c7d2fe;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:13.5px;transition:background .15s}
+.nav button:hover{background:rgba(255,255,255,.08)}
+.nav button.on{background:rgba(255,255,255,.14);color:#fff;font-weight:700}
+.nav svg{width:18px;height:18px;flex-shrink:0}
+.sidefoot{font-size:10.5px;opacity:.55;padding:10px 8px 0;border-top:1px solid rgba(255,255,255,.12)}
+
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.top{background:var(--card);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:14px}
+.top h1{font-size:16.5px}
+.top .sub{font-size:11.5px;color:var(--muted)}
+.spacer{flex:1}
+.syncpill{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:12px;cursor:pointer;user-select:none}
+.dot{width:9px;height:9px;border-radius:50%;background:#94a3b8;flex-shrink:0}
+.dot.ok{background:var(--ok);box-shadow:0 0 0 4px rgba(5,150,105,.15)}
+.dot.off{background:var(--warn);box-shadow:0 0 0 4px rgba(217,119,6,.15)}
+.dot.sync{background:var(--pri);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.content{flex:1;overflow:auto;padding:22px}
+
+/* cards & stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:20px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);position:relative;overflow:hidden}
+.stat::after{content:'';position:absolute;inset-inline-start:0;top:0;bottom:0;width:4px;background:var(--pri)}
+.stat.c2::after{background:var(--pri2)} .stat.c3::after{background:var(--ok)} .stat.c4::after{background:var(--warn)}
+.stat b{font-size:26px;display:block;margin-top:2px}
+.stat span{font-size:12px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:18px;margin-bottom:18px}
+.card h3{font-size:14.5px;margin-bottom:12px}
+
+/* table */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11.5px;color:var(--muted);text-align:right;padding:8px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:hover td{background:#f8fafc}
+.empty{color:var(--muted);text-align:center;padding:34px 0;font-size:13px}
+
+/* controls */
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.in{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 12px;min-width:130px;outline:none;transition:border .15s, box-shadow .15s}
+.in:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+.btn{border:0;border-radius:10px;padding:9px 16px;cursor:pointer;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:7px;transition:filter .15s;color:#fff;background:var(--pri)}
+.btn:hover{filter:brightness(1.08)}
+.btn.gray{background:#e2e8f0;color:var(--txt)}
+.btn.green{background:var(--ok)} .btn.red{background:var(--bad)} .btn.ghost{background:none;color:var(--pri);border:1.5px solid var(--pri)}
+.btn.sm{padding:5px 11px;font-size:12px;border-radius:8px}
+.badge{display:inline-block;border-radius:999px;padding:2.5px 10px;font-size:11px;font-weight:700}
+.badge.g{background:#d1fae5;color:#065f46}.badge.o{background:#fef3c7;color:#92400e}.badge.r{background:#fee2e2;color:#991b1b}.badge.b{background:#e0e7ff;color:#3730a3}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(2px)}
+.overlay.show{display:flex}
+.modal{background:#fff;border-radius:16px;box-shadow:0 24px 60px -12px rgba(15,23,42,.4);width:min(560px,92vw);max-height:88vh;overflow:auto;padding:22px;animation:up .18s ease}
+@keyframes up{from{transform:translateY(14px);opacity:0}}
+.modal h3{margin-bottom:16px;font-size:15.5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.f label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:5px}
+.f .in{width:100%}
+.mfoot{display:flex;gap:10px;justify-content:flex-start;margin-top:18px}
+
+/* toast */
+#toast{position:fixed;bottom:22px;right:50%;transform:translateX(50%);background:#0f172a;color:#fff;padding:11px 22px;border-radius:12px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:99;box-shadow:var(--sh)}
+#toast.show{opacity:1}
+
+.hide{display:none!important}
+.note{font-size:12px;color:var(--muted);line-height:1.9}
+.qerr{color:var(--bad);font-size:11px}
+@media(max-width:760px){.side{width:64px}.side b,.side small,.side .nav span,.sidefoot{display:none}.brand{justify-content:center}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">م</div>
+      <div><b>SchoolDesk</b><small id="brandSchool">پنل مدیریت مدرسه</small></div>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-v="dash" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>داشبورد</span></button>
+      <button data-v="students"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>دانش‌آموزان</span></button>
+      <button data-v="classes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg><span>کلاس‌ها</span></button>
+      <button data-v="teachers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg><span>دبیران</span></button>
+      <button data-v="queue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg><span>صف همگام‌سازی</span><span id="qbadge" class="badge o hide" style="margin-inline-start:auto">0</span></button>
+      <button data-v="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>تنظیمات اتصال</span></button>
+    </nav>
+    <div class="sidefoot">نسخه <span id="ver">—</span> · پورتابل<br>ذخیره‌سازی محلی + همگام‌سازی خودکار</div>
+  </aside>
+
+  <div class="main">
+    <div class="top">
+      <div>
+        <h1 id="pageTitle">داشبورد</h1>
+        <div class="sub" id="pageSub">نمای کلی اطلاعات مدرسه</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="syncpill" id="syncPill" title="برای همگام‌سازی فوری کلیک کنید">
+        <span class="dot" id="syncDot"></span><span id="syncTxt">در حال بررسی...</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- dashboard -->
+      <section id="v-dash">
+        <div class="stats">
+          <div class="stat"><span>دانش‌آموزان فعال</span><b id="stStudents">—</b></div>
+          <div class="stat c2"><span>کلاس‌ها</span><b id="stClasses">—</b></div>
+          <div class="stat c3"><span>دبیران</span><b id="stTeachers">—</b></div>
+          <div class="stat c4"><span>تغییرات در صف ارسال</span><b id="stQueue">—</b></div>
+        </div>
+        <div class="card">
+          <h3>وضعیت سامانه</h3>
+          <div class="note" id="dashNote">در حال بارگذاری...</div>
+        </div>
+        <div class="card" id="firstRun">
+          <h3>شروع سریع</h3>
+          <div class="note">
+            ۱) از منوی «تنظیمات اتصال»، آدرس سایت مدرسه و نام کاربری/رمز مدیر را وارد کنید.<br>
+            ۲) نرم‌افزار به‌صورت خودکار داده‌ها را دریافت و هر ۳۰ ثانیه همگام‌سازی می‌کند.<br>
+            ۳) بدون اینترنت هم می‌توانید کار کنید — همه تغییرات در صف نگه‌داری و بعداً ارسال می‌شوند.
+          </div>
+        </div>
+      </section>
+
+      <!-- students -->
+      <section id="v-students" class="hide">
+        <div class="row">
+          <input class="in" id="stuSearch" placeholder="جستجو: نام، نام خانوادگی یا کد ملی" style="flex:1;min-width:200px">
+          <select class="in" id="stuClassFilter"><option value="">همه کلاس‌ها</option></select>
+          <button class="btn" onclick="openStudent()">افزودن دانش‌آموز</button>
+        </div>
+        <div class="card" style="padding:0 6px">
+          <table>
+            <thead><tr><th>#</th><th>نام و نام خانوادگی</th><th>کد ملی</th><th>نام پدر</th><th>پایه</th><th>کلاس</th><th>تلفن</th><th></th></tr></thead>
+            <tbody id="stuBody"></tbody>
+          </table>
+          <div class="empty hide" id="stuEmpty">دانش‌آموزی یافت نشد</div>
+        </div>
+      </section>
+
+      <!-- classes -->
+      <section id="v-classes" class="hide">
+        <div class="row">
+          <div class="spacer"></div>
+          <button class="btn" onclick="openClass()">افزودن کلاس</button>
+        </div>
+        <div class="card" style="padding:0 6px">
+          <table>
+            <thead><tr><th>#</th><th>نام کلاس</th><th>پایه</th><th>سال تحصیلی</th><th>تعداد دانش‌آموز</th><th></th></tr></thead>
+            <tbody id="clsBody"></tbody>
+          </table>
+          <div class="empty hide" id="clsEmpty">کلاسی ثبت نشده است</div>
+        </div>
+      </section>
+
+      <!-- teachers -->
+      <section id="v-teachers" class="hide">
+        <div class="row">
+          <input class="in" id="tchSearch" placeholder="جستجو: نام یا کد ملی" style="flex:1;min-width:200px">
+          <button class="btn" onclick="openTeacher()">افزودن دبیر</button>
+        </div>
+        <div class="card" style="padding:0 6px">
+          <table>
+            <thead><tr><th>#</th><th>نام و نام خانوادگی</th><th>کد ملی</th><th>کد پرسنلی</th><th>موبایل</th><th></th></tr></thead>
+            <tbody id="tchBody"></tbody>
+          </table>
+          <div class="empty hide" id="tchEmpty">دبیری یافت نشد</div>
+        </div>
+      </section>
+
+      <!-- queue -->
+      <section id="v-queue" class="hide">
+        <div class="card">
+          <h3>صف همگام‌سازی با سرور</h3>
+          <div class="note" style="margin-bottom:12px">تغییراتی که هنوز به سرور سایت ارسال نشده‌اند اینجا نمایش داده می‌شوند. ارسال به‌صورت خودکار در پس‌زمینه انجام می‌شود؛ نیازی به اقدام شما نیست.</div>
+          <button class="btn ghost sm" onclick="syncNow()">همگام‌سازی فوری</button>
+        </div>
+        <div class="card" style="padding:0 6px">
+          <table>
+            <thead><tr><th>#</th><th>مورد</th><th>عملیات</th><th>زمان ثبت</th><th>تلاش‌ها</th><th>آخرین خطا</th></tr></thead>
+            <tbody id="qBody"></tbody>
+          </table>
+          <div class="empty hide" id="qEmpty">صف خالی است — همه تغییرات با سرور همگام شده‌اند ✓</div>
+        </div>
+      </section>
+
+      <!-- settings -->
+      <section id="v-settings" class="hide">
+        <div class="card" style="max-width:600px">
+          <h3>اتصال به سرور سایت مدرسه</h3>
+          <div class="note" style="margin-bottom:14px">آدرس سایت (همان‌جایی که پنل مدیریت آنلاین را باز می‌کنید) و مشخصات ورود مدیر را وارد کنید. یک کلید امن ساخته می‌شود و رمز شما ذخیره نمی‌گردد.</div>
+          <div class="f" style="margin-bottom:12px"><label>آدرس سایت</label><input class="in" id="setUrl" placeholder="https://school.example.com" dir="ltr" style="text-align:left"></div>
+          <div class="grid2">
+            <div class="f"><label>نام کاربری مدیر</label><input class="in" id="setUser" dir="ltr" style="text-align:left"></div>
+            <div class="f"><label>رمز عبور</label><input class="in" id="setPass" type="password" dir="ltr" style="text-align:left"></div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-top:12px"><input type="checkbox" id="setInsecure"> پذیرش گواهی SSL نامعتبر (برای سرورهای بدون گواهی معتبر)</label>
+          <div class="mfoot">
+            <button class="btn green" onclick="saveSettings()">اتصال و دریافت اطلاعات</button>
+          </div>
+          <div class="note" id="setState" style="margin-top:10px"></div>
+        </div>
+        <div class="card" style="max-width:600px">
+          <h3>درباره</h3>
+          <div class="note">SchoolDesk — کلاینت دسکتاپ پورتابل سامانه مدیریت مدرسه<br>
+          پایگاه‌داده محلی: SQLite (فایل schooldesk.db کنار برنامه)<br>
+          سازگار با ویندوز ۷ / ۸ / ۱۰ / ۱۱ — بدون نیاز به نصب یا Runtime</div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- student modal -->
+<div class="overlay" id="mStudent">
+  <div class="modal">
+    <h3 id="mStuTitle">افزودن دانش‌آموز</h3>
+    <input type="hidden" id="fStuUuid">
+    <div class="grid2">
+      <div class="f"><label>نام *</label><input class="in" id="fStuFirst"></div>
+      <div class="f"><label>نام خانوادگی *</label><input class="in" id="fStuLast"></div>
+      <div class="f"><label>کد ملی *</label><input class="in" id="fStuNid" dir="ltr" style="text-align:left"></div>
+      <div class="f"><label>نام پدر</label><input class="in" id="fStuFather"></div>
+      <div class="f"><label>پایه</label><select class="in" id="fStuGrade"><option value="">—</option><option>هفتم</option><option>هشتم</option><option>نهم</option></select></div>
+      <div class="f"><label>کلاس</label><select class="in" id="fStuClass"><option value="">—</option></select></div>
+      <div class="f"><label>تلفن دانش‌آموز</label><input class="in" id="fStuPhone" dir="ltr" style="text-align:left"></div>
+      <div class="f"><label>تلفن پدر</label><input class="in" id="fStuFPhone" dir="ltr" style="text-align:left"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn green" onclick="saveStudent()">ذخیره</button>
+      <button class="btn gray" onclick="hide('mStudent')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- class modal -->
+<div class="overlay" id="mClass">
+  <div class="modal">
+    <h3 id="mClsTitle">افزودن کلاس</h3>
+    <input type="hidden" id="fClsUuid">
+    <div class="grid2">
+      <div class="f"><label>نام کلاس *</label><input class="in" id="fClsName" placeholder="مثلاً هفتم ۱"></div>
+      <div class="f"><label>پایه</label><select class="in" id="fClsGrade"><option value="">—</option><option>هفتم</option><option>هشتم</option><option>نهم</option></select></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn green" onclick="saveClass()">ذخیره</button>
+      <button class="btn gray" onclick="hide('mClass')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<!-- teacher modal -->
+<div class="overlay" id="mTeacher">
+  <div class="modal">
+    <h3 id="mTchTitle">افزودن دبیر</h3>
+    <input type="hidden" id="fTchUuid">
+    <div class="grid2">
+      <div class="f"><label>نام و نام خانوادگی *</label><input class="in" id="fTchName"></div>
+      <div class="f"><label>کد ملی</label><input class="in" id="fTchNid" dir="ltr" style="text-align:left"></div>
+      <div class="f"><label>کد پرسنلی</label><input class="in" id="fTchCode" dir="ltr" style="text-align:left"></div>
+      <div class="f"><label>موبایل</label><input class="in" id="fTchMobile" dir="ltr" style="text-align:left"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn green" onclick="saveTeacher()">ذخیره</button>
+      <button class="btn gray" onclick="hide('mTeacher')">انصراف</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+var $=function(id){return document.getElementById(id)};
+var curView='dash', classCache=[], toastT=null;
+var FA=['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+function fa(n){return String(n==null?'':n).replace(/[0-9]/g,function(d){return FA[+d]})}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function toast(m){var t=$('toast');t.textContent=m;t.className='show';clearTimeout(toastT);toastT=setTimeout(function(){t.className=''},2600)}
+function uuid(){var s='';for(var i=0;i<32;i++){s+='0123456789abcdef'[Math.floor(Math.random()*16)];if(i==7||i==11||i==15||i==19)s+='-'}return s}
+function show(id){$(id).classList.add('show')}
+function hide(id){$(id).classList.remove('show')}
+function api(path,body){
+  return fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{}).then(function(r){return r.json()});
+}
+
+/* ---------- navigation ---------- */
+var titles={dash:['داشبورد','نمای کلی اطلاعات مدرسه'],students:['دانش‌آموزان','مدیریت دانش‌آموزان — تغییرات به‌صورت خودکار با سرور همگام می‌شود'],
+ classes:['کلاس‌ها','مدیریت کلاس‌های مدرسه'],teachers:['دبیران','مدیریت دبیران'],queue:['صف همگام‌سازی','تغییرات در انتظار ارسال به سرور'],settings:['تنظیمات اتصال','پیکربندی ارتباط با سرور سایت مدرسه']};
+document.querySelectorAll('#nav button').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('#nav button').forEach(function(x){x.classList.remove('on')});
+    b.classList.add('on');
+    curView=b.dataset.v;
+    ['dash','students','classes','teachers','queue','settings'].forEach(function(v){
+      $('v-'+v).classList.toggle('hide',v!==curView);
+    });
+    $('pageTitle').textContent=titles[curView][0];
+    $('pageSub').textContent=titles[curView][1];
+    refreshView();
+  };
+});
+function refreshView(){
+  if(curView==='students')loadStudents();
+  else if(curView==='classes')loadClasses();
+  else if(curView==='teachers')loadTeachers();
+  else if(curView==='queue')loadQueue();
+  loadState();
+}
+
+/* ---------- state / dashboard ---------- */
+function loadState(){
+  api('/api/state').then(function(s){
+    $('ver').textContent=fa(s.version);
+    $('stStudents').textContent=fa(s.students);
+    $('stClasses').textContent=fa(s.classes);
+    $('stTeachers').textContent=fa(s.teachers);
+    $('stQueue').textContent=fa(s.queue);
+    if(s.school_name)$('brandSchool').textContent=s.school_name;
+    var qb=$('qbadge');qb.textContent=fa(s.queue);qb.classList.toggle('hide',!(s.queue>0));
+    var dot=$('syncDot'),txt=$('syncTxt');
+    dot.className='dot';
+    if(s.sync_state==='ok'){dot.classList.add('ok');txt.textContent='همگام با سرور'+(s.last_sync?' · '+fa(s.last_sync.substr(11,5)):'');}
+    else if(s.sync_state==='syncing'){dot.classList.add('sync');txt.textContent='در حال همگام‌سازی...';}
+    else if(s.sync_state==='unconfigured'){txt.textContent='اتصال پیکربندی نشده';}
+    else{dot.classList.add('off');txt.textContent='آفلاین — '+fa(s.queue)+' تغییر در صف';}
+    $('firstRun').classList.toggle('hide',s.configured);
+    var n='حالت کار: <b>'+(s.configured?'متصل به سرور':'محلی (بدون پیکربندی سرور)')+'</b><br>';
+    n+='آخرین همگام‌سازی موفق: <b>'+(s.last_sync?fa(s.last_sync):'هنوز انجام نشده')+'</b><br>';
+    n+='وضعیت: '+esc(s.sync_msg||'—')+'<br>';
+    n+='تغییرات در انتظار ارسال: <b>'+fa(s.queue)+'</b> مورد';
+    $('dashNote').innerHTML=n;
+    if(s.server_url)$('setUrl').value=$('setUrl').value||s.server_url;
+    $('setState').innerHTML=s.configured?'<span class="badge g">متصل</span> '+esc(s.server_url):'<span class="badge o">پیکربندی نشده</span>';
+  }).catch(function(){});
+}
+
+/* ---------- students ---------- */
+function loadStudents(){
+  var q=encodeURIComponent($('stuSearch').value.trim());
+  var c=encodeURIComponent($('stuClassFilter').value);
+  api('/api/students?q='+q+'&class='+c).then(function(r){
+    var tb=$('stuBody');tb.innerHTML='';
+    (r.items||[]).forEach(function(s,i){
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td>'+fa(i+1)+'</td><td><b>'+esc(s.first_name)+' '+esc(s.last_name)+'</b></td>'+
+        '<td style="font-family:monospace">'+fa(s.national_id)+'</td><td>'+esc(s.father_name||'—')+'</td>'+
+        '<td>'+esc(s.grade_level||'—')+'</td><td><span class="badge b">'+esc(s.class_name||'—')+'</span></td>'+
+        '<td style="font-family:monospace">'+fa(s.phone||'—')+'</td>'+
+        '<td style="white-space:nowrap"><button class="btn gray sm">ویرایش</button> <button class="btn red sm">حذف</button></td>';
+      tr.querySelector('.gray').onclick=function(){openStudent(s)};
+      tr.querySelector('.red').onclick=function(){delEntity('student',s.uuid,s.first_name+' '+s.last_name)};
+      tb.appendChild(tr);
+    });
+    $('stuEmpty').classList.toggle('hide',(r.items||[]).length>0);
+  });
+}
+$('stuSearch').oninput=debounce(loadStudents,300);
+$('stuClassFilter').onchange=loadStudents;
+function openStudent(s){
+  $('mStuTitle').textContent=s?'ویرایش دانش‌آموز':'افزودن دانش‌آموز';
+  $('fStuUuid').value=s?s.uuid:'';
+  $('fStuFirst').value=s?s.first_name||'':'';
+  $('fStuLast').value=s?s.last_name||'':'';
+  $('fStuNid').value=s?s.national_id||'':'';
+  $('fStuFather').value=s?s.father_name||'':'';
+  $('fStuGrade').value=s?s.grade_level||'':'';
+  fillClassSelect('fStuClass',s?s.class_name||'':'');
+  $('fStuPhone').value=s?s.phone||'':'';
+  $('fStuFPhone').value=s?s.father_phone||'':'';
+  show('mStudent');
+}
+function saveStudent(){
+  var u=$('fStuUuid').value, isNew=!u;
+  if(!$('fStuFirst').value.trim()||!$('fStuLast').value.trim()||!$('fStuNid').value.trim())return toast('نام، نام خانوادگی و کد ملی الزامی است');
+  api('/api/mutate',{entity:'student',op:isNew?'create':'update',payload:{
+    uuid:isNew?uuid():u, first_name:$('fStuFirst').value.trim(), last_name:$('fStuLast').value.trim(),
+    national_id:$('fStuNid').value.trim(), father_name:$('fStuFather').value.trim(),
+    grade_level:$('fStuGrade').value, class_name:$('fStuClass').value,
+    phone:$('fStuPhone').value.trim(), father_phone:$('fStuFPhone').value.trim()
+  }}).then(function(r){
+    if(r.ok){hide('mStudent');toast('ذخیره شد — در پس‌زمینه با سرور همگام می‌شود');loadStudents();loadState();}
+    else toast(r.msg||'خطا در ذخیره');
+  });
+}
+
+/* ---------- classes ---------- */
+function loadClasses(){
+  api('/api/classes').then(function(r){
+    classCache=r.items||[];
+    var tb=$('clsBody');tb.innerHTML='';
+    classCache.forEach(function(cl,i){
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td>'+fa(i+1)+'</td><td><b>'+esc(cl.name)+'</b></td><td>'+esc(cl.grade||'—')+'</td>'+
+        '<td>'+fa(cl.academic_year||'—')+'</td><td>'+fa(cl.student_count)+' نفر</td>'+
+        '<td style="white-space:nowrap"><button class="btn gray sm">ویرایش</button> <button class="btn red sm">حذف</button></td>';
+      tr.querySelector('.gray').onclick=function(){openClass(cl)};
+      tr.querySelector('.red').onclick=function(){delEntity('class',cl.uuid,cl.name)};
+      tb.appendChild(tr);
+    });
+    $('clsEmpty').classList.toggle('hide',classCache.length>0);
+    var sel=$('stuClassFilter'),old=sel.value;
+    sel.innerHTML='<option value="">همه کلاس‌ها</option>';
+    classCache.forEach(function(cl){var o=document.createElement('option');o.value=cl.name;o.textContent=cl.name;sel.appendChild(o)});
+    sel.value=old;
+  });
+}
+function fillClassSelect(id,val){
+  var sel=$(id);sel.innerHTML='<option value="">—</option>';
+  classCache.forEach(function(cl){var o=document.createElement('option');o.value=cl.name;o.textContent=cl.name;sel.appendChild(o)});
+  sel.value=val;
+}
+function openClass(cl){
+  $('mClsTitle').textContent=cl?'ویرایش کلاس':'افزودن کلاس';
+  $('fClsUuid').value=cl?cl.uuid:'';
+  $('fClsName').value=cl?cl.name||'':'';
+  $('fClsGrade').value=cl?cl.grade||'':'';
+  show('mClass');
+}
+function saveClass(){
+  var u=$('fClsUuid').value,isNew=!u;
+  if(!$('fClsName').value.trim())return toast('نام کلاس الزامی است');
+  api('/api/mutate',{entity:'class',op:isNew?'create':'update',payload:{
+    uuid:isNew?uuid():u,name:$('fClsName').value.trim(),grade:$('fClsGrade').value,academic_year:''
+  }}).then(function(r){
+    if(r.ok){hide('mClass');toast('ذخیره شد');loadClasses();loadState();}
+    else toast(r.msg||'خطا');
+  });
+}
+
+/* ---------- teachers ---------- */
+function loadTeachers(){
+  var q=encodeURIComponent($('tchSearch').value.trim());
+  api('/api/teachers?q='+q).then(function(r){
+    var tb=$('tchBody');tb.innerHTML='';
+    (r.items||[]).forEach(function(t,i){
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td>'+fa(i+1)+'</td><td><b>'+esc(t.full_name)+'</b></td>'+
+        '<td style="font-family:monospace">'+fa(t.national_id||'—')+'</td>'+
+        '<td style="font-family:monospace">'+fa(t.personnel_code||'—')+'</td>'+
+        '<td style="font-family:monospace">'+fa(t.mobile||'—')+'</td>'+
+        '<td style="white-space:nowrap"><button class="btn gray sm">ویرایش</button> <button class="btn red sm">حذف</button></td>';
+      tr.querySelector('.gray').onclick=function(){openTeacher(t)};
+      tr.querySelector('.red').onclick=function(){delEntity('teacher',t.uuid,t.full_name)};
+      tb.appendChild(tr);
+    });
+    $('tchEmpty').classList.toggle('hide',(r.items||[]).length>0);
+  });
+}
+$('tchSearch').oninput=debounce(loadTeachers,300);
+function openTeacher(t){
+  $('mTchTitle').textContent=t?'ویرایش دبیر':'افزودن دبیر';
+  $('fTchUuid').value=t?t.uuid:'';
+  $('fTchName').value=t?t.full_name||'':'';
+  $('fTchNid').value=t?t.national_id||'':'';
+  $('fTchCode').value=t?t.personnel_code||'':'';
+  $('fTchMobile').value=t?t.mobile||'':'';
+  show('mTeacher');
+}
+function saveTeacher(){
+  var u=$('fTchUuid').value,isNew=!u;
+  if(!$('fTchName').value.trim())return toast('نام دبیر الزامی است');
+  api('/api/mutate',{entity:'teacher',op:isNew?'create':'update',payload:{
+    uuid:isNew?uuid():u,full_name:$('fTchName').value.trim(),national_id:$('fTchNid').value.trim(),
+    personnel_code:$('fTchCode').value.trim(),mobile:$('fTchMobile').value.trim()
+  }}).then(function(r){
+    if(r.ok){hide('mTeacher');toast('ذخیره شد');loadTeachers();loadState();}
+    else toast(r.msg||'خطا');
+  });
+}
+
+/* ---------- shared ---------- */
+function delEntity(entity,u,label){
+  if(!confirm('«'+label+'» حذف شود؟'))return;
+  api('/api/mutate',{entity:entity,op:'delete',payload:{uuid:u}}).then(function(r){
+    if(r.ok){toast('حذف شد');refreshView();}
+    else toast(r.msg||'خطا');
+  });
+}
+function loadQueue(){
+  api('/api/queue').then(function(r){
+    var tb=$('qBody');tb.innerHTML='';
+    var ops={create:'ایجاد',update:'ویرایش',delete:'حذف'};
+    var ents={student:'دانش‌آموز','class':'کلاس',teacher:'دبیر'};
+    (r.items||[]).forEach(function(x,i){
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td>'+fa(i+1)+'</td><td><b>'+esc(ents[x.entity]||x.entity)+'</b> '+esc(x.title||'')+'</td>'+
+        '<td><span class="badge '+(x.op==='delete'?'r':x.op==='create'?'g':'b')+'">'+(ops[x.op]||x.op)+'</span></td>'+
+        '<td>'+fa(x.created_at)+'</td><td>'+fa(x.tries)+'</td>'+
+        '<td class="qerr">'+esc(x.last_error||'—')+'</td>';
+      tb.appendChild(tr);
+    });
+    $('qEmpty').classList.toggle('hide',(r.items||[]).length>0);
+  });
+}
+function syncNow(){
+  api('/api/sync-now',{}).then(function(){toast('همگام‌سازی آغاز شد');setTimeout(loadState,1200);setTimeout(loadQueue,2500)});
+}
+$('syncPill').onclick=syncNow;
+
+/* ---------- settings ---------- */
+function saveSettings(){
+  var u=$('setUrl').value.trim();
+  if(!u)return toast('آدرس سایت را وارد کنید');
+  if(!/^https?:\/\//.test(u)){u='https://'+u;$('setUrl').value=u;}
+  toast('در حال اتصال به سرور...');
+  api('/api/settings',{server_url:u,username:$('setUser').value.trim(),password:$('setPass').value,insecure:$('setInsecure').checked})
+  .then(function(r){
+    if(r.ok){toast('اتصال برقرار شد — دریافت اطلاعات آغاز شد');$('setPass').value='';setTimeout(function(){loadState();},1500);}
+    else toast(r.msg||'خطا در اتصال');
+  });
+}
+
+function debounce(fn,ms){var t;return function(){clearTimeout(t);t=setTimeout(fn,ms)}}
+
+/* boot */
+loadClasses();
+loadState();
+setInterval(loadState,5000);
+</script>
+</body>
+</html>
