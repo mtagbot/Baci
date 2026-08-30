@@ -25,8 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_sync'])) {
         redirect('desk-sync.php');
     }
     $url = trim($_POST['sync_url'] ?? '');
-    if ($url !== '' && !preg_match('#/desk-sync-api\.php$#', $url)) {
-        $url = rtrim($url, '/') . '/desk-sync-api.php';
+    if ($url !== '') {
+        // no scheme typed → default to https:// (engine falls back to http:// automatically)
+        if (!preg_match('#^https?://#i', $url)) $url = 'https://' . ltrim($url, '/');
+        if (!preg_match('#/desk-sync-api\.php$#', $url)) $url = rtrim($url, '/') . '/desk-sync-api.php';
     }
     DeskSync::setCfg('desk_sync_url', $url);
     DeskSync::setCfg('desk_sync_key', trim($_POST['sync_key'] ?? ''));
@@ -60,15 +62,19 @@ function fa_ago($ts) {
             برنامه به‌صورت خودکار هر ۲ دقیقه تغییرات را با سایت شما رد و بدل می‌کند
             (دوطرفه: هم تغییرات اینجا به سایت می‌رود، هم تغییرات سایت به اینجا می‌آید).
             برای فعال‌سازی: فایل <code dir="ltr">desk-sync-api.php</code> (داخل پوشه server همین بسته)
-            را در ریشه سایت آپلود کنید، کلید داخل آن را عوض کنید و همان کلید را اینجا وارد کنید.
+            را در پوشه‌ای از سایت که سامانه در آن نصب است آپلود کنید (کنار index.php).
+            کلید اتصال از قبل در فایل و در برنامه تنظیم شده و نیازی به تغییر ندارد.
+            سپس آدرس همان پوشه را در پایین وارد کنید — مثلا اگر سامانه در
+            <code dir="ltr">example.com/reports</code> نصب است، همان را بنویسید.
         </p>
         <form method="POST" action="desk-sync.php">
             <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
             <div class="mb-4">
                 <label class="form-label">آدرس سایت</label>
                 <input type="text" name="sync_url" dir="ltr" class="form-input w-full"
-                       placeholder="https://school.example.com"
+                       placeholder="https://school.example.com/reports"
                        value="<?php echo clean($st['url']); ?>">
+                <div class="text-xs text-muted mt-1">آدرس دقیق پوشه‌ای که سامانه روی سایت در آن نصب است (با یا بدون https فرقی ندارد)</div>
             </div>
             <div class="mb-4">
                 <label class="form-label">کلید همگام‌سازی (همان کلید داخل desk-sync-api.php)</label>

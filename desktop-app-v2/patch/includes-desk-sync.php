@@ -97,7 +97,31 @@ class DeskSync {
         $err  = curl_error($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        if ($body === false) throw new Exception('اتصال به سرور برقرار نشد: ' . $err);
+        // https failed at connection level → retry once over plain http
+        if ($body === false && stripos($url, 'https://') === 0) {
+            $ch = curl_init('http://' . substr($url, 8));
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE),
+                CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_TIMEOUT        => 40,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS      => 3,
+            ]);
+            $body = curl_exec($ch);
+            if ($body !== false) { $err = ''; $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); }
+            curl_close($ch);
+        }
+        if ($body === false) {
+            $hint = '';
+            if (stripos($err, 'resolve') !== false) {
+                $host = parse_url($url, PHP_URL_HOST);
+                $hint = ' — آدرس دامنه «' . $host . '» پیدا نشد؛ املای آدرس سایت را در تنظیمات بررسی کنید';
+            }
+            throw new Exception('اتصال به سرور برقرار نشد: ' . $err . $hint);
+        }
         if ($code !== 200)   throw new Exception('پاسخ نامعتبر سرور (HTTP ' . $code . ')');
         $j = json_decode($body, true);
         if (!is_array($j))   throw new Exception('پاسخ سرور JSON نیست — آدرس desk-sync-api.php را بررسی کنید');
