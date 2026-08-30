@@ -41,7 +41,10 @@ if (PHP_SAPI === 'cli-server') {
         ]);
         // A form POST always follows at least one GET of the same app,
         // so by POST time the test cookie must have come back.
-        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+        // desk-doctor.php is exempt: it must work even with broken cookies.
+        $sdpUri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+            && basename((string)$sdpUri) !== 'desk-doctor.php') {
             http_response_code(200);
             header('Content-Type: text/html; charset=utf-8');
             echo '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8">'
