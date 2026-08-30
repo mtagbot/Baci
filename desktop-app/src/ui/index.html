@@ -114,6 +114,8 @@ table.g{width:100%;border-collapse:collapse;font-size:13px}
       <button data-v="teachers"><span class="ic">✎</span>دبیران</button>
       <button data-v="attendance"><span class="ic">✓</span>حضور و غیاب</button>
       <button data-v="attreport"><span class="ic">▤</span>گزارش حضور</button>
+      <button data-v="grades"><span class="ic">۲۰</span>ثبت نمرات</button>
+      <button data-v="repcard"><span class="ic">≡</span>کارنامه</button>
       <button data-v="queue"><span class="ic">⇄</span>صف همگام‌سازی <span id="qbadge" class="badge o hide">0</span></button>
       <button data-v="settings"><span class="ic">⚙</span>تنظیمات اتصال</button>
     </div>
@@ -210,6 +212,44 @@ table.g{width:100%;border-collapse:collapse;font-size:13px}
         </div>
       </div>
 
+      <!-- grades -->
+      <div id="v-grades" class="hide">
+        <div class="row">
+          <span class="it"><select class="in" id="grMonth"></select></span>
+          <span class="it"><select class="in" id="grClassFilter"><option value="">همه کلاس‌ها</option></select></span>
+          <span class="it"><select class="in" id="grSubject" style="min-width:150px"></select></span>
+          <span class="it"><button class="btn gray" onclick="addSubject()">درس جدید</button></span>
+          <span class="it"><span class="note" id="grHint">نمره را وارد و Enter بزنید — خودکار ذخیره می‌شود</span></span>
+        </div>
+        <div class="card tbl">
+          <table class="g"><thead><tr><th>#</th><th>نام و نام خانوادگی</th><th>کلاس</th><th style="width:120px">نمره این درس</th><th>معدل ماه</th><th>تعداد درس ثبت‌شده</th></tr></thead><tbody id="grBody"></tbody></table>
+          <div class="empty hide" id="grEmpty">دانش‌آموزی یافت نشد — ابتدا درس و ماه را انتخاب کنید</div>
+        </div>
+      </div>
+
+      <!-- report card -->
+      <div id="v-repcard" class="hide">
+        <div class="row noprint">
+          <span class="it"><select class="in" id="rcClassFilter"><option value="">انتخاب کلاس...</option></select></span>
+          <span class="it"><select class="in" id="rcStudent" style="min-width:190px"><option value="">انتخاب دانش‌آموز...</option></select></span>
+          <span class="it"><select class="in" id="rcMonth"></select></span>
+          <span class="it"><button class="btn" onclick="loadReportCard()">نمایش کارنامه</button></span>
+          <span class="it left"><button class="btn gray" onclick="window.print()">چاپ کارنامه</button></span>
+        </div>
+        <div class="card" id="rcCard" style="display:none">
+          <div style="text-align:center;border-bottom:2px solid #0f172a;padding-bottom:10px;margin-bottom:14px">
+            <b style="font-size:16px" id="rcSchool">کارنامه تحصیلی</b><br>
+            <span class="note" id="rcHead"></span>
+          </div>
+          <table class="g" style="margin-bottom:12px"><tbody id="rcInfo"></tbody></table>
+          <table class="g"><thead><tr><th>#</th><th>نام درس</th><th>نمره</th><th>رتبه در کلاس</th><th>وضعیت</th></tr></thead>
+            <tbody id="rcBody"></tbody>
+            <tfoot><tr style="background:#f1f5f9;font-weight:bold"><td colspan="2">معدل</td><td id="rcAvg">—</td><td id="rcRank">—</td><td id="rcRes">—</td></tr></tfoot>
+          </table>
+          <div class="empty hide" id="rcEmpty">نمره‌ای برای این ماه ثبت نشده است</div>
+        </div>
+      </div>
+
       <!-- queue -->
       <div id="v-queue" class="hide">
         <div class="card">
@@ -234,7 +274,9 @@ table.g{width:100%;border-collapse:collapse;font-size:13px}
             <div class="f"><label>رمز عبور</label><input class="in ltr" id="setPass" type="password"></div>
           </div>
           <label style="display:block;font-size:12px;color:#64748b;margin-top:11px"><input type="checkbox" id="setInsecure"> پذیرش گواهی SSL نامعتبر</label>
-          <div class="mfoot"><button class="btn green" onclick="saveSettings()">اتصال و دریافت اطلاعات</button></div>
+          <div class="mfoot"><button class="btn green" id="setBtn" onclick="saveSettings()">اتصال و دریافت اطلاعات</button>
+          <button class="btn gray" onclick="testServer()">تست آدرس سرور</button></div>
+          <div id="setResult" style="margin-top:10px;font-size:12.5px;line-height:2"></div>
           <div class="note" id="setState" style="margin-top:8px"></div>
         </div>
         <div class="card" style="max-width:600px">
@@ -331,9 +373,11 @@ var titles={dash:['داشبورد','نمای کلی اطلاعات مدرسه'],
  teachers:['دبیران','مدیریت دبیران'],
  attendance:['حضور و غیاب','ثبت روزانه حضور، تاخیر و غیبت — آفلاین هم کار می‌کند'],
  attreport:['گزارش حضور','جمع‌بندی ماهانه حضور و غیاب'],
+ grades:['ثبت نمرات','ثبت نمره هر درس برای هر ماه — با سایت همگام می‌شود'],
+ repcard:['کارنامه','مشاهده و چاپ کارنامه ماهانه دانش‌آموز'],
  queue:['صف همگام‌سازی','تغییرات در انتظار ارسال به سرور'],
  settings:['تنظیمات اتصال','پیکربندی ارتباط با سرور سایت مدرسه']};
-var views=['dash','students','classes','teachers','attendance','attreport','queue','settings'];
+var views=['dash','students','classes','teachers','attendance','attreport','grades','repcard','queue','settings'];
 each(document.getElementById('nav').getElementsByTagName('button'),function(b){
   b.onclick=function(){
     each(document.getElementById('nav').getElementsByTagName('button'),function(x){x.className=x.className.replace(/\s*\bon\b/g,'')});
@@ -351,6 +395,8 @@ function refreshView(){
   else if(curView==='teachers')loadTeachers();
   else if(curView==='attendance')loadAttendance();
   else if(curView==='attreport'){if(!$('repMonth').value)$('repMonth').value=todayJalali().substr(0,7);loadAttReport();}
+  else if(curView==='grades')loadGrades();
+  else if(curView==='repcard')initRepCard();
   else if(curView==='queue')loadQueue();
   loadState();
 }
@@ -451,7 +497,7 @@ function loadClasses(){
     });
     $('clsBody').innerHTML=h;
     setHide('clsEmpty',classCache.length>0);
-    each(['stuClassFilter','attClassFilter','repClassFilter'],function(id){
+    each(['stuClassFilter','attClassFilter','repClassFilter','grClassFilter'],function(id){
       var sel=$(id),old=sel.value,o='<option value="">همه کلاس‌ها</option>';
       each(classCache,function(cl){o+='<option value="'+esc(cl.name)+'">'+esc(cl.name)+'</option>'});
       sel.innerHTML=o;sel.value=old;
@@ -598,6 +644,104 @@ function loadAttReport(){
   });
 }
 
+/* ---------- grades ---------- */
+var MONTHS=['مهر','آبان','آذر','دی','بهمن','اسفند','فروردین','اردیبهشت','خرداد','نوبت اول','نوبت دوم'];
+function fillMonths(id){
+  var sel=$(id);if(sel.options.length)return;
+  var o='';each(MONTHS,function(m){o+='<option value="'+m+'">'+m+'</option>'});
+  sel.innerHTML=o;
+}
+function faDigitsToEn(s){return String(s).replace(/[۰-۹]/g,function(c){return FA.indexOf(c)})}
+function loadGrades(){
+  fillMonths('grMonth');
+  var m=encodeURIComponent($('grMonth').value);
+  var c=encodeURIComponent($('grClassFilter').value);
+  var sj=$('grSubject').value;
+  api('/api/grades?month='+m+'&class='+c+'&subject='+encodeURIComponent(sj),null,function(r){
+    /* refill subject list, keep selection */
+    var subs=r.subjects||[],sel=$('grSubject'),old=sel.value,o='<option value="">انتخاب درس...</option>';
+    each(subs,function(s){o+='<option value="'+esc(s)+'">'+esc(s)+'</option>'});
+    sel.innerHTML=o;sel.value=old;
+    if(!sel.value&&subs.length){sel.value=subs[0];loadGrades();return}
+    var h='',items=r.items||[];
+    each(items,function(s,i){
+      var sc=(s.score==null?'':String(s.score));
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(s.first_name)+' '+esc(s.last_name)+'</b></td>'+
+        '<td><span class="badge b">'+esc(s.class_name||'—')+'</span></td>'+
+        '<td><input class="in mono" style="width:80px;min-width:0;text-align:center" value="'+esc(sc)+'"'+
+        ' onkeydown="if(event.keyCode===13){gradeSave(this,'+i+');return false}" onblur="gradeSave(this,'+i+')"></td>'+
+        '<td>'+(s.avg!=null?'<b>'+fa(s.avg)+'</b>':'—')+'</td>'+
+        '<td>'+fa(s.cnt||0)+' درس</td></tr>';
+    });
+    window._gr=items;
+    $('grBody').innerHTML=h;
+    setHide('grEmpty',items.length>0&&!!$('grSubject').value);
+  });
+}
+$('grMonth').onchange=loadGrades;
+$('grClassFilter').onchange=loadGrades;
+$('grSubject').onchange=loadGrades;
+function gradeSave(inp,i){
+  var s=window._gr[i],subj=$('grSubject').value;
+  if(!subj)return toast('ابتدا درس را انتخاب کنید');
+  var v=faDigitsToEn(inp.value).replace(/[^0-9.]/g,'');
+  if(v!==''&&(parseFloat(v)<0||parseFloat(v)>20))return toast('نمره باید بین ۰ تا ۲۰ باشد');
+  if(v===String(s.score==null?'':s.score))return; /* unchanged */
+  api('/api/grade-set',{student_uuid:s.uuid,report_month:$('grMonth').value,subject_name:subj,score:v},function(r){
+    if(r.ok){s.score=(v===''?null:parseFloat(v));toast(v===''?'نمره پاک شد':'ذخیره شد');loadState();}
+    else toast(r.msg||'خطا');
+  });
+}
+function addSubject(){
+  var n=prompt('نام درس جدید:','');
+  if(!n)return;
+  api('/api/subject-add',{name:n},function(r){
+    if(r.ok){$('grSubject').innerHTML='';toast('درس اضافه شد');loadGrades();setTimeout(function(){$('grSubject').value=n;loadGrades()},300);}
+  });
+}
+
+/* ---------- report card ---------- */
+function initRepCard(){
+  fillMonths('rcMonth');
+  var sel=$('rcClassFilter'),old=sel.value,o='<option value="">انتخاب کلاس...</option>';
+  each(classCache,function(cl){o+='<option value="'+esc(cl.name)+'">'+esc(cl.name)+'</option>'});
+  sel.innerHTML=o;sel.value=old;
+}
+$('rcClassFilter').onchange=function(){
+  var c=encodeURIComponent(this.value);
+  api('/api/students?q=&class='+c,null,function(r){
+    var o='<option value="">انتخاب دانش‌آموز...</option>';
+    each(r.items||[],function(s){o+='<option value="'+esc(s.uuid)+'">'+esc(s.first_name)+' '+esc(s.last_name)+'</option>'});
+    $('rcStudent').innerHTML=o;
+  });
+};
+function loadReportCard(){
+  var u=$('rcStudent').value;
+  if(!u)return toast('دانش‌آموز را انتخاب کنید');
+  api('/api/reportcard?student='+encodeURIComponent(u)+'&month='+encodeURIComponent($('rcMonth').value),null,function(r){
+    if(!r.ok)return toast(r.msg||'خطا');
+    $('rcCard').style.display='block';
+    $('rcSchool').innerHTML=esc($('brandSchool').innerHTML)||'کارنامه تحصیلی';
+    $('rcHead').innerHTML='کارنامه ماهانه — '+esc($('rcMonth').value);
+    var st=r.student;
+    $('rcInfo').innerHTML='<tr><td><b>نام:</b> '+esc(st.first_name)+' '+esc(st.last_name)+'</td>'+
+      '<td><b>کد ملی:</b> <span class="mono">'+fa(st.national_id||'—')+'</span></td>'+
+      '<td><b>نام پدر:</b> '+esc(st.father_name||'—')+'</td>'+
+      '<td><b>کلاس:</b> '+esc(st.class_name||'—')+'</td></tr>';
+    var h='';
+    each(r.grades||[],function(g,i){
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(g.subject_name)+'</b></td><td><b>'+fa(g.score)+'</b></td>'+
+        '<td>#'+fa(g.class_rank)+'</td>'+
+        '<td>'+(g.score>=10?'<span class="badge g">قبول</span>':'<span class="badge r">مردود</span>')+'</td></tr>';
+    });
+    $('rcBody').innerHTML=h;
+    setHide('rcEmpty',(r.grades||[]).length>0);
+    $('rcAvg').innerHTML=r.avg?fa(r.avg):'—';
+    $('rcRank').innerHTML=r.class_rank>0?'#'+fa(r.class_rank):'—';
+    $('rcRes').innerHTML=r.avg?(parseFloat(r.avg)>=10?'قبول':'مردود'):'—';
+  });
+}
+
 /* ---------- shared ---------- */
 function delEntity(entity,u,label){
   if(!confirm('«'+label+'» حذف شود؟'))return;
@@ -609,7 +753,7 @@ function delEntity(entity,u,label){
 function loadQueue(){
   api('/api/queue',null,function(r){
     var ops={create:'ایجاد',update:'ویرایش','delete':'حذف',set:'ثبت'};
-    var ents={student:'دانش‌آموز','class':'کلاس',teacher:'دبیر',attendance:'حضورغیاب'};
+    var ents={student:'دانش‌آموز','class':'کلاس',teacher:'دبیر',attendance:'حضورغیاب',grade:'نمره'};
     var h='',items=r.items||[];
     each(items,function(x,i){
       h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(ents[x.entity]||x.entity)+'</b> '+esc(x.title||'')+'</td>'+
@@ -627,14 +771,37 @@ function syncNow(){
 $('syncPill').onclick=syncNow;
 
 /* ---------- settings ---------- */
+function setResult(html,ok){
+  $('setResult').innerHTML='<div style="border-radius:9px;padding:10px 14px;border:1px solid '+
+    (ok?'#a7f3d0;background:#ecfdf5;color:#065f46':'#fecaca;background:#fef2f2;color:#991b1b')+'">'+html+'</div>';
+}
 function saveSettings(){
   var u=$('setUrl').value.replace(/^\s+|\s+$/g,'');
-  if(!u)return toast('آدرس سایت را وارد کنید');
+  if(!u)return setResult('آدرس سایت را وارد کنید',false);
+  if(!$('setUser').value)return setResult('نام کاربری مدیر را وارد کنید',false);
+  if(!$('setPass').value)return setResult('رمز عبور را وارد کنید',false);
   if(!/^https?:\/\//.test(u)){u='https://'+u;$('setUrl').value=u;}
-  toast('در حال اتصال به سرور...');
+  $('setBtn').disabled=true;
+  setResult('در حال اتصال به سرور... (تا ۳۰ ثانیه صبر کنید)',true);
   api('/api/settings',{server_url:u,username:$('setUser').value,password:$('setPass').value,insecure:$('setInsecure').checked},function(r){
-    if(r.ok){toast('اتصال برقرار شد — دریافت اطلاعات آغاز شد');$('setPass').value='';setTimeout(loadState,1500);}
-    else toast(r.msg||'خطا در اتصال');
+    $('setBtn').disabled=false;
+    if(r.ok){setResult('✓ اتصال برقرار شد — دریافت اطلاعات در پس‌زمینه آغاز شد',true);$('setPass').value='';setTimeout(loadState,1500);setTimeout(loadState,5000);}
+    else setResult('✗ '+esc(r.msg||'خطای نامشخص در اتصال'),false);
+  },function(){
+    $('setBtn').disabled=false;
+    setResult('✗ خطای داخلی برنامه — دوباره تلاش کنید',false);
+  });
+}
+function testServer(){
+  var u=$('setUrl').value.replace(/^\s+|\s+$/g,'');
+  if(!u)return setResult('آدرس سایت را وارد کنید',false);
+  if(!/^https?:\/\//.test(u)){u='https://'+u;$('setUrl').value=u;}
+  setResult('در حال تست آدرس سرور...',true);
+  api('/api/settings',{server_url:u,username:'__ping__',password:'__ping__',insecure:$('setInsecure').checked},function(r){
+    /* wrong credentials but valid JSON response = the file IS reachable */
+    if(r.ok)setResult('✓ سرور در دسترس است و اتصال کامل برقرار شد',true);
+    else if(r.msg&&r.msg.indexOf('نام کاربری')>=0)setResult('✓ فایل sync-api.php روی سرور در دسترس است — حالا نام کاربری و رمز صحیح مدیر را وارد کنید',true);
+    else setResult('✗ '+esc(r.msg||'سرور پاسخ نداد'),false);
   });
 }
 

@@ -13,16 +13,33 @@
  *  - All writes are idempotent: re-sending the same create finds the row by uuid.
  */
 
+/* Hard guards: many shared hosts print notices/warnings or BOMs that would
+ * corrupt the JSON response — silence everything and flush buffers. */
+@error_reporting(0);
+@ini_set('display_errors', '0');
+if (!headers_sent()) { @ob_start(); }
+
 require_once __DIR__ . '/includes/auth.php';
 
+while (ob_get_level() > 0) { @ob_end_clean(); }
 header('Content-Type: application/json; charset=utf-8');
 
-function sd_out($arr) { echo json_encode($arr, JSON_UNESCAPED_UNICODE); exit; }
+function sd_out($arr) {
+    while (ob_get_level() > 0) { @ob_end_clean(); }
+    echo json_encode($arr, JSON_UNESCAPED_UNICODE);
+    exit;
+}
 function sd_fail($msg) { sd_out(['ok' => false, 'msg' => $msg]); }
+
+/* GET ping: open https://site/sync-api.php in a browser to verify install */
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    sd_out(['ok' => true, 'ping' => 'sync-api ready', 'version' => '1.2.0',
+            'php' => PHP_VERSION, 'time' => date('Y-m-d H:i:s')]);
+}
 
 $raw = file_get_contents('php://input');
 $in = json_decode($raw, true);
-if (!is_array($in)) sd_fail('درخواست نامعتبر');
+if (!is_array($in)) sd_fail('درخواست نامعتبر (JSON دریافت نشد)');
 $action = $in['action'] ?? '';
 
 /* ---- ensure schema bits (safe / idempotent) ---- */
@@ -109,7 +126,7 @@ if ($action === 'pull') {
         "SELECT id, desk_uuid AS uuid, full_name, national_id, personnel_code, mobile, status
          FROM teachers WHERE status = 1 ORDER BY full_name");
 
-    // attendance: last 60 days only (keeps payload small)
+    // attendance: last records only (keeps payload small)
     $attendance = [];
     try {
         $attendance = DB::fetchAll(
@@ -120,9 +137,32 @@ if ($action === 'pull') {
              ORDER BY a.id DESC LIMIT 5000");
     } catch (Exception $e) {}
 
+    // grades of current year (joined via reports)
+    $grades = [];
+    try {
+        $grades = DB::fetchAll(
+            "SELECT CONCAT('srv-', rg.id) AS uuid, s.desk_uuid AS student_uuid,
+                    r.report_month, rg.subject_name, rg.score
+             FROM report_grades rg
+             JOIN reports r ON r.id = rg.report_id
+             JOIN students s ON s.id = r.student_id
+             WHERE s.desk_uuid IS NOT NULL" .
+             ($year !== '' ? " AND r.academic_year = " . "'" . str_replace("'", "", $year) . "'" : "") .
+            " ORDER BY rg.id DESC LIMIT 20000");
+    } catch (Exception $e) {}
+
+    // distinct subjects list
+    $subjects = [];
+    try {
+        $subjects = DB::fetchAll("SELECT DISTINCT subject_name AS name FROM report_grades
+                                  WHERE subject_name IS NOT NULL AND subject_name <> ''
+                                  ORDER BY subject_name LIMIT 100");
+    } catch (Exception $e) {}
+
     $school = function_exists('get_setting') ? get_setting('report_header_line2', get_setting('school_name', '')) : '';
     sd_out(['ok' => true, 'students' => $students, 'classes' => $classes,
             'teachers' => $teachers, 'attendance' => $attendance,
+            'grades' => $grades, 'subjects' => $subjects,
             'school_name' => $school, 'year' => $year]);
 }
 
@@ -252,6 +292,43 @@ if ($action === 'push') {
                                      VALUES (?, ?, ?, ?, ?, ?, 'manual', ?)",
                                     [$stu['id'], $year, $date, $status, $ml, $stime,
                                      function_exists('jdate') ? jdate('Y/m/d H:i') : date('Y/m/d H:i')]);
+                    }
+                }
+                $res['ok'] = true;
+                $res['server_id'] = (int)$stu['id'];
+            } elseif ($entity === 'grade') {
+                $stuUuid = trim($p['student_uuid'] ?? '');
+                $rmonth = trim($p['report_month'] ?? '');
+                $subj = trim($p['subject_name'] ?? '');
+                $score = trim((string)($p['score'] ?? ''));
+                if ($stuUuid === '' || $rmonth === '' || $subj === '') throw new Exception('اطلاعات نمره ناقص است');
+                $stu = DB::fetch("SELECT id, class_name FROM students WHERE desk_uuid = ?", [$stuUuid]);
+                if (!$stu) throw new Exception('دانش‌آموز هنوز روی سرور ساخته نشده (در تلاش بعدی ارسال می‌شود)');
+                // find/create the report row for this student+month
+                $rep = DB::fetch("SELECT id FROM reports WHERE student_id = ? AND report_month = ?" .
+                                 ($year !== '' ? " AND academic_year = ?" : ""),
+                                 $year !== '' ? [$stu['id'], $rmonth, $year] : [$stu['id'], $rmonth]);
+                if (!$rep && $score !== '') {
+                    DB::execute("INSERT INTO reports (student_id, class_name, academic_year, term, report_month, total_score, gpa) VALUES (?, ?, ?, 'نوبت اول', ?, 0, 0)",
+                                [$stu['id'], $stu['class_name'], $year, $rmonth]);
+                    $rep = ['id' => DB::lastInsertId()];
+                }
+                if ($rep) {
+                    $ex = DB::fetch("SELECT id FROM report_grades WHERE report_id = ? AND subject_name = ?",
+                                    [$rep['id'], $subj]);
+                    if ($score === '') {
+                        if ($ex) DB::execute("DELETE FROM report_grades WHERE id = ?", [$ex['id']]);
+                    } elseif ($ex) {
+                        DB::execute("UPDATE report_grades SET score = ? WHERE id = ?", [(float)$score, $ex['id']]);
+                    } else {
+                        DB::execute("INSERT INTO report_grades (report_id, subject_name, score, max_score, coefficient, status) VALUES (?, ?, ?, 20, 1, ?)",
+                                    [$rep['id'], $subj, (float)$score, ((float)$score >= 10 ? 'قبول' : 'مردود')]);
+                    }
+                    // recompute gpa
+                    $ag = DB::fetch("SELECT AVG(score) a, SUM(score) t, COUNT(*) c FROM report_grades WHERE report_id = ?", [$rep['id']]);
+                    if ((int)($ag['c'] ?? 0) > 0) {
+                        DB::execute("UPDATE reports SET gpa = ?, total_score = ? WHERE id = ?",
+                                    [round((float)$ag['a'], 2), (float)$ag['t'], $rep['id']]);
                     }
                 }
                 $res['ok'] = true;

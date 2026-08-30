@@ -22,7 +22,7 @@
 #include "sqlite3.h"
 #include "blobs.h" /* generated: BLOB_UI_HTML, BLOB_FONT_REG, BLOB_FONT_BOLD */
 
-#define APP_VERSION "1.1.0"
+#define APP_VERSION "1.2.0"
 #define SYNC_PERIOD_TICKS 60 /* x500ms = 30s */
 
 #ifdef _WIN32
@@ -143,6 +143,12 @@ static void db_init(sqlite3 *db) {
       " uuid TEXT UNIQUE, student_uuid TEXT, date_jalali TEXT, status TEXT,"
       " minutes_late INTEGER DEFAULT 0, scan_time TEXT, deleted INTEGER DEFAULT 0,"
       " UNIQUE(student_uuid, date_jalali));"
+      "CREATE TABLE IF NOT EXISTS grades(id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      " uuid TEXT UNIQUE, student_uuid TEXT, report_month TEXT, subject_name TEXT,"
+      " score REAL, deleted INTEGER DEFAULT 0,"
+      " UNIQUE(student_uuid, report_month, subject_name));"
+      "CREATE TABLE IF NOT EXISTS subjects(id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      " name TEXT UNIQUE);"
       "CREATE TABLE IF NOT EXISTS queue(id INTEGER PRIMARY KEY AUTOINCREMENT,"
       " entity TEXT, op TEXT, payload TEXT,"
       " created_at TEXT DEFAULT (datetime('now','localtime')),"
@@ -425,7 +431,7 @@ static int sync_pull(sqlite3 *db, const char *api, const char *key, int insecure
   const char *rb[1] = { resp };
   sqlite3_exec(db, "BEGIN", 0, 0, 0);
   sqlite3_exec(db, "DELETE FROM students; DELETE FROM classes; DELETE FROM teachers;"
-                   " DELETE FROM attendance;", 0, 0, 0);
+                   " DELETE FROM attendance; DELETE FROM grades; DELETE FROM subjects;", 0, 0, 0);
   db_exec_b(db,
       "INSERT INTO students(server_id,uuid,national_id,first_name,last_name,father_name,"
       "grade_level,class_name,phone,father_phone,status) SELECT"
@@ -455,6 +461,16 @@ static int sync_pull(sqlite3 *db, const char *api, const char *key, int insecure
       " json_extract(value,'$.date_jalali'), json_extract(value,'$.status'),"
       " COALESCE(json_extract(value,'$.minutes_late'),0), json_extract(value,'$.scan_time')"
       " FROM json_each(?1,'$.attendance')",
+      1, rb);
+  db_exec_b(db,
+      "INSERT OR IGNORE INTO grades(uuid,student_uuid,report_month,subject_name,score)"
+      " SELECT json_extract(value,'$.uuid'), json_extract(value,'$.student_uuid'),"
+      " json_extract(value,'$.report_month'), json_extract(value,'$.subject_name'),"
+      " json_extract(value,'$.score') FROM json_each(?1,'$.grades')",
+      1, rb);
+  db_exec_b(db,
+      "INSERT OR IGNORE INTO subjects(name)"
+      " SELECT value FROM json_each(?1,'$.subjects') WHERE value IS NOT NULL AND value<>''",
       1, rb);
   sqlite3_exec(db, "COMMIT", 0, 0, 0);
 
@@ -852,6 +868,143 @@ static void api_attendance_report(struct mg_connection *c, struct mg_http_messag
   free(body); free(json);
 }
 
+/* ---- grades: sheet for class+month (students x subject scores) ---- */
+static void api_grades(struct mg_connection *c, struct mg_http_message *hm) {
+  char month[40] = "", cls[128] = "", subj[128] = "";
+  mg_http_get_var(&hm->query, "month", month, sizeof(month));
+  mg_http_get_var(&hm->query, "class", cls, sizeof(cls));
+  mg_http_get_var(&hm->query, "subject", subj, sizeof(subj));
+  const char *b[3] = { month, cls, subj };
+  char *json = db_text(g_db,
+      "SELECT COALESCE(json_group_array(json_object('uuid',s.uuid,"
+      "'first_name',s.first_name,'last_name',s.last_name,'class_name',s.class_name,"
+      "'score',(SELECT g.score FROM grades g WHERE g.student_uuid=s.uuid AND g.deleted=0"
+      "  AND g.report_month=?1 AND g.subject_name=?3),"
+      "'avg',(SELECT ROUND(AVG(g.score),2) FROM grades g WHERE g.student_uuid=s.uuid"
+      "  AND g.deleted=0 AND g.report_month=?1),"
+      "'cnt',(SELECT COUNT(*) FROM grades g WHERE g.student_uuid=s.uuid AND g.deleted=0"
+      "  AND g.report_month=?1))),'[]')"
+      " FROM (SELECT * FROM students WHERE deleted=0 AND (?2='' OR class_name=?2)"
+      " ORDER BY class_name, last_name, first_name) s",
+      3, b);
+  char *subjects = db_text(g_db,
+      "SELECT COALESCE(json_group_array(name),'[]') FROM (SELECT name FROM subjects ORDER BY name)",
+      0, NULL);
+  if (!json) { free(subjects); reply_json(c, 500, "{\"ok\":false}"); return; }
+  size_t cap = strlen(json) + (subjects ? strlen(subjects) : 4) + 64;
+  char *body = (char *) malloc(cap);
+  snprintf(body, cap, "{\"ok\":true,\"items\":%s,\"subjects\":%s}", json,
+           subjects ? subjects : "[]");
+  reply_json(c, 200, body);
+  free(body); free(json); free(subjects);
+}
+
+/* ---- grades: set/clear one score ---- */
+static void api_grade_set(struct mg_connection *c, struct mg_http_message *hm) {
+  struct mg_str js = mg_str_n(hm->body.ptr, hm->body.len);
+  char *stu = mg_json_get_str(js, "$.student_uuid");
+  char *month = mg_json_get_str(js, "$.report_month");
+  char *subj = mg_json_get_str(js, "$.subject_name");
+  char *score = mg_json_get_str(js, "$.score"); /* "" = clear */
+  if (!stu || !month || !subj || !*month || !*subj) {
+    free(stu); free(month); free(subj); free(score);
+    reply_json(c, 400, "{\"ok\":false,\"msg\":\"درخواست نامعتبر\"}");
+    return;
+  }
+  char gu[220];
+  snprintf(gu, sizeof(gu), "gr-%.36s-%.40s-%.60s", stu, month, subj);
+  for (char *p = gu; *p; p++) if (*p == '/' || *p == ' ') *p = '-';
+
+  int ok;
+  if (!score || !*score) {
+    const char *b[3] = { stu, month, subj };
+    ok = db_exec_b(g_db,
+        "DELETE FROM grades WHERE student_uuid=?1 AND report_month=?2 AND subject_name=?3",
+        3, b) == 0;
+  } else {
+    const char *b[5] = { gu, stu, month, subj, score };
+    ok = db_exec_b(g_db,
+        "INSERT INTO grades(uuid,student_uuid,report_month,subject_name,score)"
+        " VALUES(?1,?2,?3,?4,CAST(?5 AS REAL))"
+        " ON CONFLICT(student_uuid,report_month,subject_name)"
+        " DO UPDATE SET score=CAST(?5 AS REAL), deleted=0", 5, b) == 0;
+    const char *sb[1] = { subj };
+    db_exec_b(g_db, "INSERT OR IGNORE INTO subjects(name) VALUES(?1)", 1, sb);
+  }
+  if (ok) {
+    const char *qb[5] = { gu, stu, month, subj, score ? score : "" };
+    db_exec_b(g_db,
+        "INSERT INTO queue(entity,op,payload) VALUES('grade','set',"
+        " json_object('uuid',?1,'student_uuid',?2,'report_month',?3,"
+        " 'subject_name',?4,'score',?5,"
+        " 'server_id',(SELECT server_id FROM students WHERE uuid=?2)))", 5, qb);
+    g_sync_req = 1;
+    reply_json(c, 200, "{\"ok\":true}");
+  } else {
+    reply_json(c, 500, "{\"ok\":false,\"msg\":\"خطا در ذخیره محلی\"}");
+  }
+  free(stu); free(month); free(subj); free(score);
+}
+
+/* ---- subjects: add one ---- */
+static void api_subject_add(struct mg_connection *c, struct mg_http_message *hm) {
+  struct mg_str js = mg_str_n(hm->body.ptr, hm->body.len);
+  char *name = mg_json_get_str(js, "$.name");
+  if (!name || !*name) {
+    free(name);
+    reply_json(c, 400, "{\"ok\":false,\"msg\":\"نام درس الزامی است\"}");
+    return;
+  }
+  const char *b[1] = { name };
+  db_exec_b(g_db, "INSERT OR IGNORE INTO subjects(name) VALUES(?1)", 1, b);
+  reply_json(c, 200, "{\"ok\":true}");
+  free(name);
+}
+
+/* ---- report card: one student, one month (with class ranks) ---- */
+static void api_reportcard(struct mg_connection *c, struct mg_http_message *hm) {
+  char stu[80] = "", month[40] = "";
+  mg_http_get_var(&hm->query, "student", stu, sizeof(stu));
+  mg_http_get_var(&hm->query, "month", month, sizeof(month));
+  const char *b[2] = { stu, month };
+  char *info = db_text(g_db,
+      "SELECT json_object('first_name',first_name,'last_name',last_name,"
+      "'national_id',national_id,'father_name',father_name,'class_name',class_name,"
+      "'grade_level',grade_level) FROM students WHERE uuid=?1", 1, b);
+  char *rows = db_text(g_db,
+      "SELECT COALESCE(json_group_array(json_object('subject_name',subject_name,"
+      "'score',score,"
+      "'class_rank',(SELECT 1+COUNT(*) FROM grades g2 JOIN students s2 ON s2.uuid=g2.student_uuid"
+      "  WHERE g2.deleted=0 AND g2.report_month=?2 AND g2.subject_name=g.subject_name"
+      "  AND s2.class_name=(SELECT class_name FROM students WHERE uuid=?1)"
+      "  AND g2.score>g.score))),'[]')"
+      " FROM (SELECT * FROM grades WHERE student_uuid=?1 AND report_month=?2 AND deleted=0"
+      " ORDER BY subject_name) g",
+      2, b);
+  char *avg = db_text(g_db,
+      "SELECT COALESCE(ROUND(AVG(score),2),'') FROM grades"
+      " WHERE student_uuid=?1 AND report_month=?2 AND deleted=0", 2, b);
+  char *rank = db_text(g_db,
+      "SELECT 1+COUNT(*) FROM (SELECT g.student_uuid, AVG(g.score) a FROM grades g"
+      " JOIN students s ON s.uuid=g.student_uuid WHERE g.deleted=0 AND g.report_month=?2"
+      " AND s.class_name=(SELECT class_name FROM students WHERE uuid=?1)"
+      " GROUP BY g.student_uuid)"
+      " WHERE a>(SELECT AVG(score) FROM grades WHERE student_uuid=?1"
+      " AND report_month=?2 AND deleted=0)", 2, b);
+  if (!info) {
+    free(rows); free(avg); free(rank);
+    reply_json(c, 404, "{\"ok\":false,\"msg\":\"دانش‌آموز یافت نشد\"}");
+    return;
+  }
+  size_t cap = strlen(info) + strlen(rows ? rows : "[]") + 256;
+  char *body = (char *) malloc(cap);
+  snprintf(body, cap,
+           "{\"ok\":true,\"student\":%s,\"grades\":%s,\"avg\":\"%s\",\"class_rank\":%s}",
+           info, rows ? rows : "[]", avg ? avg : "", (rank && *rank) ? rank : "0");
+  reply_json(c, 200, body);
+  free(body); free(info); free(rows); free(avg); free(rank);
+}
+
 /* Connect & login to the site server, obtain API key */
 static void api_settings(struct mg_connection *c, struct mg_http_message *hm) {
   struct mg_str js = mg_str_n(hm->body.ptr, hm->body.len);
@@ -876,17 +1029,40 @@ static void api_settings(struct mg_connection *c, struct mg_http_message *hm) {
   char *resp = NULL;
   size_t rlen = 0;
   int st = http_post(api, body, insecure ? 1 : 0, &resp, &rlen);
-  if (st != 200 || !resp) {
+  if (st < 0 || !resp || rlen == 0) {
     free(resp); free(url); free(user); free(pass);
-    char eb[256];
+    reply_json(c, 200,
+        "{\"ok\":false,\"msg\":\"اتصال به سرور برقرار نشد — اینترنت/آدرس را بررسی کنید. "
+        "اگر SSL سایت معتبر نیست گزینه (پذیرش گواهی SSL نامعتبر) را فعال کنید. "
+        "برای تست، آدرس sync-api.php را در مرورگر باز کنید\"}");
+    return;
+  }
+  if (st != 200) {
+    char frag[120], fe[240], eb[560];
+    snprintf(frag, sizeof(frag), "%.100s", resp);
+    json_esc(frag, fe, sizeof(fe));
+    free(resp); free(url); free(user); free(pass);
     snprintf(eb, sizeof(eb),
-             "{\"ok\":false,\"msg\":\"اتصال به سرور برقرار نشد (کد %d) — آدرس و اینترنت را بررسی کنید\"}", st);
+             "{\"ok\":false,\"msg\":\"سرور کد %d برگرداند (%s%s) — مسیر sync-api.php را بررسی کنید. "
+             "پاسخ سرور: %s\"}",
+             st, st == 404 ? "فایل پیدا نشد" : st == 403 ? "دسترسی رد شد" : st >= 500 ? "خطای داخلی سرور" : "خطا",
+             "", fe);
     reply_json(c, 200, eb);
     return;
   }
   struct mg_str rj = mg_str_n(resp, rlen);
   bool okv = false;
-  mg_json_get_bool(rj, "$.ok", &okv);
+  bool got = mg_json_get_bool(rj, "$.ok", &okv);
+  if (!got) { /* 200 but not our JSON — wrong URL (HTML page?) */
+    char frag[120], fe[240], eb[560];
+    snprintf(frag, sizeof(frag), "%.100s", resp);
+    json_esc(frag, fe, sizeof(fe));
+    free(resp); free(url); free(user); free(pass);
+    snprintf(eb, sizeof(eb),
+             "{\"ok\":false,\"msg\":\"پاسخ سرور JSON معتبر نبود — احتمالا آدرس اشتباه است یا فایل sync-api.php آپلود نشده. ابتدای پاسخ: %s\"}", fe);
+    reply_json(c, 200, eb);
+    return;
+  }
   if (!okv) {
     char *m = mg_json_get_str(rj, "$.msg");
     char me[300];
@@ -934,6 +1110,14 @@ static void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
     api_attendance_set(c, hm);
   } else if (mg_http_match_uri(hm, "/api/attendance-report")) {
     api_attendance_report(c, hm);
+  } else if (mg_http_match_uri(hm, "/api/grades")) {
+    api_grades(c, hm);
+  } else if (mg_http_match_uri(hm, "/api/grade-set")) {
+    api_grade_set(c, hm);
+  } else if (mg_http_match_uri(hm, "/api/subject-add")) {
+    api_subject_add(c, hm);
+  } else if (mg_http_match_uri(hm, "/api/reportcard")) {
+    api_reportcard(c, hm);
   } else if (mg_http_match_uri(hm, "/api/queue")) {
     api_queue(c);
   } else if (mg_http_match_uri(hm, "/api/settings")) {
