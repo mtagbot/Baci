@@ -29,6 +29,10 @@ if (!defined('DESK_SYNC_TABLES')) {
         'online_exam_categories','online_question_categories','online_question_bank',
         'online_exams','online_questions','online_exam_attempts','online_exam_answers',
         'grade_messages','counseling_requests','student_attendance','student_qr_tags',
+        // bot integration: registrations, staff bot sessions, templates, logs —
+        // so everything the site's Bale/Telegram bots know is also on the desktop
+        'bale_bot_users','telegram_bot_users','bot_admin_sessions',
+        'bot_message_templates','bot_button_templates','bot_login_tokens','bot_message_logs',
         'settings',
     ]));
 }
@@ -167,6 +171,29 @@ class DeskSync {
         }
     }
 
+    /* self-heal: make sure every synced table has its local change triggers
+       (covers databases created by an older version of the app) */
+    public static function ensureLocalTriggers() {
+        $tables = json_decode(DESK_SYNC_TABLES, true);
+        foreach ($tables as $t) {
+            if ($t === 'settings') continue; // has custom key_name triggers in the schema
+            try {
+                $have = DB::fetch("SELECT COUNT(*) c FROM sqlite_master WHERE type='trigger' AND name = ?", ["trg_sync_{$t}_i"]);
+                if ((int)($have['c'] ?? 0) > 0) continue;
+                $exists = DB::fetch("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name = ?", [$t]);
+                if ((int)($exists['c'] ?? 0) === 0) continue;
+                foreach ([['i','INSERT','NEW'], ['u','UPDATE','NEW'], ['d','DELETE','OLD']] as $x) {
+                    list($suf, $evt, $ref) = $x;
+                    DB::getInstance()->getPdo()->exec(
+                        "CREATE TRIGGER IF NOT EXISTS trg_sync_{$t}_{$suf} AFTER {$evt} ON \"{$t}\"\n" .
+                        "WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)\n" .
+                        "BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('{$t}', {$ref}.id, '" . substr($evt, 0, 1) . "', strftime('%s','now')); END"
+                    );
+                }
+            } catch (Throwable $e) { /* ignore */ }
+        }
+    }
+
     /* ---------------- apply one remote change locally ---------------- */
 
     private static function pkCol($tbl) {
@@ -245,6 +272,7 @@ class DeskSync {
 
         $pushed = 0; $pulled = 0;
         try {
+            self::ensureLocalTriggers();
             self::bumpSequences();
 
             // 1) handshake (also auto-installs server-side triggers)

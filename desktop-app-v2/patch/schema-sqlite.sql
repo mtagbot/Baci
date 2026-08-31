@@ -915,3 +915,68 @@ BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('student_qr_tags', NEW.
 CREATE TRIGGER IF NOT EXISTS trg_sync_student_qr_tags_d AFTER DELETE ON "student_qr_tags"
 WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
 BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('student_qr_tags', OLD.id, 'D', strftime('%s','now')); END;
+
+-- bot tables (v2.4.0): keep bot registrations/templates in sync with the site
+CREATE TRIGGER IF NOT EXISTS trg_sync_bale_bot_users_i AFTER INSERT ON "bale_bot_users"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bale_bot_users', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bale_bot_users_u AFTER UPDATE ON "bale_bot_users"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bale_bot_users', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bale_bot_users_d AFTER DELETE ON "bale_bot_users"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bale_bot_users', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_telegram_bot_users_i AFTER INSERT ON "telegram_bot_users"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('telegram_bot_users', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_telegram_bot_users_u AFTER UPDATE ON "telegram_bot_users"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('telegram_bot_users', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_telegram_bot_users_d AFTER DELETE ON "telegram_bot_users"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('telegram_bot_users', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_admin_sessions_i AFTER INSERT ON "bot_admin_sessions"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_admin_sessions', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_admin_sessions_u AFTER UPDATE ON "bot_admin_sessions"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_admin_sessions', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_admin_sessions_d AFTER DELETE ON "bot_admin_sessions"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_admin_sessions', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_message_templates_i AFTER INSERT ON "bot_message_templates"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_message_templates', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_message_templates_u AFTER UPDATE ON "bot_message_templates"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_message_templates', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_message_templates_d AFTER DELETE ON "bot_message_templates"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_message_templates', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_button_templates_i AFTER INSERT ON "bot_button_templates"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_button_templates', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_button_templates_u AFTER UPDATE ON "bot_button_templates"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_button_templates', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_button_templates_d AFTER DELETE ON "bot_button_templates"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_button_templates', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_login_tokens_i AFTER INSERT ON "bot_login_tokens"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_login_tokens', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_login_tokens_u AFTER UPDATE ON "bot_login_tokens"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_login_tokens', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_login_tokens_d AFTER DELETE ON "bot_login_tokens"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_login_tokens', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_message_logs_i AFTER INSERT ON "bot_message_logs"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_message_logs', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_message_logs_u AFTER UPDATE ON "bot_message_logs"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_message_logs', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_bot_message_logs_d AFTER DELETE ON "bot_message_logs"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_message_logs', OLD.id, 'D', strftime('%s','now')); END;

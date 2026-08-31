@@ -232,8 +232,10 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hp, LPSTR cmd, int show) {
            "-d error_log=\"%s\\data\\php-error.log\" "
            "-d session.save_path=\"%s\\data\\sessions\" "
            "-d upload_tmp_dir=\"%s\\data\\uploads\" "
+           "-d curl.cainfo=\"%s\\php\\cacert.pem\" "
+           "-d openssl.cafile=\"%s\\php\\cacert.pem\" "
            "-S 127.0.0.1:%d -t \"%s\\www\" \"%s\\www\\router.php\"",
-           g_dir, g_dir, g_dir, g_dir, g_dir, g_dir, port, g_dir, g_dir);
+           g_dir, g_dir, g_dir, g_dir, g_dir, g_dir, g_dir, g_dir, port, g_dir, g_dir);
 
   STARTUPINFOA si;
   PROCESS_INFORMATION pi;
