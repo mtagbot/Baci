@@ -134,7 +134,7 @@ if ($action === 'handshake') {
         $trg = (int)$pdo->query("SELECT COUNT(*) FROM information_schema.TRIGGERS
             WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME LIKE 'desk_sync_%'")->fetchColumn();
     } catch (Exception $e) {}
-    jout(['ok' => true, 'server' => 'desk-sync-api v1.0', 'triggers' => $trg]);
+    jout(['ok' => true, 'server' => 'desk-sync-api v2.4', 'triggers' => $trg, 'tables' => SYNC_TABLES]);
 }
 
 if ($action === 'snapshot') {

@@ -270,13 +270,20 @@ class DeskSync {
         self::setCfg('desk_sync_lock', (string) time());
         self::setCfg('desk_sync_last', (string) time());
 
-        $pushed = 0; $pulled = 0;
+        $pushed = 0; $pulled = 0; $warn = '';
         try {
             self::ensureLocalTriggers();
             self::bumpSequences();
 
             // 1) handshake (also auto-installs server-side triggers)
-            self::call('handshake');
+            $hs = self::call('handshake');
+            // old server file? → it does not know recently added tables (e.g. bots)
+            if (isset($hs['tables']) && is_array($hs['tables'])) {
+                $missingSrv = array_diff(json_decode(DESK_SYNC_TABLES, true), $hs['tables']);
+                if ($missingSrv) $warn = 'فایل desk-sync-api.php روی سایت قدیمی است — فایل جدید (پوشه server همین بسته) را دوباره آپلود کنید تا این جدول‌ها هم همگام شوند: ' . implode('، ', $missingSrv);
+            } elseif (!isset($hs['tables'])) {
+                $warn = 'فایل desk-sync-api.php روی سایت قدیمی است — فایل جدید (پوشه server همین بسته) را دوباره آپلود کنید.';
+            }
 
             // 2) first-time snapshot
             if (self::getCfg('desk_sync_snapshot_done') !== '1') {
@@ -288,7 +295,21 @@ class DeskSync {
                     $tbl = $tables[$ti];
                     $pk  = self::pkCol($tbl);
                     if ($aft === 0 && $pk !== 'id') $aft = '';
-                    $res = self::call('snapshot', ['tbl' => $tbl, 'after' => $aft, 'limit' => self::BATCH]);
+                    try {
+                        $res = self::call('snapshot', ['tbl' => $tbl, 'after' => $aft, 'limit' => self::BATCH]);
+                    } catch (Throwable $e) {
+                        // old server file does not know this table — skip it,
+                        // and remember that so it is imported later (2b) once
+                        // the server file has been updated.
+                        if (mb_strpos($e->getMessage(), 'bad table') !== false) {
+                            $skipped = json_decode(self::getCfg('desk_sync_skipped', '[]'), true) ?: [];
+                            if (!in_array($tbl, $skipped, true)) { $skipped[] = $tbl; self::setCfg('desk_sync_skipped', json_encode($skipped)); }
+                            $ti++; $aft = 0;
+                            self::setCfg('desk_sync_state', json_encode(['ti' => $ti, 'after' => $aft]));
+                            continue;
+                        }
+                        throw $e;
+                    }
                     $rows = $res['rows'] ?? [];
                     if ($rows) {
                         self::suppress(true);
@@ -306,8 +327,57 @@ class DeskSync {
                 }
                 // snapshot rows must not be pushed back
                 DB::execute("DELETE FROM desk_change_log");
-                self::setCfg('desk_sync_cursor', (string)($res['log_max'] ?? 0));
+                self::setCfg('desk_sync_cursor', (string)(isset($res['log_max']) ? $res['log_max'] : 0));
                 self::setCfg('desk_sync_snapshot_done', '1');
+                $skipped = json_decode(self::getCfg('desk_sync_skipped', '[]'), true) ?: [];
+                self::setCfg('desk_sync_snapped', json_encode(array_values(array_diff(
+                    json_decode(DESK_SYNC_TABLES, true), $skipped))));
+                self::setCfg('desk_sync_skipped', '[]');
+                self::bumpSequences();
+            }
+
+            // 2b) tables added in an app update AFTER the first snapshot:
+            //     import them once, without redoing the whole snapshot.
+            $snapped = json_decode(self::getCfg('desk_sync_snapped', '[]'), true) ?: [];
+            if (!$snapped && self::getCfg('desk_sync_snapshot_done') === '1') {
+                // upgraded from a pre-2.4 install: everything except the
+                // bot tables was already imported by the original snapshot
+                $snapped = array_values(array_diff(json_decode(DESK_SYNC_TABLES, true), [
+                    'bale_bot_users','telegram_bot_users','bot_admin_sessions',
+                    'bot_message_templates','bot_button_templates','bot_login_tokens','bot_message_logs',
+                ]));
+                self::setCfg('desk_sync_snapped', json_encode($snapped));
+            }
+            $newTables = array_diff(json_decode(DESK_SYNC_TABLES, true), $snapped);
+            $srvTables = (isset($hs['tables']) && is_array($hs['tables'])) ? $hs['tables'] : null;
+            foreach ($newTables as $tbl) {
+                if ($srvTables !== null && !in_array($tbl, $srvTables, true)) continue; // server file too old for this table
+                $pk = self::pkCol($tbl);
+                $aft = ($pk === 'id') ? 0 : '';
+                do {
+                    try {
+                        $res = self::call('snapshot', ['tbl' => $tbl, 'after' => $aft, 'limit' => self::BATCH]);
+                    } catch (Throwable $e) {
+                        if (mb_strpos($e->getMessage(), 'bad table') !== false) { $rows = []; break; }
+                        throw $e;
+                    }
+                    $rows = $res['rows'] ?? [];
+                    if ($rows) {
+                        self::suppress(true);
+                        try {
+                            foreach ($rows as $row) {
+                                if (!isset($row[$pk])) continue;
+                                self::applyChange(['tbl' => $tbl, 'rid' => $row[$pk], 'op' => 'U', 'row' => $row]);
+                                $aft = ($pk === 'id') ? max((int)$aft, (int)$row[$pk]) : max((string)$aft, (string)$row[$pk]);
+                                $pulled++;
+                            }
+                        } finally { self::suppress(false); }
+                    }
+                } while (count($rows) >= self::BATCH);
+                // rows imported this way must not echo back
+                try { DB::execute("DELETE FROM desk_change_log WHERE tbl = ?", [$tbl]); } catch (Throwable $e) {}
+                $snapped[] = $tbl;
+                self::setCfg('desk_sync_snapped', json_encode(array_values($snapped)));
                 self::bumpSequences();
             }
 
@@ -334,11 +404,12 @@ class DeskSync {
                 $pushed += count($changes);
             } while (count($changes) >= 1 && $maxId > 0 && DB::fetch("SELECT id FROM desk_change_log LIMIT 1"));
 
-            self::setCfg('desk_sync_err', '');
+            self::setCfg('desk_sync_err', $warn);
             self::setCfg('desk_sync_last_ok', (string) time());
             self::setCfg('desk_sync_pushed', (string)((int)self::getCfg('desk_sync_pushed','0') + $pushed));
             self::setCfg('desk_sync_pulled', (string)((int)self::getCfg('desk_sync_pulled','0') + $pulled));
             $out = ['ok' => true, 'pushed' => $pushed, 'pulled' => $pulled];
+            if ($warn !== '') $out['warning'] = $warn;
         } catch (Throwable $e) {
             self::setCfg('desk_sync_err', $e->getMessage());
             $out = ['ok' => false, 'error' => $e->getMessage(), 'pushed' => $pushed, 'pulled' => $pulled];
