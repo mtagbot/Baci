@@ -126,7 +126,12 @@ document.getElementById('syncNowBtn').addEventListener('click', function () {
             if (j.ok) {
                 out.innerHTML = '<span class="text-green-600">انجام شد — ارسال: '
                     + (j.pushed || 0) + '، دریافت: ' + (j.pulled || 0) + '</span>';
-                setTimeout(function () { location.reload(); }, 1200);
+                if (j.warning) {
+                    out.innerHTML += '<div class="mt-2 text-orange-600 font-bold">⚠ ' + j.warning + '</div>';
+                    btn.disabled = false; // stay on page so the warning is read
+                } else {
+                    setTimeout(function () { location.reload(); }, 1200);
+                }
             } else {
                 out.innerHTML = '<span class="text-red-600">' + (j.error || j.skipped || 'خطا') + '</span>';
                 btn.disabled = false;

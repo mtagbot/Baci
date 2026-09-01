@@ -349,16 +349,32 @@ class DeskSync {
                 self::setCfg('desk_sync_snapped', json_encode($snapped));
             }
             $newTables = array_diff(json_decode(DESK_SYNC_TABLES, true), $snapped);
+            // self-heal: bot tables that are EMPTY locally are (re)imported even
+            // if an older version wrongly marked them as already snapped
+            // (v2.4.0 recorded skipped tables as done). Costs one tiny call per
+            // empty table and is skipped when local deletions are still pending.
+            foreach (['bale_bot_users','telegram_bot_users','bot_admin_sessions',
+                      'bot_message_templates','bot_button_templates','bot_login_tokens','bot_message_logs'] as $bt) {
+                if (in_array($bt, $newTables, true)) continue;
+                try {
+                    $n = DB::fetch("SELECT COUNT(*) AS c FROM \"$bt\"");
+                    if ((int)($n['c'] ?? 0) > 0) continue;
+                    $pending = DB::fetch("SELECT 1 AS x FROM desk_change_log WHERE tbl = ? LIMIT 1", [$bt]);
+                    if ($pending) continue; // local edits not pushed yet — do not overwrite
+                    $newTables[] = $bt;
+                } catch (Throwable $e) { /* table missing locally → schema upgrade handles it */ }
+            }
             $srvTables = (isset($hs['tables']) && is_array($hs['tables'])) ? $hs['tables'] : null;
             foreach ($newTables as $tbl) {
                 if ($srvTables !== null && !in_array($tbl, $srvTables, true)) continue; // server file too old for this table
                 $pk = self::pkCol($tbl);
                 $aft = ($pk === 'id') ? 0 : '';
+                $srvOld = false;
                 do {
                     try {
                         $res = self::call('snapshot', ['tbl' => $tbl, 'after' => $aft, 'limit' => self::BATCH]);
                     } catch (Throwable $e) {
-                        if (mb_strpos($e->getMessage(), 'bad table') !== false) { $rows = []; break; }
+                        if (mb_strpos($e->getMessage(), 'bad table') !== false) { $rows = []; $srvOld = true; break; }
                         throw $e;
                     }
                     $rows = $res['rows'] ?? [];
@@ -376,7 +392,13 @@ class DeskSync {
                 } while (count($rows) >= self::BATCH);
                 // rows imported this way must not echo back
                 try { DB::execute("DELETE FROM desk_change_log WHERE tbl = ?", [$tbl]); } catch (Throwable $e) {}
-                $snapped[] = $tbl;
+                if ($srvOld) {
+                    // server file too old for this table — leave it un-snapped so
+                    // it is retried once the new desk-sync-api.php is uploaded
+                    $snapped = array_values(array_diff($snapped, [$tbl]));
+                } elseif (!in_array($tbl, $snapped, true)) {
+                    $snapped[] = $tbl;
+                }
                 self::setCfg('desk_sync_snapped', json_encode(array_values($snapped)));
                 self::bumpSequences();
             }
