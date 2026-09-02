@@ -74,10 +74,16 @@ if (PHP_SAPI === 'cli-server') {
         ]);
         // A form POST always follows at least one GET of the same app,
         // so by POST time the test cookie must have come back.
-        // desk-doctor.php is exempt: it must work even with broken cookies.
+        // Exempt endpoints that do NOT rely on cookies at all:
+        //  - desk-doctor.php   (must work even with broken cookies)
+        //  - attendance-scan-api.php (QR kiosk posts with a key, no session —
+        //    v2.6.0 fix: the cookie test used to reply with an HTML error page,
+        //    which the scanner showed as «پاسخ سرور قابل خواندن نیست»)
+        //  - desk-sync-api.php / bale-webhook.php / telegram-webhook.php (keyed/webhook)
         $sdpUri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+        $sdpNoCookieOk = ['desk-doctor.php', 'attendance-scan-api.php', 'desk-sync-api.php', 'bale-webhook.php', 'telegram-webhook.php'];
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
-            && basename((string)$sdpUri) !== 'desk-doctor.php') {
+            && !in_array(basename((string)$sdpUri), $sdpNoCookieOk, true)) {
             http_response_code(200);
             header('Content-Type: text/html; charset=utf-8');
             echo '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8">'
