@@ -14,10 +14,35 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'run') {
     set_time_limit(300);
     $res = isset($_GET['force']) ? DeskSync::run() : DeskSync::runIfDue();
     $res['status'] = DeskSync::status();
+<<<<<<< Updated upstream
+=======
+    $res['pending'] = DeskSync::pendingCount();
+>>>>>>> Stashed changes
     echo json_encode($res, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
+<<<<<<< Updated upstream
+=======
+/* AJAX: real-time heartbeat — instant push after edits, quick pull of site
+   changes, offline retry ladder (10s ×5 → 20s ×5 → 60s…, then user alert) */
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'tick') {
+    header('Content-Type: application/json; charset=utf-8');
+    ignore_user_abort(true);
+    set_time_limit(300);
+    echo json_encode(DeskSync::tick(), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+/* AJAX: unsent-changes count (used by the exit warning) */
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'pending') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => true, 'pending' => DeskSync::pendingCount(),
+                      'enabled' => DeskSync::enabled()], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+>>>>>>> Stashed changes
 /* save settings */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_sync'])) {
     if (!verify_csrf($_POST['csrf_token'] ?? '')) {

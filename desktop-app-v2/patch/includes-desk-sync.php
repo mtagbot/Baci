@@ -64,6 +64,19 @@ class DeskSync {
             && self::getCfg('desk_sync_key') !== '';
     }
 
+<<<<<<< Updated upstream
+=======
+    /* retry ladder (seconds) when the server cannot be reached:
+       attempts 1-5 → every 10s, 6-10 → every 20s, 11+ → every 60s.
+       After 15 failed attempts (5+5+5) the UI asks the user to check
+       the internet connection; retrying continues every minute. */
+    public static function backoffDelay($fails) {
+        if ($fails <= 5)  return 10;
+        if ($fails <= 10) return 20;
+        return 60;
+    }
+
+>>>>>>> Stashed changes
     public static function status() {
         return [
             'enabled'   => self::enabled(),
@@ -261,6 +274,84 @@ class DeskSync {
         return self::run();
     }
 
+<<<<<<< Updated upstream
+=======
+    /** rows waiting to be pushed to the site */
+    public static function pendingCount() {
+        try {
+            $r = DB::fetch("SELECT COUNT(*) c FROM desk_change_log");
+            return (int)($r['c'] ?? 0);
+        } catch (Throwable $e) { return 0; }
+    }
+
+    /**
+     * Real-time heartbeat (called every few seconds by the UI):
+     *  - pushes local changes IMMEDIATELY after any edit,
+     *  - pulls site changes within seconds (cheap `ping` checks the site's
+     *    change counter, a full cycle runs only when something is new),
+     *  - when offline, retries on the 10s/20s/60s ladder and keeps every
+     *    change safely in the local change-log until the connection is back.
+     */
+    public static function tick() {
+        if (!self::enabled()) return ['ok' => false, 'skipped' => 'disabled', 'pending' => 0, 'fails' => 0, 'alert' => false];
+        $now     = time();
+        $pending = self::pendingCount();
+        $fails   = (int) self::getCfg('desk_sync_fails', '0');
+        $nextTry = (int) self::getCfg('desk_sync_next_try', '0');
+        $base    = ['pending' => $pending, 'fails' => $fails, 'alert' => $fails >= 15,
+                    'retry_in' => max(0, $nextTry - $now)];
+
+        // offline back-off window still open → wait
+        if ($fails > 0 && $now < $nextTry) return ['ok' => true, 'skipped' => 'backoff'] + $base;
+
+        $due = $pending > 0 || self::getCfg('desk_sync_snapshot_done') !== '1';
+
+        // nothing to push → ask the site (cheap) whether IT has news
+        if (!$due) {
+            try {
+                $res = self::call('ping');
+                if ((int)($res['log_max'] ?? 0) > (int) self::getCfg('desk_sync_cursor', '0')) $due = true;
+                if ($fails > 0) { self::setCfg('desk_sync_fails', '0'); self::setCfg('desk_sync_next_try', '0'); $fails = 0; }
+            } catch (Throwable $e) {
+                if (self::isOffline($e)) return self::noteFailure($now) + ['ok' => true, 'skipped' => 'offline', 'pending' => $pending];
+                // old server file (no ping action) → fall back to the periodic cycle
+                $due = ($now - (int) self::getCfg('desk_sync_last', '0')) >= self::MIN_INTERVAL;
+            }
+        }
+
+        // periodic safety cycle even when both sides look quiet
+        if (!$due && ($now - (int) self::getCfg('desk_sync_last', '0')) >= self::MIN_INTERVAL) $due = true;
+
+        if (!$due) return ['ok' => true, 'skipped' => 'idle'] + $base;
+
+        $res = self::run();
+        $pending = self::pendingCount();
+        if (!empty($res['ok'])) {
+            self::setCfg('desk_sync_fails', '0');
+            self::setCfg('desk_sync_next_try', '0');
+            return $res + ['pending' => $pending, 'fails' => 0, 'alert' => false, 'retry_in' => 0];
+        }
+        if (isset($res['error']) && mb_strpos((string)$res['error'], 'اتصال به سرور برقرار نشد') !== false) {
+            return self::noteFailure($now) + $res + ['pending' => $pending];
+        }
+        return $res + ['pending' => $pending, 'fails' => $fails, 'alert' => $fails >= 15, 'retry_in' => 0];
+    }
+
+    private static function isOffline(Throwable $e) {
+        return mb_strpos($e->getMessage(), 'اتصال به سرور برقرار نشد') !== false;
+    }
+
+    /** register one failed attempt and schedule the next one on the ladder */
+    private static function noteFailure($now) {
+        $fails = (int) self::getCfg('desk_sync_fails', '0') + 1;
+        $delay = self::backoffDelay($fails);
+        self::setCfg('desk_sync_fails', (string)$fails);
+        self::setCfg('desk_sync_next_try', (string)($now + $delay));
+        self::setCfg('desk_sync_err', 'اتصال به سرور برقرار نشد — تلاش بعدی تا ' . $delay . ' ثانیه دیگر (تلاش ' . $fails . ')');
+        return ['fails' => $fails, 'alert' => $fails >= 15, 'retry_in' => $delay];
+    }
+
+>>>>>>> Stashed changes
     public static function run() {
         if (!self::enabled()) return ['ok' => false, 'error' => 'sync disabled'];
 

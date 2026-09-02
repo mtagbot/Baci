@@ -127,6 +127,17 @@ function ensure_infra($pdo) {
 /* actions                                                             */
 /* ------------------------------------------------------------------ */
 
+<<<<<<< Updated upstream
+=======
+/* lightweight poll: lets the desktop know instantly (every few seconds)
+   whether the site has produced new changes — no trigger install, no data */
+if ($action === 'ping') {
+    $max = 0;
+    try { $max = (int)$pdo->query("SELECT COALESCE(MAX(id),0) FROM desk_change_log")->fetchColumn(); } catch (Exception $e) {}
+    jout(['ok' => true, 'log_max' => $max]);
+}
+
+>>>>>>> Stashed changes
 if ($action === 'handshake') {
     ensure_infra($pdo);
     $trg = 0;
