@@ -33,6 +33,9 @@ if (!defined('DESK_SYNC_TABLES')) {
         // so everything the site's Bale/Telegram bots know is also on the desktop
         'bale_bot_users','telegram_bot_users','bot_admin_sessions',
         'bot_message_templates','bot_button_templates','bot_login_tokens','bot_message_logs',
+        // v2.11.0: full parity with the site dashboard — admin activity log,
+        // notifications, SMS log and parent report reviews sync too
+        'activity_logs','notifications','sms_logs','report_parent_reviews',
         'settings',
     ]));
 }
@@ -43,6 +46,7 @@ class DeskSync {
     const BATCH   = 400;
     const MIN_INTERVAL = 120;     // seconds between automatic runs
     const LOCK_TTL     = 180;     // stale-lock takeover
+    const RECON_INTERVAL = 3600;  // v2.11.0: mirror-reconcile at most once per hour
 
     /* ---------------- settings helpers (raw, no cache) ---------------- */
 
@@ -64,8 +68,6 @@ class DeskSync {
             && self::getCfg('desk_sync_key') !== '';
     }
 
-<<<<<<< Updated upstream
-=======
     /* retry ladder (seconds) when the server cannot be reached:
        attempts 1-5 → every 10s, 6-10 → every 20s, 11+ → every 60s.
        After 15 failed attempts (5+5+5) the UI asks the user to check
@@ -76,7 +78,6 @@ class DeskSync {
         return 60;
     }
 
->>>>>>> Stashed changes
     public static function status() {
         return [
             'enabled'   => self::enabled(),
@@ -93,7 +94,13 @@ class DeskSync {
 
     /* ---------------- HTTP ---------------- */
 
-    private static function call($action, $payload = []) {
+    private static function call($action, $payload = [], $fast = false) {
+        /* v2.11.0: $fast = lightweight probes (ping). When the internet is
+           down, the old 10s-connect + 40s-total timeouts held the desktop's
+           single PHP worker hostage — every click in the app waited behind
+           the stuck sync request. Probes now give up within seconds. */
+        $connectT = $fast ? 4 : 6;
+        $totalT   = $fast ? 6 : 40;
         $url = self::getCfg('desk_sync_url');
         $payload['action'] = $action;
         $payload['key']    = self::getCfg('desk_sync_key');
@@ -103,8 +110,8 @@ class DeskSync {
             CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE),
             CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_TIMEOUT        => 40,
+            CURLOPT_CONNECTTIMEOUT => $connectT,
+            CURLOPT_TIMEOUT        => $totalT,
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => 0,
             CURLOPT_FOLLOWLOCATION => true,
@@ -114,16 +121,18 @@ class DeskSync {
         $err  = curl_error($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        // https failed at connection level → retry once over plain http
-        if ($body === false && stripos($url, 'https://') === 0) {
+        // https failed at connection level → retry once over plain http.
+        // v2.11.0: skipped when DNS itself failed (device offline) — the
+        // fallback could never succeed and only doubled the frozen time.
+        if ($body === false && stripos($url, 'https://') === 0 && stripos($err, 'resolve') === false) {
             $ch = curl_init('http://' . substr($url, 8));
             curl_setopt_array($ch, [
                 CURLOPT_POST           => true,
                 CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE),
                 CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_CONNECTTIMEOUT => 10,
-                CURLOPT_TIMEOUT        => 40,
+                CURLOPT_CONNECTTIMEOUT => $connectT,
+                CURLOPT_TIMEOUT        => $totalT,
                 CURLOPT_FOLLOWLOCATION => true,
                 CURLOPT_MAXREDIRS      => 3,
             ]);
@@ -274,8 +283,6 @@ class DeskSync {
         return self::run();
     }
 
-<<<<<<< Updated upstream
-=======
     /** rows waiting to be pushed to the site */
     public static function pendingCount() {
         try {
@@ -309,7 +316,7 @@ class DeskSync {
         // nothing to push → ask the site (cheap) whether IT has news
         if (!$due) {
             try {
-                $res = self::call('ping');
+                $res = self::call('ping', [], true);
                 if ((int)($res['log_max'] ?? 0) > (int) self::getCfg('desk_sync_cursor', '0')) $due = true;
                 if ($fails > 0) { self::setCfg('desk_sync_fails', '0'); self::setCfg('desk_sync_next_try', '0'); $fails = 0; }
             } catch (Throwable $e) {
@@ -351,8 +358,70 @@ class DeskSync {
         return ['fails' => $fails, 'alert' => $fails >= 15, 'retry_in' => $delay];
     }
 
->>>>>>> Stashed changes
-    public static function run() {
+    /**
+     * v2.11.0: mirror reconcile — the guarantee that desktop and site are
+     * IDENTICAL, not just "no missed events". Compares a cheap per-table
+     * fingerprint (row count + sum of ids) with the server; any table that
+     * differs (leftover demo rows, rows changed before the sync file was
+     * installed, a missed trigger, a crash mid-import...) is wiped and
+     * re-imported from the site in full. Runs on every manual sync and
+     * automatically at most once per hour. Tables with unpushed local
+     * changes are skipped — user data is never thrown away.
+     */
+    private static function reconcile(&$pulled) {
+        $sum = self::call('recon');                    // old server file → exception, caught by caller
+        $srv = $sum['tables'] ?? [];
+        $fixed = [];
+        foreach (json_decode(DESK_SYNC_TABLES, true) as $tbl) {
+            if (!isset($srv[$tbl])) continue;          // server file older than this table
+            $pk = self::pkCol($tbl);
+            try {
+                $pending = DB::fetch("SELECT 1 x FROM desk_change_log WHERE tbl = ? LIMIT 1", [$tbl]);
+                if ($pending) continue;                // unpushed local edits — never overwrite
+                if ($pk === 'id') {
+                    $loc = DB::fetch("SELECT COUNT(*) n, COALESCE(SUM(id),0) s FROM \"$tbl\"");
+                    $same = ((int)$loc['n'] === (int)($srv[$tbl]['n'] ?? -1))
+                         && ((string)(int)$loc['s'] === (string)(int)($srv[$tbl]['s'] ?? -1));
+                } else {                               // settings: count of non-desk keys
+                    $loc = DB::fetch("SELECT COUNT(*) n FROM \"$tbl\" WHERE key_name NOT LIKE 'desk!_%' ESCAPE '!'");
+                    $same = ((int)$loc['n'] === (int)($srv[$tbl]['n'] ?? -1));
+                }
+                if ($same) continue;
+                // ---- mismatch → wipe + full re-import of this one table ----
+                $aft = ($pk === 'id') ? 0 : '';
+                $first = true;
+                do {
+                    $res  = self::call('snapshot', ['tbl' => $tbl, 'after' => $aft, 'limit' => self::BATCH]);
+                    $rows = $res['rows'] ?? [];
+                    self::suppress(true);
+                    try {
+                        if ($first) {
+                            if ($tbl === 'admins' && !$rows) break; // never lock the user out
+                            if ($tbl === 'settings') DB::execute("DELETE FROM \"settings\" WHERE key_name NOT LIKE 'desk!_%' ESCAPE '!'");
+                            else                     DB::execute("DELETE FROM \"$tbl\"");
+                            $first = false;
+                        }
+                        foreach ($rows as $row) {
+                            if (!isset($row[$pk])) continue;
+                            self::applyChange(['tbl' => $tbl, 'rid' => $row[$pk], 'op' => 'U', 'row' => $row]);
+                            $aft = ($pk === 'id') ? max((int)$aft, (int)$row[$pk]) : max((string)$aft, (string)$row[$pk]);
+                            $pulled++;
+                        }
+                    } finally { self::suppress(false); }
+                } while (count($rows) >= self::BATCH);
+                try { DB::execute("DELETE FROM desk_change_log WHERE tbl = ?", [$tbl]); } catch (Throwable $e) {}
+                $fixed[] = $tbl;
+            } catch (Throwable $e) {
+                if (mb_strpos($e->getMessage(), 'اتصال به سرور') !== false) throw $e; // offline → stop
+                /* per-table problem: keep reconciling the rest */
+            }
+        }
+        if ($fixed) self::bumpSequences();
+        self::setCfg('desk_sync_recon_last', (string) time());
+        return $fixed;
+    }
+
+    public static function run($force = false) {
         if (!self::enabled()) return ['ok' => false, 'error' => 'sync disabled'];
 
         // lock
@@ -361,7 +430,7 @@ class DeskSync {
         self::setCfg('desk_sync_lock', (string) time());
         self::setCfg('desk_sync_last', (string) time());
 
-        $pushed = 0; $pulled = 0; $warn = '';
+        $pushed = 0; $pulled = 0; $warn = ''; $out0 = '';
         try {
             self::ensureLocalTriggers();
             self::bumpSequences();
@@ -402,6 +471,21 @@ class DeskSync {
                         throw $e;
                     }
                     $rows = $res['rows'] ?? [];
+                    /* v2.11.0: full-mirror snapshot — before importing the FIRST
+                       batch of a table, wipe the local copy (demo/seed rows and
+                       stale data must never survive; the site is the source of
+                       truth). settings keeps its desk_* keys (sync config!),
+                       and admins is only wiped when the server actually sent
+                       admins (never lock the user out on a server glitch). */
+                    $freshStart = ($aft === 0 || $aft === '' || $aft === '0');
+                    if ($freshStart && !($tbl === 'admins' && !$rows)) {
+                        self::suppress(true);
+                        try {
+                            if ($tbl === 'settings') DB::execute("DELETE FROM \"settings\" WHERE key_name NOT LIKE 'desk!_%' ESCAPE '!'");
+                            else                     DB::execute("DELETE FROM \"$tbl\"");
+                        } catch (Throwable $e) { /* keep going */ }
+                        finally { self::suppress(false); }
+                    }
                     if ($rows) {
                         self::suppress(true);
                         try {
@@ -517,11 +601,26 @@ class DeskSync {
                 $pushed += count($changes);
             } while (count($changes) >= 1 && $maxId > 0 && DB::fetch("SELECT id FROM desk_change_log LIMIT 1"));
 
+            // 5) v2.11.0: mirror reconcile — desktop must EQUAL the site, not
+            //    just receive its events. Every manual sync + hourly otherwise.
+            $reconLast = (int) self::getCfg('desk_sync_recon_last', '0');
+            if ($force || time() - $reconLast >= self::RECON_INTERVAL) {
+                try {
+                    $fixed = self::reconcile($pulled);
+                    if ($fixed) $out0 = 'جدول‌های ناهمسان دوباره از سایت دریافت شدند: ' . implode('، ', $fixed);
+                } catch (Throwable $e) {
+                    if (mb_strpos($e->getMessage(), 'اتصال به سرور') !== false) throw $e;
+                    if (mb_strpos($e->getMessage(), 'unknown action') !== false && $warn === '')
+                        $warn = 'فایل desk-sync-api.php روی سایت قدیمی است — فایل جدید (پوشه server همین بسته) را دوباره آپلود کنید تا مقایسه کامل دسکتاپ/سایت هم فعال شود.';
+                }
+            }
+
             self::setCfg('desk_sync_err', $warn);
             self::setCfg('desk_sync_last_ok', (string) time());
             self::setCfg('desk_sync_pushed', (string)((int)self::getCfg('desk_sync_pushed','0') + $pushed));
             self::setCfg('desk_sync_pulled', (string)((int)self::getCfg('desk_sync_pulled','0') + $pulled));
             $out = ['ok' => true, 'pushed' => $pushed, 'pulled' => $pulled];
+            if (!empty($out0)) $out['reconciled'] = $out0;
             if ($warn !== '') $out['warning'] = $warn;
         } catch (Throwable $e) {
             self::setCfg('desk_sync_err', $e->getMessage());

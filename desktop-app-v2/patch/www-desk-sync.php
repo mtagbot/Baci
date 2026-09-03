@@ -12,22 +12,31 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'run') {
     header('Content-Type: application/json; charset=utf-8');
     ignore_user_abort(true);
     set_time_limit(300);
-    $res = isset($_GET['force']) ? DeskSync::run() : DeskSync::runIfDue();
+    $res = isset($_GET['force']) ? DeskSync::run(true) : DeskSync::runIfDue();
     $res['status'] = DeskSync::status();
-<<<<<<< Updated upstream
-=======
     $res['pending'] = DeskSync::pendingCount();
->>>>>>> Stashed changes
     echo json_encode($res, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-<<<<<<< Updated upstream
-=======
-/* AJAX: real-time heartbeat — instant push after edits, quick pull of site
-   changes, offline retry ladder (10s ×5 → 20s ×5 → 60s…, then user alert) */
+/* AJAX: real-time heartbeat.
+   v2.11.0: the page NO LONGER executes the sync itself — all network I/O
+   lives in desk-sync-daemon.php (separate hidden php.exe). Here we only
+   read the daemon's status file, which returns instantly even when the
+   internet is down. Fallback: if the daemon is not running (old launcher,
+   blocked spawn), we run the old inline tick so sync still works. */
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'tick') {
     header('Content-Type: application/json; charset=utf-8');
+    $hb = dirname(__DIR__) . '/data/sync-heartbeat.json';
+    @touch(dirname(__DIR__) . '/data/app-alive.txt');
+    if (is_file($hb) && time() - (int)@filemtime($hb) < 30) {
+        $j = json_decode((string)@file_get_contents($hb), true);
+        if (is_array($j)) {
+            $j['pending'] = DeskSync::pendingCount();   // live number (cheap local query)
+            echo json_encode($j, JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
     ignore_user_abort(true);
     set_time_limit(300);
     echo json_encode(DeskSync::tick(), JSON_UNESCAPED_UNICODE);
@@ -42,7 +51,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'pending') {
     exit;
 }
 
->>>>>>> Stashed changes
 /* save settings */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_sync'])) {
     if (!verify_csrf($_POST['csrf_token'] ?? '')) {
@@ -84,8 +92,14 @@ function fa_ago($ts) {
     <div class="card p-6 mb-6">
         <h3 class="text-lg font-bold mb-4 text-primary border-b pb-2">همگام‌سازی با سایت مدرسه</h3>
         <p class="text-sm mb-4 text-muted">
-            برنامه به‌صورت خودکار هر ۲ دقیقه تغییرات را با سایت شما رد و بدل می‌کند
+            برنامه به‌صورت خودکار و لحظه‌ای تغییرات را با سایت شما رد و بدل می‌کند
             (دوطرفه: هم تغییرات اینجا به سایت می‌رود، هم تغییرات سایت به اینجا می‌آید).
+            همگام‌سازی در پس‌زمینه و در یک پردازه جدا انجام می‌شود؛ بنابراین حتی وقتی
+            اینترنت قطع است برنامه با همان سرعت همیشگی کار می‌کند و همه تغییرات شما
+            در بانک اطلاعاتی داخلی محفوظ می‌ماند تا به محض اتصال، خودکار ارسال شود.
+            علاوه بر ارسال و دریافت رویدادها، در هر همگام‌سازی دستی (و خودکار ساعتی)
+            محتوای جدول‌های دسکتاپ با سایت «مقایسه کامل» می‌شود و اگر جدولی ناهمسان
+            باشد، عین داده سایت دوباره دریافت می‌شود تا دو بانک همیشه همسان بمانند.
             برای فعال‌سازی: فایل <code dir="ltr">desk-sync-api.php</code> (داخل پوشه server همین بسته)
             را در پوشه‌ای از سایت که سامانه در آن نصب است آپلود کنید (کنار index.php).
             کلید اتصال از قبل در فایل و در برنامه تنظیم شده و نیازی به تغییر ندارد.

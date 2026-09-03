@@ -104,7 +104,27 @@ class DB {
         // apply idempotent schema file again (CREATE TABLE IF NOT EXISTS / INSERT OR IGNORE)
         $schema = dirname(__DIR__) . '/sql/schema-sqlite.sql';
         if (file_exists($schema)) {
-            try { $this->pdo->rawScript(file_get_contents($schema)); } catch (Exception $e) {}
+            $sql = file_get_contents($schema);
+            /* v2.11.0 CRITICAL FIX: once the first sync with the site has
+               completed, the demo/seed rows (3 sample students, sample
+               report cards, sample classes...) must NEVER come back. The
+               old code re-ran the full schema after every app update, and
+               the INSERT OR IGNORE seeds re-created the demo rows — they
+               then showed up in the dashboard next to the real school data
+               (and could even be pushed to the site). Now: after the first
+               sync, only the structural statements run; every INSERT of
+               sample data is stripped. Trigger logging is also suppressed
+               during schema apply, so seeds are never queued for push. */
+            $synced = false;
+            try {
+                $synced = (string)$this->pdo->query("SELECT key_value FROM settings WHERE key_name='desk_sync_snapshot_done'")->fetchColumn() === '1';
+            } catch (Exception $e) {}
+            if ($synced) {
+                $sql = preg_replace('/INSERT\s+OR\s+IGNORE\s+INTO\s+"(?!settings")[^;]*;/su', '', $sql);
+            }
+            try { $this->pdo->exec("INSERT INTO desk_sync_suppress (flag) VALUES (1)"); } catch (Exception $e) {}
+            try { $this->pdo->rawScript($sql); } catch (Exception $e) {}
+            try { $this->pdo->exec("DELETE FROM desk_sync_suppress"); } catch (Exception $e) {}
         }
         $this->markSchemaVersion();
     }

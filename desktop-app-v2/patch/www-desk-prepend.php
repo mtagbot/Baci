@@ -65,6 +65,49 @@ if (PHP_SAPI === 'cli-server') {
         }
     }
 
+    /* ---- 1b) v2.11.0: background sync daemon ----
+     * All sync network I/O runs in a separate hidden php.exe process, so
+     * page requests NEVER wait behind a network timeout (this was the
+     * "app is slow without internet" bug). Pages only touch a status file.
+     * Cost per request here: one filemtime check.
+     */
+    $sdpData = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data';
+    @touch($sdpData . DIRECTORY_SEPARATOR . 'app-alive.txt');
+    $sdpHb = $sdpData . DIRECTORY_SEPARATOR . 'sync-heartbeat.json';
+    if (!is_file($sdpHb) || time() - (int)@filemtime($sdpHb) > 30) {
+        /* daemon not running (first start, or it exited/crashed) → spawn it.
+           A stale-start guard avoids double-spawn from parallel requests. */
+        $sdpSpawn = $sdpData . DIRECTORY_SEPARATOR . 'sync-daemon.start';
+        if (!is_file($sdpSpawn) || time() - (int)@filemtime($sdpSpawn) > 30) {
+            @touch($sdpSpawn);
+            $sdpPhp    = PHP_BINARY;                    // the bundled php.exe
+            $sdpPhpDir = dirname($sdpPhp);
+            $sdpScript = __DIR__ . DIRECTORY_SEPARATOR . 'desk-sync-daemon.php';
+            // pass ini/ext explicitly — the daemon must load the same
+            // extensions (pdo_sqlite, curl, mbstring...) as the launcher does
+            $sdpArgs = '';
+            $sdpIni  = php_ini_loaded_file();           // exactly what THIS process loaded
+            if (!$sdpIni && is_file($sdpPhpDir . DIRECTORY_SEPARATOR . 'php.ini'))
+                $sdpIni = $sdpPhpDir . DIRECTORY_SEPARATOR . 'php.ini';
+            if ($sdpIni) $sdpArgs .= ' -c ' . escapeshellarg($sdpIni);
+            $sdpExt = (string) ini_get('extension_dir'); // inherit the live extension dir
+            if ($sdpExt === '' && is_dir($sdpPhpDir . DIRECTORY_SEPARATOR . 'ext'))
+                $sdpExt = $sdpPhpDir . DIRECTORY_SEPARATOR . 'ext';
+            if ($sdpExt !== '') $sdpArgs .= ' -d extension_dir=' . escapeshellarg($sdpExt);
+            $sdpArgs .= ' -d error_log=' . escapeshellarg($sdpData . DIRECTORY_SEPARATOR . 'php-error.log');
+            if (is_file($sdpPhpDir . DIRECTORY_SEPARATOR . 'cacert.pem')) {
+                $sdpArgs .= ' -d curl.cainfo=' . escapeshellarg($sdpPhpDir . DIRECTORY_SEPARATOR . 'cacert.pem')
+                          . ' -d openssl.cafile=' . escapeshellarg($sdpPhpDir . DIRECTORY_SEPARATOR . 'cacert.pem');
+            }
+            if (DIRECTORY_SEPARATOR === '\\') {
+                // Windows: start detached + hidden (popen returns immediately)
+                @pclose(@popen('start /B "" ' . escapeshellarg($sdpPhp) . $sdpArgs . ' ' . escapeshellarg($sdpScript), 'r'));
+            } else {
+                @exec(escapeshellarg($sdpPhp) . $sdpArgs . ' ' . escapeshellarg($sdpScript) . ' > /dev/null 2>&1 &');
+            }
+        }
+    }
+
     /* ---- 2) cookie round-trip self test ---- */
     if (!isset($_COOKIE['sdp_ck'])) {
         @setcookie('sdp_ck', '1', [
