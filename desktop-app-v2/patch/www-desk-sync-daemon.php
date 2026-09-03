@@ -33,6 +33,7 @@ if (!$lockFh || !@flock($lockFh, LOCK_EX | LOCK_NB)) exit(0);
 
 $hbFile    = $dataDir . '/sync-heartbeat.json';
 $aliveFile = $dataDir . '/app-alive.txt';
+$kickFile  = $dataDir . '/sync-kick.txt';
 
 while (true) {
     $res = ['ok' => false];
@@ -50,7 +51,14 @@ while (true) {
     // app closed? (no page request refreshed app-alive for 15 minutes) → stop
     if (!is_file($aliveFile) || time() - (int)@filemtime($aliveFile) > 900) break;
 
-    sleep(5);
+    /* v2.12.0: sync must follow EVERY change immediately. Any page request
+       that modified data touches sync-kick.txt (see desk-prepend.php);
+       we sleep in 1-second slices and wake instantly on that signal, so a
+       change reaches the site within ~1 second instead of up to 5. */
+    for ($i = 0; $i < 5; $i++) {
+        if (is_file($kickFile)) { @unlink($kickFile); break; }
+        sleep(1);
+    }
 }
 @flock($lockFh, LOCK_UN);
 @fclose($lockFh);

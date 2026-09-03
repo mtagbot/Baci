@@ -68,10 +68,12 @@ class DeskSync {
             && self::getCfg('desk_sync_key') !== '';
     }
 
-    /* retry ladder (seconds) when the server cannot be reached:
-       attempts 1-5 → every 10s, 6-10 → every 20s, 11+ → every 60s.
-       After 15 failed attempts (5+5+5) the UI asks the user to check
-       the internet connection; retrying continues every minute. */
+    /* v2.12.0 — retry ladder (seconds) when the server cannot be reached,
+       exactly per the user's spec:
+       attempts 1-5 → every 10s, attempts 6-10 → every 20s,
+       attempts 11+ → every 60s. After 5 one-minute attempts (i.e. from
+       attempt 15 on) the UI shows a message asking the user to check the
+       internet connection; retrying continues every minute forever. */
     public static function backoffDelay($fails) {
         if ($fails <= 5)  return 10;
         if ($fails <= 10) return 20;
@@ -421,6 +423,119 @@ class DeskSync {
         return $fixed;
     }
 
+    /* ---------------- v2.12.0: file mirror ----------------
+     * Rows alone are not enough — an exam design saved on the SITE points
+     * to files: the uploaded source PDF/image (question_file), the
+     * server-converted page images (uploads/exams/pdf-pages/exam_N/...),
+     * student photos and the exam stamp. Without them the desktop opens
+     * the design with empty pages. This mirrors every referenced file in
+     * BOTH directions (site⇄desktop): newer/missing files are transferred,
+     * mtimes preserved, everything locked inside uploads/. */
+
+    private static function safeRel($p) {
+        $p = str_replace('\\', '/', trim((string)$p));
+        $p = ltrim($p, '/');
+        if ($p === '' || strpos($p, '..') !== false || strpos($p, "\0") !== false) return '';
+        if (strpos($p, 'uploads/') !== 0) return '';
+        return $p;
+    }
+
+    private static function fileSyncTargets() {
+        $paths = []; $dirs = [];
+        try {
+            foreach (DB::fetchAll("SELECT id, question_file FROM exam_schedules WHERE question_file IS NOT NULL AND question_file != ''") as $r) {
+                $rel = self::safeRel($r['question_file']);
+                if ($rel !== '') { $paths[] = $rel; $dirs[] = 'uploads/exams/pdf-pages/exam_' . (int)$r['id']; }
+            }
+        } catch (Throwable $e) {}
+        try {
+            foreach (DB::fetchAll("SELECT photo_url FROM students WHERE photo_url LIKE 'uploads/%'") as $r) {
+                $rel = self::safeRel($r['photo_url']);
+                if ($rel !== '') $paths[] = $rel;
+            }
+        } catch (Throwable $e) {}
+        foreach (['principal_signature_url','school_stamp_url','exam_stamp_url','school_logo_url','report_stamp_url'] as $k) {
+            $rel = self::safeRel(self::getCfg($k, ''));
+            if ($rel !== '') $paths[] = $rel;
+        }
+        return [array_values(array_unique($paths)), array_values(array_unique($dirs))];
+    }
+
+    private static function fileSync(&$warn) {
+        $root = dirname(__DIR__);                      // www/
+        list($paths, $dirs) = self::fileSyncTargets();
+        if (!$paths && !$dirs) return 0;
+
+        $srv = [];                                     // rel => ['s'=>size,'m'=>mtime] (s=-1 missing)
+        if ($dirs) {
+            $res = self::call('files_list', ['dirs' => $dirs]);
+            foreach (($res['dirs'] ?? []) as $rel => $files) {
+                foreach ((array)$files as $f) {
+                    if (!empty($f['p'])) $srv[$f['p']] = ['s' => (int)$f['s'], 'm' => (int)$f['m']];
+                }
+            }
+            // local page images whose dir exists on the server list are known;
+            // also mirror desktop-only page images upward (dir scan below).
+            foreach ($dirs as $d) {
+                $full = $root . '/' . $d;
+                if (!is_dir($full)) continue;
+                foreach (scandir($full) ?: [] as $fn) {
+                    if ($fn === '' || $fn[0] === '.') continue;
+                    if (is_file($full . '/' . $fn)) $paths[] = $d . '/' . $fn;
+                }
+            }
+        }
+        $paths = array_values(array_unique($paths));
+        $need = array_values(array_diff($paths, array_keys($srv)));
+        for ($i = 0; $i < count($need); $i += 500) {
+            $res = self::call('files_stat', ['paths' => array_slice($need, $i, 500)]);
+            foreach (($res['files'] ?? []) as $rel => $st) $srv[$rel] = ['s' => (int)$st['s'], 'm' => (int)$st['m']];
+        }
+        // include server-side files we did not reference locally (dir listing already did that)
+        foreach (array_keys($srv) as $rel) if (!in_array($rel, $paths, true)) $paths[] = $rel;
+
+        $moved = 0; $down = 0; $up = 0;
+        foreach ($paths as $rel) {
+            if ($down >= 40 && $up >= 10) break;       // cap per cycle; next cycle continues
+            $st = $srv[$rel] ?? ['s' => -1, 'm' => 0];
+            $full = $root . '/' . $rel;
+            $locS = is_file($full) ? (int)filesize($full) : -1;
+            $locM = is_file($full) ? (int)filemtime($full) : 0;
+            $differs = ($st['s'] >= 0 && $locS >= 0 && $st['s'] !== $locS);
+            if ($st['s'] >= 0 && ($locS < 0 || ($differs && $st['m'] >= $locM))) {
+                // server has it and local is missing/older → download
+                if ($down >= 40) continue;
+                if ($st['s'] > 25 * 1024 * 1024) continue;
+                try {
+                    $res = self::call('file_get', ['path' => $rel]);
+                    $data = base64_decode((string)($res['b64'] ?? ''), true);
+                    if ($data !== false) {
+                        $dir = dirname($full);
+                        if (!is_dir($dir)) @mkdir($dir, 0777, true);
+                        if (@file_put_contents($full, $data) !== false) {
+                            if (!empty($res['m'])) @touch($full, (int)$res['m']);
+                            $moved++; $down++;
+                        }
+                    }
+                } catch (Throwable $e) {
+                    if (self::isOffline($e)) throw $e;
+                }
+            } elseif ($locS >= 0 && ($st['s'] < 0 || ($differs && $locM > $st['m']))) {
+                // desktop-only or desktop-newer file (uploaded here while offline) → push to site
+                if ($up >= 10) continue;
+                if ($locS > 25 * 1024 * 1024) continue;
+                try {
+                    self::call('file_put', ['path' => $rel, 'b64' => base64_encode((string)file_get_contents($full)), 'm' => $locM]);
+                    $moved++; $up++;
+                } catch (Throwable $e) {
+                    if (self::isOffline($e)) throw $e;
+                }
+            }
+        }
+        if ($moved) self::setCfg('desk_files_synced', (string)((int)self::getCfg('desk_files_synced', '0') + $moved));
+        return $moved;
+    }
+
     public static function run($force = false) {
         if (!self::enabled()) return ['ok' => false, 'error' => 'sync disabled'];
 
@@ -600,6 +715,19 @@ class DeskSync {
                 DB::execute("DELETE FROM desk_change_log WHERE id <= ?", [$maxId]);
                 $pushed += count($changes);
             } while (count($changes) >= 1 && $maxId > 0 && DB::fetch("SELECT id FROM desk_change_log LIMIT 1"));
+
+            // 4b) v2.12.0: mirror the FILES referenced by the rows (exam
+            //     source PDFs/images, converted page images, student photos,
+            //     stamps) — a design without its files is useless on the
+            //     desktop. Runs both ways; offline exceptions bubble up.
+            try {
+                $filesMoved = self::fileSync($warn);
+                if ($filesMoved) $pulled += 0; // counted separately in desk_files_synced
+            } catch (Throwable $e) {
+                if (self::isOffline($e)) throw $e;
+                if (mb_strpos($e->getMessage(), 'unknown action') !== false && $warn === '')
+                    $warn = 'فایل desk-sync-api.php روی سایت قدیمی است — فایل جدید (پوشه server همین بسته) را آپلود کنید تا فایل‌های آزمون (PDF/تصاویر) هم همگام شوند.';
+            }
 
             // 5) v2.11.0: mirror reconcile — desktop must EQUAL the site, not
             //    just receive its events. Every manual sync + hourly otherwise.

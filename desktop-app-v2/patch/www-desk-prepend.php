@@ -108,6 +108,16 @@ if (PHP_SAPI === 'cli-server') {
         }
     }
 
+    /* ---- 1c) v2.12.0: sync follows EVERY change immediately ----
+     * Any request that can modify data (POSTs = saves, edits, scans...)
+     * signals the sync daemon at the END of the request; the daemon wakes
+     * up within a second and pushes the change to the site right away. */
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+        register_shutdown_function(function () use ($sdpData) {
+            @touch($sdpData . DIRECTORY_SEPARATOR . 'sync-kick.txt');
+        });
+    }
+
     /* ---- 2) cookie round-trip self test ---- */
     if (!isset($_COOKIE['sdp_ck'])) {
         @setcookie('sdp_ck', '1', [

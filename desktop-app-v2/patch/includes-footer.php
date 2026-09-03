@@ -19,16 +19,6 @@ if (is_admin_logged_in() || is_student_logged_in() || (function_exists('is_teach
 <script src="assets/js/ui-modern.js"></script><!-- v4.30.0: UX enhancements -->
 
 <script>
-<<<<<<< Updated upstream
-/* SchoolDesk Pro: background auto-sync heartbeat (every 2 min while app is open) */
-(function () {
-    if (!document.querySelector('a[href="desk-sync.php"]')) return; /* admin pages only */
-    function beat() {
-        fetch('desk-sync.php?ajax=run').catch(function () {});
-    }
-    setTimeout(beat, 15000);
-    setInterval(beat, 120000);
-=======
 /* SchoolDesk Pro: real-time auto-sync.
    - a light "tick" runs every 5 seconds: local edits are pushed to the site
      immediately and site-side changes are pulled within seconds;
@@ -94,13 +84,17 @@ if (is_admin_logged_in() || is_student_logged_in() || (function_exists('is_teach
     }, true);
     window.addEventListener('beforeunload', function (e) {
         if (pending > 0 && !innerNav) {
-            var msg = 'تغییرات ارسال‌نشده‌ای وجود دارد؛ در صورت بستن برنامه، ارسال آن‌ها به اجرای بعدی موکول می‌شود.';
+            /* v2.12.0: exact message per spec — data exists that has not
+               reached the server because the internet was unavailable.
+               (It is safe: everything is stored in the local database and
+               will be uploaded automatically on the next run.) */
+            var msg = 'داده‌های جدید به دلیل عدم ارتباط با اینترنت هنوز روی سرور بارگذاری نشده است. ' +
+                      'این داده‌ها (' + pending + ' مورد) در بانک اطلاعاتی برنامه محفوظ می‌ماند و در اجرای بعدی، به محض اتصال اینترنت، خودکار به سرور ارسال می‌شود.';
             e.preventDefault();
             e.returnValue = msg;
             return msg;
         }
     });
->>>>>>> Stashed changes
 })();
 </script>
 </body>

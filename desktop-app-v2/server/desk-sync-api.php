@@ -143,7 +143,7 @@ if ($action === 'handshake') {
         $trg = (int)$pdo->query("SELECT COUNT(*) FROM information_schema.TRIGGERS
             WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME LIKE 'desk_sync_%'")->fetchColumn();
     } catch (Exception $e) {}
-    jout(['ok' => true, 'server' => 'desk-sync-api v2.11', 'triggers' => $trg, 'tables' => SYNC_TABLES]);
+    jout(['ok' => true, 'server' => 'desk-sync-api v2.12', 'triggers' => $trg, 'tables' => SYNC_TABLES]);
 }
 
 /* v2.11.0: cheap per-table fingerprint (row count + sum of ids) so the desktop
@@ -247,6 +247,76 @@ if ($action === 'push') {
     }
     suppress_triggers($pdo, false);
     jout(['ok' => true, 'applied' => $applied]);
+}
+
+/* v2.12.0: file-sync actions — the desktop must mirror not only rows but the
+   FILES they reference (exam source PDFs, converted page images, student
+   photos, stamps). All paths are locked inside uploads/. */
+function desk_safe_rel($p) {
+    $p = str_replace('\\', '/', trim((string)$p));
+    $p = ltrim($p, '/');
+    if ($p === '' || strpos($p, '..') !== false || strpos($p, "\0") !== false) return '';
+    if (strpos($p, 'uploads/') !== 0) return '';
+    return $p;
+}
+
+if ($action === 'files_list') {
+    $dirs = $in['dirs'] ?? [];
+    if (!is_array($dirs)) $dirs = [];
+    $out = [];
+    foreach (array_slice($dirs, 0, 200) as $d) {
+        $rel = desk_safe_rel($d);
+        if ($rel === '') continue;
+        $full = __DIR__ . '/' . $rel;
+        $files = [];
+        if (is_dir($full)) {
+            foreach (scandir($full) ?: [] as $fn) {
+                if ($fn === '' || $fn[0] === '.') continue;
+                $fp = $full . '/' . $fn;
+                if (is_file($fp)) $files[] = ['p' => $rel . '/' . $fn, 's' => (int)filesize($fp), 'm' => (int)filemtime($fp)];
+            }
+        }
+        $out[$rel] = $files;
+    }
+    jout(['ok' => true, 'dirs' => $out]);
+}
+
+if ($action === 'files_stat') {
+    $paths = $in['paths'] ?? [];
+    if (!is_array($paths)) $paths = [];
+    $out = [];
+    foreach (array_slice($paths, 0, 2000) as $p) {
+        $rel = desk_safe_rel($p);
+        if ($rel === '') continue;
+        $full = __DIR__ . '/' . $rel;
+        $out[$rel] = is_file($full) ? ['s' => (int)filesize($full), 'm' => (int)filemtime($full)] : ['s' => -1, 'm' => 0];
+    }
+    jout(['ok' => true, 'files' => $out]);
+}
+
+if ($action === 'file_get') {
+    $rel = desk_safe_rel($in['path'] ?? '');
+    if ($rel === '') jfail('bad path');
+    $full = __DIR__ . '/' . $rel;
+    if (!is_file($full)) jfail('not found');
+    $size = (int)filesize($full);
+    if ($size > 25 * 1024 * 1024) jfail('file too large');
+    jout(['ok' => true, 'b64' => base64_encode((string)file_get_contents($full)), 's' => $size, 'm' => (int)filemtime($full)]);
+}
+
+if ($action === 'file_put') {
+    $rel = desk_safe_rel($in['path'] ?? '');
+    if ($rel === '') jfail('bad path');
+    $b64 = (string)($in['b64'] ?? '');
+    $data = base64_decode($b64, true);
+    if ($data === false || strlen($data) > 25 * 1024 * 1024) jfail('bad data');
+    $full = __DIR__ . '/' . $rel;
+    $dir = dirname($full);
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    if (@file_put_contents($full, $data) === false) jfail('write failed');
+    $m = (int)($in['m'] ?? 0);
+    if ($m > 0) @touch($full, $m);
+    jout(['ok' => true, 's' => strlen($data)]);
 }
 
 jfail('unknown action');
