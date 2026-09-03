@@ -143,7 +143,7 @@ if ($action === 'handshake') {
         $trg = (int)$pdo->query("SELECT COUNT(*) FROM information_schema.TRIGGERS
             WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME LIKE 'desk_sync_%'")->fetchColumn();
     } catch (Exception $e) {}
-    jout(['ok' => true, 'server' => 'desk-sync-api v2.12', 'triggers' => $trg, 'tables' => SYNC_TABLES]);
+    jout(['ok' => true, 'server' => 'desk-sync-api v2.13', 'triggers' => $trg, 'tables' => SYNC_TABLES]);
 }
 
 /* v2.11.0: cheap per-table fingerprint (row count + sum of ids) so the desktop
@@ -302,6 +302,86 @@ if ($action === 'file_get') {
     $size = (int)filesize($full);
     if ($size > 25 * 1024 * 1024) jfail('file too large');
     jout(['ok' => true, 'b64' => base64_encode((string)file_get_contents($full)), 's' => $size, 'm' => (int)filemtime($full)]);
+}
+
+/* v2.13.0: reverse exam-design path — an exam DESIGNED ON THE DESKTOP with a
+   PDF source cannot be rendered there (the portable app has no Imagick or
+   Ghostscript). The desktop pushes the PDF via file_put and then calls this
+   action: the SITE converts the PDF to page images (same proven logic as
+   exam-source-api.php) and returns the list, so the desktop pulls them back
+   and both sides show the exam identically. */
+if ($action === 'exam_pages') {
+    $examId = (int)($in['exam_id'] ?? 0);
+    if ($examId <= 0) jfail('bad exam id');
+    $qf = '';
+    try {
+        $st = $pdo->prepare('SELECT question_file FROM exam_schedules WHERE id = ?');
+        $st->execute([$examId]);
+        $qf = (string)($st->fetchColumn() ?: '');
+    } catch (Exception $e) { /* row may not have synced yet */ }
+    // desktop may convert BEFORE its exam row reaches the site → accept the
+    // explicit path too (still locked inside uploads/)
+    if ($qf === '' && !empty($in['path'])) $qf = (string)$in['path'];
+    $rel = desk_safe_rel($qf);
+    if ($rel === '') jout(['ok' => true, 'pages' => []]);
+    $full = __DIR__ . '/' . $rel;
+    if (!is_file($full)) jout(['ok' => true, 'pages' => []]);
+    $ext = strtolower(pathinfo($full, PATHINFO_EXTENSION));
+    if ($ext !== 'pdf') jout(['ok' => true, 'pages' => [$rel]]);  // image source needs no conversion
+
+    $cacheDir = __DIR__ . '/uploads/exams/pdf-pages/exam_' . $examId;
+    if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
+    $declaredPages = max(0, (int)($in['declared_pages'] ?? 0));
+    $pages = [];
+    // valid cache (newer than the pdf, and complete) → reuse
+    foreach (glob($cacheDir . '/page_*.jpg') ?: [] as $img) {
+        if (filemtime($img) < filemtime($full)) @unlink($img); else $pages[] = 'uploads/exams/pdf-pages/exam_' . $examId . '/' . basename($img);
+    }
+    if ($pages && ($declaredPages <= 0 || count($pages) >= $declaredPages)) { sort($pages); jout(['ok' => true, 'pages' => $pages]); }
+    $pages = [];
+    if ($declaredPages <= 0 && class_exists('Imagick')) {
+        try { $probe = new Imagick(); $probe->pingImage($full); $declaredPages = max(1, (int)$probe->getNumberImages()); $probe->clear(); } catch (Exception $e) { $declaredPages = 1; }
+    }
+    if ($declaredPages <= 0) $declaredPages = 1;
+    // 1) Imagick — render one source page per output image (never flatten)
+    if (class_exists('Imagick')) {
+        for ($i = 0; $i < $declaredPages; $i++) {
+            try {
+                $page = new Imagick(); $page->setResolution(180, 180); $page->readImage($full . '[' . $i . ']');
+                $page->setIteratorIndex(0); $page->setImageBackgroundColor('white');
+                if (defined('Imagick::ALPHACHANNEL_REMOVE')) $page->setImageAlphaChannel(Imagick::ALPHACHANNEL_REMOVE);
+                $page->setImageFormat('jpeg'); $page->setImageCompressionQuality(90);
+                $file = $cacheDir . '/page_' . str_pad((string)($i + 1), 3, '0', STR_PAD_LEFT) . '.jpg';
+                $page->writeImage($file); $page->clear();
+                $pages[] = 'uploads/exams/pdf-pages/exam_' . $examId . '/' . basename($file);
+            } catch (Exception $e) { break; }
+        }
+    }
+    // 2) Ghostscript CLI fallback
+    if (count($pages) < $declaredPages && function_exists('exec')) {
+        foreach (glob($cacheDir . '/page_*.jpg') ?: [] as $old) @unlink($old);
+        $pages = [];
+        for ($i = 1; $i <= $declaredPages; $i++) {
+            $file = $cacheDir . '/page_' . str_pad((string)$i, 3, '0', STR_PAD_LEFT) . '.jpg';
+            @exec('gs -q -dSAFER -dBATCH -dNOPAUSE -sDEVICE=jpeg -r180 -dJPEGQ=90 -dFirstPage=' . (int)$i . ' -dLastPage=' . (int)$i . ' -sOutputFile=' . escapeshellarg($file) . ' ' . escapeshellarg($full) . ' 2>&1', $o1, $c1);
+            if ($c1 === 0 && is_file($file)) $pages[] = 'uploads/exams/pdf-pages/exam_' . $examId . '/' . basename($file);
+        }
+    }
+    // 3) ImageMagick CLI fallback (hosts without the PHP extension)
+    if (count($pages) < $declaredPages && function_exists('exec')) {
+        foreach (glob($cacheDir . '/page_*.jpg') ?: [] as $old) @unlink($old);
+        $pages = [];
+        foreach (['magick', 'convert'] as $bin) {
+            for ($i = 0; $i < $declaredPages; $i++) {
+                $file = $cacheDir . '/page_' . str_pad((string)($i + 1), 3, '0', STR_PAD_LEFT) . '.jpg';
+                @exec($bin . ' -density 180 ' . escapeshellarg($full . '[' . $i . ']') . ' -background white -alpha remove -quality 90 ' . escapeshellarg($file) . ' 2>&1', $o2, $c2);
+                if ($c2 === 0 && is_file($file)) $pages[] = 'uploads/exams/pdf-pages/exam_' . $examId . '/' . basename($file);
+            }
+            if (count($pages) >= $declaredPages) break;
+        }
+    }
+    sort($pages);
+    jout(['ok' => true, 'pages' => array_slice($pages, 0, $declaredPages), 'converted' => count($pages) > 0]);
 }
 
 if ($action === 'file_put') {

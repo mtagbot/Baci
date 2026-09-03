@@ -440,6 +440,59 @@ class DeskSync {
         return $p;
     }
 
+    /* v2.13.0 — reverse design path: an exam designed ON THE DESKTOP with a
+     * PDF source cannot be converted to page images locally (the portable
+     * app ships no Imagick/Ghostscript). This pushes the PDF to the site,
+     * asks the site to convert it (action exam_pages — same rendering code
+     * the site itself uses), then pulls the generated page images back.
+     * Returns the local relative page paths, or [] when offline/unavailable.
+     */
+    public static function remoteExamPdfPages($examId, $relPath, $declaredPages = 0) {
+        if (!self::enabled()) return [];
+        $examId = (int)$examId;
+        $rel = self::safeRel($relPath);
+        if ($examId <= 0 || $rel === '') return [];
+        $root = dirname(__DIR__);
+        $full = $root . '/' . $rel;
+        if (!is_file($full) || filesize($full) > 25 * 1024 * 1024) return [];
+        try {
+            // 1) make sure the PDF itself is on the site (the row may not have
+            //    synced yet — file_put is idempotent and cheap to repeat)
+            self::call('file_put', ['path' => $rel,
+                'b64' => base64_encode((string)file_get_contents($full)),
+                'm'   => (int)filemtime($full)]);
+            // 2) the site needs the exam row to know question_file → push
+            //    pending changes first so exam_schedules is up to date there
+            try { self::run(true); } catch (Throwable $e) { /* best effort */ }
+            // 3) convert on the site (path passed too, in case the exam row
+            //    itself has not reached the site yet)
+            $res = self::call('exam_pages', ['exam_id' => $examId, 'declared_pages' => (int)$declaredPages, 'path' => $rel]);
+            $pages = [];
+            foreach ((array)($res['pages'] ?? []) as $p) {
+                $pRel = self::safeRel($p);
+                if ($pRel === '') continue;
+                // 4) pull each page image down
+                $g = self::call('file_get', ['path' => $pRel]);
+                $data = base64_decode((string)($g['b64'] ?? ''), true);
+                if ($data === false) continue;
+                $pFull = $root . '/' . $pRel;
+                $dir = dirname($pFull);
+                if (!is_dir($dir)) @mkdir($dir, 0777, true);
+                if (@file_put_contents($pFull, $data) !== false) {
+                    // force mtime NEWER than the local pdf so the print page's
+                    // cache check never discards these (clock skew safe)
+                    @touch($pFull, time() + 1);
+                    $pages[] = $pRel;
+                }
+            }
+            sort($pages);
+            return $pages;
+        } catch (Throwable $e) {
+            return []; // offline → caller shows the existing warning; the
+                       // pages will be produced next time sync succeeds
+        }
+    }
+
     private static function fileSyncTargets() {
         $paths = []; $dirs = [];
         try {
