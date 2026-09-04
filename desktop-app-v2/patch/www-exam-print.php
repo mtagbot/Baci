@@ -320,14 +320,40 @@ function syncRenderedImagesToModel(){const first=studentsData[0]; qItems.forEach
 function renderHeaderEditor(){const box=document.getElementById('headerFieldsBox');box.innerHTML='';headerFields.forEach((f,i)=>box.insertAdjacentHTML('beforeend',`<div class="header-field-row"><input type="checkbox" ${f.on?'checked':''} onchange="headerFields[${i}].on=this.checked;rerenderPages()"><input value="${esc(f.label)}" oninput="headerFields[${i}].label=this.value;rerenderPages()"><input value="${esc(f.value||'')}" placeholder="مقدار ثابت/خالی" oninput="headerFields[${i}].value=this.value;rerenderPages()"><button onclick="headerFields.splice(${i},1);renderHeaderEditor();rerenderPages()">×</button></div>`));}
 function addHeaderField(){const l=document.getElementById('newHeaderLabel').value||'فیلد';const v=document.getElementById('newHeaderValue').value||'';headerFields.push({key:'custom_'+Date.now(),label:l,value:v,on:true});document.getElementById('newHeaderLabel').value='';document.getElementById('newHeaderValue').value='';renderHeaderEditor();rerenderPages();}
 function renderHeaders(){document.querySelectorAll('.page').forEach(p=>{const st=studentsData.find(s=>String(s.id)===String(p.dataset.studentId));const header=p.querySelector('.exam-header'); if(header&&st){const meta=header.querySelector('.meta'); meta.innerHTML=headerFields.filter(f=>f.on).map(f=>`<div class="box">${esc(f.label)}: ${esc(f.value!==undefined&&f.value!==''?f.value:st[f.source])}</div>`).join('');}});}
-function setTool(t){tool=t;
-/* v4.83.0: while a drawing tool is active, saved-handwriting overlay images are
-   hidden and the live canvases (which already contain the restored strokes)
-   take over — so the ERASER works on handwriting saved by ANY user on ANY
-   platform (site or desktop). Leaving drawing mode re-syncs the overlays. */
-document.body.classList.toggle('drawing-mode', t!=='off');
-if(t==='off'){collectDrawings(); applyDrawingOverlays(); document.querySelectorAll('.page').forEach(p=>p.classList.toggle('questions-hidden'));} document.querySelectorAll('.qwrap').forEach(w=>{w.classList.toggle('draw-on',t!=='off'); if(t==='pen'){const color=(document.getElementById('penColor')?.value||'#111111').replace('#','%23'); w.style.cursor=`url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><circle cx='12' cy='12' r='7' fill='none' stroke='${color}' stroke-width='3'/></svg>") 12 12, crosshair`; } else if(t==='eraser'){w.style.cursor=`url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><rect x='5' y='5' width='14' height='14' fill='white' stroke='black' stroke-width='2'/></svg>") 12 12, cell`; } else {w.style.cursor='default';}});}
-function resizeCanvases(){document.querySelectorAll('.drawCanvas').forEach(c=>{const r=c.parentElement.getBoundingClientRect();c.width=r.width;c.height=r.height;});}
+/* v4.84.0: paint every draw-canvas from drawingsData (the saved handwriting —
+   including strokes made by OTHER users on OTHER devices/platforms), then run
+   cb once all page images have actually been drawn. This is what makes the
+   eraser selective everywhere: the live canvas gets the full saved artwork
+   before the static overlay is hidden, so the mouse eraser removes only the
+   pixels it touches instead of "everything vanishing". */
+function syncCanvasesFromData(cb){
+  const canv=[...document.querySelectorAll('.drawCanvas')]; let pending=0, fired=false;
+  const fin=()=>{ if(!fired && pending===0){ fired=true; if(cb)cb(); } };
+  canv.forEach(c=>{const page=c.closest('.page').dataset.pageIndex, data=drawingsData[page]; const ctx=c.getContext('2d'); ctx.clearRect(0,0,c.width,c.height);
+    if(data){ pending++; const img=new Image();
+      img.onload=()=>{ try{ctx.drawImage(img,0,0,c.width,c.height);}catch(e){} pending--; fin(); };
+      img.onerror=()=>{ pending--; fin(); };
+      img.src=data; }
+  });
+  fin();
+}
+let drawModeSeq=0;
+function setTool(t){tool=t; const seq=++drawModeSeq;
+/* v4.84.0: entering a drawing tool first REPAINTS the canvases from the saved
+   handwriting and only then hides the overlay images — strokes saved by any
+   user on any device stay visible and individually erasable. */
+if(t!=='off'){
+  syncCanvasesFromData(()=>{ if(seq===drawModeSeq && tool!=='off') document.body.classList.add('drawing-mode'); });
+} else {
+  document.body.classList.remove('drawing-mode');
+  collectDrawings(); applyDrawingOverlays(); document.querySelectorAll('.page').forEach(p=>p.classList.toggle('questions-hidden'));
+}
+document.querySelectorAll('.qwrap').forEach(w=>{w.classList.toggle('draw-on',t!=='off'); if(t==='pen'){const color=(document.getElementById('penColor')?.value||'#111111').replace('#','%23'); w.style.cursor=`url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><circle cx='12' cy='12' r='7' fill='none' stroke='${color}' stroke-width='3'/></svg>") 12 12, crosshair`; } else if(t==='eraser'){w.style.cursor=`url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><rect x='5' y='5' width='14' height='14' fill='white' stroke='black' stroke-width='2'/></svg>") 12 12, cell`; } else {w.style.cursor='default';}});}
+function resizeCanvases(){document.querySelectorAll('.drawCanvas').forEach(c=>{const r=c.parentElement.getBoundingClientRect();c.width=r.width;c.height=r.height;});
+/* v4.84.0: resizing a canvas WIPES its bitmap (this was the second root cause
+   of "everything disappears with the eraser on another device") — repaint the
+   saved handwriting right away whenever a drawing tool is active. */
+if(document.body.classList.contains('drawing-mode')||tool!=='off') syncCanvasesFromData();}
 function canvasPos(e,c){const r=c.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
 document.addEventListener('pointerdown',e=>{if(!e.target.classList.contains('drawCanvas')||tool==='off')return;drawing=true;last=canvasPos(e,e.target);});
 document.addEventListener('pointermove',e=>{if(!drawing||!e.target.classList.contains('drawCanvas'))return;const c=e.target,p=canvasPos(e,c),page=c.closest('.page').dataset.pageIndex;drawStrokeOnPage(page,last,p,tool);last=p;});document.addEventListener('pointerup',()=>drawing=false);
