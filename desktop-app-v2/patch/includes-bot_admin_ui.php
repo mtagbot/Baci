@@ -172,10 +172,49 @@ if (!function_exists('bot_admin_handle_request')) {
                     $webhookPayload['secret_token'] = $whSecret;
                 }
                 $res = bot_api_request($platform, 'setWebhook', $webhookPayload);
+                if ($platform === 'telegram') set_setting('telegram_receive_mode', 'webhook'); // polling and webhook are mutually exclusive
                 set_flash_message('success', 'وبهوک ربات ' . $title . ' با موفقیت روی ' . $webhookUrl . ' تنظیم شد.');
                 log_activity($_SESSION['admin_id'] ?? null, 'تنظیم وبهوک ربات ' . $title, json_encode($res, JSON_UNESCAPED_UNICODE));
             } catch (Exception $e) {
                 set_flash_message('error', 'خطا در تنظیم وبهوک: ' . $e->getMessage());
+            }
+            redirect($page);
+        }
+
+        /* v4.85.0: «دریافت با Cron» — when the host also blocks INBOUND foreign
+           traffic, Telegram can never reach telegram-webhook.php (webhook shows
+           "Connection timed out" from Telegram's side). Polling flips the
+           direction: the site pulls updates itself via getUpdates (an outbound
+           call that goes through the relay) and feeds them to the same webhook
+           engine locally. Telegram requires the webhook to be DELETED first. */
+        if ($platform === 'telegram' && ($_GET['action'] ?? '') === 'enable_polling') {
+            if (!verify_csrf($_GET['csrf_token'] ?? '')) {
+                set_flash_message('error', 'درخواست معتبر نیست.');
+                redirect($page);
+            }
+            if (PHP_SAPI === 'cli-server') {
+                set_flash_message('error', 'فعال‌سازی دریافت با Cron فقط از روی سایت اصلی امکان‌پذیر است.');
+                redirect($page);
+            }
+            if (get_setting(bot_token_key($platform), '') === '') {
+                set_flash_message('error', 'ابتدا توکن ربات را ذخیره کنید.');
+                redirect($page);
+            }
+            try {
+                bot_api_request($platform, 'deleteWebhook', ['drop_pending_updates' => false]);
+                $pollSecret = get_setting('telegram_poll_secret', '');
+                if ($pollSecret === '') { $pollSecret = bin2hex(random_bytes(16)); set_setting('telegram_poll_secret', $pollSecret); }
+                $whSecret = get_setting('telegram_webhook_secret', '');
+                if ($whSecret === '') { $whSecret = bin2hex(random_bytes(24)); set_setting('telegram_webhook_secret', $whSecret); }
+                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+                $base = rtrim(str_replace('\\', '/', dirname($_SERVER['PHP_SELF'] ?? '')), '/');
+                if ($base === '.') $base = '';
+                set_setting('telegram_poll_hook_url', $protocol . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $base . '/telegram-webhook.php');
+                set_setting('telegram_receive_mode', 'polling');
+                set_flash_message('success', 'دریافت با Cron فعال شد و وبهوک تلگرام حذف شد. حالا Cron Job را طبق راهنمای همین صفحه تنظیم کنید تا پیام‌ها هر دقیقه دریافت شود.');
+                log_activity($_SESSION['admin_id'] ?? null, 'فعال‌سازی دریافت با Cron ربات ' . $title, '');
+            } catch (Exception $e) {
+                set_flash_message('error', 'خطا در فعال‌سازی دریافت با Cron: ' . $e->getMessage());
             }
             redirect($page);
         }
@@ -261,7 +300,7 @@ if (!function_exists('bot_admin_render_page')) {
                         <li>آدرس Worker (مثلا <code class="dir-ltr">https://my-relay.my-name.workers.dev</code>) را در فیلد «آدرس واسط» بالا وارد و ذخیره کنید.</li>
                         <li>دکمه «ثبت خودکار Webhook» را بزنید — این‌بار درخواست از طریق واسط به تلگرام می‌رسد.</li>
                     </ol>
-                    <p class="text-muted">نکته: وبهوک (دریافت پیام از تلگرام به سایت شما) سمت تلگرام است و از بیرون به سایت شما می‌آید؛ معمولا مشکلی ندارد. مشکل فقط تماس‌های خروجی سایت شماست که واسط آن را حل می‌کند. ارسال همه پیام‌ها/اعلان‌ها هم از همین واسط عبور می‌کند. اگر دامنه workers.dev هم روی هاست شما بسته بود، می‌توانید یک دامنه دلخواه به همان Worker وصل کنید یا واسط را روی هر هاست خارجی دیگری (یک فایل PHP ساده) قرار دهید.</p>
+                    <p class="text-muted">نکته: واسط فقط تماس‌های «خروجی» سایت شما را حل می‌کند. اگر بعد از ثبت وبهوک، ربات همچنان به پیام‌ها جواب نداد و در getWebhookInfo خطای Connection timed out از سمت تلگرام دیدید، یعنی هاست شما ترافیک «ورودی» خارجی را هم بسته است — در این حالت از بخش «دریافت پیام‌ها با Cron» پایین همین ستون استفاده کنید. اگر دامنه workers.dev هم روی هاست شما بسته بود، می‌توانید یک دامنه دلخواه به همان Worker وصل کنید یا واسط را روی هر هاست خارجی دیگری (یک فایل PHP ساده) قرار دهید.</p>
                 </div>
             </details>
             <?php endif; ?>
@@ -270,6 +309,27 @@ if (!function_exists('bot_admin_render_page')) {
                 <code class="block dir-ltr text-left break-all"><?php echo clean(bot_admin_webhook_file($platform)); ?></code>
                 <a class="btn btn-success w-full text-xs" href="<?php echo clean($page); ?>?action=set_webhook&amp;csrf_token=<?php echo urlencode(csrf_token()); ?>">⚡ ثبت خودکار Webhook</a>
             </div>
+            <?php if ($platform === 'telegram'):
+                $tgMode = get_setting('telegram_receive_mode', 'webhook');
+                $tgPollSecret = get_setting('telegram_poll_secret', '');
+                $tgProto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+                $tgBase = rtrim(str_replace('\\', '/', dirname($_SERVER['PHP_SELF'] ?? '')), '/');
+                if ($tgBase === '.') $tgBase = '';
+                $tgPollUrl = $tgProto . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $tgBase . '/telegram-poll.php' . ($tgPollSecret !== '' ? '?k=' . $tgPollSecret : '');
+            ?>
+            <div class="soft-panel text-xs space-y-2">
+                <b>دریافت پیام‌ها با Cron (وقتی وبهوک به سایت نمی‌رسد)</b>
+                <p class="text-muted">اگر در getWebhookInfo خطای <code class="dir-ltr">Connection timed out</code> از سمت تلگرام می‌بینید، یعنی هاست شما ترافیک ورودی خارجی را هم بسته و تلگرام نمی‌تواند پیام‌ها را به سایت برساند. در این حالت «دریافت با Cron» را فعال کنید: سایت خودش هر دقیقه پیام‌ها را از تلگرام (از طریق واسط) می‌کشد.</p>
+                <p>وضعیت فعلی: <b><?php echo $tgMode === 'polling' ? '🔄 دریافت با Cron فعال است' : '🌐 وبهوک (پیش‌فرض)'; ?></b></p>
+                <?php if ($tgMode !== 'polling'): ?>
+                <a class="btn btn-warning w-full text-xs" href="<?php echo clean($page); ?>?action=enable_polling&amp;csrf_token=<?php echo urlencode(csrf_token()); ?>" onclick="return confirm('وبهوک تلگرام حذف و حالت دریافت با Cron فعال می‌شود. ادامه می‌دهید؟');">🔄 فعال‌سازی دریافت با Cron</a>
+                <?php else: ?>
+                <p><b>گام بعدی:</b> در پنل هاست (cPanel/DirectAdmin) یک Cron Job با اجرای «هر ۱ دقیقه» بسازید که این آدرس را صدا بزند:</p>
+                <code class="block dir-ltr text-left break-all"><?php echo clean($tgPollUrl); ?></code>
+                <p class="text-muted">فرمان cron در cPanel: <code class="dir-ltr text-left">wget -q -O /dev/null "<?php echo clean($tgPollUrl); ?>"</code> — یا اگر «Cron وب» دارید، همان آدرس بالا را وارد کنید. برای بازگشت به حالت وبهوک، کافی است دکمه «ثبت خودکار Webhook» را بزنید.</p>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
             <div class="soft-panel text-xs">
                 <b>لینک/فرمان مخفی ورود مدیر در ربات</b>
                 <p class="text-muted">این گزینه داخل ربات نمایش داده نمی‌شود. مدیر این فرمان را در چت ربات ارسال می‌کند:</p>
