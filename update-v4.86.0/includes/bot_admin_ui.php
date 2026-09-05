@@ -326,7 +326,8 @@ if (!function_exists('bot_admin_render_page')) {
                 <?php else: ?>
                 <p><b>گام بعدی:</b> در پنل هاست (cPanel/DirectAdmin) یک Cron Job با اجرای «هر ۱ دقیقه» بسازید که این آدرس را صدا بزند:</p>
                 <code class="block dir-ltr text-left break-all"><?php echo clean($tgPollUrl); ?></code>
-                <p class="text-muted">فرمان cron در cPanel: <code class="dir-ltr text-left">wget -q -O /dev/null "<?php echo clean($tgPollUrl); ?>"</code> — یا اگر «Cron وب» دارید، همان آدرس بالا را وارد کنید. برای بازگشت به حالت وبهوک، کافی است دکمه «ثبت خودکار Webhook» را بزنید.</p>
+                <p class="text-muted">فرمان cron در cPanel (فیلد Command): <code class="dir-ltr text-left">wget -q -O /dev/null "<?php echo clean($tgPollUrl); ?>" &gt;/dev/null 2&gt;&amp;1</code> — یا اگر «Cron وب» دارید، همان آدرس بالا را وارد کنید. برای بازگشت به حالت وبهوک، کافی است دکمه «ثبت خودکار Webhook» را بزنید.</p>
+                <p class="text-muted"><b>پاسخ تقریبا لحظه‌ای (v4.86.0):</b> هر اجرای cron حدود ۵۰ ثانیه به تلگرام «گوش» می‌دهد و به محض رسیدن پیام، همان لحظه (۱ تا ۳ ثانیه) پاسخ می‌دهد؛ با cron هر ۱ دقیقه، پوشش شبانه‌روزی و بدون وقفه است و کاربر معطل نمی‌شود. اگر هاست شما اسکریپت‌های طولانی را قطع می‌کند و در تست، عدد <code class="dir-ltr">ran:</code> خیلی کوچک بود، مقدار <code class="dir-ltr">telegram_poll_loop_seconds</code> را در تنظیمات کمتر کنید (مثلا ۲۵) یا صفر بگذارید تا به حالت «یک‌بار بررسی» برگردد.</p>
                 <?php endif; ?>
             </div>
             <?php endif; ?>
