@@ -556,7 +556,10 @@ else:
             <h2 class="text-2xl font-bold">مدیریت پرونده دانش‌آموزان</h2>
             <p class="text-sm text-muted">فیلتر پیشرفته، عملیات دسته‌جمعی و گزارش‌گیری اداری</p>
         </div>
-        <a href="students.php?action=add" class="btn btn-primary gap-1"><span>+ افزودن دانش‌آموز جدید</span></a>
+        <div class="flex gap-2">
+            <a href="deputy-panel.php" class="btn btn-warning gap-1"><span>موارد انضباطی</span></a>
+            <a href="students.php?action=add" class="btn btn-primary gap-1"><span>+ افزودن دانش‌آموز جدید</span></a>
+        </div>
     </div>
 
     <div class="card p-4">
