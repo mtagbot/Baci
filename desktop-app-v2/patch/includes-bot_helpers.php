@@ -240,7 +240,9 @@ if (!function_exists('bot_api_request')) {
             CURLOPT_URL => $url,
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => $isDesk ? 12 : 20,
+            /* v4.88.0: multipart = file uploads (exam PDFs can be a few MB);
+               they need far more than 20s on slow hosts/relays. */
+            CURLOPT_TIMEOUT => $multipart ? 180 : ($isDesk ? 12 : 20),
             CURLOPT_CONNECTTIMEOUT => $isDesk ? 4 : 8,
             CURLOPT_SSL_VERIFYPEER => true,
         ]);
