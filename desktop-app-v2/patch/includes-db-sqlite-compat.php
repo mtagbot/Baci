@@ -117,6 +117,10 @@ class SQLiteCompat {
 
         // CREATE TABLE ... ENGINE=InnoDB ... -> strip engine/charset tail
         if (preg_match('/^\s*CREATE\s+TABLE/i', $s)) {
+            /* v4.89.0: "id INT AUTO_INCREMENT PRIMARY KEY" (بدون NOT NULL/پرانتز) باید
+               مستقیم INTEGER PRIMARY KEY AUTOINCREMENT شود وگرنه ستون rowid-alias
+               نمی‌شود و id در INSERTها NULL می‌ماند. */
+            $s = preg_replace('/\b(big|medium|small|tiny)?int(\(\d+\))?(\s+NOT\s+NULL)?\s+AUTO_INCREMENT\s+PRIMARY\s+KEY\b/i', 'INTEGER PRIMARY KEY AUTOINCREMENT', $s);
             $s = preg_replace('/\bint\(\d+\)\s+NOT\s+NULL\s+AUTO_INCREMENT\b/i', 'INTEGER', $s);
             $s = preg_replace('/\b(big|medium|small|tiny)?int\(\d+\)(\s+unsigned)?/i', 'INTEGER', $s);
             $s = preg_replace('/\bAUTO_INCREMENT\b/i', '', $s);
