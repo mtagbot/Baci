@@ -408,6 +408,19 @@ CREATE TABLE IF NOT EXISTS "exam_designs" (
   "updated_at_jalali" TEXT NOT NULL,
   UNIQUE ("exam_id")
 );
+CREATE TABLE IF NOT EXISTS "exam_design_archive" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "exam_id" int(11) NOT NULL,
+  "design_json" TEXT NOT NULL,
+  "designer_name" TEXT DEFAULT NULL,
+  "subject_name" TEXT DEFAULT NULL,
+  "exam_month" TEXT DEFAULT NULL,
+  "academic_year" TEXT DEFAULT NULL,
+  "grade_level" TEXT DEFAULT NULL,
+  "class_name" TEXT DEFAULT NULL,
+  "src_fingerprint" TEXT DEFAULT NULL,
+  "created_at_jalali" TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS "exam_question_bank" (
   "id" INTEGER PRIMARY KEY AUTOINCREMENT,
   "source_exam_id" int(11) DEFAULT NULL,
@@ -780,6 +793,15 @@ BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_designs', NEW.id,
 CREATE TRIGGER IF NOT EXISTS trg_sync_exam_designs_d AFTER DELETE ON "exam_designs"
 WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
 BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_designs', OLD.id, 'D', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_design_archive_i AFTER INSERT ON "exam_design_archive"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_design_archive', NEW.id, 'I', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_design_archive_u AFTER UPDATE ON "exam_design_archive"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_design_archive', NEW.id, 'U', strftime('%s','now')); END;
+CREATE TRIGGER IF NOT EXISTS trg_sync_exam_design_archive_d AFTER DELETE ON "exam_design_archive"
+WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
+BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_design_archive', OLD.id, 'D', strftime('%s','now')); END;
 CREATE TRIGGER IF NOT EXISTS trg_sync_exam_question_bank_i AFTER INSERT ON "exam_question_bank"
 WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
 BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('exam_question_bank', NEW.id, 'I', strftime('%s','now')); END;
@@ -916,6 +938,7 @@ CREATE TRIGGER IF NOT EXISTS trg_sync_student_qr_tags_d AFTER DELETE ON "student
 WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
 BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('student_qr_tags', OLD.id, 'D', strftime('%s','now')); END;
 
+
 -- bot tables (v2.4.0): keep bot registrations/templates in sync with the site
 CREATE TRIGGER IF NOT EXISTS trg_sync_bale_bot_users_i AFTER INSERT ON "bale_bot_users"
 WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
@@ -980,3 +1003,6 @@ BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_message_logs', NEW
 CREATE TRIGGER IF NOT EXISTS trg_sync_bot_message_logs_d AFTER DELETE ON "bot_message_logs"
 WHEN NOT EXISTS (SELECT 1 FROM desk_sync_suppress)
 BEGIN INSERT INTO desk_change_log(tbl,rid,op,ts) VALUES ('bot_message_logs', OLD.id, 'D', strftime('%s','now')); END;
+
+-- Desktop seed: sync key (pre-paired with bundled desk-sync-api.php)
+INSERT OR IGNORE INTO "settings" ("key_name", "key_value") VALUES ('desk_sync_key', 'SDP-63fd161031e1f130a6530e6d161c65f1f86b87ca1d03fb99');

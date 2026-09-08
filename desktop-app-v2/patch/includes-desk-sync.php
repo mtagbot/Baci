@@ -25,7 +25,7 @@ if (!defined('DESK_SYNC_TABLES')) {
         'academic_years','teachers','discipline_titles','classes','subjects',
         'class_schedules','students','student_discipline_records','reports',
         'report_grades','report_locks','exam_schedules','exam_designs',
-        'exam_question_bank','exam_assignments','exam_student_seating',
+        'exam_question_bank','exam_design_archive','exam_assignments','exam_student_seating',
         'online_exam_categories','online_question_categories','online_question_bank',
         'online_exams','online_questions','online_exam_attempts','online_exam_answers',
         'grade_messages','counseling_requests','student_attendance','student_qr_tags',
@@ -506,6 +506,12 @@ class DeskSync {
                     if (!$hasPages) $paths[] = $rel;
                     $dirs[] = 'uploads/exams/pdf-pages/exam_' . (int)$r['id'];
                 }
+            }
+        } catch (Throwable $e) {}
+        /* v4.99.0: بایگانی نسخه‌های قبلی بانک هم بین سایت و دسکتاپ همگام می‌شود */
+        try {
+            foreach (DB::fetchAll("SELECT id FROM exam_design_archive") as $r) {
+                $dirs[] = 'uploads/exams/bank-archive/' . (int)$r['id'];
             }
         } catch (Throwable $e) {}
         try {
