@@ -195,16 +195,37 @@ def to_fa_digits(t):
 # الگوی «ران ریاضی LTR» داخل جمله فارسی: عبارت با =، عملگر، متغیر لاتین یا مجموعه {…}
 INLINE_MATH = re.compile(
     r'((?:[({\[]|[0-9۰-۹a-zA-Z+\-−±])'
-    r'[0-9۰-۹a-zA-Z+\-−±×÷=/.,٫\s()\[\]{}]*'
-    r'(?:[=×÷]|[0-9۰-۹]\s*[+\-−]|[+\-−]\s*[0-9۰-۹]|[a-zA-Z])'
-    r'[0-9۰-۹a-zA-Z+\-−±×÷=/.,٫\s()\[\]{}]*'
+    r'[0-9۰-۹a-zA-Z+\-−±×÷=/.,٫\u2044\s()\[\]{}]*'
+    r'(?:[=×÷\u2044]|[0-9۰-۹]\s*[+\-−]|[+\-−]\s*[0-9۰-۹]|[a-zA-Z])'
+    r'[0-9۰-۹a-zA-Z+\-−±×÷=/.,٫\u2044\s()\[\]{}]*'
     r'(?:[)}\]=]|[0-9۰-۹a-zA-Z]))')
 
 LABEL_MATH = re.compile(r'^\s*([ا-ی]{1,3})\s*[)\-–]\s*(.*[=×÷+−].*)$')
 
+FRAC_HTML_STYLE_WRAP = 'display:inline-block;vertical-align:middle;text-align:center;margin:0 2px'
+FRAC_HTML_STYLE_NUM = 'display:block;padding:0 4px;border-bottom:1.2px solid currentColor;line-height:1.15'
+FRAC_HTML_STYLE_DEN = 'display:block;padding:0 4px;line-height:1.15'
+
+def frac_html(num, den):
+    """کسر فارسی ایرانی: صورت بالا، خط افقی، مخرج پایین."""
+    return ('<span class="pfrac" style="' + FRAC_HTML_STYLE_WRAP + '">'
+            + '<span style="' + FRAC_HTML_STYLE_NUM + '">' + esc(to_fa_digits(num.strip())) + '</span>'
+            + '<span style="' + FRAC_HTML_STYLE_DEN + '">' + esc(to_fa_digits(den.strip())) + '</span></span>')
+
+def mathtext_to_html(expr):
+    """متن ریاضی → HTML: نشانه‌های کسر U+2044 به کسر پله‌ای ایرانی تبدیل می‌شوند."""
+    out = []
+    last = 0
+    for m in re.finditer(r'(\([^()\u2044]{1,14}\)|[0-9۰-۹]+(?:[.,][0-9۰-۹]+)?)\s*\u2044\s*(\([^()\u2044]{1,14}\)|[0-9۰-۹]+(?:[.,][0-9۰-۹]+)?)', expr):
+        out.append(esc(to_fa_digits(expr[last:m.start()])))
+        out.append(frac_html(m.group(1), m.group(2)))
+        last = m.end()
+    out.append(esc(to_fa_digits(expr[last:])))
+    return ''.join(out)
+
 def html_math_span(expr):
     """عبارت ریاضی → span چپ‌به‌راست با ارقام فارسی (نظیر برگه ایرانی)."""
-    return '<span dir="ltr" style="unicode-bidi:isolate">' + esc(to_fa_digits(expr.strip())) + '</span>'
+    return '<span dir="ltr" style="unicode-bidi:isolate">' + mathtext_to_html(expr.strip()) + '</span>'
 
 def render_line_html(body_raw):
     """یک سطر متن سوال → HTML با جهت‌دهی صریح ریاضی/فارسی."""
@@ -222,15 +243,15 @@ def render_line_html(body_raw):
     for m2 in INLINE_MATH.finditer(t):
         seg = m2.group(1)
         # فقط ران‌هایی که واقعاً ریاضی‌اند (نه عدد ساده داخل جمله)
-        if not (re.search(r'[=×÷{}\[\]]', seg) or re.search(r'[a-zA-Z]', seg) or re.search(r'[()].*[()]', seg)):
+        if not (re.search(r'[=×÷{}\[\]\u2044]', seg) or re.search(r'[a-zA-Z]', seg) or re.search(r'[()].*[()]', seg)):
             continue
-        if len(seg.strip()) < 2 or (len(seg.strip()) < 3 and not re.search(r'[a-zA-Z]', seg)):
+        if len(seg.strip()) < 2 or (len(seg.strip()) < 3 and not re.search(r'[a-zA-Z\u2044]', seg)):
             continue
         pre = t[last:m2.start()]
-        out.append(esc(to_fa_digits(pre)))
+        out.append(mathtext_to_html(pre))
         out.append(html_math_span(seg))
         last = m2.end()
-    out.append(esc(to_fa_digits(t[last:])))
+    out.append(mathtext_to_html(t[last:]))
     html = ''.join(out)
     # ضریب‌های جبری کوتاه باقی‌مانده در متن فارسی: ۴n، ۵b، x2 …
     html = re.sub(r'(?<![\w>])([0-9۰-۹]{1,3}[a-zA-Z]|[a-zA-Z][0-9۰-۹]{1,3}|[a-zA-Z])(?![\w<])',
@@ -264,14 +285,64 @@ def png_ink_ratio(png_bytes):
     except Exception:
         return 1.0
 
+def png_autotrim(png_bytes, pad=6):
+    """برش خودکار حاشیه سفید + حذف خطوط جدول چسبیده به لبه‌ها (ستون/ردیف تیره تمام‌قد)."""
+    if not HAS_PIL: return png_bytes
+    try:
+        im = Image.open(io.BytesIO(png_bytes)).convert('RGB')
+        g = im.convert('L')
+        W, H = im.size
+        px = g.load()
+        def col_dark_ratio(x):
+            c = 0
+            for y in range(0, H, 2):
+                if px[x, y] < 128: c += 1
+            return c / max(1, len(range(0, H, 2)))
+        def row_dark_ratio(y):
+            c = 0
+            for x in range(0, W, 2):
+                if px[x, y] < 128: c += 1
+            return c / max(1, len(range(0, W, 2)))
+        # ۱) خطوط جدول در ۶٪ کناری: ستون/ردیفی که >۶۰٪ تیره است حذف می‌شود
+        x0, x1, y0, y1 = 0, W, 0, H
+        lim = max(2, int(0.06 * W))
+        while x0 < lim and col_dark_ratio(x0) > 0.6: x0 += 1
+        while x1 - 1 > W - lim and col_dark_ratio(x1 - 1) > 0.6: x1 -= 1
+        limh = max(2, int(0.06 * H))
+        while y0 < limh and row_dark_ratio(y0) > 0.6: y0 += 1
+        while y1 - 1 > H - limh and row_dark_ratio(y1 - 1) > 0.6: y1 -= 1
+        if x1 - x0 < 8 or y1 - y0 < 8: return png_bytes
+        im2 = im.crop((x0, y0, x1, y1))
+        # ۲) trim سفید
+        from PIL import ImageChops
+        bg = Image.new('RGB', im2.size, (255, 255, 255))
+        diff = ImageChops.difference(im2, bg).convert('L').point(lambda v: 255 if v > 24 else 0)
+        bbox = diff.getbbox()
+        if bbox:
+            l, t, r2, b = bbox
+            l = max(0, l - pad); t = max(0, t - pad)
+            r2 = min(im2.width, r2 + pad); b = min(im2.height, b + pad)
+            im2 = im2.crop((l, t, r2, b))
+        buf = io.BytesIO(); im2.save(buf, 'PNG', optimize=True)
+        return buf.getvalue()
+    except Exception:
+        return png_bytes
+
 def crop_b64(page, rect, dpi, min_ink=0.004):
     zoom = dpi / 72.0
     r = fitz.Rect(rect) & page.rect
     if r.is_empty or r.width < 2 or r.height < 2: return None, 0, 0
     pm = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=r, alpha=False)
     png = whiten_png(pm.tobytes('png'))
+    png = png_autotrim(png)
     if min_ink and png_ink_ratio(png) < min_ink:
         return None, 0, 0   # برش تقریباً خالی (خط‌های جدا/فاصله سفید) — دور انداخته می‌شود
+    if HAS_PIL:
+        try:
+            im0 = Image.open(io.BytesIO(png))
+            return base64.b64encode(png).decode(), im0.width, im0.height
+        except Exception:
+            pass
     return base64.b64encode(png).decode(), pm.width, pm.height
 
 def figure_rects(page, first_q_y):
@@ -419,7 +490,7 @@ def assemble_fractions(page, spans):
             spans.remove(s)
         nn = ntxt if re.fullmatch(r'[0-9۰-۹.,/ ]+', ntxt) else '(' + ntxt + ')'
         dd = dtxt if re.fullmatch(r'[0-9۰-۹.,/ ]+', dtxt) else '(' + dtxt + ')'
-        spans.append({'t': f' {nn}/{dd} ', 'r': R, 'f': 'synth-frac'})
+        spans.append({'t': f' {nn}\u2044{dd} ', 'r': R, 'f': 'synth-frac'})
     # کسرهای پله‌ای بدون خط کسری: دو قطعه عددی کوتاه دقیقاً روی هم
     pw_f = page.rect.width
     digit_spans = [s for s in spans if s['f'] != 'synth-frac'
@@ -440,7 +511,7 @@ def assemble_fractions(page, spans):
                 spans.remove(a); spans.remove(b)
             except ValueError:
                 continue
-            spans.append({'t': f" {top['t'].strip()}/{bot['t'].strip()} ", 'r': R, 'f': 'synth-frac'})
+            spans.append({'t': f" {top['t'].strip()}\u2044{bot['t'].strip()} ", 'r': R, 'f': 'synth-frac'})
             used.add(id(a)); used.add(id(b))
             break
     return spans
@@ -505,7 +576,7 @@ def math_chars_text(page, rects):
                     x_anchor = min(tx0, bx0)
                     y_anchor = tr[0][1]
                     for t in tr + br: used.add(id(t))
-                    chars.append((x_anchor, y_anchor, f'\u0000FRAC:{num}/{den}\u0000', tr[0][3]))
+                    chars.append((x_anchor, y_anchor, f'\u0000FRAC:{num}\u2044{den}\u0000', tr[0][3]))
                     break
         chars = [t for t in chars if id(t) not in used]
     chars.sort(key=lambda t: (t[0], t[1]))
@@ -566,14 +637,14 @@ def valid_math_line(t):
     for g in re.findall(r'\(([^()]*)\)', body):
         gg = g.strip()
         if re.fullmatch(r'[+\-−±]?\s*[0-9۰-۹]+(?:[./][0-9۰-۹]+)?', gg): continue
-        if re.fullmatch(r'[0-9۰-۹a-zA-Z+\-−±×÷/.\s]{1,30}', gg): continue
+        if re.fullmatch(r'[0-9۰-۹a-zA-Z+\-−±×÷/.\u2044\s]{1,30}', gg): continue
         return False
     # عملگر پشت‌سرهم بی‌معنا (× ÷ کنار هم)
     if re.search(r'[×÷]\s*[×÷=]', body): return False
     # تکرار بی‌معنای متغیر-عدد چسبیده مثل «a1 a−»
     if re.search(r'[a-z][0-9][a-z]', body): return False
     return True
-MATHY_SEG = re.compile(r'[=+×÷−±√]|[0-9][./][0-9]')
+MATHY_SEG = re.compile(r'[=+×÷−±√\u2044]|[0-9][./][0-9]')
 
 def fix_digit_runs(page, rect, txt):
     """اعداد چندرقمی داخل سطر فارسی گاهی با ترتیب وارونه استخراج می‌شوند (bidi legacy).
