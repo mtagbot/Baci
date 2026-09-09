@@ -133,8 +133,52 @@ def split_options(line):
     pairs.sort(key=lambda pv: OPT_ORDER.get(pv[0], 9))
     return [f"{lab}) {val}".strip() for lab, val in pairs if val or lab]
 
+# لیگاتور «لا» در فونت‌های قدیمی به‌صورت «ا+ل» وارونه استخراج می‌شود
+LAM_ALEF_FIXES = {
+    'کالس': 'کلاس', 'کالسی': 'کلاسی', 'عالمت': 'علامت', 'عالمت‌ها': 'علامت‌ها',
+    'سواالت': 'سوالات', 'سؤاالت': 'سؤالات', 'باال': 'بالا', 'باالی': 'بالای',
+    'باالتر': 'بالاتر', 'کالمی': 'کلامی', 'حاال': 'حالا', 'اکنون': 'اکنون',
+    'اشکاالت': 'اشکالات', 'مشکالت': 'مشکلات', 'بزرگترین': 'بزرگ‌ترین',
+    'وسایل': 'وسایل', 'طالیی': 'طلایی', 'میالدی': 'میلادی', 'امال': 'املا',
+    'تالش': 'تلاش', 'خالصه': 'خلاصه', 'اختالف': 'اختلاف', 'انقالب': 'انقلاب',
+    'اطالعات': 'اطلاعات', 'عالوه': 'علاوه', 'مثال‌ها': 'مثال‌ها',
+}
+def fix_lam_alef(t):
+    def rep(m):
+        w = m.group(0)
+        return LAM_ALEF_FIXES.get(w, w)
+    return re.sub(r'[\u0600-\u06FF\u200c]+', rep, t)
+
+def fix_floating_dot(t):
+    """نقطه شناور بعد از برچسب: «الف- .قرینة …» → «الف- قرینة … .»"""
+    m = re.match(r'^(\s*[ا-ی]{1,3}\s*[-–—)]\s*)\.\s*(.+)$', t)
+    if m:
+        t = m.group(1) + m.group(2).strip()
+        if not re.search(r'[.؟?!:…]\s*$', t): t = t + '.'
+    return t
+
+def fix_misplaced_dot(t):
+    """نقطه پایان جمله که bidi آن را به ابتدای/وسط کلمه چسبانده: «را.بدست» → «را بدست …»."""
+    moved = False
+    # نقطه ابتدای خط فارسی
+    m = re.match(r'^\s*\.\s*(.+)$', t)
+    if m and re.search(r'[\u0600-\u06FF]', m.group(1)):
+        t = m.group(1); moved = True
+    # نقطه چسبیده بین دو حرف فارسی (بدون فاصله) → حذف از وسط
+    if re.search(r'[\u0600-\u06FF]\.[\u0600-\u06FF]', t):
+        t = re.sub(r'([\u0600-\u06FF])\.([\u0600-\u06FF])', r'\1 \2', t); moved = True
+    if moved and not re.search(r'[.؟?!:…]\s*$', t):
+        t = t.rstrip() + '.'
+    return t
+
 def tidy_text(t):
     t = re.sub(r'\s{2,}', ' ', t).strip()
+    t = fix_lam_alef(t)
+    t = fix_floating_dot(t)
+    t = fix_misplaced_dot(t)
+    # فاصله بین حرف فارسی و رقم چسبیده (طول9 → طول ۹)
+    t = re.sub(r'([\u0600-\u06FF])([0-9])', r'\1 \2', t)
+    t = re.sub(r'([0-9])([\u0600-\u06FF])', r'\1 \2', t)
     m = re.match(r'^(?:نمره|نم|بارم)\s*[()]?\s*([0-9۰-۹٠-٩]+(?:[./⁄][0-9۰-۹٠-٩]+)?)\s*(.+?)\s*[()]?\s*$', t)
     if m and re.search(r'[\u0600-\u06FF]', m.group(2)):
         t = m.group(2).strip() + ' (' + m.group(1) + ' نمره)'
@@ -143,6 +187,55 @@ def tidy_text(t):
 
 def esc(t):
     return (t.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;'))
+
+EN2FA = str.maketrans('0123456789', FA_DIGITS)
+def to_fa_digits(t):
+    return t.translate(EN2FA)
+
+# الگوی «ران ریاضی LTR» داخل جمله فارسی: عبارت با =، عملگر، متغیر لاتین یا مجموعه {…}
+INLINE_MATH = re.compile(
+    r'((?:[({\[]|[0-9۰-۹a-zA-Z+\-−±])'
+    r'[0-9۰-۹a-zA-Z+\-−±×÷=/.,٫\s()\[\]{}]*'
+    r'(?:[=×÷]|[0-9۰-۹]\s*[+\-−]|[+\-−]\s*[0-9۰-۹]|[a-zA-Z])'
+    r'[0-9۰-۹a-zA-Z+\-−±×÷=/.,٫\s()\[\]{}]*'
+    r'(?:[)}\]=]|[0-9۰-۹a-zA-Z]))')
+
+LABEL_MATH = re.compile(r'^\s*([ا-ی]{1,3})\s*[)\-–]\s*(.*[=×÷+−].*)$')
+
+def html_math_span(expr):
+    """عبارت ریاضی → span چپ‌به‌راست با ارقام فارسی (نظیر برگه ایرانی)."""
+    return '<span dir="ltr" style="unicode-bidi:isolate">' + esc(to_fa_digits(expr.strip())) + '</span>'
+
+def render_line_html(body_raw):
+    """یک سطر متن سوال → HTML با جهت‌دهی صریح ریاضی/فارسی."""
+    t = body_raw
+    # حالت «برچسب) عبارت ریاضی خالص»
+    m = LABEL_MATH.match(t)
+    if m and not re.search(r'[\u0600-\u06FF]', m.group(2)):
+        return esc(m.group(1)) + ') ' + html_math_span(m.group(2))
+    # سطر ریاضی خالص بدون برچسب
+    if not FA_LETTER.search(t) and re.search(r'[=×÷]|[0-9]\s*[+\-−]|[+\-−]\s*[0-9]|[a-zA-Z]', t) and len(t.strip()) >= 3:
+        return html_math_span(t)
+    # جمله فارسی با ران‌های ریاضی داخلی
+    out = []
+    last = 0
+    for m2 in INLINE_MATH.finditer(t):
+        seg = m2.group(1)
+        # فقط ران‌هایی که واقعاً ریاضی‌اند (نه عدد ساده داخل جمله)
+        if not (re.search(r'[=×÷{}\[\]]', seg) or re.search(r'[a-zA-Z]', seg) or re.search(r'[()].*[()]', seg)):
+            continue
+        if len(seg.strip()) < 2 or (len(seg.strip()) < 3 and not re.search(r'[a-zA-Z]', seg)):
+            continue
+        pre = t[last:m2.start()]
+        out.append(esc(to_fa_digits(pre)))
+        out.append(html_math_span(seg))
+        last = m2.end()
+    out.append(esc(to_fa_digits(t[last:])))
+    html = ''.join(out)
+    # ضریب‌های جبری کوتاه باقی‌مانده در متن فارسی: ۴n، ۵b، x2 …
+    html = re.sub(r'(?<![\w>])([0-9۰-۹]{1,3}[a-zA-Z]|[a-zA-Z][0-9۰-۹]{1,3}|[a-zA-Z])(?![\w<])',
+                  lambda m: '<span dir="ltr" style="unicode-bidi:isolate">' + to_fa_digits(m.group(1)) + '</span>', html)
+    return html
 
 # ---------------------------------------------------------------- تصویر
 def whiten_png(png_bytes, thr=175):
@@ -328,18 +421,20 @@ def assemble_fractions(page, spans):
         dd = dtxt if re.fullmatch(r'[0-9۰-۹.,/ ]+', dtxt) else '(' + dtxt + ')'
         spans.append({'t': f' {nn}/{dd} ', 'r': R, 'f': 'synth-frac'})
     # کسرهای پله‌ای بدون خط کسری: دو قطعه عددی کوتاه دقیقاً روی هم
+    pw_f = page.rect.width
     digit_spans = [s for s in spans if s['f'] != 'synth-frac'
-                   and re.fullmatch(r'\s*[0-9۰-۹]{1,3}\s*', s['t']) and s['r'].width <= 26]
+                   and re.fullmatch(r'\s*[0-9۰-۹]{1,3}\s*', s['t']) and s['r'].width <= 26
+                   and pw_f * 0.20 < s['r'].x0 and s['r'].x1 < pw_f * 0.915]  # ستون بارم/ردیف جدول مستثنا
     used = set()
     for i, a in enumerate(digit_spans):
         if id(a) in used: continue
         for b in digit_spans:
             if b is a or id(b) in used: continue
             ox = min(a['r'].x1, b['r'].x1) - max(a['r'].x0, b['r'].x0)
-            if ox < 0.6 * min(a['r'].width, b['r'].width): continue
+            if ox < 0.7 * max(a['r'].width, b['r'].width): continue
             top, bot = (a, b) if a['r'].y0 < b['r'].y0 else (b, a)
             vgap = bot['r'].y0 - top['r'].y1
-            if not (-3 <= vgap <= 9): continue
+            if not (-3 <= vgap <= 5): continue
             R = rect_union(a['r'], b['r'])
             try:
                 spans.remove(a); spans.remove(b)
@@ -384,40 +479,79 @@ def math_chars_text(page, rects):
                     cx, cy = (r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2
                     if not any(rr.x0 - 1.5 <= cx <= rr.x1 + 1.5 and rr.y0 - 1.5 <= cy <= rr.y1 + 1.5 for rr in rects):
                         continue
-                    chars.append((r.x0, r.y0, c))
+                    chars.append((r.x0, r.y0, c, r.y1))
     if not chars: return None
+    # ---- کسرهای عمودی (صورت بالای مخرج): خوشه‌بندی باند بالا/پایین ارقام ----
+    ys = sorted(t[1] for t in chars)
+    base_y = ys[len(ys) // 2]
+    top = [t for t in chars if t[2].isdigit() and t[1] < base_y - 4]
+    bot = [t for t in chars if t[2].isdigit() and t[1] > base_y + 4]
+    if top and bot:
+        def runs(band):
+            band = sorted(band)
+            out = [[band[0]]]
+            for t in band[1:]:
+                if t[0] - out[-1][-1][0] <= 7: out[-1].append(t)
+                else: out.append([t])
+            return out
+        used = set()
+        for tr in runs(top):
+            tx0, tx1 = tr[0][0], tr[-1][0]
+            for br in runs(bot):
+                bx0, bx1 = br[0][0], br[-1][0]
+                if min(tx1, bx1) - max(tx0, bx0) >= -4:  # هم‌ستون
+                    num = ''.join(t[2] for t in tr)
+                    den = ''.join(t[2] for t in br)
+                    x_anchor = min(tx0, bx0)
+                    y_anchor = tr[0][1]
+                    for t in tr + br: used.add(id(t))
+                    chars.append((x_anchor, y_anchor, f'\u0000FRAC:{num}/{den}\u0000', tr[0][3]))
+                    break
+        chars = [t for t in chars if id(t) not in used]
     chars.sort(key=lambda t: (t[0], t[1]))
     txt = ''
-    prev_x = None
-    for x, y, c in chars:
-        if prev_x is not None and x - prev_x > 3.5 and not txt.endswith(' '):
-            txt += ' '
+    prev = None
+    for x, y, c, y1 in chars:
+        if c.startswith('\u0000FRAC:'):
+            c = ' ' + c[6:-1] + ' '
+        if prev is not None:
+            px, py, pc, py1 = prev
+            if x - px > 3.5 and not txt.endswith(' '):
+                txt += ' '
         txt += c
-        prev_x = x
+        prev = (x, y, c, y1)
     txt = unicodedata.normalize('NFKC', txt)
     txt = re.sub(r'\s+', ' ', txt).strip()
     # انتخاب جهت پرانتز: اصلی یا آینه‌شده — هر کدام سالم‌تر
-    mirrored = txt.translate(str.maketrans('()[]', ')(]['))
+    mirrored = txt.translate(str.maketrans('()[]{}', ')(][}{'))
     if _paren_variant_score(mirrored) > _paren_variant_score(txt):
         txt = mirrored
     # فاصله‌گذاری تمیز
     txt = re.sub(r'\(\s+', '(', txt); txt = re.sub(r'\s+\)', ')', txt)
     txt = re.sub(r'\s*([+×÷=])\s*', r' \1 ', txt)
-    txt = re.sub(r'([0-9])\s+([0-9])', r'\1\2', txt)
+    txt = re.sub(r'([0-9])\s+([0-9])(?![0-9]*\s*/)', r'\1\2', txt)  # فاصله عدد مخلوط (۸ ۱/۵) حفظ شود
     txt = re.sub(r'\s{2,}', ' ', txt).strip()
+    # برچسب گزینه انتهایی: «۳t + ۳a (۱» → «۱) ۳t + ۳a»
+    mtail = re.match(r'^(.*?)[\s]*\(\s*([1-4۱-۴])\s*$', txt)
+    if mtail and re.search(r'[0-9a-zA-Z]', mtail.group(1)):
+        txt = fa2en(mtail.group(2)) + ') ' + mtail.group(1).strip()
+    # «(N» ابتدای عبارت (برچسب گزینه آینه‌شده): «(1) expr» → «1) expr»
+    txt = re.sub(r'^\(\s*([1-4۱-۴])\s*\)\s*', lambda m: fa2en(m.group(1)) + ') ', txt)
     # توازن پرانتز: پرانتز حذف‌شده در مرز برچسب را جبران کن
     opens, closes = txt.count('('), txt.count(')')
     if closes == opens + 1 and not txt.lstrip().startswith('('):
         txt = '(' + txt
     elif opens == closes + 1 and not txt.rstrip().endswith(')') and txt.rstrip().endswith('='):
         pass  # = انتهایی طبیعی است؛ دست نمی‌زنیم
+    txt = re.sub(r'^\(\s*([1-4۱-۴])\s*\)\s*', lambda m: fa2en(m.group(1)) + ') ', txt)
     return txt
 
 HAS_FA = re.compile(r'[\u0600-\u06FF\uFB50-\uFEFF]')
+FA_LETTER = re.compile(r'[\u0621-\u064A\u067E\u0686\u0698\u06A9\u06AF\u06CC\u06C0-\u06C3]')
 
 def valid_math_line(t):
     """درستی ساختاری عبارت ریاضی تک‌خطی بازسازی‌شده. اگر نامعتبر → آن خط تصویر می‌شود."""
-    body = re.sub(r'^\s*[ا-ی]{1,3}\s*[)\-–]\s*', '', t).strip()   # حذف برچسب الف) ب) …
+    body = re.sub(r'^\s*(?:[ا-ی]{1,3}|[1-4۱-۴])\s*[)\-–]\s*', '', t).strip()   # حذف برچسب الف) / 1) …
     body = re.sub(r'\s*\((?:[0-9۰-۹]{1,2}|[ا-ی]{1,3})\s*$', '', body).strip()  # برچسب انتهایی «(1» یا «(الف»
     if body.startswith('='): return False
     if '//' in body or '××' in body or '÷÷' in body: return False
@@ -441,6 +575,54 @@ def valid_math_line(t):
     return True
 MATHY_SEG = re.compile(r'[=+×÷−±√]|[0-9][./][0-9]')
 
+def fix_digit_runs(page, rect, txt):
+    """اعداد چندرقمی داخل سطر فارسی گاهی با ترتیب وارونه استخراج می‌شوند (bidi legacy).
+    ارقام از rawdict به ترتیب x واقعی صفحه خوانده می‌شوند — عدد همیشه چپ→راست خوانده می‌شود."""
+    runs_txt = list(re.finditer(r'[0-9]{2,}', txt))
+    if not runs_txt: return txt
+    try:
+        rd = page.get_text('rawdict', clip=fitz.Rect(rect))
+    except Exception:
+        return txt
+    digs = []
+    for blk in rd.get('blocks', []):
+        if blk.get('type') != 0: continue
+        for ln in blk.get('lines', []):
+            for sp in ln.get('spans', []):
+                for ch in sp.get('chars', []):
+                    c = ch.get('c', '')
+                    if c in '0123456789۰۱۲۳۴۵۶۷۸۹':
+                        r = fitz.Rect(ch['bbox'])
+                        digs.append((r.x0, fa2en(c)))
+    if not digs: return txt
+    digs.sort()
+    vruns = []
+    curr = ''
+    prev_x1 = None
+    for x, c in digs:
+        if prev_x1 is not None and x - prev_x1 > 7.5:
+            if len(curr) >= 1: vruns.append((run_x0, curr))
+            curr = ''
+        if curr == '': run_x0 = x
+        curr += c
+        prev_x1 = x
+    if curr: vruns.append((run_x0, curr))
+    vruns_big = [(x, v) for x, v in vruns if len(v) >= 2]
+    if len(vruns_big) != len(runs_txt): return txt
+    # چندمجموعه ارقام باید یکی باشد
+    if sorted(''.join(v for _, v in vruns_big)) != sorted(''.join(m.group(0) for m in runs_txt)):
+        return txt
+    # سطر فارسی RTL: اولین عدد در متنِ منطقی = راست‌ترین عدد صفحه
+    vsorted = [v for _, v in sorted(vruns_big, key=lambda t: -t[0])]
+    for m, v in zip(runs_txt, vsorted):
+        if len(m.group(0)) != len(v): return txt
+    out = []
+    last = 0
+    for m, v in zip(runs_txt, vsorted):
+        out.append(txt[last:m.start()]); out.append(v); last = m.end()
+    out.append(txt[last:])
+    return ''.join(out)
+
 def collect_rows(page):
     """ردیف‌های بصری صفحه: قطعات هر ردیف راست→چپ (ترتیب منطقی RTL) به هم می‌چسبند —
     همان رشته‌ای که در Word تایپ شده و مرورگر RTL عیناً بازسازی‌اش می‌کند."""
@@ -457,16 +639,24 @@ def collect_rows(page):
     if not spans: return []
     spans = assemble_fractions(page, spans)
     spans.sort(key=lambda s: ((s['r'].y0 + s['r'].y1) / 2, s['r'].x0))
-    rows = []
-    for s in spans:
-        cy = (s['r'].y0 + s['r'].y1) / 2
+    rows = []           # هر سطر: {'spans':[…], 'cy': مرکز خط بر اساس قطعات کوتاه}
+    heights = sorted(x['r'].height for x in spans)
+    h_med = heights[len(heights) // 2] if heights else 12
+    tol = max(5.0, 0.55 * h_med)
+    for s0 in spans:
+        cy = (s0['r'].y0 + s0['r'].y1) / 2
+        tall = s0['r'].height > 1.9 * h_med
         placed = False
         for row in rows:
-            ry0 = min(x['r'].y0 for x in row); ry1 = max(x['r'].y1 for x in row)
-            if ry0 - 1.5 <= cy <= ry1 + 1.5:
-                row.append(s); placed = True; break
+            if abs(cy - row['cy']) <= (tol * (1.8 if tall else 1.0)):
+                row['spans'].append(s0)
+                if not tall:
+                    cores = [x for x in row['spans'] if x['r'].height <= 1.9 * h_med]
+                    row['cy'] = sum((x['r'].y0 + x['r'].y1) / 2 for x in cores) / len(cores)
+                placed = True; break
         if not placed:
-            rows.append([s])
+            rows.append({'spans': [s0], 'cy': cy})
+    rows = [r['spans'] for r in rows]
     ph = page.rect.height
     out = []
     segs_all = []
@@ -496,21 +686,21 @@ def collect_rows(page):
         for s in row[1:]: R = rect_union(R, s['r'])
         # قطعه ریاضی خالص (بدون فارسی): بازخوانی حرف‌به‌حرف به ترتیب چپ→راست
         has_frac = any(s['f'] == 'synth-frac' for s in row)
-        if not HAS_FA.search(txt) and MATHY_SEG.search(txt) and not has_frac:
+        if not FA_LETTER.search(txt) and MATHY_SEG.search(txt) and not has_frac:
             mt = math_chars_text(page, R)
             if mt: txt = mt
-        elif not HAS_FA.search(txt) and has_frac:
+        elif not FA_LETTER.search(txt) and has_frac:
             # قطعه ریاضی دارای کسر پله‌ای: اجزا چپ→راست مرتب شوند (ترتیب ریاضی واقعی)
             lr = sorted(row, key=lambda s0: s0['r'].x0)
             txt = ' '.join(x['t'].strip() for x in lr if x['t'].strip())
-            txt = txt.translate(str.maketrans('()[]', ')(][')) if re.search(r'[()]', txt) and re.search(r'[()]', txt).group(0) == ')' else txt
+            txt = txt.translate(str.maketrans('()[]{}', ')(][}{')) if re.search(r'[()]', txt) and re.search(r'[()]', txt).group(0) == ')' else txt
             txt = re.sub(r'\s{2,}', ' ', txt).strip()
-        elif HAS_FA.search(txt) and MATHY_SEG.search(txt) and not has_frac:
+        elif FA_LETTER.search(txt) and MATHY_SEG.search(txt) and not has_frac:
             # قطعه مخلوط: برچسب/کلمات فارسی + عبارت ریاضی LTR جابه‌جاشده.
             # اگر بخش فارسی فقط برچسب کوتاه است (الف/ب/ج/د/ه/و/ی + نهایتاً یک عدد بارم)،
             # ریاضی را حرف‌به‌حرف بازمی‌خوانیم و برچسب را جلوی آن می‌گذاریم.
-            fa_spans = [s0 for s0 in row if HAS_FA.search(s0['t'])]
-            other = [s0 for s0 in row if not HAS_FA.search(s0['t'])]
+            fa_spans = [s0 for s0 in row if FA_LETTER.search(s0['t'])]
+            other = [s0 for s0 in row if not FA_LETTER.search(s0['t'])]
             fa_txt = ' '.join(s0['t'].strip() for s0 in fa_spans).strip()
             fa_core = re.sub(r'[\s()​]+', '', fa_txt)
             if other and len(fa_core) <= 4 and re.fullmatch(r'[الفبجدهویـ‌]+', fa_core or 'x') :
@@ -525,21 +715,28 @@ def collect_rows(page):
         # آخرین شانس متن‌سازی: الگوی معکوس «= (» در ابتدای متن یا «(د /0» ➜ بازخوانی حرف‌به‌حرف
         if MATHY_SEG.search(txt) and (txt.lstrip().startswith('=') or re.search(r'=\s*\([0-9+\-]', txt) or re.search(r'\([ا-ی0-9۰-۹]{1,3}\s*$', txt) or re.search(r'[0-9]\s*/\s*/[0-9]', txt)):
             # بارم Bold را جدا کن
-            mspans = [s0 for s0 in row if not re.fullmatch(r'[\s0-9./]+', s0['t'])]
-            labs = [s0 for s0 in mspans if HAS_FA.search(s0['t'])]
-            math_sp = [s0 for s0 in mspans if not HAS_FA.search(s0['t'])]
-            # قطعات عددی که بین قطعات ریاضی قرار دارند (بخشی از عبارت‌اند) برگردند
-            if math_sp:
-                minx = min(s0['r'].x0 for s0 in math_sp); maxx = max(s0['r'].x1 for s0 in math_sp)
-                for s0 in row:
-                    if re.fullmatch(r'[\s0-9./]+', s0['t']) and 'Bold' not in s0.get('f', ''):
-                        cx = (s0['r'].x0 + s0['r'].x1) / 2
-                        if minx - 4 <= cx <= maxx + 4:
-                            math_sp.append(s0)
+            pw_lc = page.rect.width
+            mspans = [s0 for s0 in row if not (re.fullmatch(r'[\s0-9./]+', s0['t'])
+                                               and ('Bold' in s0.get('f', '') or s0['r'].x1 <= pw_lc * 0.19 or s0['r'].x0 >= pw_lc * 0.86))]
+            labs = [s0 for s0 in mspans if FA_LETTER.search(s0['t'])]
             lab_txt = re.sub(r'[^ا-ی]', '', ' '.join(x['t'] for x in labs))
-            if math_sp and len(lab_txt) <= 3:
-                mt = math_chars_text(page, [s0['r'] for s0 in math_sp])
-                if mt: txt = (lab_txt + ') ' if lab_txt else '') + mt
+            if mspans and len(lab_txt) <= 3:
+                mt = math_chars_text(page, [s0['r'] for s0 in mspans])
+                if mt:
+                    # برچسب فارسی داخل خروجی «(ی)…» یا «0/5ی(…» → جدا به‌صورت «ی) »
+                    mlab = re.match(r'^\s*(?:[0-9]+\s*/\s*[0-9]+\s*)?\(?\s*([ا-ی]{1,3})\s*\)?\s*(.*)$', mt)
+                    if mlab and re.sub(r'[^ا-ی]', '', mlab.group(1)) == lab_txt and lab_txt:
+                        txt = lab_txt + ') ' + mlab.group(2).strip()
+                    elif lab_txt and lab_txt not in mt:
+                        txt = lab_txt + ') ' + mt
+                    else:
+                        txt = mt
+                    # پرانتز باز یتیم ابتدای عبارت (مرز برچسب): «د) (- 1 + 4 =» → حذف
+                    mhead = re.match(r'^(\s*[ا-ی]{1,3}\s*\)\s*)\((.*)$', txt)
+                    if mhead:
+                        rest = mhead.group(2)
+                        if rest.count('(') + 1 == rest.count(')') + 1 and rest.count('(') == rest.count(')') and rest.rstrip().endswith('='):
+                            txt = mhead.group(1) + rest.lstrip()
         garb = is_garbled(txt)
         txt = txt.replace('\x00', '□')
         txt, conf = fix_rtl(txt)
@@ -548,6 +745,14 @@ def collect_rows(page):
         fa_only = re.sub(r'[^\u0600-\u06FF]', '', txt)
         if not garb and MATHY_SEG.search(txt) and len(fa_only) <= 3 and re.search(r'[()=]', txt):
             if not valid_math_line(txt): garb = True
+        # برچسب گزینه انتهایی در سطرهای ریاضی: «t + 3a (1» → «1) t + 3a»
+        if not FA_LETTER.search(txt):
+            mt2 = re.match(r'^(.*?)[\s]*\(\s*([1-4۱-۴])\s*$', txt)
+            if mt2 and re.search(r'[0-9a-zA-Z]', mt2.group(1)):
+                txt = fa2en(mt2.group(2)) + ') ' + mt2.group(1).strip()
+        if (HAS_FA.search(txt) and re.search(r'[0-9]{2,}', txt)
+                and not re.search(r'[=×÷]', txt) and txt.count('(') + txt.count(')') <= 1):
+            txt = fix_digit_runs(page, R, txt)
         t0 = txt.strip()
         if R.y0 > ph - 45 and (FOOTER_PAT.search(t0) or len(t0) < 30):
             continue
@@ -568,7 +773,7 @@ def collect_rows(page):
                 if re.match(r'^\s*[ا-ی]{1,3}\s*\)', o['text']): continue   # قبلاً برچسب دارد
                 ov = min(l['rect'].y1, o['rect'].y1) - max(l['rect'].y0, o['rect'].y0)
                 if ov < 0.25 * min(l['rect'].height, o['rect'].height) and abs((l['rect'].y0+l['rect'].y1)/2-(o['rect'].y0+o['rect'].y1)/2) > 8: continue
-                if not MATHY_SEG.search(o['text']) or HAS_FA.search(o['text']): continue
+                if not MATHY_SEG.search(o['text']) or FA_LETTER.search(o['text']): continue
                 gap = min(abs(l['rect'].x0 - o['rect'].x1), abs(o['rect'].x0 - l['rect'].x1))
                 if gap < bestgap: bestgap, best = gap, k
             if best is not None and bestgap < 40:
@@ -681,7 +886,7 @@ def analyze(pdf_path, subject='', grade='', dpi=200):
                 opts_in_line = split_options(plain)
                 if opts_in_line:
                     for o in opts_in_line: cur['items'].append(('opt', o))
-                elif OPT_START.match(plain):
+                elif OPT_START.match(plain) or re.match(r'^\s*[1-4۱-۴]\s*\)', plain):
                     cur['items'].append(('opt', norm_opt(plain.strip())))
                 else:
                     cur['items'].append(('text', plain.strip()))
@@ -911,18 +1116,18 @@ def analyze(pdf_path, subject='', grade='', dpi=200):
         text_lines = 0
         for t in texts:
             body = tidy_text(t[1])
-            body = esc(body)
+            body = render_line_html(body)
             body = DOTS_RUN.sub('<span class="blank-line"></span>', body)
             body = re.sub(r'[□◻☐]', '<span class="tf-square"></span>', body)
             parts.append(f'<p>{body}</p>')
             text_lines += 1
         if opts and pure_mcq:
-            spans = ''.join(f'<span>{esc(o[1])}</span>' for o in opts)
+            spans = ''.join(f'<span>{render_line_html(tidy_text(o[1]))}</span>' for o in opts)
             parts.append(f'<div class="q-options">{spans}</div>')
             text_lines += (len(opts) + 1) // 2
         elif opts:
             for o in opts:
-                body = esc(tidy_text(o[1]))
+                body = render_line_html(tidy_text(o[1]))
                 body = DOTS_RUN.sub('<span class="blank-line"></span>', body)
                 parts.append(f'<p>{body}</p>')
                 text_lines += 1
