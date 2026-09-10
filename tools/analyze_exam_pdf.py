@@ -161,6 +161,35 @@ def rect_union(a, b):
 OPT_ORDER = {'الف': 0, 'أ': 0, 'ب': 1, 'ج': 2, 'جـ': 2, 'د': 3, 'هـ': 4, 'ه': 4,
              '1': 0, '2': 1, '3': 2, '4': 3, '۱': 0, '۲': 1, '۳': 2, '۴': 3}
 
+def find_score_tokens(row, pw):
+    """توکن‌های بارم داخل/کنار سطر: ران‌های عددی مجاور که با هم الگوی «N/N» می‌سازند
+    (مثل «5»+« /0» = ۰/۵ بارم)، یا عدد ایزوله در ستون‌های کناری صفحه.
+    ارقام داخل عبارت (چسبیده به عملگر/متغیر) هرگز بارم نیستند."""
+    numeric = [s0 for s0 in row if re.fullmatch(r'[\s0-9./\u2044]+', s0['t']) and s0['t'].strip()]
+    others = [s0 for s0 in row if s0 not in numeric]
+    drop = set()
+    # ۱) ران‌های عددی مجاور (فاصله < 4pt) که concat آن‌ها «N/N» می‌شود
+    numeric_sorted = sorted(numeric, key=lambda s0: -s0['r'].x1)
+    run = []
+    def flush(run):
+        if not run: return
+        cat = ''.join(x['t'] for x in run)
+        if re.search(r'[0-9]\s*[/\u2044]\s*[0-9]', cat) and len(re.sub(r'[^0-9]', '', cat)) <= 4:
+            for x in run: drop.add(id(x))
+    for s0 in numeric_sorted:
+        if run and (run[-1]['r'].x0 - s0['r'].x1) > 4:
+            flush(run); run = []
+        run.append(s0)
+    flush(run)
+    # ۲) عدد ایزوله در ستون کناری: فاصله تا نزدیک‌ترین قطعه غیرعددی > 14pt
+    #    یا قطعه دارای الگوی کسر بارم (/N یا N/N) کاملاً داخل ستون کناری
+    for s0 in numeric:
+        if id(s0) in drop: continue
+        if s0['r'].x1 <= pw * 0.19 or s0['r'].x0 >= pw * 0.86:
+            mind = min((max(o['r'].x0 - s0['r'].x1, s0['r'].x0 - o['r'].x1) for o in others), default=99)
+            if mind > 14 or re.search(r'[/\u2044]', s0['t']): drop.add(id(s0))
+    return drop
+
 def looks_like_question_start(t):
     """«N - جمله بلند فارسی» = شروع سوال است حتی اگر N بین ۱و۴ باشد؛
     گزینه واقعی معمولاً کوتاه است و فعل جمله‌ای ندارد."""
@@ -645,8 +674,12 @@ def math_chars_text(page, rects):
     # ---- کسرهای عمودی (صورت بالای مخرج): خوشه‌بندی باند بالا/پایین ارقام ----
     ys = sorted(t[1] for t in chars)
     base_y = ys[len(ys) // 2]
-    top = [t for t in chars if t[2].isdigit() and t[1] < base_y - 4]
-    bot = [t for t in chars if t[2].isdigit() and t[1] > base_y + 4]
+    # فقط ارقامی که واقعاً بین کاراکترهای خط پایه محصورند (کسر داخل عبارت)
+    base_chars = [t for t in chars if abs(t[1] - base_y) <= 4]
+    bx0 = min((t[0] for t in base_chars), default=0)
+    bx1 = max((t[0] for t in base_chars), default=1e9)
+    top = [t for t in chars if t[2].isdigit() and t[1] < base_y - 4 and bx0 - 4 <= t[0] <= bx1 + 4]
+    bot = [t for t in chars if t[2].isdigit() and t[1] > base_y + 4 and bx0 - 4 <= t[0] <= bx1 + 4]
     if top and bot:
         def runs(band):
             band = sorted(band)
@@ -968,11 +1001,9 @@ def collect_rows(page):
             fa_txt = ' '.join(s0['t'].strip() for s0 in fa_spans).strip()
             fa_core = re.sub(r'[\s()​]+', '', fa_txt)
             if other and len(fa_core) <= 4 and re.fullmatch(r'[الفبجدهویـ‌]+', fa_core or 'x') :
-                # فقط بارم‌های ستون‌های کناری صفحه حذف شوند — عدد Bold وسط سطر جزو عبارت است
-                pw_mx = page.rect.width
-                mspans = [s0 for s0 in other
-                          if not (re.fullmatch(r'[\s0-9./]+', s0['t'])
-                                  and (s0['r'].x1 <= pw_mx * 0.19 or s0['r'].x0 >= pw_mx * 0.86))]
+                # تشخیص هوشمند بارم: جفت «N/N» مجاور یا عدد ایزوله ستون کناری
+                sc_drop = find_score_tokens(row, page.rect.width)
+                mspans = [s0 for s0 in other if id(s0) not in sc_drop]
                 if mspans:
                     mt = math_chars_text(page, [s0['r'] for s0 in mspans])
                     if mt:
@@ -981,9 +1012,8 @@ def collect_rows(page):
         # آخرین شانس متن‌سازی: الگوی معکوس «= (» در ابتدای متن یا «(د /0» ➜ بازخوانی حرف‌به‌حرف
         if MATHY_SEG.search(txt) and (txt.lstrip().startswith('=') or re.search(r'=\s*\([0-9+\-]', txt) or re.search(r'\([ا-ی0-9۰-۹]{1,3}\s*$', txt) or re.search(r'[0-9]\s*/\s*/[0-9]', txt)):
             # بارم Bold را جدا کن
-            pw_lc = page.rect.width
-            mspans = [s0 for s0 in row if not (re.fullmatch(r'[\s0-9./]+', s0['t'])
-                                               and (s0['r'].x1 <= pw_lc * 0.19 or s0['r'].x0 >= pw_lc * 0.86))]
+            sc_drop2 = find_score_tokens(row, page.rect.width)
+            mspans = [s0 for s0 in row if id(s0) not in sc_drop2]
             labs = [s0 for s0 in mspans if FA_LETTER.search(s0['t'])]
             lab_txt = re.sub(r'[^ا-ی]', '', ' '.join(x['t'] for x in labs))
             if mspans and len(lab_txt) <= 3:
