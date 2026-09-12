@@ -63,9 +63,10 @@ if (process.env.PATCH) {
   let n = 0;
   (function walk(d) {
     for (const e of readdirSync(d, { withFileTypes: true })) {
-      const abs = join(d, e.name), rel = '/' + relative(pd, abs).split('\\').join('/');
+      const abs = join(d, e.name);
+      const rel = '/www/' + relative(pd, abs).split('\\').join('/');   /* باید زیر /www برود */
       if (e.isDirectory()) { php.mkdirTree(rel); walk(abs); }
-      else if (e.name.endsWith('.php')) { php.writeFile(rel, new Uint8Array(readFileSync(abs))); n++; }
+      else if (e.name.endsWith('.php')) { php.writeFile(rel, new Uint8Array(readFileSync(abs))); n++; console.log('      overlay → ' + rel); }
     }
   })(pd);
   console.log(`>>> وصلهٔ ${process.env.PATCH} اورلی شد (${n} فایل PHP)`);
@@ -99,6 +100,7 @@ export async function req(label, spec) {
   const r = await run("<?php require '/harness/run_request.php';");
   const res = JSON.parse(php.readFileAsText('/harness/result.json'));
   res.redirect = (r.out.match(/window\.location\.href="([^"]+)"/) || [])[1] || null;
+  try { res.page = php.readFileAsText('/harness/page.html'); } catch (e) { res.page = ''; }
   if (label) {
     const flag = res.flash ? `FLASH[${res.flash.type}] ${res.flash.message}`
       : res.has_exam_ui ? `exam UI (${res.q_boxes} box, ${res.radio_inputs} radio)`
@@ -123,15 +125,26 @@ file_put_contents('/harness/db.json', json_encode(DB::fetchAll(${JSON.stringify(
 }
 
 /* فراخوانی online-exam-api.php و گرفتن JSON پاسخ */
-export async function api(label, post) {
+export async function api(label, post, opts = {}) {
   php.writeFile('/harness/req.json', JSON.stringify({
-    session_id: 'harnessStu0001', method: 'POST', file: 'online-exam-api.php', query: '', post,
+    session_id: opts.sid || 'harnessStu0001', method: 'POST', file: 'online-exam-api.php', query: '', post,
   }));
   await run("<?php require '/harness/run_request.php';");
   const res = JSON.parse(php.readFileAsText('/harness/result.json'));
   let j = null; try { j = JSON.parse((res.raw_head || '').trim()); } catch (e) {}
   if (label) console.log(`     · ${label} → ok=${j ? j.ok : '?'} ${j && j.msg ? '(' + j.msg + ')' : ''}`);
   return j;
+}
+
+/* اجرای کوئری نوشتنی (UPDATE/INSERT) روی دیتابیس */
+export async function dbExec(sql) {
+  php.writeFile('/harness/dbx.php', `<?php ini_set('display_errors','0'); error_reporting(0);
+@mkdir('/tmp/sess'); ini_set('session.save_path','/tmp/sess'); session_name('BACI_TEST');
+session_id('harnessStu0001'); session_start();
+require_once '/www/includes/functions.php'; require_once '/www/includes/db.php';
+file_put_contents('/harness/dbx.json', json_encode(['ok'=>DB::execute(${JSON.stringify(sql)})]));`);
+  await run("<?php require '/harness/dbx.php';");
+  return JSON.parse(php.readFileAsText('/harness/dbx.json')).ok;
 }
 
 /* ورود دانش‌آموز با شناسهٔ نشست دلخواه */

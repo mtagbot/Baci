@@ -42,9 +42,15 @@ const NEW_PATH = resolveFile('online-exam-take.php');
 const NEW_SRC = readFileSync(NEW_PATH, 'utf8');
 console.log(`قدیمی: ${resolveSite().split('/').slice(-3).join('/')}`);
 console.log(`جدید : ${NEW_PATH.split('/').slice(-4).join('/')}`);
-const HAS_BASELINE = OLD_SRC !== NEW_SRC;
+/* پایهٔ مقایسه فقط وقتی معتبر است که سورس قدیمی *واقعاً* هنوز باگ را داشته باشد.
+   از v4.127.0 به بعد بستهٔ پایه خودِ رفع را دارد، پس «فایل‌ها متفاوت‌اند» معیار درستی نیست. */
+const HAS_FIX_MARK = (t) => /location_watchdog/.test(t) && /withTimeout\s*\(/.test(t);
+const HAS_BASELINE = !HAS_FIX_MARK(OLD_SRC);
+if (!HAS_BASELINE && HAS_FIX_MARK(NEW_SRC)) {
+  console.log('⚠️  سورس پایهٔ موجود از قبل رفع v4.127.0 را دارد — بازتولید باگ معنی ندارد، skip می‌شود');
+}
 let skipped = 0;
-if (!HAS_BASELINE) console.log('⚠️  سورس قدیمی و جدید یکسان‌اند (PATCH ست نشده) — دو تست بازتولید باگ skip می‌شوند');
+if (!HAS_BASELINE && !HAS_FIX_MARK(NEW_SRC)) console.log('⚠️  سورس قدیمی و جدید یکسان‌اند — دو تست بازتولید باگ skip می‌شوند');
 
 /* ── ساعت مجازی ── */
 const flush = async () => { for (let i = 0; i < 4; i++) await new Promise(r => setImmediate(r)); };

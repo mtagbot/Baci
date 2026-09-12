@@ -17,7 +17,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 
-PATCH_DIR="${1:?用法: release.sh <update-vX.Y.Z> <site-version> <desktop-version>}"
+PATCH_DIR="${1:?کاربرد: release.sh <update-vX.Y.Z> <site-version> <desktop-version>}"
 SITE_VER="${2:?نسخهٔ سایت لازم است (مثلاً 4.127.0)}"
 DESK_VER="${3:?نسخهٔ دسکتاپ لازم است (مثلاً 2.58.0)}"
 

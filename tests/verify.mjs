@@ -60,6 +60,22 @@ ok('انواع دستی علامت خورد', ['short_text', 'text', 'file_uploa
   .every(t => by(t)?.needs_manual == 1));
 ok('info پاسخی نگرفت', by('info') === undefined);
 
+console.log('\n══════════ فاز ۱.۵: چیدمان صفحه و تخته سفید (v4.128.0) ══════════');
+{
+  const html = first.res.page || '';
+  const iMap = html.indexOf('id="qMap"');
+  const iBtn = html.indexOf('onclick="submitExam()"');   /* نه کلاس CSS، خودِ دکمه */
+  ok('نقشهٔ سوالات قبل از دکمهٔ ارسال می‌آید', iMap > -1 && iBtn > -1 && iMap < iBtn, `map=${iMap} btn=${iBtn}`);
+  ok('در موبایل نقشه از حالت fixed خارج می‌شود', /@media \(max-width:768px\)\{\s*\.q-map\{position:static/.test(html.replace(/\s+/g, ' ').replace('@media (max-width:768px){ .q-map{position:static', '@media (max-width:768px){.q-map{position:static'))
+    || /\.q-map\{position:static/.test(html), '');
+  ok('دکمهٔ بزرگنمایی حذف شده', !/onclick="zoomWhiteboard/.test(html));
+  ok('دکمهٔ «اندازه اصلی» حذف شده', !/onclick="resetZoomWhiteboard/.test(html));
+  ok('بوم تخته عرضش ۱۰۰٪ قاب است', /class="whiteboard-canvas[^>]*style="display:block;width:100%;height:auto/.test(html));
+  ok('قاب تخته اسکرول ندارد', /class="whiteboard-container" style="width:100%;overflow:hidden/.test(html));
+  ok('تابع displayScale وجود دارد', /function displayScale\(canvas\)/.test(html));
+  ok('تابع zoomWhiteboard حذف شده', !/function zoomWhiteboard/.test(html));
+}
+
 console.log('\n══════════ فاز ۲: سناریوهای «آزمون نامعتبر» ══════════');
 const bad = [
   await req('GET بدون هیچ پارامتر', { method: 'GET', file: T, query: '' }),

@@ -65,6 +65,9 @@ register_shutdown_function(function () use ($file, $query, $sid) {
         $fatal = $e['message'] . ' (' . $e['file'] . ':' . $e['line'] . ')';
     }
 
+    /* کل صفحهٔ رندرشده — سوئیت‌های چیدمان به آن نیاز دارند */
+    @file_put_contents('/harness/page.html', $out);
+
     $flash = null;
     if (!empty($_SESSION['flash_message'])) {
         $flash = $_SESSION['flash_message'];
