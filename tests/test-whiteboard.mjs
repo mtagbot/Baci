@@ -10,19 +10,18 @@
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { resolveFile } from './harness/site.mjs';
 import { req, examId } from './harness/lib.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, d = '') => c ? (pass++, console.log(`  ✅ ${n}`)) : (fail++, console.log(`  ❌ ${n}${d ? '  → ' + d : ''}`));
 
 /* ── منبع ─────────────────────────────────────────────── */
-const PATCH = process.env.PATCH;
-const candidates = PATCH
-  ? [join(process.cwd(), '..', PATCH, 'online-exam-take.php')]
-  : [];
-candidates.push(join(process.cwd(), '..', '.arena', 'current', 'SchoolDeskPro', 'www', 'online-exam-take.php'));
-const SRC = candidates.find(existsSync);
-if (!SRC) { console.error('منبع پیدا نشد'); process.exit(2); }
+/* resolveFile() همان ترتیبِ مشترکِ harness است: PATCH → .arena/current →
+   جدیدترین بستهٔ دسکتاپ (استخراج خودکار). قبلاً این سوئیت فقط
+   .arena/current را می‌دید، پس روی کلونِ تازه با «منبع پیدا نشد» می‌مرد. */
+const SRC = resolveFile('online-exam-take.php');
+if (!existsSync(SRC)) { console.error('منبع پیدا نشد: ' + SRC); process.exit(2); }
 const src = readFileSync(SRC, 'utf8');
 console.log(`\n>>> منبع: ${SRC.replace(process.cwd() + '/', '')}  (${src.length} نویسه)`);
 

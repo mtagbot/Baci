@@ -11,16 +11,18 @@
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { resolveFile } from './harness/site.mjs';
 import { req, loginAdmin, examId } from './harness/lib.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, d = '') => c ? (pass++, console.log(`  ✅ ${n}`)) : (fail++, console.log(`  ❌ ${n}${d ? '  → ' + d : ''}`));
 
 /* ── منبع ─────────────────────────────────────────────── */
-const PATCH = process.env.PATCH;
-const cands = PATCH ? [join(process.cwd(), '..', PATCH, 'online-exam-monitor.php')] : [];
-cands.push(join(process.cwd(), '..', '.arena', 'current', 'SchoolDeskPro', 'www', 'online-exam-monitor.php'));
-const SRC = cands.find(existsSync);
+/* resolveFile() همان ترتیبِ مشترکِ harness است: PATCH → .arena/current →
+   جدیدترین بستهٔ دسکتاپ (استخراج خودکار). قبلاً این سوئیت فقط
+   .arena/current را می‌دید و روی کلونِ تازه با ERR_INVALID_ARG_TYPE می‌مرد. */
+const SRC = resolveFile('online-exam-monitor.php');
+if (!existsSync(SRC)) { console.error('منبع پیدا نشد: ' + SRC); process.exit(2); }
 const src = readFileSync(SRC, 'utf8');
 console.log(`\n>>> منبع: ${SRC.replace(process.cwd() + '/', '')}  (${src.length} نویسه)`);
 
