@@ -16,8 +16,8 @@ if [ ! -d node_modules ]; then
   npm install --silent --no-audit --no-fund || { echo "❌ npm install ناموفق بود"; exit 1; }
 fi
 
-declare -a NAMES=("بررسی نحوی PHP" "منطق تایمر" "انتخاب گزینه" "راندن کامل آزمون")
-declare -a CMDS=("node lint.mjs" "node test-timer.mjs" "node test-save.mjs" "node verify.mjs")
+declare -a NAMES=("بررسی نحوی PHP" "منطق تایمر" "انتخاب گزینه" "موقعیت مکانی" "راندن کامل آزمون")
+declare -a CMDS=("node lint.mjs" "node test-timer.mjs" "node test-save.mjs" "node test-location.mjs" "node verify.mjs")
 declare -a RC=()
 
 for i in "${!CMDS[@]}"; do

@@ -8,7 +8,7 @@
  *   ۳) جدیدترین SchoolDeskPro-v*-win64.zip در ریشهٔ ریپو (استخراج خودکار)
  */
 import { readdirSync, existsSync, mkdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -28,7 +28,8 @@ export function resolveSite() {
   const good = p => p && existsSync(join(p, 'includes', 'db.php'));
 
   if (process.env.SITE) {
-    const p = join(REPO, process.env.SITE);
+    /* هم مسیر مطلق قبول است هم مسیر نسبی از ریشهٔ ریپو */
+    const p = isAbsolute(process.env.SITE) ? process.env.SITE : join(REPO, process.env.SITE);
     if (good(p)) return p;
     throw new Error(`SITE=${process.env.SITE} معتبر نیست (includes/db.php پیدا نشد)`);
   }
