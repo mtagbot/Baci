@@ -3,9 +3,9 @@
 > **هدف این فایل:** حافظهٔ ماندگار معماری سامانه. هر عدد و مسیر در این سند با
 > اجرای دستور روی خود فایل‌ها به‌دست آمده، نه از حدس.
 >
-> **تاریخ راستی‌آزمایی:** ۲۰۲۶-۰۹-۱۲
-> **نسخهٔ سایت:** ۴.۱۲۷.۰ &nbsp;·&nbsp; **نسخهٔ دسکتاپ:** ۲.۵۸.۰
-> **شاخهٔ کاری:** `arena/01a0934a-baci`
+> **تاریخ راستی‌آزمایی:** ۲۰۲۶-۰۹-۱۲ (بازبینی دوم روی بستهٔ v2.61.0)
+> **نسخهٔ سایت:** ۴.۱۳۰.۰ &nbsp;·&nbsp; **نسخهٔ دسکتاپ:** ۲.۶۱.۰
+> **شاخهٔ کاری:** `arena/01a097e6-baci`
 
 ---
 
@@ -20,7 +20,7 @@
 
 ### اعداد راستی‌آزمایی‌شده
 
-| | بالادستی `Maxess/mtagbot` | فعلی (سایت v4.126.0) |
+| | بالادستی `Maxess/mtagbot` | فعلی (سایت v4.130.0) |
 |---|---|---|
 | کل فایل‌ها | ۲۱۱ | ۱۴۶ (فقط `www/`) |
 | فایل PHP | ۱۰۶ | ۱۲۴ |
@@ -116,8 +116,8 @@ www/
 | `online-exams.php` | لیست و مدیریت آزمون‌ها |
 | `online-exam-form.php` | ایجاد/ویرایش (زمان‌بندی، مدت، نمرهٔ قبولی، تصادفی‌سازی) |
 | `online-exam-questions.php` | استودیوی طراحی سوال با ویرایشگر WYSIWYG |
-| `online-exam-take.php` | **برگهٔ برگزاری آزمون دانش‌آموز** (۱۲۷۳ خط در v4.126.0) |
-| `online-exam-api.php` | **API آزمون — ۱۸ اکشن** (فهرست پایین) |
+| `online-exam-take.php` | **برگهٔ برگزاری آزمون دانش‌آموز** (۱۴۷۷ خط در v4.130.0) |
+| `online-exam-api.php` | **API آزمون — ۲۱ اکشن** (فهرست پایین) |
 | `online-exam-result.php` / `online-exam-results.php` | نتیجهٔ تکی / لیست نتایج |
 | `online-exam-grading.php` | تصحیح دستی |
 | `online-exam-monitor.php` | مانیتورینگ زندهٔ ضدتقلب |
@@ -131,16 +131,22 @@ www/
 `number` 🔢 · `info` ℹ️ (بدون نمره) · `fill_blank` ✍️ · `matching` 🔗 ·
 `file_upload` 📎 · `voice_upload` 🎤 · `whiteboard` 🎨
 
-**۱۸ اکشن `online-exam-api.php` در v4.126.0:**
+**۲۱ اکشن `online-exam-api.php` در v4.130.0** (شمرده‌شده از خودِ فایل با
+`grep -oP "if \(\$action === '\K[a-z_]+"` — نه از حافظه):
 
 ```
-ack_voice_note            get_webcam_snapshots        save_answer
-check_time      ← جدید    get_webcam_request_status   save_webcam_snapshot
-get_attempts_in_progress  heartbeat                   send_voice_note
-get_live_sessions         proctoring_log              start_attempt
-get_pending_webcam_...    request_webcam              submit_exam
-get_proctoring_logs       upload_webcam_snapshot      upload_webcam_video
+ack_voice_note            get_proctoring_logs         save_webcam_snapshot
+check_time                get_webcam_request_status   send_voice_note
+claim_device   ← v4.128   get_webcam_snapshots        start_attempt
+get_attempts_in_progress  heartbeat                   submit_exam
+get_live_sessions         proctoring_log              upload_webcam_snapshot
+get_pending_webcam_...    request_webcam              upload_webcam_video
+                          save_answer
 ```
+
+هر اکشن علاوه بر نام، نقش را هم چک می‌کند (`$role['type']`): اکشن‌های
+دانش‌آموز از اکشن‌های کادر (`admin`/`teacher`) جدا هستند و در همان خط `if`
+تفکیک می‌شوند.
 
 ### ۴.۴ حضور و غیاب **(جدید)**
 `attendance.php` · `attendance-scanner.php` · `attendance-tags.php` ·
@@ -234,7 +240,7 @@ desk-prepend.php             telegram-poll.php
 
 | | سایت | SchoolDesk Pro (دسکتاپ) |
 |---|---|---|
-| نسخه | ۴.۱۲۷.۰ | ۲.۵۸.۰ |
+| نسخه | ۴.۱۳۰.۰ | ۲.۶۱.۰ |
 | زبان | PHP + MySQL | PHP 8.1.34 داخلی + SQLite |
 | نصب | آپلود در هاست | unzip + اجرای `SchoolDeskPro.exe` |
 | پورت‌ها | — | ۸۱۲۳–۸۱۹۹ |
@@ -335,3 +341,94 @@ desk-prepend.php             telegram-poll.php
 13. `resolveSite()` پوشهٔ `.arena/current` را بر جدیدترین زیپ ترجیح می‌دهد؛
     بعد از `release.sh` حتماً `.arena/current` را پاک و از بستهٔ تازه باز
     کنید، وگرنه تست‌ها بی‌صدا روی بستهٔ قبلی اجرا می‌شوند.
+
+---
+
+## ۱۰. یافته‌های بازبینی مستقل (۲۰۲۶-۰۹-۱۲، روی بستهٔ v2.61.0)
+
+این بخش نتیجهٔ خواندن مستقیم سورسِ بستهٔ منتشرشده است، نه اعتماد به بخش‌های
+بالا. هر مورد با دستور روی خود فایل تأیید شده و شمارهٔ خط دارد.
+
+### ۱۰.۱ رفع‌شده در همین بازبینی
+
+**۱۴.** دو سوئیت `test-whiteboard.mjs` و `test-monitor-ui.mjs` مسیر سورس را
+دستی به `.arena/current` سیم‌کشی کرده بودند — پوشه‌ای که بین نشست‌ها پاک
+می‌شود. روی کلونِ تازه، سوئیت تخته‌سفید با `منبع پیدا نشد` خارج می‌شد و
+سوئیت مانیتورینگ با `ERR_INVALID_ARG_TYPE` کرش می‌کرد (`readFileSync(undefined)`).
+یعنی ۲ سوئیت از ۱۰ به دلیل محیط قرمز بودند، نه به دلیل باگ محصول.
+هر دو به `harness/site.mjs::resolveFile()` منتقل شدند (همان ترتیبی که ۵
+سوئیت دیگر از قبل داشتند). راستی‌آزمایی با `rm -rf /tmp/baci-site`:
+**قبل ۸ سبز / ۲ قرمز → بعد ۱۰ سبز، ۲۰۷ PASS / ۰ FAIL / ۲ SKIP**.
+
+> درسِ تکرارشونده: این سومین باگ از یک خانواده است (موارد ۱، ۱۱ و حالا ۱۴) —
+> «تست چیزی غیر از آنچه فکر می‌کنیم را می‌سنجد». هر سوئیت جدید باید مسیر
+> سورس را از `site.mjs` بگیرد، نه با `join()` دستی.
+
+### ۱۰.۲ باز — به ترتیب اولویت
+
+**۱۵. ورود با رمز خام (plaintext fallback) — امنیتی، بحرانی.**
+در سه نقطه، اگر `password_verify()` رد شود، مقایسهٔ رشته‌ای خام انجام می‌شود:
+
+| فایل | خط | شرط |
+|---|---|---|
+| `admin-login.php` | ۴۴ | `password_verify(...) \|\| $pass === $adm['password']` |
+| `admin-login.php` | ۷۷ | `... \|\| $pass === $t['password'] \|\| $pass === $t['personnel_code']` |
+| `api/index.php` | ۷۰ | `... \|\| $pass === $st['password'] \|\| $pass === $st['national_id']` |
+
+دو پیامد: (الف) هر رکوردی که هش نشده باشد با رمز خام باز می‌شود؛ (ب) در
+مورد دبیر و دانش‌آموز، **کد پرسنلی و کد ملی عملاً رمز عبور معتبرند** — و
+کد ملی در همین سامانه نام‌کاربری است، یعنی برای آن حساب‌ها رمز عمومی است.
+راه درست: مهاجرت یک‌بارهٔ رکوردهای هش‌نشده + حذف کامل شاخهٔ `||`.
+
+**۱۶. ایندکس در schema دسکتاپ تقریباً وجود ندارد — کارایی.**
+`sql/database.sql` (MySQL) ۱۱۳ تعریف `KEY` دارد، ولی
+`sql/schema-sqlite.sql` فقط **یک** `CREATE INDEX` دارد (`idx_dcl_tbl` روی
+`desk_change_log`). بقیه فقط `UNIQUE` های درون‌جدولی‌اند. یعنی روی دسکتاپ،
+`reports.student_id`, `report_grades.report_id`, `online_exam_answers.attempt_id`
+و … همگی full-scan می‌شوند.
+اندازه‌گیری شد (SQLite، ۱۲۰٬۰۰۰ ردیف، ۳۰۰ کوئری):
+**بدون ایندکس ۵٫۳۶ ms — با ایندکس ۰٫۱۲ ms، یعنی ~۴۳ برابر.**
+مدرسه‌ای با چند سال کارنامه این را به‌صورت «برنامه کند شده» حس می‌کند.
+
+**۱۷. `db-optimizer.php` روی دسکتاپ کار نمی‌کند.** کل فایل با
+`information_schema` و `ALTER TABLE ... ADD INDEX` و `OPTIMIZE TABLE`
+نوشته شده — هیچ‌کدام در SQLite وجود ندارند، و هیچ شاخهٔ `is_sqlite` در فایل
+نیست. ولی `includes/header.php:154` منوی «سلامت پایگاه داده» را روی دسکتاپ
+هم نشان می‌دهد. پس کاربر دسکتاپ صفحه‌ای می‌بیند که دکمه‌هایش بی‌صدا شکست
+می‌خورند (خطاها در `try/catch` بلعیده می‌شوند). ضمناً `dbopt_index_exists()`
+در `catch` مقدار `true` برمی‌گرداند، پس روی SQLite همه‌چیز «از قبل موجود»
+گزارش می‌شود. معادل SQLite: `CREATE INDEX IF NOT EXISTS`, `PRAGMA index_list`,
+`VACUUM`, `ANALYZE`.
+
+**۱۸. `online-exam-media-upload.php` بدون CSRF و بدون سقف حجم.** تنها چکِ
+این endpoint، لاگین‌بودن (`admin_id` یا `teacher_id`) و پسوند فایل است.
+نه `verify_csrf` دارد، نه محدودیت اندازه، نه بررسی MIME واقعی. پسوند
+`pdf/mp4/…` مجاز است و فایل زیر `uploads/online-exams/media` با نام قابل
+حدس‌زدنِ زمانی ذخیره می‌شود. (چهار فایل دیگر هم CSRF ندارند —
+`desk-doctor`, `desk-prepend`, `exam-print`, `installer` — ولی آن‌ها یا
+CLI/محلی‌اند یا فقط خواندنی.)
+
+**۱۹. `uploads/` هیچ `.htaccess` ندارد.** در کل درخت، صفر فایل `.htaccess`
+هست. روی هاست اشتراکی Apache، هر چیزی که در `uploads/` بنشیند و به PHP
+تفسیر شود اجرا می‌شود. با مورد ۱۸ ترکیب شود، زنجیرهٔ آپلود→اجرا کامل است.
+حداقلِ لازم: `php_flag engine off` + `Options -ExecCGI` در `uploads/.htaccess`.
+
+**۲۰. حذف آزمون آنلاین همچنان یتیم می‌سازد.** `online-exams.php:50-51` فقط
+`online_exams` و `online_questions` را پاک می‌کند. جدول‌های
+`online_exam_attempts`, `online_exam_answers`, `online_exam_proctoring_logs`,
+`online_exam_live_sessions`, `online_exam_webcam_*` دست‌نخورده می‌مانند.
+نکتهٔ مهم: مسیر حذفِ **دانش‌آموز** (`students.php:94-106`) این کار را
+درست انجام می‌دهد — پس الگوی صحیح همان‌جا موجود است و فقط باید تکرار شود.
+(این همان مورد ۲ است؛ اینجا با شماره‌خط و راه‌حل مشخص تأیید شد.)
+
+**۲۱. حجم مخزن.** ۷۶۹ فایل track‌شده که **۱۰۴ تای آن zip با مجموع ۱۰۷ مگابایت**
+است؛ `.git` الان ۴۳ مگابایت است و هر انتشار ~۱۵ مگابایت دیگر اضافه می‌کند
+(بستهٔ دسکتاپ). `.gitignore` فعلی فقط `.arena/` و `tests/node_modules/` را
+می‌گیرد. گزینه‌ها: GitHub Releases برای باینری‌ها، یا Git LFS. ضمناً
+`sssssssssssssss.jpg` در ریشه بلااستفاده است و شکاف نسخه‌ای ۴.۸۰–۴.۸۵ در
+`update-v*` همچنان باقی است (۹۷ پوشه).
+
+**۲۲. CI هنوز متصل نیست.** `bash scripts/run-tests.sh` کامل و سبز است ولی
+اجرایش دستی است. با توجه به مورد ۱۴ (سوئیت‌هایی که ماه‌ها روی محیطِ آلوده
+سبز بودند) یک GitHub Actions ساده که روی هر push از **کلون تمیز** اجرا شود،
+دقیقاً همان دسته باگ را می‌گیرد.
