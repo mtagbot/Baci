@@ -124,15 +124,27 @@ function makeEnv({ perm = 'prompt', geo = 'never', ip = 'ok', clock }) {
   return env;
 }
 
+/* v4.129.0 — از این نسخه، finishOk وضعیت‌ها را با emState()/ic() می‌سازد
+   (به‌جای ایموجی). پس این دو تابع هم باید از «خودِ فایل» استخراج شوند،
+   نه اینکه بدلشان نوشته شود؛ وگرنه چیزی که سنجیده می‌شود کد واقعی نیست.
+   اگر سورس قدیمی‌ای آن‌ها را نداشت، یک جایگزین بی‌ضرر می‌نشیند. */
+function tryExtract(src, name, fallback) {
+  try { return extractFn(src, name); } catch (e) { return fallback; }
+}
+
 function build(src) {
   const loc = extractFn(src, 'checkLocationRobust');
   const gate = renderPhp(extractFn(src, 'function checkAllPermissionsDone'));
+  const ico = tryExtract(src, 'function ic', "function ic(n){ return '['+n+']'; }");
+  const stt = tryExtract(src, 'function emState', "function emState(k,t){ return t; }");
   return new Function('env', `
     const permissionState = env.permissionState, document = env.document;
     const navigator = env.navigator, location = env.location, window = env.window;
     const fetch = env.fetch, setTimeout = env.setTimeout, clearTimeout = env.clearTimeout;
     const AbortController = env.AbortController, console = { log(){}, warn(){} };
     const logProctor = env.logProctor;
+    ${ico}
+    ${stt}
     ${gate}
     ${loc}
     return { checkLocationRobust, permissionState };

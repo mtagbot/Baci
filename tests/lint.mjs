@@ -19,7 +19,29 @@ const files = [];
     else if (e.name.endsWith('.php')) files.push(abs);
   }
 })(SITE);
-console.log(`>>> ${files.length} فایل PHP در ${SITE}`);
+
+/* v4.129.0 — PATCH باید اینجا هم اورلی شود.
+   تا پیش از این lint فقط سورس پایه را می‌دید؛ یعنی `PATCH=update-vX node lint.mjs`
+   «۰ خطا» چاپ می‌کرد در حالی که فایل‌های وصله اصلاً بررسی نشده بودند. */
+if (process.env.PATCH) {
+  const PD = join(process.cwd(), '..', process.env.PATCH);
+  const patched = [];
+  (function walk(d) {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const abs = join(d, e.name);
+      if (e.isDirectory()) walk(abs);
+      else if (e.name.endsWith('.php')) patched.push(abs);
+    }
+  })(PD);
+  for (const p of patched) {
+    const rel = relative(PD, p);
+    const hit = files.findIndex((f) => relative(SITE, f) === rel);
+    if (hit >= 0) files[hit] = p; else files.push(p);
+    console.log(`      lint ← وصله: ${rel}`);
+  }
+}
+
+console.log(`>>> ${files.length} فایل PHP در ${SITE}${process.env.PATCH ? ' (با وصلهٔ ' + process.env.PATCH + ')' : ''}`);
 
 const php = new PHP(await loadNodeRuntime('8.3', { emscriptenOptions: { processId: 1 } }));
 php.mkdirTree('/lint');

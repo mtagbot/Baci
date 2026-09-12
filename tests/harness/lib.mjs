@@ -154,4 +154,14 @@ session_name('BACI_TEST'); session_id(${JSON.stringify(sid)}); session_start();
 $_SESSION['student_id']=${Number(studentId)}; echo 'LOGIN_OK';`);
   return (await run("<?php require '/harness/login.php';")).out.trim();
 }
+
+/* v4.129.0 — ورود به‌عنوان مدیر (برای سوئیت‌هایی که نمای «کادر مدرسه» را
+   در برابر نمای «دانش‌آموز» می‌سنجند). */
+export async function loginAdmin(sid = 'harnessAdm0001') {
+  php.writeFile('/harness/loginadm.php', `<?php @mkdir('/tmp/sess'); ini_set('session.save_path','/tmp/sess');
+session_name('BACI_TEST'); session_id(${JSON.stringify(sid)}); session_start();
+$_SESSION['admin_id']=1; $_SESSION['admin_role']='super_admin';
+unset($_SESSION['student_id']); unset($_SESSION['teacher_id']); echo 'LOGIN_OK';`);
+  return (await run("<?php require '/harness/loginadm.php';")).out.trim();
+}
 await login();

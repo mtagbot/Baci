@@ -47,16 +47,20 @@ echo "  پایه: $PREV"
 unzip -qo "$PREV" -d "$WORK"
 BASE="$WORK/SchoolDeskPro"
 
-# جایگزینی فایل‌های وصله در www/ با حفظ زیرپوشه‌ها
+# جایگزینی فایل‌های وصله در www/ با حفظ زیرپوشه‌ها.
+# همهٔ فایل‌ها کپی می‌شوند (PHP، CSS، JS) — جز خودِ راهنما، که فایل مستندات است نه payload.
 COUNT=0
+PHP_COUNT=0
 while IFS= read -r -d '' f; do
   rel="${f#$PATCH_DIR/}"
+  [ "$(basename "$rel")" = "راهنمای-بروزرسانی.txt" ] && continue
   mkdir -p "$BASE/www/$(dirname "$rel")"
   cp "$f" "$BASE/www/$rel"
   echo "    · www/$rel"
   COUNT=$((COUNT+1))
-done < <(find "$PATCH_DIR" -name "*.php" -print0)
-[ "$COUNT" -gt 0 ] || { echo "❌ هیچ فایل PHP در پوشهٔ وصله نیست"; exit 1; }
+  case "$f" in *.php) PHP_COUNT=$((PHP_COUNT+1));; esac
+done < <(find "$PATCH_DIR" -type f -print0)
+[ "$PHP_COUNT" -gt 0 ] || { echo "❌ هیچ فایل PHP در پوشهٔ وصله نیست"; exit 1; }
 
 # bump نسخه در README.txt
 python3 - "$BASE/README.txt" "$DESK_VER" <<'PY'
