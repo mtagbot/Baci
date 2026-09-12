@@ -1,0 +1,43 @@
+/* ==========================================================
+ * Admin Panel Custom Theme (Navy Blue + Gold Accents)
+ * ========================================================== */
+
+:root {
+    --admin-navy: #0f172a;
+    --admin-navy-light: #1e293b;
+    --admin-gold: #d97706;
+    --admin-gold-light: #f59e0b;
+}
+
+body.admin-panel {
+    background-color: #f1f5f9;
+}
+
+.sidebar {
+    background-color: var(--admin-navy) !important;
+    color: #ffffff !important;
+    border-left: 2px solid var(--admin-gold) !important;
+}
+
+.sidebar .sidebar-item {
+    color: #cbd5e1 !important;
+}
+
+.sidebar .sidebar-item:hover, .sidebar .sidebar-item.active {
+    background-color: var(--admin-navy-light) !important;
+    color: var(--admin-gold-light) !important;
+    border-right: 4px solid var(--admin-gold-light);
+}
+
+.navbar {
+    border-bottom: 3px solid var(--admin-gold) !important;
+}
+
+.btn-admin-gold {
+    background-color: var(--admin-gold);
+    color: #ffffff;
+    font-weight: 700;
+}
+.btn-admin-gold:hover {
+    background-color: var(--admin-gold-light);
+}

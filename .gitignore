@@ -1,2 +1,6 @@
 # Local analysis scratch space (extracted bundles, temp working trees) — never commit
 .arena/
+
+# وابستگی‌های تست — با npm install ساخته می‌شوند
+tests/node_modules/
+tests/package-lock.json
