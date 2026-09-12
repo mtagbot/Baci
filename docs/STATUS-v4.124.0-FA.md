@@ -10,7 +10,7 @@
 
 | لایه | نام | نسخه فعلی | وضعیت |
 |---|---|---|---|
-| وب‌سایت (PHP/MySQL، هاست اشتراکی) | سامانه کارنامه مدرسه | **v4.124.0** | فعال، ۹۱ بسته آپدیت منتشرشده |
+| وب‌سایت (PHP/MySQL، هاست اشتراکی) | سامانه کارنامه مدرسه | **v4.125.0** | فعال، ۹۲ بسته آپدیت منتشرشده |
 | دسکتاپ ویندوز (نسل ۲) | SchoolDesk Pro | **v2.55.0** | فعال، باندل کامل سایت + PHP + SQLite |
 | دسکتاپ ویندوز (نسل ۱) | SchoolDesk | v1.4.0 | منسوخ‌شده (جایگزین: نسل ۲) |
 | ابزار استخراج سوال از PDF | `tools/analyze_exam_pdf.py` | هم‌نسخه با v4.110 | فعال، ۱۴۱۴ خط پایتون |
@@ -84,11 +84,15 @@ URL های استاتیکِ *موجود‌نبود* باید ۴۰۴ بگیرند
 | ربات‌ها | `bale_bot_users`, `telegram_bot_users`, `bale_bot_state`, `telegram_bot_state`, `bot_admin_sessions`, `bot_message_templates`, `bot_button_templates`, `bot_login_tokens`, `bot_message_logs` |
 | سیستم/پلتفرم | `admins`, `settings`, `activity_logs`, `user_sessions`, `api_tokens`, `notifications`, `sms_logs`, `import_queue`, `import_sessions`, `desk_change_log`, `desk_sync_suppress` |
 
-**۴۱ جدول همگام‌شونده با دسکتاپ** (`SYNC_TABLES` در `desk-sync-api.php v2.13`):
-همه‌ی جدول‌های بالا به‌جز جدول‌های حالت/کش (`*_bot_state`, `user_sessions`, `api_tokens`,
-`import_*`, `online_exam_live_sessions`, `online_exam_proctoring_logs`,
-`online_exam_webcam_*`, `online_exam_voice_*`) — یعنی داده‌های زنده/حساس آزمون آنلاین
-عمداً همگام نمی‌شوند.
+**۴۱ جدول همگام‌شونده با دسکتاپ** (`SYNC_TABLES` در `desk-sync-api.php v2.13`)؛
+**۱۵ جدول همگام نمی‌شود** (خروجی `comm` روی دو فهرست):
+`api_tokens`, `user_sessions`, `bale_bot_state`, `telegram_bot_state`,
+`import_queue`, `import_sessions`, `desk_change_log`, `desk_sync_suppress`,
+`grade_entry_permissions`, `online_exam_live_sessions`, `online_exam_proctoring_logs`,
+`online_exam_webcam_requests`, `online_exam_webcam_snapshots`,
+`online_exam_voice_notes`, `online_exam_voice_plays`
+— یعنی همه‌ی داده‌های *زنده و ضدتقلب* آزمون آنلاین (سشن زنده، لاگ نظارت، وبکم، صوت)
+عمداً فقط روی سایت می‌مانند و به دسکتاپ نمی‌روند.
 
 ---
 
@@ -114,7 +118,7 @@ URL های استاتیکِ *موجود‌نبود* باید ۴۰۴ بگیرند
 آپلود فایل · آپلود صدا · تخته سفید · اطلاع‌رسانی
 > نتیجه تست ثبت‌شده در راهنمای v4.123: آزمون جامع ۱۳ سواله، نمره خودکار ۱۱/۲۱ مطابق انتظار.
 
-**ضدتقلب / نظارت (`online-exam-api.php` — ۱۹ اکشن):**
+**ضدتقلب / نظارت (`online-exam-api.php` — ۱۷ اکشن):**
 `heartbeat` · `proctoring_log` · `save_answer` · `submit_exam` · `start_attempt` ·
 `send_voice_note` · `ack_voice_note` · `request_webcam` · `upload_webcam_snapshot` ·
 `upload_webcam_video` · `get_live_sessions` · `get_webcam_snapshots` ·
@@ -181,7 +185,7 @@ trigger های SQLite (`trg_sync_*`) که تغییرات محلی را در صف
 
 ---
 
-## ۷) تایم‌لاین نسخه‌ها (۹۱ بسته، v4.29.1 → v4.124.0)
+## ۷) تایم‌لاین نسخه‌ها (۹۲ بسته، v4.29.1 → v4.125.0)
 
 | فاز | نسخه‌ها | موضوع |
 |---|---|---|
@@ -196,10 +200,21 @@ trigger های SQLite (`trg_sync_*`) که تغییرات محلی را در صف
 | ۸. طراحی زنده + آرشیو | 4.99–4.103 | `exam_design_archive`, فایل منبع، ویرایشگر زنده |
 | ۹. ایمپورت PDF | 4.104–4.111 | `exam-bank-import.php` + ابزار پایتون (۵ نسخه پیاپی بهبود دقت) |
 | ۱۰. پولیش ویرایشگر | 4.112–4.118 | درگ ارتفاع سوال، resize تصویر، صفحه‌بندی بانک، نمره خودکار سربرگ، سربرگ لوکس |
-| ۱۱. بلوغ آزمون آنلاین | **4.119–4.124** | عدالت زمانی، ضدتقلب موقعیتی، UI مدرن، Push-To-Talk، تایمر ضدخرابی، موقعیت بی‌صدا |
+| ۱۱. بلوغ آزمون آنلاین | **4.119–4.125** | عدالت زمانی، ضدتقلب موقعیتی، UI مدرن، Push-To-Talk، تایمر ضدخرابی، موقعیت بی‌صدا، حذف کامل نتیجه دانش‌آموز |
 
 **الگوی انتشار:** هر نسخه = پوشه `update-vX.Y.Z/` با فایل‌های جایگزین +
 `راهنمای-بروزرسانی.txt`، و همزمان یک `MODIFIED-FILES-vX.Y.Z.zip`.
+
+### v4.125.0 — حذف کامل آزمون ثبت‌شده دانش‌آموز (جدیدترین)
+در `online-exam-results.php` دکمه «حذف کامل» اضافه شد که attempt دانش‌آموز را
+با همه رکوردهایش در ۸ جدول (`answers`, `proctoring_logs`, `live_sessions`,
+`webcam_requests`, `webcam_snapshots`, `voice_notes`, `voice_plays`, `attempts`)
+و همه فایل‌هایش روی دیسک (پوشه `answers/attempt_<id>/`، وبکم temp+saved، صوت
+هدفمند) پاک می‌کند. منطق در تابع `online_exam_delete_attempt_full()` در
+`includes/online_exam_helpers.php` است. رسانه مشترک سوالات
+(`uploads/online-exams/questions|media`) و پیام صوتی عمومی عمداً حفظ می‌شوند.
+**تست‌شده:** ۳۱ بررسی روی SQLite/PDO واقعی با فایل‌های واقعی — همه PASS، و
+`token_get_all(..., TOKEN_PARSE)` روی هر دو فایل بدون خطای نحوی.
 
 ---
 
