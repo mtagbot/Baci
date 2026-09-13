@@ -76,7 +76,9 @@ ok('مرتب‌سازی فارسی درست است (آبادی قبل از اب�
 console.log('\n══ فونت در چاپ ══');
 ok('فونت سامانه خوانده می‌شود', pageC.includes("get_setting('font_family'"));
 ok('@font-face در صفحهٔ چاپ تولید می‌شود', pageC.includes('$fontFaces'));
-ok('فقط فایل فونتِ موجود اعلام می‌شود', pageC.includes('is_file(__DIR__'));
+/* منطق فونت به card_ornaments.php منتقل شد تا همهٔ طرح‌ها از یک
+   منبع تغذیه شوند؛ پس بررسی هم باید آنجا را ببیند. */
+ok('فقط فایل فونتِ موجود اعلام می‌شود', orn.includes('is_file(__DIR__'));
 ok('Tahoma به‌عنوان فونت اصلی hardcode نشده',
    !/html,body\{background:#fff;font-family:Tahoma/.test(pageC));
 /* باید واقعاً *فراخوانی* شود، نه اینکه فقط نامش در فایل باشد.
@@ -126,9 +128,46 @@ ok('اگر عکس نبود جایگزین امن دارد', face.includes('card-
 ok('لوگوی مدرسه پشتیبانی می‌شود', face.includes('$logoUrl'));
 ok('همهٔ داده‌ها از clean() رد می‌شوند',
    !/<\?php echo \$s\['(first_name|last_name|class_name|national_id)'\]/.test(face));
-ok('سه طرح کارت وجود دارد',
-   styles.includes('.th-classic') && styles.includes('.th-ribbon') && styles.includes('.th-minimal'));
-ok('پشت کارت با مقررات و تماس هست', back.includes('مقررات') && back.includes('card-back-foot'));
+ok('شش طرح کارت وجود دارد',
+   ['classic','ribbon','minimal','titr','tile','sarv'].every(t => styles.includes('.th-' + t)));
+ok('پشت کارت مقررات و تماس دارد', back.includes('card-back-l') && back.includes('card-back-foot'));
+
+/* ── v4.137.0: خواسته‌های صریح کارفرما ── */
+console.log('\n══ QR بزرگ و دوطرفه ══');
+ok('نام پدر از کارت حذف شد', !face.includes("father_name"));
+ok('QR روی کارت دست‌کم ۳۰ میلی‌متر است', (() => {
+    const m = styles.match(/\.card-qr\{[^}]*width:(\d+(?:\.\d+)?)mm/);
+    return m && parseFloat(m[1]) >= 30;
+})(), (styles.match(/\.card-qr\{[^}]*width:([\d.]+)mm/) || [])[1]);
+ok('QR پشت کارت دست‌کم ۳۴ میلی‌متر است', (() => {
+    const m = styles.match(/\.card-back-qr\{[^}]*width:(\d+(?:\.\d+)?)mm/);
+    return m && parseFloat(m[1]) >= 34;
+})(), (styles.match(/\.card-back-qr\{[^}]*width:([\d.]+)mm/) || [])[1]);
+ok('پشت کارت هم QR دارد', back.includes('card-back-qr') && back.includes('data-qr'));
+ok('هر دو طرف از یک توکن استفاده می‌کنند', back.includes("$s['qr']") && face.includes("$s['qr']"));
+ok('پشت کارت نام و کلاس را هم دارد (بدون برگرداندن کارت)',
+   back.includes('card-back-name') && back.includes('class_name'));
+ok('سطح تصحیح خطای QR به Q ارتقا یافت (مقاوم به خط‌خوردگی)',
+   !pageC.includes("qrcode(0, 'M')") && (pageC.match(/qrcode\(0, 'Q'\)/g) || []).length === 2);
+ok('حاشیهٔ سفید QR استاندارد است (۴ ماژول)',
+   (pageC.match(/quiet = 4/g) || []).length === 2 && !pageC.includes('quiet = 2'));
+ok('هر دو canvas در چاپ رسم می‌شوند',
+   (pageC.match(/canvas\.card-qr\[data-qr\],canvas\.card-back-qr\[data-qr\]/g) || []).length === 2);
+
+console.log('\n══ فونت‌های ایرانی ══');
+ok('چهار فونت ایرانی تعریف شده',
+   ['Vazirmatn','Sahel','Yekan','B-Titr'].every(f => orn.includes("'" + f + "'")));
+ok('هر فونت متغیر CSS خودش را دارد',
+   ['--f-vazir','--f-sahel','--f-yekan','--f-titr'].every(v => orn.includes(v)));
+ok('طرح‌ها از متغیر فونت استفاده می‌کنند',
+   ['var(--f-vazir)','var(--f-sahel)','var(--f-yekan)','var(--f-titr)'].every(v => styles.includes(v)));
+ok('اگر فونتی روی دیسک نبود، جایگزین امن دارد', orn.includes('card_font_exists'));
+ok('فونت‌ها محلی‌اند (بدون CDN)', !/https?:\/\/fonts\./.test(orn) && !/googleapis/.test(orn));
+ok('فهرست طرح‌ها یک منبع واحد دارد', orn.includes('function card_themes'));
+ok('فرم طرح‌ها را از همان منبع می‌سازد', pageC.includes('card_themes()'));
+ok('پیش‌نمایش هم همان فونت‌ها را لود می‌کند',
+   (pageC.match(/card_font_faces\(\)/g) || []).length >= 1 &&
+   (pageC.match(/card_font_vars\(\)/g) || []).length >= 1);
 
 /* ═══ ۶) پیش‌نمایش و چاپ از یک منبع ═══ */
 console.log('\n══ هماهنگی پیش‌نمایش و چاپ ══');
