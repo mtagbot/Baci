@@ -605,6 +605,18 @@ if (!function_exists('verify_user_password')) {
             return true;
         }
 
+        /* رکورد قدیمیِ md5 (نسخه‌های خیلی قدیم سامانه فقط برای مدیران).
+           v4.131.0 در اولین نسخه این شاخه را حذف کرده بود و همان باعث
+           می‌شد مدیرِ md5‌دار دیگر نتواند وارد شود. برگشت، ولی این بار
+           رمز بلافاصله به bcrypt ارتقا می‌یابد پس md5 ماندگار نمی‌شود. */
+        if (strlen($stored) === 32 && ctype_xdigit($stored)
+            && hash_equals(strtolower($stored), md5($plain))) {
+            if (!empty($rehash['table'])) {
+                password_store_hash($rehash['table'], $rehash['id'] ?? 0, $plain);
+            }
+            return true;
+        }
+
         /* رکورد قدیمیِ هش‌نشده: فقط تطابق دقیق، و بلافاصله هش می‌شود.
            hash_equals برای جلوگیری از نشت زمانی. */
         if (hash_equals($stored, $plain)) {

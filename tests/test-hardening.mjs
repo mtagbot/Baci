@@ -61,6 +61,40 @@ ok('خودِ رشتهٔ هش به‌عنوان رمز کار نمی‌کند',  
 ok('password_is_hashed هش را می‌شناسد',       vup.is_hashed_yes === 1);
 ok('password_is_hashed متن خام را هش نمی‌داند', vup.is_hashed_no === 0);
 
+/* ── رمزهای پیش‌فرض مدرسه باید کار کنند ──────────────────────
+   قرارداد سامانه:
+     دانش‌آموز → نام کاربری = کد ملی · رمز پیش‌فرض = سریال ۶ رقمی شناسنامه
+     دبیر      → نام کاربری = کد ملی · رمز پیش‌فرض = کد پرسنلی
+   هر دو در زمان ساخت حساب با password_hash ذخیره می‌شوند، پس باید از
+   مسیر عادیِ هش باز شوند. این تست‌ها جلوی «سخت‌سازی بیش از حد» را
+   می‌گیرند: اگر روزی کسی شاخهٔ هش را هم خراب کند، کل مدرسه پشت در
+   می‌ماند و اینجا قرمز می‌شود. */
+php.writeFile('/harness/defpw.php', `<?php
+ini_set('display_errors','0'); error_reporting(0);
+require_once '/www/includes/functions.php';
+$serial = password_hash('654321', PASSWORD_DEFAULT);   // سریال شناسنامه
+$percod = password_hash('P7788',  PASSWORD_DEFAULT);   // کد پرسنلی
+$md5old = md5('secret123');                            // مدیرِ قدیمیِ md5
+echo json_encode([
+  'stu_serial'   => verify_user_password('654321', $serial) ? 1 : 0,
+  'stu_wrongnid' => verify_user_password('1111111111', $serial) ? 1 : 0,
+  'tea_percode'  => verify_user_password('P7788', $percod) ? 1 : 0,
+  'tea_wrongnid' => verify_user_password('2222222222', $percod) ? 1 : 0,
+  'md5_admin'    => verify_user_password('secret123', $md5old) ? 1 : 0,
+  'md5_wrong'    => verify_user_password('nope', $md5old) ? 1 : 0,
+  'md5_upper'    => verify_user_password('secret123', strtoupper($md5old)) ? 1 : 0,
+  'not_hex32'    => verify_user_password('zz', str_repeat('z', 32)) ? 1 : 0,
+]);`);
+const dpw = JSON.parse((await run("<?php require '/harness/defpw.php';")).out.trim());
+ok('دانش‌آموز با سریال ۶ رقمی شناسنامه وارد می‌شود', dpw.stu_serial === 1);
+ok('دانش‌آموز با کد ملی به‌جای رمز وارد نمی‌شود',     dpw.stu_wrongnid === 0);
+ok('دبیر با کد پرسنلی وارد می‌شود',                   dpw.tea_percode === 1);
+ok('دبیر با کد ملی به‌جای رمز وارد نمی‌شود',          dpw.tea_wrongnid === 0);
+ok('مدیرِ قدیمیِ md5 قفل نشده است',                   dpw.md5_admin === 1);
+ok('md5 با رمز غلط باز نمی‌شود',                      dpw.md5_wrong === 0);
+ok('md5 با حروف بزرگ هم شناخته می‌شود',               dpw.md5_upper === 1);
+ok('رشتهٔ ۳۲ نویسه‌ای غیرhex با md5 اشتباه نمی‌شود',  dpw.not_hex32 === 0);
+
 /* ج) مهاجرت خودکار: رکورد هش‌نشده بعد از ورود موفق هش می‌شود */
 await dbExec(`UPDATE students SET password='legacy-raw-pw' WHERE id=${student.id}`);
 const before = (await db(`SELECT password p FROM students WHERE id=${student.id}`))[0].p;
