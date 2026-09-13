@@ -16,8 +16,8 @@ if [ ! -d node_modules ]; then
   npm install --silent --no-audit --no-fund || { echo "❌ npm install ناموفق بود"; exit 1; }
 fi
 
-declare -a NAMES=("بررسی نحوی جاوااسکریپت" "بررسی نحوی PHP" "منطق تایمر" "انتخاب گزینه" "موقعیت مکانی" "راندن کامل آزمون" "قفل تک‌دستگاهی" "تختهٔ سفید و چیدمان" "حریم خصوصی گزارش" "رابط مانیتورینگ" "سخت‌سازی v4.131.0" "کاشی‌های هدر و کپچای تطبیقی" "هدر موبایل و تبلت")
-declare -a CMDS=("node test-js-syntax.mjs" "node lint.mjs" "node test-timer.mjs" "node test-save.mjs" "node test-location.mjs" "node verify.mjs" "node test-device-lock.mjs" "node test-whiteboard.mjs" "node test-proctoring-privacy.mjs" "node test-monitor-ui.mjs" "node test-hardening.mjs" "node test-header-tiles.mjs" "node test-header-mobile.mjs")
+declare -a NAMES=("بررسی نحوی جاوااسکریپت" "بررسی نحوی PHP" "منطق تایمر" "انتخاب گزینه" "موقعیت مکانی" "راندن کامل آزمون" "قفل تک‌دستگاهی" "تختهٔ سفید و چیدمان" "حریم خصوصی گزارش" "رابط مانیتورینگ" "سخت‌سازی v4.131.0" "کاشی‌های هدر و کپچای تطبیقی" "هدر موبایل و تبلت" "آیکون کاشی‌ها")
+declare -a CMDS=("node test-js-syntax.mjs" "node lint.mjs" "node test-timer.mjs" "node test-save.mjs" "node test-location.mjs" "node verify.mjs" "node test-device-lock.mjs" "node test-whiteboard.mjs" "node test-proctoring-privacy.mjs" "node test-monitor-ui.mjs" "node test-hardening.mjs" "node test-header-tiles.mjs" "node test-header-mobile.mjs" "node test-tile-icons.mjs")
 declare -a RC=()
 
 for i in "${!CMDS[@]}"; do
