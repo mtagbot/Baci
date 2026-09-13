@@ -1,5 +1,27 @@
 # SchoolDesk Pro — build notes
 
+v2.65.0 changes (launcher v2.4):
+- app window now opens MAXIMIZED (`--start-maximized`). Deliberately NOT
+  `--start-fullscreen`: in `--app` mode there is no F11 and no visible
+  close button, so true fullscreen traps the user.
+- the "don't close this window" status window is GONE. When no modern
+  engine is found we now sit in the notification area (tray icon) with a
+  right-click menu (open / exit) and double-click to reopen. The PHP
+  server keeps running in the background with no desktop window.
+- browser discovery is much more stubborn, because users reported the app
+  opening in the system browser: App Paths -> Uninstall\InstallLocation
+  -> fixed paths -> %LOCALAPPDATA%/%ProgramFiles% variants -> **WebView2
+  runtime** (msedgewebview2.exe, present on virtually every Win10/11).
+  Default browser is now genuinely the last resort.
+- launcher icon source now lives in git at launcher/res/app.ico +
+  app.rc (it was previously only inside the shipped .exe).
+
+Build the launcher (verified in this repo with zig 0.16):
+    python -m ziglang rc res/app.rc            # -> app.res
+    python -m ziglang cc -target x86_64-windows-gnu -O2 -s \
+        launcher.c app.res -lws2_32 -ladvapi32 -lshell32 -luser32 -lgdi32 \
+        -Wl,--subsystem,windows -o SchoolDeskPro.exe
+
 v2.3.0 changes:
 - launcher no longer embeds MSHTML/IE (webwin.c is retired — the old
   embedded engine rendered the app broken and JS never ran). The new
