@@ -60,16 +60,27 @@ for (const f of ['setup.php', 'run_request.php']) {
 if (process.env.PATCH) {
   const pd = join(REPO, process.env.PATCH);
   if (!existsSync(pd)) throw new Error(`پوشهٔ وصله پیدا نشد: ${process.env.PATCH}`);
+  /* v4.131.0 — پیش از این فقط فایل‌های .php اورلی می‌شدند و بقیه بی‌صدا
+     نادیده گرفته می‌شدند. یعنی وصله‌ای که sql/schema-sqlite.sql یا
+     assets/css یا .htaccess را عوض می‌کرد، اصلاً تست نمی‌شد و سوئیت
+     روی سورسِ پایه سبز می‌شد. (همان خانوادهٔ باگی که در lint.mjs و
+     در مسیر resolveFile دو بار دیگر هم دیده شد: «تست چیزی غیر از
+     آنچه فکر می‌کنیم را می‌سنجد».)
+     حالا هر فایلی که در پوشهٔ وصله باشد اورلی می‌شود. */
   let n = 0;
+  const skipped = [];
   (function walk(d) {
     for (const e of readdirSync(d, { withFileTypes: true })) {
       const abs = join(d, e.name);
       const rel = '/www/' + relative(pd, abs).split('\\').join('/');   /* باید زیر /www برود */
-      if (e.isDirectory()) { php.mkdirTree(rel); walk(abs); }
-      else if (e.name.endsWith('.php')) { php.writeFile(rel, new Uint8Array(readFileSync(abs))); n++; console.log('      overlay → ' + rel); }
+      if (e.isDirectory()) { php.mkdirTree(rel); walk(abs); continue; }
+      /* راهنمای فارسی وصله جزو سورس نیست */
+      if (/^راهنمای-بروزرسانی\.txt$/.test(e.name)) { skipped.push(e.name); continue; }
+      php.writeFile(rel, new Uint8Array(readFileSync(abs)));
+      n++; console.log('      overlay → ' + rel);
     }
   })(pd);
-  console.log(`>>> وصلهٔ ${process.env.PATCH} اورلی شد (${n} فایل PHP)`);
+  console.log(`>>> وصلهٔ ${process.env.PATCH} اورلی شد (${n} فایل${skipped.length ? `، ${skipped.length} فایل راهنما نادیده گرفته شد` : ''})`);
 }
 
 /* دیتابیس SQLite داخل MEMFS */

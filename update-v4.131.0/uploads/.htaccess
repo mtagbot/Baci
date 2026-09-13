@@ -1,0 +1,37 @@
+# v4.131.0 — هیچ اسکریپتی داخل uploads/ اجرا نمی‌شود.
+#
+# این پوشه محتوای آپلودیِ کاربر را نگه می‌دارد (رسانهٔ سوال، پاسخ‌های
+# دانش‌آموز، صدا، اسنپ‌شات وب‌کم، فونت). اگر وب‌سرور اجازه دهد فایلی
+# اینجا به‌عنوان PHP تفسیر شود، هر آپلود تبدیل به اجرای کد می‌شود.
+#
+# روی نصب‌های Apache این فایل خودش کار می‌کند. روی Nginx معادلش باید در
+# کانفیگ سرور نوشته شود:
+#     location ^~ /uploads/ { location ~ \.php$ { return 403; } }
+
+# --- Apache 2.4 ---
+<IfModule mod_php.c>
+  php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+  php_flag engine off
+</IfModule>
+<IfModule mod_php5.c>
+  php_flag engine off
+</IfModule>
+
+Options -ExecCGI -Indexes
+
+# هندلرهای اجرایی را بردار (وقتی PHP به‌صورت CGI/FPM سوار است)
+RemoveHandler .php .php3 .php4 .php5 .php7 .php8 .phtml .phar .pl .py .cgi .asp .aspx .sh
+RemoveType    .php .php3 .php4 .php5 .php7 .php8 .phtml .phar
+
+# و در نهایت: دسترسی مستقیم به هر چیزی که شبیه اسکریپت است، ممنوع
+<FilesMatch "\.(php[0-9]?|phtml|phar|pl|py|cgi|asp|aspx|sh|htaccess)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>

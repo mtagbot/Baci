@@ -4,3 +4,9 @@
 # وابستگی‌های تست — با npm install ساخته می‌شوند
 tests/node_modules/
 tests/package-lock.json
+
+# فایل‌های موقت و کاری
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db

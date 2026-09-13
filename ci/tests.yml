@@ -1,0 +1,55 @@
+# اجرای خودکار همهٔ سوئیت‌های تست روی هر push و هر PR.
+#
+# چرا این فایل وجود دارد: تا v4.130.0 تست‌ها فقط دستی اجرا می‌شدند و دو
+# سوئیت (تختهٔ سفید و مانیتورینگ) ماه‌ها روی پوشهٔ محلی .arena/current
+# سبز بودند، در حالی که روی یک کلون تمیز اصلاً اجرا نمی‌شدند. CI دقیقاً
+# همین دسته باگ را می‌گیرد چون همیشه از صفر و روی بستهٔ منتشرشده اجرا
+# می‌شود — نه روی محیط توسعه‌دهنده.
+#
+# نکتهٔ کلیدی: عمداً .arena/ ساخته نمی‌شود تا resolveSite() مجبور شود
+# جدیدترین SchoolDeskPro-v*-win64.zip را باز کند. یعنی CI همان چیزی را
+# می‌سنجد که واقعاً به مدرسه تحویل می‌شود.
+
+name: tests
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: دریافت کد
+        uses: actions/checkout@v4
+
+      - name: نصب Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: کش وابستگی‌های تست
+        uses: actions/cache@v4
+        with:
+          path: tests/node_modules
+          key: ${{ runner.os }}-testdeps-${{ hashFiles('tests/package.json') }}
+
+      - name: نصب وابستگی‌ها
+        working-directory: tests
+        run: npm install --no-audit --no-fund
+
+      - name: مطمئن شو از بستهٔ منتشرشده تست می‌گیریم (نه از .arena)
+        run: |
+          rm -rf .arena
+          ls -1 SchoolDeskPro-v*-win64.zip | sort -V | tail -1
+
+      - name: اجرای همهٔ سوئیت‌ها
+        run: bash scripts/run-tests.sh

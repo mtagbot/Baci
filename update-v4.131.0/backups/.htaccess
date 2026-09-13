@@ -1,0 +1,16 @@
+# v4.131.0 — پوشهٔ پشتیبان‌ها هرگز نباید از وب قابل دانلود باشد.
+#
+# محتوای اینجا dump کامل دیتابیس است: مشخصات دانش‌آموزان، نمرات و هش
+# رمزها. دانلود مستقیم یکی از این فایل‌ها یعنی افشای کل مدرسه.
+# دسترسی مجاز فقط از داخل پنل و از طریق backups.php است که مجوز
+# system_settings را چک می‌کند.
+
+<IfModule mod_authz_core.c>
+  Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+  Order allow,deny
+  Deny from all
+</IfModule>
+
+Options -ExecCGI -Indexes
