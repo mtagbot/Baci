@@ -38,6 +38,12 @@ export function resolveSite() {
 
   const zip = newestDesktopBundle();
   if (!zip) throw new Error('سورسی پیدا نشد: SITE را ست کنید یا بستهٔ دسکتاپ را در ریشهٔ ریپو بگذارید');
+  // A delivery can now be patch-only even when it retains the old bundle name.
+  // Never extract it over stale /tmp files and mistake that mixture for a full app.
+  const entries = execFileSync('unzip', ['-Z1', zip], { encoding: 'utf8' }).split('\n');
+  if (!entries.includes('SchoolDeskPro/www/includes/db.php')) {
+    throw new Error('جدیدترین ZIP فقط وصله است؛ SITE را روی www نسخهٔ کامل نصب‌شده و PATCH را روی update-v4.152.0 تنظیم کنید.');
+  }
   const dest = join(tmpdir(), 'baci-site');
   mkdirSync(dest, { recursive: true });
   execFileSync('unzip', ['-qo', zip, '-d', dest]);
