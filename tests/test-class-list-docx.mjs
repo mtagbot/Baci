@@ -175,6 +175,7 @@ $cellText = function ($tr, $idx) {
     return trim(implode('', $t[1]));
 };
 echo json_encode([
+  'a4Portrait' => strpos($xml, '<w:pgSz w:w="11906" w:h="16838"') !== false,
   'size'      => strlen($doc),
   'entries'   => $n,
   'tables'    => count($tm[0]),
@@ -204,6 +205,7 @@ echo json_encode([
   'tbl2'      => isset($tm[0][1]) && strpos($tm[0][1], 'جدول ثبت میزان تدریس') !== false ? 1 : 0,
 ], JSON_UNESCAPED_UNICODE);`);
 const D = await j("<?php require '/harness/gen.php';");
+ok('قالب Word دبیر A4 عمودی است', D.a4Portrait === true);
 ok('فایل docx ساخته شد', typeof D.size === 'number' && D.size > 10000, JSON.stringify(D).slice(0, 160));
 ok('فایل zip معتبر با اجزای کامل است', D.entries >= 8, String(D.entries));
 ok('هر دو جدول قالب حفظ شده‌اند', D.tables === 2, String(D.tables));

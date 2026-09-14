@@ -33,6 +33,8 @@ try {
     writeFileSync(join(REPO,'.cache/roster-tests/teacher-print.pdf'),pdf);
     const pages=(pdf.toString('latin1').match(/\/Type\s*\/Page\b/g)||[]).length;
     if(pages!==2)throw new Error('Expected 2 PDF pages; got '+pages);
+    const boxes=[...pdf.toString('latin1').matchAll(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/g)];
+    if(!boxes.length || boxes.some(b=>Math.abs(+b[1]-595.3)>1 || Math.abs(+b[2]-841.9)>1))throw new Error('Teacher PDF paper is not A4 portrait');
     await page.screenshot({path:join(REPO,'.cache/roster-tests/teacher-print.png')});
     console.log('Browser print: PASS (LTR 1/7, 8mm title, B Titr loaded, exactly two A4 PDF pages)',metrics);
 } finally {await browser.close();}

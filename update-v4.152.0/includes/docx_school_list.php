@@ -1,6 +1,7 @@
 <?php
 /** Full-school roster, v4.152.0. Transform the school's DOCX, never rebuild its design.
- * Template: A3 landscape, three grade blocks, three classes/block, 29 student rows.
+ * Source template: A3 landscape; generated documents are proportionally fitted to A4 landscape.
+ * Three grade blocks, three classes/block, 29 student rows per logical sheet.
  * Additional classes/students use continuation sheets, not narrower columns or truncation.
  * No writes to the database. Only active students explicitly assigned to the selected year.
  */
@@ -337,6 +338,97 @@ function srl_table(DOMElement $table, array $groups, $classOffset, $studentOffse
     }
 }
 
+/** Scale physical OOXML dimensions, not character spacing or horizontal glyph scale.
+ * Also used on styles.xml so inherited cell padding/paragraph spacing cannot stay A3-sized.
+ */
+function srl_scale_dimensions(DOMDocument $doc, $factor) {
+    $xp = srl_xpath($doc);
+    $scaleAttr = function ($node, $name, $minimum = 0, $floor = false) use ($factor) {
+        if (!$node->hasAttributeNS(SRL_W, $name)) return;
+        $old = (float)$node->getAttributeNS(SRL_W, $name);
+        $scaled = $floor ? floor($old * $factor) : round($old * $factor);
+        if ($old > 0) $scaled = max($minimum, $scaled);
+        $node->setAttributeNS(SRL_W, 'w:' . $name, (string)(int)$scaled);
+    };
+    foreach ($xp->query('//w:rPr/w:sz | //w:rPr/w:szCs') as $el) $scaleAttr($el, 'val', 2, true);
+    foreach ($xp->query('//w:gridCol') as $el) $scaleAttr($el, 'w', 1);
+    foreach ($xp->query('//w:tcW | //w:tblW | //w:tblInd | //w:tblCellSpacing | //w:tcMar/* | //w:tblCellMar/*') as $el) {
+        if ($el->getAttributeNS(SRL_W, 'type') === 'dxa') $scaleAttr($el, 'w');
+    }
+    foreach ($xp->query('//w:trHeight') as $el) $scaleAttr($el, 'val', 1);
+    foreach ($xp->query('//w:pPr/w:ind') as $el) {
+        foreach (['left','right','start','end','firstLine','hanging'] as $a) $scaleAttr($el, $a);
+    }
+    foreach ($xp->query('//w:pPr/w:spacing') as $el) {
+        foreach (['before','after'] as $a) $scaleAttr($el, $a);
+        // Auto line spacing is in 240ths of a line, NOT twips. It follows the font size.
+        if (in_array($el->getAttributeNS(SRL_W, 'lineRule'), ['exact','atLeast'], true)) $scaleAttr($el, 'line', 1);
+    }
+    foreach ($xp->query('//w:tabs/w:tab') as $el) $scaleAttr($el, 'pos');
+    foreach ($xp->query('//w:tblBorders/* | //w:tcBorders/* | //w:pBdr/*') as $el) {
+        $scaleAttr($el, 'sz', 2); $scaleAttr($el, 'space');
+    }
+    foreach ($xp->query('//w:docGrid') as $el) $scaleAttr($el, 'linePitch', 1);
+    foreach ($xp->query('//w:cols') as $el) $scaleAttr($el, 'space');
+}
+
+/** Map each logical sheet to A4 landscape, retaining all rows and page breaks.
+ * The entire source page (not just the table) is scaled into a 5mm-margin A4 box.
+ * An additional 80-twip reserve prevents rounding/renderer differences from adding a page.
+ */
+function srl_fit_a4(DOMDocument $doc, DOMDocument $styles) {
+    $xp = srl_xpath($doc);
+    $pg = $xp->query('//w:sectPr/w:pgSz')->item(0);
+    if (!$pg) throw new RuntimeException('اندازهٔ صفحه در قالب Word مشخص نشده است.');
+    $sourceW = (int)$pg->getAttributeNS(SRL_W, 'w');
+    $sourceH = (int)$pg->getAttributeNS(SRL_W, 'h');
+    if ($sourceW <= 0 || $sourceH <= 0) throw new RuntimeException('ابعاد قالب Word معتبر نیست.');
+    // Some source tables slightly exceed the source page width; account for that as well.
+    foreach ($xp->query('//w:tbl') as $table) {
+        $sum = 0;
+        foreach ($xp->query('./w:tblGrid/w:gridCol', $table) as $col) $sum += (int)$col->getAttributeNS(SRL_W, 'w');
+        $sourceW = max($sourceW, $sum);
+    }
+    $targetW = 16838; $targetH = 11906; // A4 297 x 210 mm, landscape.
+    $margin = 283; $reserve = 80;      // 5mm margins plus ~1.4mm layout safety.
+    $factor = min(1.0, ($targetW - 2*$margin - $reserve) / $sourceW,
+                       ($targetH - 2*$margin - $reserve) / $sourceH);
+    srl_scale_dimensions($doc, $factor);
+    srl_scale_dimensions($styles, $factor);
+    foreach ($xp->query('//w:sectPr') as $section) {
+        $size = $xp->query('./w:pgSz', $section)->item(0);
+        foreach (['w'=>$targetW, 'h'=>$targetH, 'orient'=>'landscape', 'code'=>9] as $a=>$v) $size->setAttributeNS(SRL_W, 'w:' . $a, (string)$v);
+        $mar = $xp->query('./w:pgMar', $section)->item(0);
+        if (!$mar) {
+            $mar = $doc->createElementNS(SRL_W, 'w:pgMar');
+            $section->insertBefore($mar, $size->nextSibling);
+        }
+        foreach (['top','bottom','left','right'] as $a) $mar->setAttributeNS(SRL_W, 'w:' . $a, (string)$margin);
+        foreach (['header','footer','gutter'] as $a) $mar->setAttributeNS(SRL_W, 'w:' . $a, '0');
+    }
+    // Rounding each cell independently can disagree with the grid at merged cells.
+    // Recompute every cell width from the scaled grid and its unchanged gridSpan.
+    foreach ($xp->query('//w:tbl') as $table) {
+        $grid=[];
+        foreach ($xp->query('./w:tblGrid/w:gridCol', $table) as $col) $grid[]=(int)$col->getAttributeNS(SRL_W, 'w');
+        $tblW=$xp->query('./w:tblPr/w:tblW', $table)->item(0);
+        $tblW->setAttributeNS(SRL_W, 'w:type', 'dxa');
+        $tblW->setAttributeNS(SRL_W, 'w:w', (string)array_sum($grid));
+        foreach ($xp->query('./w:tr', $table) as $row) {
+            $colIndex=0;
+            foreach ($xp->query('./w:tc', $row) as $cell) {
+                $span=$xp->query('./w:tcPr/w:gridSpan', $cell)->item(0);
+                $n=$span ? (int)$span->getAttributeNS(SRL_W, 'val') : 1;
+                $width=$xp->query('./w:tcPr/w:tcW', $cell)->item(0);
+                $width->setAttributeNS(SRL_W, 'w:w', (string)array_sum(array_slice($grid, $colIndex, $n)));
+                $width->setAttributeNS(SRL_W, 'w:type', 'dxa');
+                $colIndex += $n;
+            }
+        }
+    }
+    return $factor;
+}
+
 function srl_generate(array $data, $template = null, $layout = 'split') {
     if (!in_array($layout, ['split', 'combined'], true)) throw new RuntimeException('نوع چیدمان لیست معتبر نیست.');
     if (!class_exists('ZipArchive') || !class_exists('DOMDocument')) throw new RuntimeException('افزونه‌های Zip و DOM در PHP باید فعال باشند.');
@@ -379,6 +471,11 @@ function srl_generate(array $data, $template = null, $layout = 'split') {
                 }
             }
         }
+        $styleXml = $zip->getFromName('word/styles.xml');
+        $styles = new DOMDocument(); $styles->preserveWhiteSpace = true;
+        if (!$styleXml || !$styles->loadXML($styleXml, LIBXML_NONET)) throw new RuntimeException('قالب‌بندی Word معتبر نیست.');
+        srl_fit_a4($doc, $styles);
+        if (!$zip->addFromString('word/styles.xml', $styles->saveXML())) throw new RuntimeException('ذخیرهٔ قالب‌بندی A4 ممکن نشد.');
         if (!$zip->addFromString('word/document.xml', $doc->saveXML())) throw new RuntimeException('ذخیرهٔ سند ممکن نشد.');
         if (!$zip->close()) throw new RuntimeException('بستن فایل Word ممکن نشد.');
         $opened = false;
