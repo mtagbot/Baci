@@ -262,6 +262,113 @@ ok('حالت مربع: حاشیهٔ اطراف QR بسیار کم است', (() =
 ok('حالت مربع: نوار رنگی سربرگ برای صرفه‌جویی حذف شده',
    /\.card-id\.sq \.card-head::after\{display:none\}/.test(styles));
 
+console.log('\n══ کاغذ چاپ و مقیاس (v4.141.0) ══');
+ok('چهار اندازهٔ کاغذ تعریف شده',
+   ['A5','A4','A3','A2'].every(k => new RegExp("'" + k + "' *=>").test(orn)));
+ok('ابعاد A4 درست است', /'A4'\s*=>\s*\['w'\s*=>\s*210,\s*'h'\s*=>\s*297/.test(orn));
+ok('ابعاد A3 درست است', /'A3'\s*=>\s*\['w'\s*=>\s*297,\s*'h'\s*=>\s*420/.test(orn));
+ok('ابعاد A2 درست است', /'A2'\s*=>\s*\['w'\s*=>\s*420,\s*'h'\s*=>\s*594/.test(orn));
+ok('ابعاد A5 درست است', /'A5'\s*=>\s*\['w'\s*=>\s*148,\s*'h'\s*=>\s*210/.test(orn));
+ok('جهت افقی پشتیبانی می‌شود', orn.includes("'landscape'"));
+ok('کاغذ با allow-list اعتبارسنجی می‌شود', /array_key_exists\(\(\$_GET\['paper'\]/.test(pageC));
+ok('جهت با allow-list اعتبارسنجی می‌شود', /in_array\(\(\$_GET\['orient'\]/.test(pageC));
+ok('مقیاس در بازهٔ امن محدود شده', /min\(1\.6, max\(0\.6/.test(pageC));
+ok('انتخاب کاغذ و جهت و مقیاس در ویرایشگر هست',
+   pageC.includes('id="cPaper"') && pageC.includes('id="cOrient"') && pageC.includes('id="cScale"'));
+ok('هر سه به نمای چاپ فرستاده می‌شوند',
+   pageC.includes("params.set('paper'") && pageC.includes("params.set('orient'") && pageC.includes("params.set('scale'"));
+ok('اندازهٔ کاغذ در @page اعمال می‌شود', /@page\{size:<\?php echo \$grid\['paper_w'\]/.test(pageC));
+ok('صفحات با page-break از هم جدا می‌شوند', /page-break-after:always/.test(pageC));
+ok('کارت‌ها به صفحات تقسیم می‌شوند', pageC.includes('array_chunk($printItems, $perPage)'));
+ok('در حالت دورو، پشت هر کارت بلافاصله بعد از روی آن می‌آید',
+   /\$printItems\[\] = \['s' => \$st, 'back' => false\];[\s\S]{0,120}'back' => true/.test(pageC));
+ok('اگر هیچ کارتی جا نشد، پیام روشن داده می‌شود',
+   pageC.includes('$gridFits') && pageC.includes('جا نمی‌شود'));
+ok('پیش‌نمایش فقط یک صفحه است (بهینه)', /array_slice\(\$students, 0, 70\)/.test(pageC));
+ok('پیش‌نمایش کاغذ واقعی دارد', pageC.includes('id="pvPaper"') && pageC.includes('pv-paper'));
+ok('پیش‌نمایش مقیاس را زنده اعمال می‌کند', pageC.includes("scaleBox.style.transform = 'scale('"));
+ok('کارت‌های خارج از صفحهٔ اول در پیش‌نمایش پنهان می‌شوند',
+   /i < g\.perPage/.test(pageC));
+ok('کاغذ بزرگ برای نمایش کوچک می‌شود (fit)', pageC.includes('avail / (g.pw * pxPerMm)'));
+ok('تعداد صفحات چاپ به کاربر گفته می‌شود', pageC.includes('pagesNeeded'));
+
+/* هم‌خوانی فرمول PHP و JS — اگر یکی عوض شود و دیگری نه، پیش‌نمایش
+   با چاپ فرق می‌کند و کسی متوجه نمی‌شود. */
+ok('فرمول چیدمان در PHP و JS یکسان است', (() => {
+    const phpF = orn.match(/floor\(\(\$uw \+ \$gap\) \/ \(\$cw \+ \$gap\)\)/);
+    const jsF  = pageC.match(/Math\.floor\(\(uw \+ d\.gap\) \/ \(cw \+ d\.gap\)\)/);
+    return !!phpF && !!jsF;
+})());
+ok('فاصله داخل مقیاس تقسیم می‌شود (تا روی کاغذ درست بماند)',
+   /--gap', \(d\.gap \/ Math\.max\(0\.0001, d\.scale\)\)/.test(pageC));
+
+/* محاسبهٔ واقعی چیدمان در PHP */
+php.writeFile('/harness/grid.php', `<?php
+ini_set('display_errors','0'); error_reporting(0);
+require_once '/www/includes/db.php';
+require_once '/www/includes/functions.php';
+require_once '/www/includes/card_ornaments.php';
+echo json_encode([
+  'a4_full'  => card_grid_info('A4','portrait','full',1.0,8,4),
+  'a4_sq'    => card_grid_info('A4','portrait','sq',1.0,8,4),
+  'a3_full'  => card_grid_info('A3','portrait','full',1.0,8,4),
+  'a5_full'  => card_grid_info('A5','portrait','full',1.0,8,4),
+  'a2_sq'    => card_grid_info('A2','portrait','sq',1.0,8,4),
+  'a4_land'  => card_grid_info('A4','landscape','full',1.0,8,4),
+  'a4_big'   => card_grid_info('A4','portrait','full',1.6,8,4),
+  'a5_huge'  => card_grid_info('A5','portrait','full',1.6,25,4),
+]);`);
+const G = await j("<?php require '/harness/grid.php';");
+ok('A4 عمودی: ۲×۴ = ۸ کارت', G.a4_full && G.a4_full.per_page === 8, JSON.stringify(G.a4_full));
+ok('A4 با کارت مربع: ۱۲ کارت', G.a4_sq && G.a4_sq.per_page === 12, String(G.a4_sq && G.a4_sq.per_page));
+ok('A3 عمودی: ۲۱ کارت', G.a3_full && G.a3_full.per_page === 21, String(G.a3_full && G.a3_full.per_page));
+ok('A5 عمودی: ۳ کارت', G.a5_full && G.a5_full.per_page === 3, String(G.a5_full && G.a5_full.per_page));
+ok('A2 با کارت مربع: ۷۰ کارت', G.a2_sq && G.a2_sq.per_page === 70, String(G.a2_sq && G.a2_sq.per_page));
+ok('جهت افقی نتیجهٔ متفاوتی می‌دهد',
+   G.a4_land && G.a4_full && G.a4_land.per_page !== G.a4_full.per_page,
+   `افقی ${G.a4_land && G.a4_land.per_page} vs عمودی ${G.a4_full && G.a4_full.per_page}`);
+ok('مقیاس بزرگ‌تر یعنی کارت کمتر در صفحه',
+   G.a4_big && G.a4_full && G.a4_big.per_page < G.a4_full.per_page,
+   `x1.6 → ${G.a4_big && G.a4_big.per_page}`);
+ok('حالت غیرممکن، صفر برمی‌گرداند (نه عدد منفی)',
+   G.a5_huge && G.a5_huge.per_page === 0, String(G.a5_huge && G.a5_huge.per_page));
+ok('ابعاد کارت با مقیاس ضرب می‌شود',
+   G.a4_big && Math.abs(G.a4_big.card_w - 85.6 * 1.6) < 0.01);
+
+/* رندر واقعی چند صفحه */
+php.writeFile('/harness/pages.php', `<?php
+ini_set('display_errors','0'); error_reporting(0);
+@mkdir('/tmp/sess'); ini_set('session.save_path','/tmp/sess');
+session_id('pgs'.mt_rand()); session_start();
+require_once '/www/includes/db.php';
+require_once '/www/includes/functions.php';
+require_once '/www/includes/auth.php';
+DB::execute("UPDATE students SET academic_year='1404/1405' WHERE academic_year IS NULL OR academic_year=''");
+$a = DB::fetch("SELECT * FROM admins WHERE status=1 ORDER BY id LIMIT 1");
+$_SESSION = ['admin_id'=>$a['id'],'admin_role'=>'super_admin'];
+$_GET = ['print'=>'1','paper'=>'A4','layout'=>'full','scale'=>'1.6','side'=>'front'];
+chdir('/www');
+register_shutdown_function(function(){ file_put_contents('/tmp/pgout.html', ob_get_clean()); });
+ob_start();
+include '/www/entry-cards.php';`);
+await run("<?php require '/harness/pages.php';");
+const PG = await j(`<?php
+require_once '/www/includes/db.php'; require_once '/www/includes/functions.php';
+$h = @file_get_contents('/tmp/pgout.html');
+$n = (int)DB::fetch("SELECT COUNT(*) c FROM students WHERE status='active'")['c'];
+echo json_encode([
+  'pages'    => substr_count($h,'class="page"'),
+  'cards'    => substr_count($h,'class="card-id'),
+  'students' => $n,
+  'pagesize' => strpos($h,'@page{size:210mm 297mm')!==false ?1:0,
+  'fatal'    => (stripos($h,'Fatal error')!==false)?1:0,
+]);`);
+ok('چاپ چندصفحه‌ای واقعاً چند صفحه می‌سازد', PG.pages >= 2, JSON.stringify(PG));
+ok('همهٔ دانش‌آموزان در چاپ می‌آیند (نه فقط صفحهٔ اول)',
+   PG.cards === PG.students, `${PG.cards}/${PG.students}`);
+ok('اندازهٔ کاغذ در CSS چاپ ست می‌شود', PG.pagesize === 1);
+ok('رندر چندصفحه‌ای بدون خطای مهلک', PG.fatal === 0);
+
 console.log('\n══ تنوع تصویرسازی ══');
 const symAll = [...orn.matchAll(/<symbol id="orn-([\w-]+)"/g)].map(m => m[1]);
 ok('دست‌کم ۱۲ نقش ایرانی موجود است', symAll.length >= 12, String(symAll.length));
