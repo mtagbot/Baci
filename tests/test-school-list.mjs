@@ -32,7 +32,21 @@ student('هفتم1','هفتم','مینا','غیرفعال','1405/1406','inactive
 student('کلاس قدیمی','هفتم','بیتا','بدون سال','');
 $d = srl_collect('۱۴۰۵–۱۴۰۶');
 $bytes = srl_generate($d); file_put_contents('/harness/school-sample.docx',$bytes);
-function inspectDoc($bytes) {
+function nodeShape($node, $numbers = false) {
+    if ($node->nodeType === XML_TEXT_NODE) return $numbers ? preg_replace('/[0-9]+/', '#', $node->nodeValue) : $node->nodeValue;
+    $attrs=[];
+    if ($node->hasAttributes()) foreach ($node->attributes as $a) {
+        // Editor identity metadata is not layout; libxml may rebind it on clones.
+        if (in_array($a->localName, ['paraId','textId'], true)) continue;
+        if ($a->namespaceURI !== 'http://www.w3.org/2000/xmlns/') $attrs[$a->namespaceURI . ':' . $a->localName]=$a->value;
+    }
+    ksort($attrs); $children=[];
+    foreach ($node->childNodes as $child) $children[]=nodeShape($child, $numbers);
+    return [$node->namespaceURI, $node->localName, $attrs, $children];
+}
+function inspectDoc($bytes, $mode = 'split') {
+    $expectedCols = $mode === 'combined' ? 12 : 21;
+    $stride = $mode === 'combined' ? 4 : 7;
     $path='/harness/inspect.docx'; file_put_contents($path,$bytes); $z=new ZipArchive(); $z->open($path);
     $xml=$z->getFromName('word/document.xml'); $doc=new DOMDocument(); $valid=$doc->loadXML($xml);
     $xp=srl_xpath($doc); $text=$xp->evaluate('string(/w:document/w:body/w:p[1])');
@@ -40,14 +54,16 @@ function inspectDoc($bytes) {
     $width=0;foreach($xp->query('./w:tblGrid/w:gridCol',$t) as $col)$width+=(int)$col->getAttributeNS(SRL_W,'w');
     $spans=true;
     foreach($xp->query('//w:tr') as $row) {
-        $sum=0; foreach($xp->query('./w:tc',$row) as $cell){$s=$xp->query('./w:tcPr/w:gridSpan',$cell)->item(0);$sum+=$s?(int)$s->getAttributeNS(SRL_W,'val'):1;} if($sum!==21)$spans=false;
+        $sum=0; foreach($xp->query('./w:tc',$row) as $cell){$s=$xp->query('./w:tcPr/w:gridSpan',$cell)->item(0);$sum+=$s?(int)$s->getAttributeNS(SRL_W,'val'):1;} if($sum!==$expectedCols)$spans=false;
     }
     // Inspect every header/name cell, including empty cells and continuation sheets.
     $nameCells = 0; $naturalNames = true; $singleLineNames = true;
     foreach ($xp->query('//w:tbl/w:tr[position() >= 2 and position() <= 31]') as $row) {
         foreach ($xp->query('./w:tc', $row) as $i => $cell) {
-            if ($i % 7 === 0) continue; // The three row-number columns.
+            if ($i % $stride === 0) continue; // The three row-number columns.
             $nameCells++;
+            // Combined-mode header cells are left exactly as in the source.
+            if ($mode === 'combined' && $row->isSameNode($row->parentNode->getElementsByTagNameNS(SRL_W, 'tr')->item(1))) continue;
             if ($xp->query('./w:tcPr/w:noWrap', $cell)->length !== 1) $singleLineNames = false;
             foreach (['left','right'] as $side) {
                 if ($xp->evaluate('string(./w:tcPr/w:tcMar/w:' . $side . '/@w:w)', $cell) !== '20') $singleLineNames = false;
@@ -65,8 +81,29 @@ function inspectDoc($bytes) {
     for($i=0;$i<$original->numFiles;$i++){ $n=$original->getNameIndex($i);if($n!=='word/document.xml' && $original->getFromName($n)!==$z->getFromName($n))$unchanged=false; }
     $ox = new DOMDocument(); $ox->loadXML($original->getFromName('word/document.xml'));$oxp=srl_xpath($ox);
     $layout=$doc->saveXML($xp->query('//w:sectPr')->item(0))===$ox->saveXML($oxp->query('//w:sectPr')->item(0));
+    // Comparing source paragraph structure after replacing numbers only detects
+    // moved runs, altered bidi controls and changed spacing (including continuation titles).
+    $sourceTitle = $oxp->query('/w:document/w:body/w:p[1]')->item(0);
+    $titleShape = function ($p) {
+        $copy = $p->cloneNode(true); $cx = srl_xpath($p->ownerDocument);
+        foreach (iterator_to_array($cx->query('./w:pPr/w:pageBreakBefore', $copy)) as $br) $br->parentNode->removeChild($br);
+        foreach ($cx->query('.//w:t', $copy) as $textNode) $textNode->nodeValue = preg_replace('/[0-9]+/', '#', $textNode->textContent);
+        return nodeShape($copy, true);
+    };
+    $titles = $xp->query('/w:document/w:body/w:p[w:r/w:t[contains(., "اسامی")]]');
+    $titleMatches = $titles->length === $xp->query('//w:tbl')->length;
+    foreach ($titles as $p) {
+        if ($titleShape($p) !== $titleShape($sourceTitle)) $titleMatches = false;
+    }
+    $gridMatches = nodeShape($xp->query('./w:tblGrid',$t)->item(0)) === nodeShape($oxp->query('//w:tbl/w:tblGrid')->item(0));
+    $headersMatch = true;
+    foreach ($xp->query('./w:tr[2]/w:tc', $t) as $i=>$cell) {
+        $sourceCell = $oxp->query('//w:tbl/w:tr[2]/w:tc')->item($i);
+        if (!$sourceCell || nodeShape($sourceCell) !== nodeShape($cell)) $headersMatch = false;
+    }
     $z->close();$original->close();
     return ['valid'=>$valid,'title'=>$text,'tables'=>$xp->query('//w:tbl')->length,'cols'=>$xp->query('./w:tblGrid/w:gridCol',$t)->length,'rows'=>$rows->length,
+        'titleMatches'=>$titleMatches,'gridMatches'=>$gridMatches,'headersMatch'=>$headersMatch,
         'singleLineNames'=>$singleLineNames, 'nameCells'=>$nameCells, 'naturalNames'=>$naturalNames,
         'width'=>$width,'spans'=>$spans,'unchanged'=>$unchanged,'layout'=>$layout,
         'firstCode'=>$xp->evaluate('string(./w:tr[1]/w:tc[2])',$t),
@@ -76,6 +113,9 @@ function inspectDoc($bytes) {
         'footer'=>$xp->evaluate('string(./w:tr[last()])',$t), 'xml'=>$xml];
 }
 $base=inspectDoc($bytes);
+$combinedBytes=srl_generate($d,null,'combined');
+$combined=inspectDoc($combinedBytes,'combined');
+file_put_contents('/harness/school-combined.docx',$combinedBytes);
 // Isolated long-name fixture, so class/student counts in the main regression stay fixed.
 $longData = $d;
 $longData['groups'][0]['classes'][0]['students'][0]['first_name'] = 'سید محمد طاها';
@@ -100,6 +140,14 @@ for($i=1;$i<=36;$i++)student('7/4','7','نام'.$i,'خانوادگی'.$i);
 student('هفتم1','هفتم','<علی & رضا>','آزمون XML');
 $more=srl_collect('1405/1406');$moreBytes=srl_generate($more);$overflow=inspectDoc($moreBytes);
 file_put_contents('/harness/school-overflow.docx',$moreBytes);
+$combinedOverflowBytes=srl_generate($more,null,'combined');
+$combinedOverflow=inspectDoc($combinedOverflowBytes,'combined');
+file_put_contents('/harness/school-combined-overflow.docx',$combinedOverflowBytes);
+$invalidMode=false;try{srl_generate($d,null,'invalid');}catch(RuntimeException $e){$invalidMode=true;}
+$missingPart=$d;
+$missingPart['groups'][0]['classes'][0]['students']=[['last_name'=>'خانوادگی','first_name'=>''],['last_name'=>'','first_name'=>'نام']];
+$missingDoc=inspectDoc(srl_generate($missingPart,null,'combined'),'combined');
+
 $blocked=false;student('','هفتم','بی کلاس','آزمایشی');
 try{srl_generate(srl_collect('1405/1406'));}catch(RuntimeException $e){$blocked=true;}
 DB::execute("DELETE FROM students WHERE class_name = ''");
@@ -107,7 +155,7 @@ $missing=false;try{srl_generate($d,'/not-found.docx');}catch(RuntimeException $e
 $invalid=false;try{srl_year('بدون سال');}catch(RuntimeException $e){$invalid=true;}
 $html=dcl_render_print_html(dcl_class_code('هفتم1','هفتم'),[], '',false);
 file_put_contents('/harness/teacher-print.html',$html);
-echo json_encode(['long'=>$longInfo,'data'=>$d,'base'=>$base,'more'=>$more,'overflow'=>$overflow,'blocked'=>$blocked,'missing'=>$missing,'invalid'=>$invalid,
+echo json_encode(['combined'=>$combined,'combinedOverflow'=>$combinedOverflow,'invalidMode'=>$invalidMode,'missingPart'=>$missingDoc,'long'=>$longInfo,'data'=>$d,'base'=>$base,'more'=>$more,'overflow'=>$overflow,'blocked'=>$blocked,'missing'=>$missing,'invalid'=>$invalid,
     'numeric'=>srl_class_info('۷/۴','۷'),'reversed'=>srl_class_info('4/7','هفتم'),
     'pdfLTR'=>strpos($html,'<bdi dir="ltr" class="class-code">1/7</bdi>')!==false,
     'pdfTitle'=>strpos($html,'.title-row{height:8mm}')!==false],JSON_UNESCAPED_UNICODE);
@@ -126,7 +174,7 @@ ok('headers retain original 9 pt size', r.long.headerSize === '18');
 ok('ZWNJ and surname spelling preserved', r.long.last === 'حسینی‌نژاد\u00a0موسوی');
 ok('all 540 name/header cells have natural unscaled centered text', b.nameCells === 540 && b.naturalNames);
 ok('all 1620 continuation name/header cells have natural unscaled centered text', o.nameCells === 1620 && o.naturalNames);
-ok('academic year range explicitly LTR', b.xml.includes('<w:dir w:val="ltr">'));
+ok('source header run order/spacing/RTL retained in both layouts and continuation pages', b.titleMatches && o.titleMatches && r.combined.titleMatches && r.combinedOverflow.titleMatches);
 ok('exact current-year active students only', r.data.total === 18);
 ok('unknown year counted separately', r.data.unassigned_year === 1);
 ok('three grades and nine classes', r.data.groups.length === 3 && r.data.groups.every(g => g.classes.length === 3));
@@ -140,9 +188,9 @@ ok('page size, margins and section properties unchanged', b.layout);
 ok('every non-document ZIP part byte-identical', b.unchanged);
 ok('family name first on RTL table', b.lastHeader.replaceAll('\u00a0',' ') === 'نام خانوادگی' && b.firstHeader === 'نام');
 ok('Persian sorting: آبادی before باقری', b.last === 'آبادی' && b.first === 'محمد');
-ok('explicit numeric class 1/7 in LTR run', b.firstCode === '1/7' && b.codeLTR === '0');
+ok('explicit numeric class 7/1 in LTR run', b.firstCode === '7/1' && b.codeLTR === '0');
 ok('grade footers contain totals', (b.footer.match(/جمع کل 6/g) || []).length === 3 && !b.footer.includes('00'));
-ok('numeric Persian class parsing', r.numeric.code === '4/7' && r.reversed.code === '4/7');
+ok('numeric Persian class parsing', r.numeric.code === '7/4' && r.reversed.code === '7/4');
 ok('full original Titr family retained (no B Titr substitution)', b.xml.includes('2  Titr') && !b.xml.includes('B Titr'));
 ok('continuation sheets for fourth class AND 36 students', o.tables === 3);
 ok('overflow total = 55, grade-seven total = 43', r.more.total === 55 && r.more.groups[0].total === 43);
@@ -153,12 +201,50 @@ ok('missing template gives controlled error', r.missing);
 ok('invalid current year gives controlled error', r.invalid);
 ok('PDF class code isolated LTR', r.pdfLTR);
 ok('PDF title row raised to 8 mm', r.pdfTitle);
+const c=r.combined, co=r.combinedOverflow;
+ok('combined DOCX has original 12 columns and 32 rows', c.valid && c.cols===12 && c.rows===32 && c.tables===1);
+ok('combined grid and all name headers match source exactly', c.gridMatches && c.headersMatch);
+ok('combined headers say family name and first name in ONE cell', c.lastHeader === 'نام خانوادگی نام');
+ok('combined names are family-first with natural spacing', c.last === 'آبادی\u00a0محمد');
+ok('combined header code is 7/1', c.firstCode==='7/1' && c.codeLTR==='0');
+ok('combined footer spans and total width correct', c.spans && co.spans && c.width===23747);
+ok('both layouts show same year and school total', c.title===b.title && co.title===o.title);
+ok('combined grade footers match split footers', c.footer===b.footer && co.footer===o.footer);
+ok('combined pages retain section margins and non-document ZIP parts', c.layout && c.unchanged && co.layout && co.unchanged);
+ok('combined continuation keeps fourth class and all 36 students', co.tables===3 && Array.from({length:36},(_,i)=>`نام${i+1}`).every(n=>co.xml.split(`\u00a0${n}<`).length-1===1));
+ok('combined students remain natural single-line names', c.singleLineNames && co.singleLineNames && c.naturalNames && co.naturalNames);
+ok('missing first or family name creates no leading/trailing separator', r.missingPart.xml.includes('>خانوادگی<') && r.missingPart.xml.includes('>نام<'));
+ok('unknown layout rejected', r.invalidMode);
 mkdirSync(join(REPO,'.cache/roster-tests'), {recursive:true});
-for (const f of ['school-sample.docx','school-overflow.docx','school-long-names.docx','teacher-print.html']) writeFileSync(join(REPO,'.cache/roster-tests',f),php.readFileAsBuffer('/harness/'+f));
+for (const f of ['school-sample.docx','school-overflow.docx','school-long-names.docx','school-combined.docx','school-combined-overflow.docx','teacher-print.html']) writeFileSync(join(REPO,'.cache/roster-tests',f),php.readFileAsBuffer('/harness/'+f));
 await loginAdmin();
 const admin = await req('school tab', {file:'reports-lists.php',query:'tab=school',sid:'harnessAdm0001'});
-ok('admin can open new school tab', !admin.res.fatal && admin.res.page.includes('دریافت لیست کل مدرسه (Word)'));
+ok('admin can open new school tab', !admin.res.fatal && admin.res.page.includes('action=school_list_docx&amp;layout=split') && admin.res.page.includes('action=school_list_docx&amp;layout=combined'));
+// Exercise the actual authenticated download endpoint, not just the generator.
+for (const mode of ['split','combined']) {
+    php.writeFile('/harness/export-layout.php', `<?php
+ini_set('session.save_path','/tmp/sess');session_name('BACI_TEST');session_id('harnessAdm0001');session_start();
+$_SERVER['REQUEST_METHOD']='GET';$_SERVER['PHP_SELF']='/reports-lists.php';
+$_GET=['action'=>'school_list_docx','layout'=>'${mode}'];
+chdir('/www');
+ob_start(function($bytes){file_put_contents('/harness/download-${mode}.docx',$bytes);return '';});
+require '/www/reports-lists.php';`);
+    const download=await run("<?php require '/harness/export-layout.php';");
+    const raw=php.readFileAsBuffer('/harness/download-'+mode+'.docx');
+    ok('authenticated '+mode+' route returns a DOCX without HTML prefix', !download.err && raw[0]===80 && raw[1]===75);
+    const inspected=await run(`<?php
+require '/www/includes/docx_school_list.php';
+$z=new ZipArchive();$z->open('/harness/download-${mode}.docx');
+$doc=new DOMDocument();$doc->loadXML($z->getFromName('word/document.xml'));$xp=srl_xpath($doc);
+echo json_encode(['cols'=>$xp->query('//w:tbl[1]/w:tblGrid/w:gridCol')->length,'code'=>$xp->evaluate('string(//w:tbl[1]/w:tr[1]/w:tc[2])')]);`);
+    const info=JSON.parse(inspected.out);
+    ok(mode+' route passes the layout through to the renderer', info.cols===(mode==='combined'?12:21) && info.code==='7/1');
+}
+const badLayout=await req('reject unknown layout',{file:'reports-lists.php',query:'action=school_list_docx&layout=wrong',sid:'harnessAdm0001'});
+ok('invalid layout produces controlled error, not a download', !badLayout.res.fatal && badLayout.res.flash?.type==='error');
+const deniedCombined=await req('student denied combined export',{file:'reports-lists.php',query:'action=school_list_docx&layout=combined'});
+ok('student cannot download combined report', !deniedCombined.res.page.startsWith('PK') && !!deniedCombined.res.redirect);
 const unauth = await req('student denied export',{file:'reports-lists.php',query:'action=school_list_docx'});
-ok('student cannot export roster', !unauth.res.page.startsWith('PK') && !unauth.res.page.includes('دریافت لیست کل مدرسه (Word)'));
+ok('student cannot export roster', !unauth.res.page.startsWith('PK') && !unauth.res.page.includes('action=school_list_docx&amp;layout=combined'));
 console.log(`School roster: ${pass} PASS / ${fail} FAIL`);
 process.exit(fail ? 1 : 0);

@@ -23,7 +23,7 @@ function srl_year($year) {
     return $year;
 }
 
-/** Numeric class codes are deliberately section/grade, e.g. 1/7. */
+/** School-roster display codes use grade/section, e.g. 7/1 (not teacher-report codes). */
 function srl_class_info($name, $grade = '') {
     $en = trim(srl_digits($name));
     $gradeEn = trim(srl_digits($grade));
@@ -36,7 +36,7 @@ function srl_class_info($name, $grade = '') {
     } else {
         $section = preg_match('/(\d+)\s*$/u', $en, $m) ? (int)$m[1] : 0;
     }
-    return ['grade' => $g, 'code' => ($g > 0 && $section > 0) ? $section . '/' . $g : $name];
+    return ['grade' => $g, 'code' => ($g > 0 && $section > 0) ? $g . '/' . $section : $name];
 }
 
 function srl_collect($year) {
@@ -266,37 +266,27 @@ function srl_split_cell(DOMElement $cell, $last, $first) {
 
 /** Preserve title spacing and mixed run formatting; change only zero placeholders. */
 function srl_title(DOMElement $p, $year, $total) {
-    $years = explode('/', $year); $i = 0; $yearRuns = [];
+    $years = explode('/', $year); $i = 0;
     foreach (srl_xpath($p->ownerDocument)->query('.//w:t', $p) as $t) {
         if ($t->textContent === '0000') {
             $t->nodeValue = $years[$i++] ?? '';
-            $yearRuns[] = $t->parentNode;
         } elseif (strpos($t->textContent, '000') !== false) {
             $t->nodeValue = str_replace('000', (string)$total, $t->textContent);
         }
     }
     if ($i !== 2) throw new RuntimeException('ساختار عنوان قالب لیست مدرسه معتبر نیست.');
-    // Keep the two years, original en dash and original spaces as one LTR range.
-    // Independent RTL runs would reorder 1405 – 1406 in some Word renderers.
-    $dir = $p->ownerDocument->createElementNS(SRL_W, 'w:dir');
-    $dir->setAttributeNS(SRL_W, 'w:val', 'ltr');
-    $p->insertBefore($dir, $yearRuns[0]);
-    $run = $yearRuns[0];
-    while ($run) {
-        $next = $run->nextSibling;
-        foreach (srl_xpath($p->ownerDocument)->query('./w:rPr/w:rtl', $run) as $rtl) $rtl->setAttributeNS(SRL_W, 'w:val', '0');
-        $dir->appendChild($run);
-        if ($run === $yearRuns[1]) break;
-        $run = $next;
-    }
+    // Keep the source paragraph's exact run order, RTL properties and spaces.
+    // The added w:dir/LTR wrapper changed how Word placed the year versus the
+    // total block. Only replace the placeholders; never regroup header runs.
 }
 
-function srl_table(DOMElement $table, array $groups, $classOffset, $studentOffset) {
+function srl_table(DOMElement $table, array $groups, $classOffset, $studentOffset, $layout = 'split') {
+    $split = $layout === 'split';
     $xp = srl_xpath($table->ownerDocument);
     $cols = iterator_to_array($xp->query('./w:tblGrid/w:gridCol', $table));
     if (count($cols) !== 12) throw new RuntimeException('ستون‌های قالب لیست مدرسه معتبر نیست.');
     foreach ($cols as $i => $col) {
-        if ($i % 4 === 0) continue;
+        if (!$split || $i % 4 === 0) continue;
         $w = (int)$col->getAttributeNS(SRL_W, 'w'); $last = (int)round($w * .62);
         $col->setAttributeNS(SRL_W, 'w:w', (string)$last);
         $new = $col->cloneNode(true); $new->setAttributeNS(SRL_W, 'w:w', (string)($w - $last));
@@ -311,9 +301,9 @@ function srl_table(DOMElement $table, array $groups, $classOffset, $studentOffse
         $cant = $table->ownerDocument->createElementNS(SRL_W, 'w:cantSplit');
         $trPr->insertBefore($cant, $height);
         if ($r === 31) {
-            // Footer gridSpans must cover the new 21-column grid, keeping all original borders.
+            // Only split mode needs wider gridSpans; combined keeps the original 12-column footer.
             foreach ([0, 2, 4] as $b => $idx) {
-                srl_span($cells[$idx], $b === 0 ? 7 : 6);
+                if ($split) srl_span($cells[$idx], $b === 0 ? 7 : 6);
                 foreach ($xp->query('.//w:t', $cells[$idx]) as $t) {
                     if (strpos($t->textContent, '00') !== false) $t->nodeValue = str_replace('00', (string)($groups[$b]['total'] ?? 0), $t->textContent);
                 }
@@ -328,18 +318,27 @@ function srl_table(DOMElement $table, array $groups, $classOffset, $studentOffse
             }
             $class = $groups[$block]['classes'][$classOffset + $slot - 1] ?? null;
             if ($r === 0) {
-                srl_span($cell, 2); srl_cell_text($cell, $class['code'] ?? '', true);
+                if ($split) srl_span($cell, 2);
+                srl_cell_text($cell, $class['code'] ?? '', true);
             } elseif ($r === 1) {
-                srl_split_cell($cell, 'نام خانوادگی', 'نام');
+                // In combined mode retain the source header text and cell formatting.
+                if ($split) srl_split_cell($cell, 'نام خانوادگی', 'نام');
             } else {
                 $student = $class['students'][$studentOffset + $r - 2] ?? [];
-                srl_split_cell($cell, $student['last_name'] ?? '', $student['first_name'] ?? '');
+                if ($split) {
+                    srl_split_cell($cell, $student['last_name'] ?? '', $student['first_name'] ?? '');
+                } else {
+                    // Family name first in the same RTL cell, as in the source form.
+                    $fullName = trim(trim($student['last_name'] ?? '') . ' ' . trim($student['first_name'] ?? ''));
+                    srl_single_line_name($cell, $fullName);
+                }
             }
         }
     }
 }
 
-function srl_generate(array $data, $template = null) {
+function srl_generate(array $data, $template = null, $layout = 'split') {
+    if (!in_array($layout, ['split', 'combined'], true)) throw new RuntimeException('نوع چیدمان لیست معتبر نیست.');
     if (!class_exists('ZipArchive') || !class_exists('DOMDocument')) throw new RuntimeException('افزونه‌های Zip و DOM در PHP باید فعال باشند.');
     if (!empty($data['missing_class'])) throw new RuntimeException('تعدادی دانش‌آموز در سال جاری کلاس ندارند. ابتدا کلاس آن‌ها را تعیین کنید تا از فهرست حذف نشوند.');
     if (empty($data['groups'])) throw new RuntimeException('برای سال تحصیلی پیش‌فرض کلاسی ثبت نشده است.');
@@ -374,7 +373,7 @@ function srl_generate(array $data, $template = null) {
                         $pr = $xp->query('./w:pPr', $p)->item(0);
                         $pr->insertBefore($doc->createElementNS(SRL_W, 'w:pageBreakBefore'), $pr->firstChild);
                     }
-                    $t = $table->cloneNode(true); srl_table($t, $groups, $c, $offset);
+                    $t = $table->cloneNode(true); srl_table($t, $groups, $c, $offset, $layout);
                     $body->insertBefore($p, $section); $body->insertBefore($t, $section);
                     $body->insertBefore($tail->cloneNode(true), $section);
                 }
