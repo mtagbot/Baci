@@ -343,7 +343,7 @@ echo json_encode([
   'fontface'   => isset($ff[0]) ? $ff[0] : '',
   'usesTitrTtf'=> (isset($ff[0]) && strpos($ff[0], 'B-Titr/B-Titr.ttf') !== false) ? 1 : 0,
   'bodyFont'   => (strpos($html, "font-family:'BTitr'") !== false) ? 1 : 0,
-  'rows'       => substr_count($html, 'class="r nm"') / 2,
+  'rows'       => substr_count($html, 'class="nm"') / 2,
   'hdrLast'    => (strpos($html, '>نام خانوادگی<') !== false) ? 1 : 0,
   'hdrFirst'   => (strpos($html, '>نام<') !== false) ? 1 : 0,
   'hasClass'   => (strpos($html, 'کلاس : 1/9') !== false) ? 1 : 0,
@@ -424,7 +424,7 @@ preg_match('/<table[^>]*>.*?<\\/table>/s', $html, $t1);
 preg_match_all('/<tr>.*?<\\/tr>/s', $t1[0], $trs);
 $dataRow = '';
 foreach ($trs[0] as $tr) { if (strpos($tr, 'حسینی نژاد') !== false) { $dataRow = $tr; break; } }
-if ($dataRow === '') { foreach ($trs[0] as $tr) { if (strpos($tr, 'class="r nm"') !== false) { $dataRow = $tr; break; } } }
+if ($dataRow === '') { foreach ($trs[0] as $tr) { if (strpos($tr, 'class="nm"') !== false) { $dataRow = $tr; break; } } }
 echo json_encode([
   'wordCols'  => count($wordCols),
   'htmlCols'  => count($htmlPct),
@@ -432,7 +432,7 @@ echo json_encode([
   'gridFnOk'  => (dcl_print_grid() === $wordCols) ? 1 : 0,
   'dataCells' => $dataRow === '' ? 0 : substr_count($dataRow, '<td'),
   'tcMar'     => substr_count($xml, '<w:tcMar>'),
-  'htmlRows'  => substr_count($html, 'class="r nm"') / 2,
+  'htmlRows'  => substr_count($html, 'class="nm"') / 2,
   'sheets'    => substr_count($html, 'class="sheet"'),
 ], JSON_UNESCAPED_UNICODE);`);
 const M = await j("<?php require '/harness/match.php';");
@@ -504,6 +504,76 @@ ok('جدول «دعوت از اولیا» در PDF هم آمد', A.olia >= 1, St
 ok('سرستون‌های دعوت از اولیا کامل‌اند', A.oliaCols === 1);
 ok('«ثبت میزان تدریس» هم سر جایش است', A.tadris >= 1, String(A.tadris));
 ok('خروجی دو برگه است', A.sheets === 2, String(A.sheets));
+
+console.log('\n══ تطابق دقیق ابعاد با قالب (v4.150.0) ══');
+/* تا v4.149.0 فقط عرض ستون‌ها با قالب یکی بود. ارتفاع ردیف‌ها و
+   اندازهٔ فونت هر سربرگ یکسان گرفته شده بودند، در حالی که قالب برای
+   هرکدام مقدار جداگانه دارد — و «ردیف» در قالب عمودی نوشته می‌شود. */
+ok('ارتفاع ردیف‌ها از قالب استخراج شده', libC.includes('function dcl_row_heights'));
+ok('اندازهٔ فونت سربرگ‌ها از قالب استخراج شده', libC.includes('function dcl_header_font'));
+ok('«ردیف» عمودی نوشته می‌شود (مثل textDirection قالب)',
+   /writing-mode:vertical-rl/.test(libC));
+
+php.writeFile('/harness/exact.php', `<?php
+ini_set('display_errors','0'); error_reporting(0);
+require_once '/www/includes/db.php';
+require_once '/www/includes/functions.php';
+require_once '/www/includes/school_sort.php';
+require_once '/www/includes/class_schedule_sync.php';
+require_once '/www/includes/docx_class_list.php';
+$html = dcl_render_print_html('1/9', [['last'=>'آبادی','first'=>'بهار']], '', false);
+$z = new ZipArchive(); $z->open('/www/assets/templates/teacher-class-list.docx');
+$xml = $z->getFromName('word/document.xml'); $z->close();
+preg_match_all('/<w:tbl>.*?<\\/w:tbl>/s', $xml, $tm);
+preg_match_all('/<w:tr[ >].*?<\\/w:tr>/s', $tm[0][0], $rx);
+$tplH = [];
+foreach ($rx[0] as $r) {
+    $h = 0;
+    if (preg_match('/<w:trPr>.*?<\\/w:trPr>/s', $r, $pr)
+        && preg_match('/<w:trHeight[^>]*w:val="(\\d+)"/', $pr[0], $m)) $h = (int)$m[1];
+    $tplH[] = $h;
+}
+/* اندازهٔ فونت سربرگ‌ها در قالب */
+$cellSz = function ($tr, $idx) {
+    preg_match_all('/<w:tc>.*?<\\/w:tc>/s', $tr, $c);
+    if (!isset($c[0][$idx])) return 0;
+    return preg_match('/<w:sz w:val="(\\d+)"/', $c[0][$idx], $m) ? (int)$m[1] : 0;
+};
+/* سلول «ردیف» عمودی است؟ */
+$radifVert = preg_match('/<w:tc>(?:(?!<\\/w:tc>).)*?textDirection(?:(?!<\\/w:tc>).)*?ردیف/s', $tm[0][0]) ? 1 : 0;
+preg_match_all('/<tr style="height:([\\d.]+)mm">/', $html, $hh);
+$decl = array_map('floatval', $hh[1]);
+$want = [];
+foreach ([1,2,3,4] as $k) $want[] = round($tplH[$k] / 56.7, 2);
+$fs = dcl_header_font();
+echo json_encode([
+  'heightsMatch' => (dcl_row_heights() === array_slice($tplH, 0, 35)) ? 1 : 0,
+  'phpH'         => array_slice(dcl_row_heights(), 0, 5),
+  'tplH'         => array_slice($tplH, 0, 5),
+  'hdrHeights'   => ($decl === $want) ? 1 : 0,
+  'declared'     => $decl,
+  'expected'     => $want,
+  'szJalasat'    => ($cellSz($rx[0][1], 1) === $fs['jalasat']) ? 1 : 0,
+  'szTarikh'     => ($cellSz($rx[0][2], 1) === $fs['tarikh']) ? 1 : 0,
+  'szFaaliat'    => ($cellSz($rx[0][3], 1) === $fs['faaliat']) ? 1 : 0,
+  'szRadif'      => ($cellSz($rx[0][1], 0) === $fs['radif']) ? 1 : 0,
+  'radifVertTpl' => $radifVert,
+  'radifVertPdf' => (strpos($html, 'h-rad') !== false) ? 1 : 0,
+  'distinctFs'   => count(array_unique(array_values($fs))),
+], JSON_UNESCAPED_UNICODE);`);
+const X = await j("<?php require '/harness/exact.php';");
+ok('ارتفاع هر ۳۵ ردیف دقیقاً مثل قالب است', X.heightsMatch === 1,
+   `php=${JSON.stringify(X.phpH)} tpl=${JSON.stringify(X.tplH)}`);
+ok('ارتفاع سربرگ‌ها در HTML درست اعلام شده', X.hdrHeights === 1,
+   `${JSON.stringify(X.declared)} vs ${JSON.stringify(X.expected)}`);
+ok('اندازهٔ فونت «جلسات» با قالب یکی است', X.szJalasat === 1);
+ok('اندازهٔ فونت «تاریخ» با قالب یکی است', X.szTarikh === 1);
+ok('اندازهٔ فونت «فعالیت درسی» با قالب یکی است', X.szFaaliat === 1);
+ok('اندازهٔ فونت «ردیف» با قالب یکی است', X.szRadif === 1);
+ok('سربرگ‌ها اندازه‌های متفاوت دارند (نه یک عدد یکسان)',
+   X.distinctFs >= 4, String(X.distinctFs));
+ok('«ردیف» در قالب عمودی است', X.radifVertTpl === 1);
+ok('«ردیف» در PDF هم عمودی است', X.radifVertPdf === 1);
 
 console.log('\n══ امنیت و حالت‌های مرزی ══');
 ok('نام دانش‌آموز برای XML امن‌سازی می‌شود', libC.includes('function dcl_xml_escape'));
