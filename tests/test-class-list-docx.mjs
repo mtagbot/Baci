@@ -497,7 +497,10 @@ const A = await j("<?php require '/harness/p2.php';");
 ok('کاغذ A4 عمودی است', A.portrait === 1, JSON.stringify(A).slice(0, 120));
 ok('هیچ اثری از حالت افقی نمانده', A.noLandscape === 1);
 ok('عرض برگه با قالب یکی است', Math.abs(A.pageW - A.tplW) < 0.6, `${A.pageW} vs ${A.tplW}`);
-ok('ارتفاع برگه با قالب یکی است', Math.abs(A.pageH - A.tplH) < 0.6, `${A.pageH} vs ${A.tplH}`);
+/* v4.151.0 — min-height حالا «فضای محتوا» است نه کل کاغذ، چون
+   padding رویش جمع می‌شد و یک صفحهٔ سوم خالی می‌ساخت. */
+ok('ارتفاع محتوای برگه = کاغذ منهای حاشیه‌ها',
+   Math.abs(A.pageH - (A.tplH - 2.5 - 4.0)) < 0.6, `${A.pageH} vs ${A.tplH}-6.5`);
 ok('نسبت ستون‌های جدول دوم دقیقاً مثل Word است', A.grid2Match === 1);
 ok('جدول «دعوت از اولیا» در قالب هست', A.tplOlia >= 1, String(A.tplOlia));
 ok('جدول «دعوت از اولیا» در PDF هم آمد', A.olia >= 1, String(A.olia));
@@ -564,8 +567,17 @@ echo json_encode([
 const X = await j("<?php require '/harness/exact.php';");
 ok('ارتفاع هر ۳۵ ردیف دقیقاً مثل قالب است', X.heightsMatch === 1,
    `php=${JSON.stringify(X.phpH)} tpl=${JSON.stringify(X.tplH)}`);
-ok('ارتفاع سربرگ‌ها در HTML درست اعلام شده', X.hdrHeights === 1,
-   `${JSON.stringify(X.declared)} vs ${JSON.stringify(X.expected)}`);
+/* v4.151.0 — «جلسات» و «تاریخ» در قالب trHeight کوچکی دارند ولی
+   چون hRule="exact" نیست، Word تا اندازهٔ متن بازشان می‌کند. پس
+   انتظار درست «بزرگ‌ترِ عدد قالب و جای متن» است، نه خود عدد. */
+ok('ارتفاع سربرگ‌ها دست‌کم به اندازهٔ قالب است', (() => {
+    if (!Array.isArray(X.declared) || X.declared.length < 4) return false;
+    return X.declared.every((v, i) => v >= X.expected[i] - 0.01);
+})(), `${JSON.stringify(X.declared)} >= ${JSON.stringify(X.expected)}`);
+ok('دو سربرگ بلندِ قالب دقیقاً حفظ شده‌اند',
+   Math.abs(X.declared[2] - X.expected[2]) < 0.02
+   && Math.abs(X.declared[3] - X.expected[3]) < 0.02,
+   `${X.declared[2]}/${X.declared[3]}`);
 ok('اندازهٔ فونت «جلسات» با قالب یکی است', X.szJalasat === 1);
 ok('اندازهٔ فونت «تاریخ» با قالب یکی است', X.szTarikh === 1);
 ok('اندازهٔ فونت «فعالیت درسی» با قالب یکی است', X.szFaaliat === 1);
@@ -574,6 +586,84 @@ ok('سربرگ‌ها اندازه‌های متفاوت دارند (نه یک �
    X.distinctFs >= 4, String(X.distinctFs));
 ok('«ردیف» در قالب عمودی است', X.radifVertTpl === 1);
 ok('«ردیف» در PDF هم عمودی است', X.radifVertPdf === 1);
+
+console.log('\n══ ارتفاع یکنواخت، تراز جدول، صفحهٔ خالی (v4.151.0) ══');
+ok('ارتفاع ردیف بدنه یک ثابت واحد است', libC.includes("define('DCL_BODY_ROW_MM'"));
+ok('تراز جدول‌ها از tblInd قالب می‌آید', libC.includes('function dcl_table_indent'));
+ok('عنوان بخش‌های صفحهٔ دوم حاشیهٔ چپ/راست/بالا ندارند',
+   /\.sec\{border-left:0;border-right:0;border-top:0\}/.test(libC));
+ok('ارتفاع برگه، حاشیه را کم می‌کند (صفحهٔ خالی نسازد)',
+   /min-height:<\?php echo round\(\$pg\['h'\] - \$pg\['top'\] - \$pg\['bottom'\], 1\)/.test(libC));
+ok('سربرگ‌ها ارتفاع لازمِ متن را می‌گیرند (نه عدد خام قالب)',
+   libC.includes('$hdrJal = max(') && libC.includes('$hdrTar = max('));
+
+php.writeFile('/harness/geo.php', `<?php
+ini_set('display_errors','0'); error_reporting(0);
+require_once '/www/includes/db.php';
+require_once '/www/includes/functions.php';
+require_once '/www/includes/school_sort.php';
+require_once '/www/includes/class_schedule_sync.php';
+require_once '/www/includes/docx_class_list.php';
+$html = dcl_render_print_html('1/9', [
+  ['last'=>'آبادی','first'=>'بهار'],
+  ['last'=>'حسینی نژاد اصفهانی','first'=>'محمدرضا'],
+], '', false);
+/* قالب: tblInd واقعی */
+$z = new ZipArchive(); $z->open('/www/assets/templates/teacher-class-list.docx');
+$xml = $z->getFromName('word/document.xml'); $z->close();
+preg_match_all('/<w:tbl>.*?<\\/w:tbl>/s', $xml, $tm);
+$tplInd = [];
+foreach ($tm[0] as $tb) {
+    $tplInd[] = preg_match('/<w:tblInd w:w="(-?\\d+)"/', $tb, $m) ? (int)$m[1] : 0;
+}
+/* عنوان بخش‌ها در قالب: حاشیهٔ nil دارند؟ */
+preg_match_all('/<w:tr[ >].*?<\\/w:tr>/s', $tm[0][1], $r2);
+$secNil = 0;
+foreach ([0, 17] as $ri) {
+    preg_match_all('/<w:tc>.*?<\\/w:tc>/s', $r2[0][$ri], $c);
+    if (preg_match('/<w:tcBorders>.*?<\\/w:tcBorders>/s', $c[0][0], $bd)
+        && strpos($bd[0], '<w:left w:val="nil"') !== false
+        && strpos($bd[0], '<w:right w:val="nil"') !== false) $secNil++;
+}
+/* ردیف‌های بدنهٔ جدول اول */
+preg_match('/<table class="tbl1".*?<\\/table>/s', $html, $t1);
+preg_match_all('/height:calc\\(([\\d.]+)mm \\* var\\(--rh\\)\\)/', $t1[0] ?? '', $bh);
+$uniq = array_values(array_unique($bh[1]));
+preg_match_all('/<tr style="height:([\\d.]+)mm">/', $html, $hd);
+preg_match('/\\.tbl1\\{margin-right:([-\\d.]+)mm\\}/', $html, $i1);
+preg_match('/\\.tbl2\\{margin-right:([-\\d.]+)mm\\}/', $html, $i2);
+preg_match('/min-height:([\\d.]+)mm/', $html, $mh);
+echo json_encode([
+  'bodyUniq'  => $uniq,
+  'bodyRows'  => count($bh[1]) / 16,
+  'hdrJal'    => (float)($hd[1][0] ?? 0),
+  'hdrTar'    => (float)($hd[1][1] ?? 0),
+  'ind1'      => (float)($i1[1] ?? 0),
+  'ind2'      => (float)($i2[1] ?? 0),
+  'tplInd1'   => round($tplInd[0] / 56.7, 2),
+  'tplInd2'   => round($tplInd[1] / 56.7, 2),
+  'minH'      => (float)($mh[1] ?? 0),
+  'wantMinH'  => round(16838 / 56.7 - 142 / 56.7 - 4.0, 1),
+  'secNilTpl' => $secNil,
+  'secCount'  => substr_count($html, 'class="t sec"'),
+  'sheets'    => substr_count($html, 'class="sheet"'),
+], JSON_UNESCAPED_UNICODE);`);
+const G = await j("<?php require '/harness/geo.php';");
+ok('همهٔ ۳۰ ردیف دانش‌آموز ارتفاع یکسان دارند',
+   Array.isArray(G.bodyUniq) && G.bodyUniq.length === 1, JSON.stringify(G.bodyUniq));
+ok('تعداد ردیف‌های بدنه ۳۰ است', G.bodyRows === 30, String(G.bodyRows));
+ok('ارتفاع «جلسات» جای متنش را دارد', G.hdrJal >= 4.8, String(G.hdrJal));
+ok('ارتفاع «تاریخ» جای متنش را دارد', G.hdrTar >= 5.2, String(G.hdrTar));
+ok('تراز جدول اول با tblInd قالب یکی است',
+   Math.abs(G.ind1 - G.tplInd1) < 0.02, `${G.ind1} vs ${G.tplInd1}`);
+ok('تراز جدول دوم با tblInd قالب یکی است (منفی)',
+   Math.abs(G.ind2 - G.tplInd2) < 0.02 && G.ind2 < 0, `${G.ind2} vs ${G.tplInd2}`);
+ok('دو جدول تراز متفاوت دارند (وسط‌چین نیستند)', G.ind1 !== G.ind2);
+ok('ارتفاع برگه دقیقاً فضای محتواست', Math.abs(G.minH - G.wantMinH) < 0.15,
+   `${G.minH} vs ${G.wantMinH}`);
+ok('قالب هم برای عنوان بخش‌ها حاشیهٔ nil دارد', G.secNilTpl === 2, String(G.secNilTpl));
+ok('هر دو عنوان صفحهٔ دوم کلاس بدون‌حاشیه گرفته‌اند', G.secCount === 2, String(G.secCount));
+ok('خروجی دقیقاً دو برگه است (نه سه)', G.sheets === 2, String(G.sheets));
 
 console.log('\n══ امنیت و حالت‌های مرزی ══');
 ok('نام دانش‌آموز برای XML امن‌سازی می‌شود', libC.includes('function dcl_xml_escape'));
