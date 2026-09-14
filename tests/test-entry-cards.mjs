@@ -410,6 +410,88 @@ ok('همهٔ دانش‌آموزان در چاپ می‌آیند (نه فقط ص
 ok('اندازهٔ کاغذ در CSS چاپ ست می‌شود', PG.pagesize === 1);
 ok('رندر چندصفحه‌ای بدون خطای مهلک', PG.fatal === 0);
 
+console.log('\n══ چیدمان واقعی مطابق محاسبه (v4.143.0) ══');
+/* باگی که دو بار گزارش شد: PHP تعداد ستون را طوری حساب می‌کرد که
+   فاصله فقط بین کارت‌ها باشد، ولی CSS به هر کارت margin-left می‌داد
+   (حتی آخرین کارت ردیف). پس عرض اشغالی هر کارت (کارت+gap) بود و
+   ردیف یک ستون کمتر جا می‌داد؛ کارت اضافه به ردیف بعد می‌افتاد. */
+ok('فاصله در سمت راست کارت است (چیدمان RTL)',
+   /\.card-id\{[\s\S]*?margin:0 var\(--gap,4mm\) var\(--gap,4mm\) 0/.test(styles));
+ok('پشت کارت هم همین قاعده را دارد',
+   /\.card-back\{[\s\S]*?margin:0 var\(--gap,4mm\) var\(--gap,4mm\) 0/.test(styles));
+ok('margin کارت آخرِ ردیف با margin منفی ظرف خنثی می‌شود',
+   /\.sheet\{margin-right:calc\(var\(--gap,4mm\) \* -1\)\}/.test(styles));
+ok('دیگر margin سمت چپ روی کارت نیست',
+   !/\.card-id\{[\s\S]*?margin:0 0 var\(--gap/.test(styles));
+
+/* اثبات ریاضی سازگاری: فرمول PHP باید با فضای واقعیِ CSS بخواند.
+   CSS پس از اصلاح: فضای مؤثر = (کاغذ - ۲×حاشیه) + gap
+   و هر کارت (کارت + gap) می‌گیرد. */
+ok('فرمول چیدمان با رندر واقعی سازگار است — همهٔ ترکیب‌ها', (() => {
+    const bad = [];
+    for (const pw of [148, 210, 297, 420]) {
+        for (const m of [0, 3, 5, 8, 12, 20, 25, 40]) {
+            for (let g = 0; g <= 20; g++) {
+                for (const base of [85.6, 54]) {
+                    for (const sc of [0.6, 0.8, 1, 1.2, 1.6]) {
+                        const c = base * sc, u = pw - 2 * m;
+                        if (u <= 0) continue;
+                        const phpCols = Math.floor((u + g) / (c + g));
+                        /* عرض در دسترس برای CSS = u + g (به‌خاطر margin منفی) */
+                        const cssCols = Math.floor((u + g) / (c + g));
+                        if (phpCols !== cssCols) bad.push(`${pw}/${m}/${g}/${c}`);
+                    }
+                }
+            }
+        }
+    }
+    return bad.length === 0 || (console.log('     ', bad.slice(0, 5).join(' ')), false);
+})());
+
+ok('سقف فاصله بالا رفت (محدودیت مصنوعی نماند)', /min\(40, max\(0, \(float\)\(\$_GET\['gap'\]/.test(pageC));
+ok('سقف حاشیه بالا رفت', /min\(50, max\(0, \(float\)\(\$_GET\['margin'\]/.test(pageC));
+ok('نوار فاصله تا ۴۰ می‌رود', /id="cGap" min="0" max="40"/.test(pageC));
+ok('نوار حاشیه تا ۵۰ می‌رود', /id="cMargin" min="0" max="50"/.test(pageC));
+ok('حاشیهٔ صفر همچنان مجاز است',
+   /min\(50, max\(0,/.test(pageC) && /id="cMargin" min="0"/.test(pageC));
+
+/* رندر واقعی در همان حالتی که قبلاً می‌شکست */
+php.writeFile('/harness/fit.php', `<?php
+ini_set('display_errors','0'); error_reporting(0);
+@mkdir('/tmp/sess'); ini_set('session.save_path','/tmp/sess');
+session_id('fit'.mt_rand()); session_start();
+require_once '/www/includes/db.php';
+require_once '/www/includes/functions.php';
+require_once '/www/includes/auth.php';
+DB::execute("UPDATE students SET academic_year='1404/1405' WHERE academic_year IS NULL OR academic_year=''");
+$a = DB::fetch("SELECT * FROM admins WHERE status=1 ORDER BY id LIMIT 1");
+$_SESSION = ['admin_id'=>$a['id'],'admin_role'=>'super_admin'];
+/* gap=5 روی A5 دقیقاً همان ترکیبی بود که PHP و CSS اختلاف داشتند */
+$_GET = ['print'=>'1','paper'=>'A5','layout'=>'sq','scale'=>'0.6','margin'=>'0','gap'=>'5','side'=>'front'];
+chdir('/www');
+register_shutdown_function(function(){ file_put_contents('/tmp/fitout.html', ob_get_clean()); });
+ob_start();
+include '/www/entry-cards.php';`);
+await run("<?php require '/harness/fit.php';");
+const FIT = await j(`<?php
+require_once '/www/includes/db.php'; require_once '/www/includes/functions.php';
+require_once '/www/includes/card_ornaments.php';
+$h = @file_get_contents('/tmp/fitout.html');
+$g = card_grid_info('A5','portrait','sq',0.6,0,5);
+$n = (int)DB::fetch("SELECT COUNT(*) c FROM students WHERE status='active'")['c'];
+echo json_encode([
+  'cols'=>$g['cols'], 'rows'=>$g['rows'], 'perpage'=>$g['per_page'],
+  'cards'=>substr_count($h,'class="card-id'), 'students'=>$n,
+  'pages'=>substr_count($h,'class="page"'),
+  'sheetfix'=>strpos($h,'margin-right:calc(var(--gap,4mm) * -1)')!==false?1:0,
+]);`);
+ok('در حالت مرزی (A5/gap=5) چیدمان محاسبه می‌شود', FIT.perpage > 0, JSON.stringify(FIT));
+ok('جبران margin در خروجی چاپ هست', FIT.sheetfix === 1);
+ok('همهٔ کارت‌ها چاپ می‌شوند، بدون سقف', FIT.cards === FIT.students, `${FIT.cards}/${FIT.students}`);
+ok('تعداد صفحات با ظرفیت هم‌خوان است',
+   FIT.pages === Math.ceil(FIT.students / FIT.perpage),
+   `${FIT.pages} vs ${Math.ceil(FIT.students / FIT.perpage)}`);
+
 console.log('\n══ تنوع تصویرسازی ══');
 const symAll = [...orn.matchAll(/<symbol id="orn-([\w-]+)"/g)].map(m => m[1]);
 ok('دست‌کم ۱۲ نقش ایرانی موجود است', symAll.length >= 12, String(symAll.length));
