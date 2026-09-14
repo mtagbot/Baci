@@ -18,7 +18,14 @@ const j = async (code) => {
     const out = (await run(code)).out.trim();
     try { return JSON.parse(out); } catch (e) { return { __raw: out }; }
 };
-const strip = (s) => s.replace(/<\?php\s*\/\*[\s\S]*?\*\/\s*\?>/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+// کامنت‌زدایی برای بررسی‌هایی که نباید متنِ توضیحات را کد بشمارند.
+// نکتهٔ مهم: الگوی «php-tag تا پایان-کامنت» نباید اول اجرا شود — تگ
+// بازکنندهٔ ابتدای فایل با نزدیک‌ترین پایانِ کامنتِ بعدی جفت می‌شد و
+// ۷۷٪ فایل را می‌بلعید (اولین بار همین ۲۲ هشدار کاذب داد). پس اول
+// کامنت‌های بلوکی حذف می‌شوند و بعد بقایای تگ خالی.
+const strip = (src) => src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/<\?php\s*\?>/g, '');
 
 const page = readFileSync(resolveFile('reports-lists.php'), 'utf8');
 const lib  = readFileSync(resolveFile('includes/docx_class_list.php'), 'utf8');
@@ -253,9 +260,12 @@ ok('نام خانوادگی سهم بیشتری گرفته (بلندتر است)
 })());
 ok('سلول دارای vMerge قربانی حذف نمی‌شود (ادغام عمودی نمی‌شکند)',
    libC.includes('vMerge') && libC.includes("w:val=\"restart\""));
-ok('نمای PDF هم یک ستون جلسه کمتر دارد', /\$sessions = 9;/.test(libC));
-ok('عرض ستون‌های نام در PDF با Word هم‌نسبت است',
-   /\.cl\{width:28mm\}/.test(libC) && /\.cf\{width:22mm\}/.test(libC));
+/* تعداد ستون جلسه حالا از خود شبکه حساب می‌شود، نه عدد ثابت — پس
+   اگر شبکه عوض شود خودکار درست می‌ماند. */
+ok('نمای PDF ستون‌های جلسه را از شبکه حساب می‌کند',
+   /\$nSess\s*=\s*\$nCols - 1 - 2 - 5/.test(libC));
+ok('عرض ستون‌های PDF از همان شبکهٔ Word می‌آید',
+   libC.includes('function dcl_print_grid') && /\$pc\[\] = round\(\$w \* 100 \/ \$total/.test(libC));
 
 /* نام واقعاً بلند نباید ساختار را بشکند */
 php.writeFile('/harness/longname.php', `<?php
@@ -329,11 +339,11 @@ $html = dcl_render_print_html(dcl_class_code('نهم1','نهم'), dcl_students_o
 preg_match('/@font-face\\{[^}]*\\}/', $html, $ff);
 echo json_encode([
   'len'        => strlen($html),
-  'pages'      => substr_count($html, 'class="page"'),
+  'sheets'     => substr_count($html, 'class="sheet"'),
   'fontface'   => isset($ff[0]) ? $ff[0] : '',
   'usesTitrTtf'=> (isset($ff[0]) && strpos($ff[0], 'B-Titr/B-Titr.ttf') !== false) ? 1 : 0,
   'bodyFont'   => (strpos($html, "font-family:'BTitr'") !== false) ? 1 : 0,
-  'rows'       => substr_count($html, 'class="cell rownum"'),
+  'rows'       => substr_count($html, 'class="r nm"') / 2,
   'hdrLast'    => (strpos($html, '>نام خانوادگی<') !== false) ? 1 : 0,
   'hdrFirst'   => (strpos($html, '>نام<') !== false) ? 1 : 0,
   'hasClass'   => (strpos($html, 'کلاس : 1/9') !== false) ? 1 : 0,
@@ -344,7 +354,7 @@ echo json_encode([
 ], JSON_UNESCAPED_UNICODE);`);
 const P = await j("<?php require '/harness/pdf.php';");
 ok('نمای چاپی تولید می‌شود', typeof P.len === 'number' && P.len > 5000, JSON.stringify(P).slice(0, 140));
-ok('دو صفحه دارد (مثل قالب Word)', P.pages === 2, String(P.pages));
+ok('دو صفحه دارد (مثل قالب Word)', P.sheets === 2, String(P.sheets));
 ok('@font-face تعریف شده', P.fontface !== '', String(P.fontface).slice(0, 80));
 ok('فونت از همان فایل B-Titr بسته می‌آید', P.usesTitrTtf === 1);
 ok('کل متن با فونت تیتر است', P.bodyFont === 1);
@@ -358,6 +368,78 @@ ok('اسامی واقعی درج شده‌اند', P.firstName === 1);
 ok('خروجی HTML امن‌سازی می‌شود', P.escaped === 1);
 ok('چاپ تا آماده‌شدن فونت صبر می‌کند', libC.includes('document.fonts.ready'));
 ok('اگر فونت نیامد چاپ گیر نمی‌کند', /setTimeout\(go, 3000\)/.test(libC));
+
+console.log('\n══ padding و تطابق PDF با Word (v4.148.0) ══');
+ok('تابع کم‌کردن حاشیهٔ سلول وجود دارد', libC.includes('function dcl_tighten_cell'));
+ok('حاشیهٔ افقی سلول نام کم شده', /<w:left w:w="28" w:type="dxa"\/>/.test(libC));
+ok('حاشیه روی هر دو ستون نام اعمال می‌شود',
+   (libC.match(/dcl_tighten_cell\(/g) || []).length >= 3);
+ok('tcMar پیش از vAlign درج می‌شود (ترتیب معتبر OOXML)',
+   libC.includes("preg_replace('/(<w:vAlign)/'"));
+ok('شبکهٔ عرض PDF از یک منبع می‌آید', libC.includes('function dcl_print_grid'));
+ok('پیش‌نمایش پیش‌فرض بدون چاپ خودکار باز می‌شود',
+   pageC.includes("$autoPrint = (($_GET['auto'] ?? '0') === '1')"));
+ok('ویرایشگر زنده در نمای چاپ هست', libC.includes('id="editor"'));
+ok('ویرایشگر اندازهٔ متن و ارتفاع ردیف دارد',
+   libC.includes('id="cFont"') && libC.includes('id="cRow"'));
+ok('تنظیمات ویرایشگر ذخیره می‌شود', libC.includes('mtag_classlist_editor_v1'));
+ok('ویرایشگر در چاپ دیده نمی‌شود', /@media print\{[\s\S]{0,200}\.noprint\{display:none!important\}/.test(libC));
+ok('عنوان‌های اختراعی حذف شدند',
+   !libC.includes('جمع غیبت') && !libC.includes('نمره مستمر') && !/>ملاحظات</.test(libC));
+
+/* تطابق واقعی: نسبت ستون‌های PDF باید مو به مو با Word یکی باشد */
+php.writeFile('/harness/match.php', `<?php
+ini_set('display_errors','0'); error_reporting(0);
+require_once '/www/includes/db.php';
+require_once '/www/includes/functions.php';
+require_once '/www/includes/school_sort.php';
+require_once '/www/includes/class_schedule_sync.php';
+require_once '/www/includes/docx_class_list.php';
+$names = [
+  ['last' => 'حسینی نژاد اصفهانی', 'first' => 'محمدرضا'],
+  ['last' => 'آبادی',              'first' => 'بهار'],
+];
+$doc = dcl_generate('1/9', $names);
+file_put_contents('/tmp/m.docx', $doc);
+$z = new ZipArchive(); $z->open('/tmp/m.docx');
+$xml = $z->getFromName('word/document.xml'); $z->close();
+preg_match_all('/<w:tbl>.*?<\\/w:tbl>/s', $xml, $tm);
+preg_match('/<w:tblGrid>.*?<\\/w:tblGrid>/s', $tm[0][0], $gm);
+preg_match_all('/w:w="(\\d+)"/', $gm[0], $gw);
+$wordCols = array_map('intval', $gw[1]);
+$sum = array_sum($wordCols);
+$wordPct = array_map(function ($w) use ($sum) { return round($w * 100 / $sum, 4); }, $wordCols);
+
+$html = dcl_render_print_html('1/9', $names, '', false);
+$cg = '';
+if (preg_match('/<colgroup>.*?<\\/colgroup>/s', $html, $c)) $cg = $c[0];
+preg_match_all('/<col style="width:([\\d.]+)%">/', $cg, $cm);
+$htmlPct = array_map('floatval', $cm[1]);
+
+/* شمارش سلول هر ردیف در HTML جدول اول */
+preg_match('/<table>.*?<\\/table>/s', $html, $t1);
+preg_match_all('/<tr>.*?<\\/tr>/s', $t1[0], $trs);
+$dataRow = '';
+foreach ($trs[0] as $tr) { if (strpos($tr, 'حسینی نژاد') !== false) { $dataRow = $tr; break; } }
+echo json_encode([
+  'wordCols'  => count($wordCols),
+  'htmlCols'  => count($htmlPct),
+  'same'      => ($wordPct === $htmlPct) ? 1 : 0,
+  'gridFnOk'  => (dcl_print_grid() === $wordCols) ? 1 : 0,
+  'dataCells' => $dataRow === '' ? 0 : substr_count($dataRow, '<td'),
+  'tcMar'     => substr_count($xml, '<w:tcMar>'),
+  'htmlRows'  => substr_count($html, 'class="r nm"') / 2,
+  'sheets'    => substr_count($html, 'class="sheet"'),
+], JSON_UNESCAPED_UNICODE);`);
+const M = await j("<?php require '/harness/match.php';");
+ok('تعداد ستون PDF و Word یکی است', M.wordCols === M.htmlCols && M.wordCols === 16,
+   `${M.wordCols}/${M.htmlCols}`);
+ok('نسبت عرض هر ستون در PDF دقیقاً مثل Word است', M.same === 1, JSON.stringify(M));
+ok('شبکهٔ PDF با شبکهٔ واقعی فایل Word یکی است', M.gridFnOk === 1);
+ok('هر ردیف داده در PDF ۱۶ سلول دارد', M.dataCells === 16, String(M.dataCells));
+ok('حاشیهٔ سلول‌ها در فایل Word اعمال شده', M.tcMar > 0, String(M.tcMar));
+ok('PDF هم ۳۰ ردیف دانش‌آموز دارد', M.htmlRows === 30, String(M.htmlRows));
+ok('PDF دو برگه است', M.sheets === 2, String(M.sheets));
 
 console.log('\n══ امنیت و حالت‌های مرزی ══');
 ok('نام دانش‌آموز برای XML امن‌سازی می‌شود', libC.includes('function dcl_xml_escape'));
