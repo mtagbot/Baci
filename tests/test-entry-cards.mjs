@@ -135,14 +135,28 @@ ok('پشت کارت مقررات و تماس دارد', back.includes('card-back
 /* ── v4.137.0: خواسته‌های صریح کارفرما ── */
 console.log('\n══ QR بزرگ و دوطرفه ══');
 ok('نام پدر از کارت حذف شد', !face.includes("father_name"));
-ok('QR روی کارت دست‌کم ۳۰ میلی‌متر است', (() => {
+ok('QR روی کارت دست‌کم ۴۰ میلی‌متر است', (() => {
     const m = styles.match(/\.card-qr\{[^}]*width:(\d+(?:\.\d+)?)mm/);
-    return m && parseFloat(m[1]) >= 30;
+    return m && parseFloat(m[1]) >= 40;
 })(), (styles.match(/\.card-qr\{[^}]*width:([\d.]+)mm/) || [])[1]);
-ok('QR پشت کارت دست‌کم ۳۴ میلی‌متر است', (() => {
+ok('QR پشت کارت دست‌کم ۴۴ میلی‌متر است', (() => {
     const m = styles.match(/\.card-back-qr\{[^}]*width:(\d+(?:\.\d+)?)mm/);
-    return m && parseFloat(m[1]) >= 34;
+    return m && parseFloat(m[1]) >= 44;
 })(), (styles.match(/\.card-back-qr\{[^}]*width:([\d.]+)mm/) || [])[1]);
+/* QR باید سهم معناداری از سطح کارت داشته باشد، نه فقط عددش بزرگ باشد */
+ok('QR دست‌کم یک‌سوم سطح روی کارت را می‌گیرد', (() => {
+    const m = styles.match(/\.card-qr\{[^}]*width:([\d.]+)mm/);
+    return m && (parseFloat(m[1]) ** 2) / (85.6 * 54) >= 0.33;
+})());
+ok('QR جا می‌شود (از ارتفاع بدنه بیرون نمی‌زند)', (() => {
+    const qr = parseFloat((styles.match(/\.card-qr\{[^}]*width:([\d.]+)mm/) || [])[1]);
+    const head = parseFloat((styles.match(/\.card-head\{[\s\S]*?height:([\d.]+)mm/) || [])[1]);
+    return qr + 3 <= 54 - head;      /* +۳ برای کپشن و پدینگ */
+})());
+ok('QR پشت کارت هم جا می‌شود', (() => {
+    const q = parseFloat((styles.match(/\.card-back-qr\{[^}]*width:([\d.]+)mm/) || [])[1]);
+    return q + 4 <= 54;
+})());
 ok('پشت کارت هم QR دارد', back.includes('card-back-qr') && back.includes('data-qr'));
 ok('هر دو طرف از یک توکن استفاده می‌کنند', back.includes("$s['qr']") && face.includes("$s['qr']"));
 ok('پشت کارت نام و کلاس را هم دارد (بدون برگرداندن کارت)',
@@ -153,6 +167,32 @@ ok('حاشیهٔ سفید QR استاندارد است (۴ ماژول)',
    (pageC.match(/quiet = 4/g) || []).length === 2 && !pageC.includes('quiet = 2'));
 ok('هر دو canvas در چاپ رسم می‌شوند',
    (pageC.match(/canvas\.card-qr\[data-qr\],canvas\.card-back-qr\[data-qr\]/g) || []).length === 2);
+
+console.log('\n══ تنوع تصویرسازی ══');
+const symAll = [...orn.matchAll(/<symbol id="orn-([\w-]+)"/g)].map(m => m[1]);
+ok('دست‌کم ۱۲ نقش ایرانی موجود است', symAll.length >= 12, String(symAll.length));
+for (const need of ['sarv','mehrab','dome','column','badgir','taq','star12','lotus','eslimi','farvahar'])
+    ok('نقش «' + need + '» اضافه شد', symAll.includes(need));
+const pats = [...orn.matchAll(/<pattern id="orn-([\w-]+)"/g)].map(m => m[1]);
+ok('دست‌کم ۶ بافت پس‌زمینه موجود است', pats.length >= 6, JSON.stringify(pats));
+ok('هر طرح تصویر شاخص خودش را دارد', orn.includes('function card_theme_art'));
+ok('تصاویر شاخص طرح‌ها یکسان نیستند', (() => {
+    const m = orn.match(/function card_theme_art[\s\S]*?\$map = \[([\s\S]*?)\];/);
+    const heroes = [...m[1].matchAll(/\['(\w+)',/g)].map(x => x[1]);
+    return heroes.length === 6 && new Set(heroes).size === 6;
+})());
+ok('بافت پس‌زمینهٔ طرح‌ها متفاوت است', (() => {
+    const fills = [...styles.matchAll(/\.th-\w+ \.card-bg rect\{fill:url\(#orn-(\w+)\)/g)].map(x => x[1]);
+    return new Set(fills).size >= 4;
+})(), JSON.stringify([...styles.matchAll(/\.th-(\w+) \.card-bg rect\{fill:url\(#orn-(\w+)\)/g)].map(x => x[1] + ':' + x[2])));
+ok('قالب کارت به نام طرح‌ها گره نخورده (افزودن طرح آسان)',
+   face.includes('card_theme_art(') && !/\$_heroArt\s*=\s*'/.test(face));
+ok('همهٔ ارجاع‌های تصویر شاخص معتبرند', (() => {
+    const m = orn.match(/function card_theme_art[\s\S]*?\$map = \[([\s\S]*?)\];/);
+    const all = [...m[1].matchAll(/'(\w+)'/g)].map(x => x[1])
+        .filter(x => !['classic','ribbon','minimal','titr','tile','sarv'].includes(x));
+    return all.every(a => symAll.includes(a) || a === 'hex-none');
+})());
 
 console.log('\n══ فونت‌های ایرانی ══');
 ok('چهار فونت ایرانی تعریف شده',
