@@ -73,17 +73,17 @@ echo json_encode([
   'empty'   => dcl_class_code('',''),
 ], JSON_UNESCAPED_UNICODE);`);
 const C = await j("<?php require '/harness/code.php';");
-ok('هفتم1 → 7/1', C.h1 === '7/1', String(C.h1));
-ok('هفتم2 → 7/2', C.h2 === '7/2', String(C.h2));
-ok('هفتم3 → 7/3', C.h3 === '7/3', String(C.h3));
-ok('هشتم1 → 8/1', C.e1 === '8/1', String(C.e1));
-ok('نهم2 → 9/2', C.n2 === '9/2', String(C.n2));
-ok('دهم3 → 10/3', C.d3 === '10/3', String(C.d3));
-ok('یازدهم1 → 11/1', C.y1 === '11/1', String(C.y1));
+ok('هفتم1 → «1/7» در XML (روی کاغذ RTL = 7/1)', C.h1 === '1/7', String(C.h1));
+ok('هفتم2 → 2/7', C.h2 === '2/7', String(C.h2));
+ok('هفتم3 → 3/7', C.h3 === '3/7', String(C.h3));
+ok('هشتم1 → 1/8', C.e1 === '1/8', String(C.e1));
+ok('نهم2 → 2/9', C.n2 === '2/9', String(C.n2));
+ok('دهم3 → 3/10', C.d3 === '3/10', String(C.d3));
+ok('یازدهم1 → 1/11', C.y1 === '1/11', String(C.y1));
 /* «دهم» زیررشتهٔ «دوازدهم» است؛ این مورد یک بار واقعاً اشتباه داد */
-ok('دوازدهم4 → 12/4 (نه 10/4)', C.dv4 === '12/4', String(C.dv4));
-ok('اگر پایه ثبت نشده باشد از نام کلاس استنتاج می‌شود', C.noGrade === '8/1', String(C.noGrade));
-ok('ارقام فارسی هم پشتیبانی می‌شوند', C.faDigit === '7/2', String(C.faDigit));
+ok('دوازدهم4 → «4/12» (نه 4/10)', C.dv4 === '4/12', String(C.dv4));
+ok('اگر پایه ثبت نشده باشد از نام کلاس استنتاج می‌شود', C.noGrade === '1/8', String(C.noGrade));
+ok('ارقام فارسی هم پشتیبانی می‌شوند', C.faDigit === '2/7', String(C.faDigit));
 ok('نام نامتعارف، خودش برگردانده می‌شود (نه کد غلط)', C.weird === 'کلاس ویژه', String(C.weird));
 ok('نام خالی، خروجی خالی می‌دهد', C.empty === '', String(C.empty));
 
@@ -113,12 +113,14 @@ DB::execute("INSERT INTO students (national_id,first_name,last_name,class_name,g
 echo json_encode(dcl_students_of_class('هفتم1','1404/1405'), JSON_UNESCAPED_UNICODE);`);
 const N = await j("<?php require '/harness/names.php';");
 ok('اسامی به ترتیب الفبای فارسی‌اند (آ پیش از ا)',
-   Array.isArray(N) && N[0] === 'آبادی بهار' && N[1] === 'ابراهیمی زهرا', JSON.stringify(N));
-ok('قالب «نام خانوادگی نام» است', Array.isArray(N) && /^آبادی بهار$/.test(N[0]));
+   Array.isArray(N) && N[0] && N[0].last === 'آبادی' && N[1] && N[1].last === 'ابراهیمی',
+   JSON.stringify(N));
+ok('نام و نام خانوادگی جدا برمی‌گردند',
+   Array.isArray(N) && N[0] && N[0].last === 'آبادی' && N[0].first === 'بهار', JSON.stringify(N[0]));
 ok('فقط دانش‌آموزان همان کلاس می‌آیند',
-   Array.isArray(N) && !N.some(x => x.includes('کلاس')), JSON.stringify(N));
+   Array.isArray(N) && !N.some(x => (x.last || '').includes('کلاس')), JSON.stringify(N));
 ok('دانش‌آموز غیرفعال نمی‌آید',
-   Array.isArray(N) && !N.some(x => x.includes('بایدنیاید')));
+   Array.isArray(N) && !N.some(x => (x.last || '').includes('بایدنیاید')));
 ok('تعداد درست است', Array.isArray(N) && N.length === 5, String(N.length));
 
 /* ═══ ۵) فایل واقعی ═══ */
@@ -130,7 +132,7 @@ require_once '/www/includes/functions.php';
 require_once '/www/includes/school_sort.php';
 require_once '/www/includes/class_schedule_sync.php';
 require_once '/www/includes/docx_class_list.php';
-$doc = dcl_generate('7/1', dcl_students_of_class('هفتم1','1404/1405'));
+$doc = dcl_generate(dcl_class_code('هفتم1','هفتم'), dcl_students_of_class('هفتم1','1404/1405'));
 if ($doc === null) { echo 'NULL'; exit; }
 file_put_contents('/tmp/gen.docx', $doc);
 /* بازش کن و XML را بیرون بده */
@@ -148,6 +150,16 @@ if (isset($rm[0][5])) {
     preg_match_all('/<w:tc>.*?<\\/w:tc>/s', $rm[0][5], $c5);
     if (isset($c5[0][1]) && preg_match('/<w:r>.*?<\\/w:r>/s', $c5[0][1], $r5)) $nameRun = $r5[0];
 }
+$gridCount = 0; $gw1 = ''; $gw2 = '';
+if (preg_match('/<w:tblGrid>.*?<\\/w:tblGrid>/s', $tm[0][0], $gm)) {
+    preg_match_all('/w:w="(\\d+)"/', $gm[0], $gwm);
+    $gridCount = count($gwm[1]);
+    $gw1 = $gwm[1][1] ?? ''; $gw2 = $gwm[1][2] ?? '';
+}
+$cellCount = function ($tr) {
+    preg_match_all('/<w:tc>.*?<\\/w:tc>/s', $tr, $c);
+    return count($c[0]);
+};
 $cellText = function ($tr, $idx) {
     preg_match_all('/<w:tc>.*?<\\\\/w:tc>/s', $tr, $cm);
     if (!isset($cm[0][$idx])) return '';
@@ -160,11 +172,20 @@ echo json_encode([
   'tables'    => count($tm[0]),
   'rows'      => isset($rm[0]) ? count($rm[0]) : 0,
   'classCell' => isset($rm[0][0]) ? $cellText($rm[0][0], 1) : '',
-  'hdrCell'   => isset($rm[0][4]) ? $cellText($rm[0][4], 1) : '',
-  'n1'        => isset($rm[0][5]) ? $cellText($rm[0][5], 1) : '',
-  'n2'        => isset($rm[0][6]) ? $cellText($rm[0][6], 1) : '',
-  'n5'        => isset($rm[0][9]) ? $cellText($rm[0][9], 1) : '',
+  'r0span'    => (preg_match('/<w:gridSpan w:val="(\\d+)"/', $rm[0][0], $sm0) ? $sm0[1] : '?'),
+  'gridCols'  => $gridCount,
+  'gridW1'    => $gw1,
+  'gridW2'    => $gw2,
+  'hdrLast'   => isset($rm[0][4]) ? $cellText($rm[0][4], 1) : '',
+  'hdrFirst'  => isset($rm[0][4]) ? $cellText($rm[0][4], 2) : '',
+  'r5cells'   => isset($rm[0][5]) ? $cellCount($rm[0][5]) : 0,
+  'n1last'    => isset($rm[0][5]) ? $cellText($rm[0][5], 1) : '',
+  'n1first'   => isset($rm[0][5]) ? $cellText($rm[0][5], 2) : '',
+  'n2last'    => isset($rm[0][6]) ? $cellText($rm[0][6], 1) : '',
+  'n5last'    => isset($rm[0][9]) ? $cellText($rm[0][9], 1) : '',
+  'n5first'   => isset($rm[0][9]) ? $cellText($rm[0][9], 2) : '',
   'n6empty'   => isset($rm[0][10]) ? $cellText($rm[0][10], 1) : 'MISSING',
+  'n6first'   => isset($rm[0][10]) ? $cellText($rm[0][10], 2) : 'MISSING',
   'lastEmpty' => isset($rm[0][34]) ? $cellText($rm[0][34], 1) : 'MISSING',
   'rowNum1'   => isset($rm[0][5]) ? $cellText($rm[0][5], 0) : '',
   'rowNum30'  => isset($rm[0][34]) ? $cellText($rm[0][34], 0) : '',
@@ -178,12 +199,22 @@ ok('فایل docx ساخته شد', typeof D.size === 'number' && D.size > 10000
 ok('فایل zip معتبر با اجزای کامل است', D.entries >= 8, String(D.entries));
 ok('هر دو جدول قالب حفظ شده‌اند', D.tables === 2, String(D.tables));
 ok('جدول اول ۳۵ ردیف دارد (۵ سرستون + ۳۰ دانش‌آموز)', D.rows === 35, String(D.rows));
-ok('سلول کلاس پر شد: «کلاس : 7/1»', D.classCell === 'کلاس : 7/1', String(D.classCell));
-ok('سرستون «نام خانوادگی و نام» دست‌نخورده است', D.hdrCell === 'نام خانوادگی و نام', String(D.hdrCell));
-ok('نام اول در ردیف اول', D.n1 === 'آبادی بهار', String(D.n1));
-ok('نام دوم در ردیف دوم', D.n2 === 'ابراهیمی زهرا', String(D.n2));
-ok('نام پنجم در ردیف پنجم', D.n5 === 'یوسفی آرش', String(D.n5));
+ok('سلول کلاس پر شد: «کلاس : 1/7»', D.classCell === 'کلاس : 1/7', String(D.classCell));
+/* v4.146.0 — ستون نام به دو ستون تقسیم شد */
+ok('شبکهٔ جدول یک ستون بیشتر شد (۱۷ ستون)', D.gridCols === 17, String(D.gridCols));
+ok('عرض دو ستون تازه درست است', D.gridW1 === '1256' && D.gridW2 === '1000',
+   `${D.gridW1}/${D.gridW2}`);
+ok('gridSpan سربرگ بالا یکی بیشتر شد (۱۴)', D.r0span === '14', String(D.r0span));
+ok('سرستون راست «نام خانوادگی» است', D.hdrLast === 'نام خانوادگی', String(D.hdrLast));
+ok('سرستون بعدی «نام» است', D.hdrFirst === 'نام', String(D.hdrFirst));
+ok('هر ردیف حالا ۱۷ سلول دارد', D.r5cells === 17, String(D.r5cells));
+ok('نام خانوادگی اول در ستون راست', D.n1last === 'آبادی', String(D.n1last));
+ok('نام اول در ستون کناری', D.n1first === 'بهار', String(D.n1first));
+ok('نام خانوادگی دوم درست است', D.n2last === 'ابراهیمی', String(D.n2last));
+ok('نام پنجم درست است', D.n5last === 'یوسفی' && D.n5first === 'آرش',
+   `${D.n5last}/${D.n5first}`);
 ok('ردیف ششم خالی ماند (کلاس ۵ نفر دارد)', D.n6empty === '', String(D.n6empty));
+ok('ستون نام ردیف ششم هم خالی است', D.n6first === '', String(D.n6first));
 ok('ردیف سی‌ام خالی ماند', D.lastEmpty === '', String(D.lastEmpty));
 ok('شماره‌های ردیف دست‌نخورده‌اند', D.rowNum1 === '1' && D.rowNum30 === '30', `${D.rowNum1}/${D.rowNum30}`);
 /* قالب خودش پر از «B Titr» است، پس شمردن کل فایل نگهبان نیست —
@@ -194,6 +225,64 @@ ok('فونت B Titr روی خودِ نام دانش‌آموز اعمال شده
 ok('جدول دوم (ثبت میزان تدریس) دست‌نخورده است', D.tbl2 === 1);
 
 /* ═══ ۶) امنیت و مقاومت ═══ */
+console.log('\n══ خروجی PDF (v4.146.0) ══');
+/* PDF از مسیر مرورگر ساخته می‌شود، چون TCPDF در بسته نیست و برای
+   فارسی به فونت تبدیل‌شده نیاز دارد؛ هر خطا در آن مسیر به‌جای فونت
+   تیتر مربع خالی چاپ می‌کند. */
+ok('اکشن PDF در صفحه هست', pageC.includes("class_list_pdf"));
+ok('دکمهٔ PDF برای هر کلاس نمایش داده می‌شود', /action=class_list_pdf&class=/.test(pageC));
+ok('PDF به قالب docx وابسته نیست', (() => {
+    const i = pageC.indexOf("$action === 'class_list_pdf'");
+    const j = pageC.indexOf("if ($action === 'class_list_all'", i);
+    const seg = pageC.slice(i, j === -1 ? i + 900 : j);
+    return !seg.includes('$templateOk') && !seg.includes('dcl_generate');
+})());
+ok('تابع رندر چاپی وجود دارد', libC.includes('function dcl_render_print_html'));
+ok('صفحهٔ PDF در استثنای چاپ دسکتاپ هست',
+   readFileSync(resolveFile('assets/js/desk-shell.js'), 'utf8').includes('reports-lists.php'));
+
+php.writeFile('/harness/pdf.php', `<?php
+ini_set('display_errors','0'); error_reporting(0);
+require_once '/www/includes/db.php';
+require_once '/www/includes/functions.php';
+require_once '/www/includes/school_sort.php';
+require_once '/www/includes/class_schedule_sync.php';
+require_once '/www/includes/docx_class_list.php';
+$html = dcl_render_print_html(dcl_class_code('نهم1','نهم'), dcl_students_of_class('هفتم1','1404/1405'), 'مدرسه', false);
+/* شمارش ردیف‌های دانش‌آموز و بررسی فونت */
+preg_match('/@font-face\\{[^}]*\\}/', $html, $ff);
+echo json_encode([
+  'len'        => strlen($html),
+  'pages'      => substr_count($html, 'class="page"'),
+  'fontface'   => isset($ff[0]) ? $ff[0] : '',
+  'usesTitrTtf'=> (isset($ff[0]) && strpos($ff[0], 'B-Titr/B-Titr.ttf') !== false) ? 1 : 0,
+  'bodyFont'   => (strpos($html, "font-family:'BTitr'") !== false) ? 1 : 0,
+  'rows'       => substr_count($html, 'class="cell rownum"'),
+  'hdrLast'    => (strpos($html, '>نام خانوادگی<') !== false) ? 1 : 0,
+  'hdrFirst'   => (strpos($html, '>نام<') !== false) ? 1 : 0,
+  'hasClass'   => (strpos($html, 'کلاس : 1/9') !== false) ? 1 : 0,
+  'tbl2'       => (strpos($html, 'جدول ثبت میزان تدریس') !== false) ? 1 : 0,
+  'landscape'  => (strpos($html, 'size:A4 landscape') !== false) ? 1 : 0,
+  'firstName'  => (strpos($html, '>آبادی<') !== false) ? 1 : 0,
+  'escaped'    => (strpos($html, '<script>alert') === false) ? 1 : 0,
+], JSON_UNESCAPED_UNICODE);`);
+const P = await j("<?php require '/harness/pdf.php';");
+ok('نمای چاپی تولید می‌شود', typeof P.len === 'number' && P.len > 5000, JSON.stringify(P).slice(0, 140));
+ok('دو صفحه دارد (مثل قالب Word)', P.pages === 2, String(P.pages));
+ok('@font-face تعریف شده', P.fontface !== '', String(P.fontface).slice(0, 80));
+ok('فونت از همان فایل B-Titr بسته می‌آید', P.usesTitrTtf === 1);
+ok('کل متن با فونت تیتر است', P.bodyFont === 1);
+ok('جدول ۳۰ ردیف دانش‌آموز دارد', P.rows === 30, String(P.rows));
+ok('سرستون «نام خانوادگی» هست', P.hdrLast === 1);
+ok('سرستون «نام» هست', P.hdrFirst === 1);
+ok('کد کلاس با ترتیب RTL درست است', P.hasClass === 1);
+ok('صفحهٔ دوم «ثبت میزان تدریس» را دارد', P.tbl2 === 1);
+ok('کاغذ A4 افقی تنظیم شده', P.landscape === 1);
+ok('اسامی واقعی درج شده‌اند', P.firstName === 1);
+ok('خروجی HTML امن‌سازی می‌شود', P.escaped === 1);
+ok('چاپ تا آماده‌شدن فونت صبر می‌کند', libC.includes('document.fonts.ready'));
+ok('اگر فونت نیامد چاپ گیر نمی‌کند', /setTimeout\(go, 3000\)/.test(libC));
+
 console.log('\n══ امنیت و حالت‌های مرزی ══');
 ok('نام دانش‌آموز برای XML امن‌سازی می‌شود', libC.includes('function dcl_xml_escape'));
 ok('از htmlspecialchars با ENT_XML1 استفاده می‌شود', libC.includes('ENT_XML1'));
