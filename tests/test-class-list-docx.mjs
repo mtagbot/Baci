@@ -262,10 +262,10 @@ ok('سلول دارای vMerge قربانی حذف نمی‌شود (ادغام �
    libC.includes('vMerge') && libC.includes("w:val=\"restart\""));
 /* تعداد ستون جلسه حالا از خود شبکه حساب می‌شود، نه عدد ثابت — پس
    اگر شبکه عوض شود خودکار درست می‌ماند. */
-ok('نمای PDF ستون‌های جلسه را از شبکه حساب می‌کند',
-   /\$nSess\s*=\s*\$nCols - 1 - 2 - 5/.test(libC));
+ok('نمای PDF ستون‌ها را از شبکه حساب می‌کند، نه عدد ثابت',
+   /\$nCols\s*=\s*count\(\$grid\)/.test(libC));
 ok('عرض ستون‌های PDF از همان شبکهٔ Word می‌آید',
-   libC.includes('function dcl_print_grid') && /\$pc\[\] = round\(\$w \* 100 \/ \$total/.test(libC));
+   libC.includes('function dcl_print_grid') && /\$pc\[\]\s*=\s*round\(\$w \* 100 \/ \$total,/.test(libC));
 
 /* نام واقعاً بلند نباید ساختار را بشکند */
 php.writeFile('/harness/longname.php', `<?php
@@ -348,7 +348,7 @@ echo json_encode([
   'hdrFirst'   => (strpos($html, '>نام<') !== false) ? 1 : 0,
   'hasClass'   => (strpos($html, 'کلاس : 1/9') !== false) ? 1 : 0,
   'tbl2'       => (strpos($html, 'جدول ثبت میزان تدریس') !== false) ? 1 : 0,
-  'landscape'  => (strpos($html, 'size:A4 landscape') !== false) ? 1 : 0,
+  'portrait'   => (strpos($html, 'size:A4 portrait') !== false) ? 1 : 0,
   'firstName'  => (strpos($html, '>آبادی<') !== false) ? 1 : 0,
   'escaped'    => (strpos($html, '<script>alert') === false) ? 1 : 0,
 ], JSON_UNESCAPED_UNICODE);`);
@@ -363,7 +363,9 @@ ok('سرستون «نام خانوادگی» هست', P.hdrLast === 1);
 ok('سرستون «نام» هست', P.hdrFirst === 1);
 ok('کد کلاس با ترتیب RTL درست است', P.hasClass === 1);
 ok('صفحهٔ دوم «ثبت میزان تدریس» را دارد', P.tbl2 === 1);
-ok('کاغذ A4 افقی تنظیم شده', P.landscape === 1);
+/* v4.149.0 — قالب Word صریحاً A4 «عمودی» است (pgSz 11906×16838)؛
+   حالت افقی اشتباه من بود و کارفرما گرفتش. */
+ok('کاغذ A4 عمودی تنظیم شده', P.portrait === 1, String(P.portrait));
 ok('اسامی واقعی درج شده‌اند', P.firstName === 1);
 ok('خروجی HTML امن‌سازی می‌شود', P.escaped === 1);
 ok('چاپ تا آماده‌شدن فونت صبر می‌کند', libC.includes('document.fonts.ready'));
@@ -417,10 +419,12 @@ preg_match_all('/<col style="width:([\\d.]+)%">/', $cg, $cm);
 $htmlPct = array_map('floatval', $cm[1]);
 
 /* شمارش سلول هر ردیف در HTML جدول اول */
-preg_match('/<table>.*?<\\/table>/s', $html, $t1);
+/* جدول حالا style عرض دارد، پس <table> خالی دیگر تطابق نمی‌کند. */
+preg_match('/<table[^>]*>.*?<\\/table>/s', $html, $t1);
 preg_match_all('/<tr>.*?<\\/tr>/s', $t1[0], $trs);
 $dataRow = '';
 foreach ($trs[0] as $tr) { if (strpos($tr, 'حسینی نژاد') !== false) { $dataRow = $tr; break; } }
+if ($dataRow === '') { foreach ($trs[0] as $tr) { if (strpos($tr, 'class="r nm"') !== false) { $dataRow = $tr; break; } } }
 echo json_encode([
   'wordCols'  => count($wordCols),
   'htmlCols'  => count($htmlPct),
@@ -440,6 +444,66 @@ ok('هر ردیف داده در PDF ۱۶ سلول دارد', M.dataCells === 16,
 ok('حاشیهٔ سلول‌ها در فایل Word اعمال شده', M.tcMar > 0, String(M.tcMar));
 ok('PDF هم ۳۰ ردیف دانش‌آموز دارد', M.htmlRows === 30, String(M.htmlRows));
 ok('PDF دو برگه است', M.sheets === 2, String(M.sheets));
+
+console.log('\n══ A4 عمودی و جدول دعوت از اولیا (v4.149.0) ══');
+/* سه ایراد گزارش‌شده: کاغذ افقی بود، ابعاد با Word نمی‌خواند، و
+   جدول «دعوت از اولیا» اصلاً در PDF نبود. */
+ok('ابعاد صفحه از sectPr قالب می‌آید', libC.includes('function dcl_print_page'));
+ok('شبکهٔ جدول دوم هم تعریف شده', libC.includes('function dcl_print_grid2'));
+ok('جدول دوم ۷ ستون دارد (مثل قالب)',
+   /return \[773, 1409, 559, 1129, 3770, 1415, 1600\];/.test(libC));
+
+php.writeFile('/harness/p2.php', `<?php
+ini_set('display_errors','0'); error_reporting(0);
+require_once '/www/includes/db.php';
+require_once '/www/includes/functions.php';
+require_once '/www/includes/school_sort.php';
+require_once '/www/includes/class_schedule_sync.php';
+require_once '/www/includes/docx_class_list.php';
+$html = dcl_render_print_html('1/9', [['last'=>'آبادی','first'=>'بهار']], '', false);
+/* قالب واقعی */
+$z = new ZipArchive(); $z->open('/www/assets/templates/teacher-class-list.docx');
+$xml = $z->getFromName('word/document.xml'); $z->close();
+preg_match('/<w:pgSz w:w="(\\d+)" w:h="(\\d+)"/', $xml, $pg);
+preg_match('/<w:pgMar w:top="(\\d+)" w:right="(\\d+)" w:bottom="(\\d+)" w:left="(\\d+)"/', $xml, $mg);
+preg_match_all('/<w:tbl>.*?<\\/w:tbl>/s', $xml, $tm);
+preg_match('/<w:tblGrid>.*?<\\/w:tblGrid>/s', $tm[0][1], $g2);
+preg_match_all('/w:w="(\\d+)"/', $g2[0], $gw2);
+$tplG2 = array_map('intval', $gw2[1]);
+$sum2 = array_sum($tplG2);
+$tplPct2 = array_map(function ($w) use ($sum2) { return round($w * 100 / $sum2, 4); }, $tplG2);
+preg_match_all('/<colgroup>.*?<\\/colgroup>/s', $html, $cgs);
+preg_match_all('/<col style="width:([\\d.]+)%">/', $cgs[0][1] ?? '', $c2);
+$h2 = array_map('floatval', $c2[1]);
+preg_match('/\\.sheet\\{\\s*width:([\\d.]+)mm/', $html, $sw);
+preg_match('/min-height:([\\d.]+)mm/', $html, $sh);
+echo json_encode([
+  'portrait'   => strpos($html, 'size:A4 portrait') !== false ? 1 : 0,
+  'noLandscape'=> strpos($html, 'landscape') === false ? 1 : 0,
+  'pageW'      => isset($sw[1]) ? (float)$sw[1] : 0,
+  'pageH'      => isset($sh[1]) ? (float)$sh[1] : 0,
+  'tplW'       => round((int)$pg[1] / 56.7, 1),
+  'tplH'       => round((int)$pg[2] / 56.7, 1),
+  'grid2Match' => ($tplPct2 === $h2) ? 1 : 0,
+  'olia'       => substr_count($html, 'دعوت از اولیا'),
+  'oliaCols'   => (strpos($html, 'نام دانش آموز') !== false
+                   && strpos($html, 'علت دعوت') !== false
+                   && strpos($html, 'نتیجه') !== false) ? 1 : 0,
+  'tadris'     => substr_count($html, 'جدول ثبت میزان تدریس'),
+  'tplOlia'    => substr_count($xml, 'دعوت از اولیا'),
+  'sheets'     => substr_count($html, 'class="sheet"'),
+], JSON_UNESCAPED_UNICODE);`);
+const A = await j("<?php require '/harness/p2.php';");
+ok('کاغذ A4 عمودی است', A.portrait === 1, JSON.stringify(A).slice(0, 120));
+ok('هیچ اثری از حالت افقی نمانده', A.noLandscape === 1);
+ok('عرض برگه با قالب یکی است', Math.abs(A.pageW - A.tplW) < 0.6, `${A.pageW} vs ${A.tplW}`);
+ok('ارتفاع برگه با قالب یکی است', Math.abs(A.pageH - A.tplH) < 0.6, `${A.pageH} vs ${A.tplH}`);
+ok('نسبت ستون‌های جدول دوم دقیقاً مثل Word است', A.grid2Match === 1);
+ok('جدول «دعوت از اولیا» در قالب هست', A.tplOlia >= 1, String(A.tplOlia));
+ok('جدول «دعوت از اولیا» در PDF هم آمد', A.olia >= 1, String(A.olia));
+ok('سرستون‌های دعوت از اولیا کامل‌اند', A.oliaCols === 1);
+ok('«ثبت میزان تدریس» هم سر جایش است', A.tadris >= 1, String(A.tadris));
+ok('خروجی دو برگه است', A.sheets === 2, String(A.sheets));
 
 console.log('\n══ امنیت و حالت‌های مرزی ══');
 ok('نام دانش‌آموز برای XML امن‌سازی می‌شود', libC.includes('function dcl_xml_escape'));
