@@ -141,5 +141,45 @@ ok('فقط یک نقطهٔ شکست برای پنهان‌سازی کاشی‌ه
    tileDisplayRules.length === 1 && tileDisplayRules[0] === 1024,
    JSON.stringify(tileDisplayRules));
 
+console.log('\n══ sprite آیکون‌ها هرگز دیده نمی‌شود (v4.144.0) ══');
+/* باگ گزارش‌شده روی کروم اندروید: sprite آیکون‌های کاشی داخل
+   <nav class="hdr-tiles"> چاپ می‌شد و آن nav در موبایل display:none
+   است. به‌جای نادیده‌گرفتن، کروم svg را با ابعاد ذاتی ۳۰۰×۱۵۰ سیاه
+   وسط صفحه رندر می‌کرد و کل رابط را غیرقابل استفاده می‌کرد. */
+import { readFileSync as _rf } from 'node:fs';
+const tileIcons = _rf(resolveFile('includes/tile_icons.php'), 'utf8');
+const tilesPhp  = _rf(resolveFile('includes/header_tiles.php'), 'utf8');
+const emIcons   = _rf(resolveFile('includes/em_icons.php'), 'utf8');
+const ornPhp    = _rf(resolveFile('includes/card_ornaments.php'), 'utf8');
+
+ok('sprite پیش از nav چاپ می‌شود (نه داخل والد پنهان)', (() => {
+    const sp  = tilesPhp.indexOf('tile_icon_sprite()');
+    const nav = tilesPhp.indexOf("echo '<nav class=\"hdr-tiles\"");
+    return sp !== -1 && nav !== -1 && sp < nav;
+})());
+for (const [name, src] of [['tile_icons', tileIcons], ['em_icons', emIcons], ['card_ornaments', ornPhp]]) {
+    ok(`sprite «${name}» کلاس شناسایی دارد`, src.includes('class="tile-sprite"'));
+    ok(`sprite «${name}» ابعاد صفر در style دارد`, /style="[^"]*width:0;height:0/.test(src));
+    ok(`sprite «${name}» با visibility پنهان است`, /style="[^"]*visibility:hidden/.test(src));
+    ok(`sprite «${name}» بیرون از کادر دید است`, /style="[^"]*left:-9999px/.test(src));
+    ok(`sprite «${name}» viewBox صفر دارد`, src.includes('viewBox="0 0 0 0"'));
+}
+ok('قاعدهٔ CSS پشتیبان برای sprite وجود دارد', /svg\.tile-sprite\{/.test(css));
+ok('قاعدهٔ CSS همهٔ راه‌های نمایش را می‌بندد', (() => {
+    const m = css.match(/svg\.tile-sprite\{([^}]*)\}/);
+    if (!m) return false;
+    return ['position:absolute', 'width:0', 'height:0', 'overflow:hidden',
+            'visibility:hidden', 'left:-9999px'].every(p => m[1].includes(p));
+})());
+ok('sprite در هر عرضی پنهان است، نه فقط موبایل', (() => {
+    /* اگر قاعده داخل media query بود، فقط در همان بازه کار می‌کرد */
+    const i = css.indexOf('svg.tile-sprite{');
+    const before = css.slice(0, i);
+    const opens = (before.match(/@media[^{]*\{/g) || []).length;
+    let depth = 0;
+    for (const ch of before) { if (ch === '{') depth++; else if (ch === '}') depth--; }
+    return depth === 0;
+})());
+
 console.log(`\n  سوئیت هدر موبایل و تبلت: ${pass} PASS / ${fail} FAIL`);
 process.exit(fail ? 1 : 0);
