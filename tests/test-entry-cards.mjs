@@ -180,16 +180,44 @@ const qrOf = (sel) => {
 };
 ok('سه شکل کارت وجود دارد (کامل، تگ‌محور، مربع)',
    /\['full', 'qrmax', 'sq'\]/.test(pageC));
-ok('کارت مربع ۵۴×۵۴ تعریف شده', /\.card-id\.sq\{width:54mm;height:54mm\}/.test(styles));
-ok('QR کارت مربع دست‌کم ۴۸ میلی‌متر است', qrOf('.card-id.sq .card-qr') >= 48,
+ok('کارت مربع ۵۴×۵۴ تعریف شده', /\.card-id\.sq\{width:54mm;height:54mm/.test(styles));
+ok('QR کارت مربع دست‌کم ۴۹ میلی‌متر است', qrOf('.card-id.sq .card-qr') >= 49,
    String(qrOf('.card-id.sq .card-qr')));
-ok('کارت مربع: QR دست‌کم ۷۵٪ مساحت را می‌گیرد', (() => {
+ok('کارت مربع: QR دست‌کم ۸۰٪ مساحت را می‌گیرد', (() => {
     const q = qrOf('.card-id.sq .card-qr');
-    return (q * q) / (54 * 54) >= 0.75;
+    return (q * q) / (54 * 54) >= 0.80;
 })(), ((qrOf('.card-id.sq .card-qr') ** 2) / (54 * 54) * 100).toFixed(0) + '%');
-ok('QR کارت مربع داخل کارت جا می‌شود', qrOf('.card-id.sq .card-qr') + 6 <= 54);
-ok('حالت تگ‌محور مستطیلی QR دست‌کم ۵۰ میلی‌متر دارد',
-   qrOf('.card-id.qrmax .card-qr') >= 50, String(qrOf('.card-id.qrmax .card-qr')));
+/* v4.140.0 — این بررسی قبلاً «qr + 6 <= 54» بود؛ عدد ۶ حدسی بود و
+   ارتفاع واقعی سربرگ ۶٫۴ بود، پس ۱٫۳mm سرریزِ واقعی را نگرفت و
+   کارفرما آن را روی کارت دید. حالا ارتفاع سربرگ و فاصلهٔ بالای QR
+   از خودِ CSS خوانده و جمع می‌شوند. */
+const mmOf = (sel, prop) => {
+    const re = new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\{[^}]*' + prop + ':([\\d.]+)mm');
+    const m = styles.match(re);
+    return m ? parseFloat(m[1]) : null;
+};
+ok('QR کارت مربع واقعاً داخل کارت جا می‌شود (بدون سرریز)', (() => {
+    const head = mmOf('.card-id.sq .card-head', 'height');
+    const top  = mmOf('.card-id.sq .card-qr-box', 'top');
+    const qr   = qrOf('.card-id.sq .card-qr');
+    if (head === null || top === null || !qr) return false;
+    const total = head + top + qr;
+    return total <= 54;
+})(), (() => {
+    const head = mmOf('.card-id.sq .card-head', 'height');
+    const top  = mmOf('.card-id.sq .card-qr-box', 'top');
+    const qr   = qrOf('.card-id.sq .card-qr');
+    return `سربرگ ${head} + top ${top} + QR ${qr} = ${(head + top + qr).toFixed(1)}mm`;
+})());
+ok('QR حالت تگ‌محور مستطیلی هم سرریز ندارد', (() => {
+    const head = mmOf('.card-id.qrmax .card-head', 'height');
+    const top  = mmOf('.card-id.qrmax .card-qr-box', 'top');
+    const qr   = qrOf('.card-id.qrmax .card-qr');
+    return head !== null && top !== null && qr && (head + top + qr) <= 54;
+})());
+/* ۴۹mm سقفِ بدون سرریز است: ۴٫۴ سربرگ + ۰٫۳ فاصله + ۴۹ = ۵۳٫۷ از ۵۴ */
+ok('حالت تگ‌محور مستطیلی QR دست‌کم ۴۹ میلی‌متر دارد',
+   qrOf('.card-id.qrmax .card-qr') >= 49, String(qrOf('.card-id.qrmax .card-qr')));
 ok('تگ‌محور مستطیلی: QR دست‌کم ۹۰٪ ارتفاع کارت است',
    qrOf('.card-id.qrmax .card-qr') / 54 >= 0.90);
 ok('پشت کارت مربع QR تمام‌صفحه دارد', qrOf('.card-back.sq .card-back-qr') >= 50);
@@ -202,6 +230,37 @@ ok('پیش‌نمایش هم شکل را اعمال می‌کند', pageC.includ
 ok('کلاس شکل با فاصلهٔ درست چاپ می‌شود (clean حذفش نکند)',
    face.includes("$_layCls !== '' ? ' ' . clean($_layCls)"));
 ok('پیش‌نمایش صفحه هم کلید layout دارد', /\$D = \[[^\]]*'layout'/.test(pageC));
+
+console.log('\n══ چیدمان v4.140.0 ══');
+ok('حالت کامل: عکس بالای ستون چپ است', (() => {
+    const m = styles.match(/\.card-photo\{[^}]*top:([\d.]+)mm/);
+    return m && parseFloat(m[1]) < 5;
+})());
+ok('حالت کامل: اطلاعات زیر عکس آمده', (() => {
+    const m = styles.match(/\.card-info\{[^}]*top:([\d.]+)mm/);
+    return m && parseFloat(m[1]) > 10;
+})());
+ok('حالت تگ‌محور: عکس بالا و اطلاعات پایین', (() => {
+    const ph = styles.match(/\.card-id\.qrmax \.card-photo,[\s\S]{0,80}?top:([\d.]+)mm/);
+    const inf = styles.match(/\.card-id\.qrmax \.card-info\{top:([\d.]+)mm/);
+    return ph && inf && parseFloat(ph[1]) < parseFloat(inf[1]);
+})());
+ok('حالت مربع: نام دانش‌آموز کنار نام مدرسه است', (() => {
+    /* شاخهٔ sq تا else ادامه دارد؛ کامنت PHP وسطش هست، پس تا
+       «else» می‌بریم نه تا اولین </div>. */
+    const m = face.match(/\$_layout === 'sq'\)[\s\S]*?else:/);
+    return !!m && /card-school[\s\S]*\$schoolShort[\s\S]*\$fullName/.test(m[0]);
+})());
+ok('حالت مربع: کلاس و پایه نمایش داده نمی‌شوند',
+   /\.card-id\.sq \.card-info,[\s\S]{0,220}display:none/.test(styles));
+ok('حالت مربع: لوگو و نقش سربرگ هم پنهان‌اند (جا برای QR)',
+   /\.card-id\.sq \.card-meta,[\s\S]{0,140}display:none/.test(styles));
+ok('حالت مربع: حاشیهٔ اطراف QR بسیار کم است', (() => {
+    const top = mmOf('.card-id.sq .card-qr-box', 'top');
+    return top !== null && top <= 0.5;
+})());
+ok('حالت مربع: نوار رنگی سربرگ برای صرفه‌جویی حذف شده',
+   /\.card-id\.sq \.card-head::after\{display:none\}/.test(styles));
 
 console.log('\n══ تنوع تصویرسازی ══');
 const symAll = [...orn.matchAll(/<symbol id="orn-([\w-]+)"/g)].map(m => m[1]);
