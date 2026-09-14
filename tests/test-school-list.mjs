@@ -43,11 +43,20 @@ function inspectDoc($bytes) {
         $sum=0; foreach($xp->query('./w:tc',$row) as $cell){$s=$xp->query('./w:tcPr/w:gridSpan',$cell)->item(0);$sum+=$s?(int)$s->getAttributeNS(SRL_W,'val'):1;} if($sum!==21)$spans=false;
     }
     // Inspect every header/name cell, including empty cells and continuation sheets.
-    $nameCells = 0; $naturalNames = true;
+    $nameCells = 0; $naturalNames = true; $singleLineNames = true;
     foreach ($xp->query('//w:tbl/w:tr[position() >= 2 and position() <= 31]') as $row) {
         foreach ($xp->query('./w:tc', $row) as $i => $cell) {
             if ($i % 7 === 0) continue; // The three row-number columns.
             $nameCells++;
+            if ($xp->query('./w:tcPr/w:noWrap', $cell)->length !== 1) $singleLineNames = false;
+            foreach (['left','right'] as $side) {
+                if ($xp->evaluate('string(./w:tcPr/w:tcMar/w:' . $side . '/@w:w)', $cell) !== '20') $singleLineNames = false;
+            }
+            $nameText = $xp->evaluate('string(./w:p)', $cell);
+            if (strpos($nameText, ' ') !== false || strpos($nameText, chr(10)) !== false) $singleLineNames = false;
+            $half = (int)$xp->evaluate('string(./w:p/w:r/w:rPr/w:szCs/@w:val)', $cell);
+            $cellWidth = (int)$xp->evaluate('string(./w:tcPr/w:tcW/@w:w)', $cell);
+            if (srl_name_width_em($nameText) * $half / 2 * 1.10 > ($cellWidth - 40) / 20 - 1.0) $singleLineNames = false;
             if ($xp->query('./w:tcPr/w:tcFitText | .//w:rPr/w:fitText | .//w:rPr/w:spacing | .//w:rPr/w:w', $cell)->length !== 0) $naturalNames = false;
             if ($xp->evaluate('string(./w:p/w:pPr/w:jc/@w:val)', $cell) !== 'center') $naturalNames = false;
         }
@@ -58,7 +67,7 @@ function inspectDoc($bytes) {
     $layout=$doc->saveXML($xp->query('//w:sectPr')->item(0))===$ox->saveXML($oxp->query('//w:sectPr')->item(0));
     $z->close();$original->close();
     return ['valid'=>$valid,'title'=>$text,'tables'=>$xp->query('//w:tbl')->length,'cols'=>$xp->query('./w:tblGrid/w:gridCol',$t)->length,'rows'=>$rows->length,
-        'nameCells'=>$nameCells, 'naturalNames'=>$naturalNames,
+        'singleLineNames'=>$singleLineNames, 'nameCells'=>$nameCells, 'naturalNames'=>$naturalNames,
         'width'=>$width,'spans'=>$spans,'unchanged'=>$unchanged,'layout'=>$layout,
         'firstCode'=>$xp->evaluate('string(./w:tr[1]/w:tc[2])',$t),
         'codeLTR'=>$xp->evaluate('string(./w:tr[1]/w:tc[2]/w:p/w:r/w:rPr/w:rtl/@w:val)',$t),
@@ -67,6 +76,24 @@ function inspectDoc($bytes) {
         'footer'=>$xp->evaluate('string(./w:tr[last()])',$t), 'xml'=>$xml];
 }
 $base=inspectDoc($bytes);
+// Isolated long-name fixture, so class/student counts in the main regression stay fixed.
+$longData = $d;
+$longData['groups'][0]['classes'][0]['students'][0]['first_name'] = 'سید محمد طاها';
+$longData['groups'][0]['classes'][0]['students'][0]['last_name'] = 'حسینی‌نژاد موسوی';
+$longBytes = srl_generate($longData);
+file_put_contents('/harness/school-long-names.docx', $longBytes);
+$longDoc = inspectDoc($longBytes);
+$ld = new DOMDocument(); $ld->loadXML($longDoc['xml']); $lx=srl_xpath($ld);
+$firstPath = '//w:tbl[1]/w:tr[3]/w:tc[3]';
+$longInfo = [
+ 'text'=>$lx->evaluate('string(' . $firstPath . '/w:p)'),
+ 'size'=>$lx->evaluate('string(' . $firstPath . '/w:p/w:r/w:rPr/w:szCs/@w:val)'),
+ 'sz'=>$lx->evaluate('string(' . $firstPath . '/w:p/w:r/w:rPr/w:sz/@w:val)'),
+ 'shortSize'=>$lx->evaluate('string(//w:tbl[1]/w:tr[4]/w:tc[3]/w:p/w:r/w:rPr/w:szCs/@w:val)'),
+ 'headerSize'=>$lx->evaluate('string(//w:tbl[1]/w:tr[2]/w:tc[2]/w:p/w:r/w:rPr/w:szCs/@w:val)'),
+ 'last'=>$lx->evaluate('string(//w:tbl[1]/w:tr[3]/w:tc[2]/w:p)'),
+ 'natural'=>$longDoc['naturalNames'], 'singleLine'=>$longDoc['singleLineNames']
+];
 // Unequal class counts, numeric class names and >29 students. No name may disappear.
 DB::execute('INSERT INTO classes(name,grade,academic_year) VALUES(?,?,?)',['7/4','7','1405/1406']);
 for($i=1;$i<=36;$i++)student('7/4','7','نام'.$i,'خانوادگی'.$i);
@@ -80,7 +107,7 @@ $missing=false;try{srl_generate($d,'/not-found.docx');}catch(RuntimeException $e
 $invalid=false;try{srl_year('بدون سال');}catch(RuntimeException $e){$invalid=true;}
 $html=dcl_render_print_html(dcl_class_code('هفتم1','هفتم'),[], '',false);
 file_put_contents('/harness/teacher-print.html',$html);
-echo json_encode(['data'=>$d,'base'=>$base,'more'=>$more,'overflow'=>$overflow,'blocked'=>$blocked,'missing'=>$missing,'invalid'=>$invalid,
+echo json_encode(['long'=>$longInfo,'data'=>$d,'base'=>$base,'more'=>$more,'overflow'=>$overflow,'blocked'=>$blocked,'missing'=>$missing,'invalid'=>$invalid,
     'numeric'=>srl_class_info('۷/۴','۷'),'reversed'=>srl_class_info('4/7','هفتم'),
     'pdfLTR'=>strpos($html,'<bdi dir="ltr" class="class-code">1/7</bdi>')!==false,
     'pdfTitle'=>strpos($html,'.title-row{height:8mm}')!==false],JSON_UNESCAPED_UNICODE);
@@ -90,6 +117,13 @@ let r;
 try { r = JSON.parse(output.out.trim()); } catch { console.log(output); process.exit(1); }
 const b = r.base, o = r.overflow;
 ok('DOCX parses as XML', b.valid);
+ok('all main-sheet name cells: narrow padding, no-wrap, size within width budget', b.singleLineNames);
+ok('all continuation name cells: narrow padding, no-wrap, size within width budget', o.singleLineNames);
+ok('multi-word example keeps exact visible letters and word spacing', r.long.text === 'سید\u00a0محمد\u00a0طاها');
+ok('long example uses smaller uniform point size, not tracking or glyph scaling', +r.long.size < 24 && +r.long.size >= 14 && r.long.size === r.long.sz && r.long.natural && r.long.singleLine);
+ok('short names retain original 12 pt size', r.long.shortSize === '24');
+ok('headers retain original 9 pt size', r.long.headerSize === '18');
+ok('ZWNJ and surname spelling preserved', r.long.last === 'حسینی‌نژاد\u00a0موسوی');
 ok('all 540 name/header cells have natural unscaled centered text', b.nameCells === 540 && b.naturalNames);
 ok('all 1620 continuation name/header cells have natural unscaled centered text', o.nameCells === 1620 && o.naturalNames);
 ok('academic year range explicitly LTR', b.xml.includes('<w:dir w:val="ltr">'));
@@ -104,7 +138,7 @@ ok('all row spans match grid, including footer', b.spans && o.spans);
 ok('sum of column widths unchanged', b.width === 23747);
 ok('page size, margins and section properties unchanged', b.layout);
 ok('every non-document ZIP part byte-identical', b.unchanged);
-ok('family name first on RTL table', b.lastHeader === 'نام خانوادگی' && b.firstHeader === 'نام');
+ok('family name first on RTL table', b.lastHeader.replaceAll('\u00a0',' ') === 'نام خانوادگی' && b.firstHeader === 'نام');
 ok('Persian sorting: آبادی before باقری', b.last === 'آبادی' && b.first === 'محمد');
 ok('explicit numeric class 1/7 in LTR run', b.firstCode === '1/7' && b.codeLTR === '0');
 ok('grade footers contain totals', (b.footer.match(/جمع کل 6/g) || []).length === 3 && !b.footer.includes('00'));
@@ -113,14 +147,14 @@ ok('full original Titr family retained (no B Titr substitution)', b.xml.includes
 ok('continuation sheets for fourth class AND 36 students', o.tables === 3);
 ok('overflow total = 55, grade-seven total = 43', r.more.total === 55 && r.more.groups[0].total === 43);
 ok('every overflow student appears exactly once', Array.from({length:36},(_,i)=>`نام${i+1}`).every(name => o.xml.split(`>${name}<`).length - 1 === 1));
-ok('XML-special names safely escaped', o.xml.includes('&lt;علی &amp; رضا&gt;'));
+ok('XML-special names safely escaped', o.xml.replaceAll('\u00a0',' ').includes('&lt;علی &amp; رضا&gt;'));
 ok('no unclassified students silently dropped', r.blocked);
 ok('missing template gives controlled error', r.missing);
 ok('invalid current year gives controlled error', r.invalid);
 ok('PDF class code isolated LTR', r.pdfLTR);
 ok('PDF title row raised to 8 mm', r.pdfTitle);
 mkdirSync(join(REPO,'.cache/roster-tests'), {recursive:true});
-for (const f of ['school-sample.docx','school-overflow.docx','teacher-print.html']) writeFileSync(join(REPO,'.cache/roster-tests',f),php.readFileAsBuffer('/harness/'+f));
+for (const f of ['school-sample.docx','school-overflow.docx','school-long-names.docx','teacher-print.html']) writeFileSync(join(REPO,'.cache/roster-tests',f),php.readFileAsBuffer('/harness/'+f));
 await loginAdmin();
 const admin = await req('school tab', {file:'reports-lists.php',query:'tab=school',sid:'harnessAdm0001'});
 ok('admin can open new school tab', !admin.res.fatal && admin.res.page.includes('دریافت لیست کل مدرسه (Word)'));

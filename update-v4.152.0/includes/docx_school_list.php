@@ -130,6 +130,127 @@ function srl_span(DOMElement $cell, $span) {
     $el->setAttributeNS(SRL_W, 'w:val', (string)$span);
 }
 
+/** Conservative width estimate in ems, without modifying the displayed text.
+ * Advances (rounded UP to 1/1000 em) come from the bundled B Titr's isolated,
+ * final, initial and medial glyphs. They are a measurement reference only:
+ * the document keeps its original 2 Titr font, which is not bundled.
+ * Contextual forms avoid treating every joined Persian letter as a wide isolated glyph.
+ * No dependency on GD/Intl or a locally installed font on either platform.
+ */
+function srl_name_width_em($text) {
+    static $forms = [
+        'ا' => [260, 301, null, null],
+        'ب' => [742, 810, 230, 282],
+        'ت' => [742, 810, 230, 282],
+        'ث' => [742, 810, 230, 282],
+        'ج' => [629, 661, 593, 608],
+        'ح' => [629, 661, 593, 608],
+        'خ' => [629, 661, 593, 608],
+        'د' => [473, 578, null, null],
+        'ذ' => [473, 578, null, null],
+        'ر' => [438, 476, null, null],
+        'ز' => [438, 476, null, null],
+        'ژ' => [438, 476, null, null],
+        'س' => [978, 1024, 514, 571],
+        'ش' => [978, 1024, 514, 573],
+        'ص' => [1049, 1084, 609, 646],
+        'ض' => [1049, 1084, 609, 646],
+        'ط' => [759, 797, 594, 634],
+        'ظ' => [759, 797, 594, 634],
+        'ع' => [643, 616, 430, 401],
+        'غ' => [638, 616, 430, 400],
+        'ف' => [757, 816, 329, 335],
+        'ق' => [633, 661, 329, 335],
+        'ک' => [893, 931, 437, 491],
+        'ك' => [893, 931, 437, 491],
+        'ل' => [612, 664, 263, 275],
+        'م' => [508, 518, 384, 448],
+        'ن' => [647, 684, 230, 282],
+        'و' => [432, 464, null, null],
+        'ه' => [430, 462, 467, 375],
+        'ة' => [430, 462, null, null],
+        'ی' => [728, 786, 265, 282],
+        'ي' => [728, 786, 265, 282],
+        'ئ' => [728, 786, 230, 282],
+        'أ' => [240, 294, null, null],
+        'إ' => [240, 296, null, null],
+        'آ' => [473, 399, null, null],
+        'ؤ' => [432, 464, null, null],
+        'ء' => [388, null, null, null],
+        'ۀ' => [430, 462, null, null],
+        'پ' => [742, 810, 230, 282],
+        'چ' => [629, 661, 593, 608],
+        'گ' => [899, 931, 412, 464],
+    ];
+    // Marks/ZWJ do not add advance; ZWNJ must remain a joining boundary.
+    $letters = preg_split('//u', preg_replace('/[\p{M}\x{200D}]/u', '', $text), -1, PREG_SPLIT_NO_EMPTY);
+    $total = 0;
+    foreach ($letters as $i => $char) {
+        if (isset($forms[$char])) {
+            $f = $forms[$char];
+            $prev = $forms[$letters[$i - 1] ?? ''] ?? null;
+            $next = $forms[$letters[$i + 1] ?? ''] ?? null;
+            $joinPrev = $prev && $prev[2] !== null && $f[1] !== null;
+            $joinNext = $next && $next[1] !== null && $f[2] !== null;
+            $form = $joinPrev ? ($joinNext ? 3 : 1) : ($joinNext ? 2 : 0);
+            $total += $f[$form] ?? max(array_filter($f, 'is_numeric'));
+        } elseif (preg_match('/[\s\p{Zs}]/u', $char)) {
+            $total += 200;
+        } elseif (preg_match('/[\p{Cf}]/u', $char)) {
+            // Includes the ZWNJ joining boundary: no advance, no joining across it.
+        } elseif (preg_match('/[0-9۰-۹٠-٩]/u', $char)) {
+            $total += 650;
+        } else {
+            $total += 1100; // Conservative fallback for Latin, punctuation and rare characters.
+        }
+    }
+    return $total / 1000;
+}
+
+/** Fit by reducing point size uniformly, never by stretching glyphs or tracking.
+ * Original font sizes are a ceiling, not a target to fill the cell with.
+ */
+function srl_single_line_name(DOMElement $cell, $text) {
+    $xp = srl_xpath($cell->ownerDocument);
+    $pr = $xp->query('./w:tcPr', $cell)->item(0);
+    $width = (int)$xp->query('./w:tcW', $pr)->item(0)->getAttributeNS(SRL_W, 'w');
+    // 20 twips per side (~0.35 mm), instead of Word's implicit 108 twips.
+    foreach (iterator_to_array($xp->query('./w:noWrap | ./w:tcMar | ./w:tcFitText', $pr)) as $old) $pr->removeChild($old);
+    $before = $xp->query('./w:textDirection | ./w:vAlign | ./w:hideMark', $pr)->item(0);
+    $wrap = $cell->ownerDocument->createElementNS(SRL_W, 'w:noWrap');
+    $pr->insertBefore($wrap, $before);
+    $mar = $cell->ownerDocument->createElementNS(SRL_W, 'w:tcMar');
+    $pr->insertBefore($mar, $before);
+    foreach (['left', 'right'] as $side) srl_prop($mar, $side, ['w' => 20, 'type' => 'dxa']);
+
+    // NBSP keeps multi-word names together without changing visible word spacing.
+    // No ZWNJ removal, kashida insertion, character scaling or fitText.
+    $display = preg_replace('/[\s\p{Zs}]+/u', "\u{00A0}", trim((string)$text));
+    srl_cell_text($cell, $display);
+    $runPr = $xp->query('./w:p/w:r/w:rPr', $cell)->item(0);
+    $sizeNode = $xp->query('./w:szCs', $runPr)->item(0) ?: $xp->query('./w:sz', $runPr)->item(0);
+    $original = $sizeNode ? (int)$sizeNode->getAttributeNS(SRL_W, 'val') : 24;
+    $ems = srl_name_width_em($display);
+    // Reserve 10% for differences between Titr variants plus 1pt for ink/borders.
+    $usablePt = max(1.0, ($width - 40) / 20 - 1.0);
+    $halfPoints = $ems > 0 ? min($original, max(2, (int)floor(2 * $usablePt / ($ems * 1.10)))) : $original;
+    if ($halfPoints < $original) {
+        foreach ($xp->query('./w:p/w:r/w:rPr | ./w:p/w:pPr/w:rPr', $cell) as $rp) {
+            foreach (['sz', 'szCs'] as $tag) {
+                $size = $xp->query('./w:' . $tag, $rp)->item(0);
+                if (!$size) {
+                    $size = $cell->ownerDocument->createElementNS(SRL_W, 'w:' . $tag);
+                    $anchor = $tag === 'sz'
+                        ? './w:szCs | ./w:rtl | ./w:lang'
+                        : './w:rtl | ./w:lang';
+                    $rp->insertBefore($size, $xp->query($anchor, $rp)->item(0));
+                }
+                $size->setAttributeNS(SRL_W, 'w:val', (string)$halfPoints);
+            }
+        }
+    }
+}
+
 function srl_split_cell(DOMElement $cell, $last, $first) {
     $xp = srl_xpath($cell->ownerDocument);
     $width = $xp->query('./w:tcPr/w:tcW', $cell)->item(0);
@@ -139,11 +260,8 @@ function srl_split_cell(DOMElement $cell, $last, $first) {
     $cell->parentNode->insertBefore($copy, $cell->nextSibling);
     $width->setAttributeNS(SRL_W, 'w:w', (string)$lastW);
     $xp->query('./w:tcPr/w:tcW', $copy)->item(0)->setAttributeNS(SRL_W, 'w:w', (string)($w - $lastW));
-    srl_cell_text($cell, $last); srl_cell_text($copy, $first);
-    // Do not add w:tcFitText: Word fits text by changing character spacing,
-    // which stretches short Persian names and even the two column headers.
-    // Keep the template's centered paragraphs, natural glyph widths and font sizes.
-    // Long names may wrap normally; never stretch or condense them to fill a cell.
+    srl_single_line_name($cell, $last);
+    srl_single_line_name($copy, $first);
 }
 
 /** Preserve title spacing and mixed run formatting; change only zero placeholders. */
