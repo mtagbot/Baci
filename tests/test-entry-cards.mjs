@@ -168,6 +168,41 @@ ok('حاشیهٔ سفید QR استاندارد است (۴ ماژول)',
 ok('هر دو canvas در چاپ رسم می‌شوند',
    (pageC.match(/canvas\.card-qr\[data-qr\],canvas\.card-back-qr\[data-qr\]/g) || []).length === 2);
 
+console.log('\n══ حالت تگ‌محور (QR-first) ══');
+/* خواستهٔ کارفرما «۸۰٪ کارت را QR بگیرد».
+   روی کارت مستطیلی ۸۵٫۶×۵۴ این از نظر هندسی ناممکن است: مربع ۸۰٪
+   باید ۶۰٫۸mm ضلع داشته باشد که از ارتفاع ۵۴mm بلندتر است. سقف مطلق
+   ۶۳٪ است. پس شکل مربع ۵۴×۵۴ اضافه شد که ۷۹٪ می‌دهد. */
+const qrOf = (sel) => {
+    const re = new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\{[^}]*width:([\\d.]+)mm');
+    const m = styles.match(re);
+    return m ? parseFloat(m[1]) : 0;
+};
+ok('سه شکل کارت وجود دارد (کامل، تگ‌محور، مربع)',
+   /\['full', 'qrmax', 'sq'\]/.test(pageC));
+ok('کارت مربع ۵۴×۵۴ تعریف شده', /\.card-id\.sq\{width:54mm;height:54mm\}/.test(styles));
+ok('QR کارت مربع دست‌کم ۴۸ میلی‌متر است', qrOf('.card-id.sq .card-qr') >= 48,
+   String(qrOf('.card-id.sq .card-qr')));
+ok('کارت مربع: QR دست‌کم ۷۵٪ مساحت را می‌گیرد', (() => {
+    const q = qrOf('.card-id.sq .card-qr');
+    return (q * q) / (54 * 54) >= 0.75;
+})(), ((qrOf('.card-id.sq .card-qr') ** 2) / (54 * 54) * 100).toFixed(0) + '%');
+ok('QR کارت مربع داخل کارت جا می‌شود', qrOf('.card-id.sq .card-qr') + 6 <= 54);
+ok('حالت تگ‌محور مستطیلی QR دست‌کم ۵۰ میلی‌متر دارد',
+   qrOf('.card-id.qrmax .card-qr') >= 50, String(qrOf('.card-id.qrmax .card-qr')));
+ok('تگ‌محور مستطیلی: QR دست‌کم ۹۰٪ ارتفاع کارت است',
+   qrOf('.card-id.qrmax .card-qr') / 54 >= 0.90);
+ok('پشت کارت مربع QR تمام‌صفحه دارد', qrOf('.card-back.sq .card-back-qr') >= 50);
+ok('در حالت مربع، عناصر غیرضروری پنهان می‌شوند',
+   /\.card-id\.sq \.card-photo,[\s\S]{0,200}display:none/.test(styles));
+ok('شکل کارت با allow-list محدود شده', /in_array\(\(\$_GET\['layout'\] \?\? 'full'\)/.test(pageC));
+ok('انتخاب شکل در ویرایشگر هست', pageC.includes('id="cLayout"'));
+ok('شکل کارت به نمای چاپ فرستاده می‌شود', pageC.includes("params.set('layout'"));
+ok('پیش‌نمایش هم شکل را اعمال می‌کند', pageC.includes("classList.add('sq')"));
+ok('کلاس شکل با فاصلهٔ درست چاپ می‌شود (clean حذفش نکند)',
+   face.includes("$_layCls !== '' ? ' ' . clean($_layCls)"));
+ok('پیش‌نمایش صفحه هم کلید layout دارد', /\$D = \[[^\]]*'layout'/.test(pageC));
+
 console.log('\n══ تنوع تصویرسازی ══');
 const symAll = [...orn.matchAll(/<symbol id="orn-([\w-]+)"/g)].map(m => m[1]);
 ok('دست‌کم ۱۲ نقش ایرانی موجود است', symAll.length >= 12, String(symAll.length));
