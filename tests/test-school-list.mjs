@@ -42,12 +42,23 @@ function inspectDoc($bytes) {
     foreach($xp->query('//w:tr') as $row) {
         $sum=0; foreach($xp->query('./w:tc',$row) as $cell){$s=$xp->query('./w:tcPr/w:gridSpan',$cell)->item(0);$sum+=$s?(int)$s->getAttributeNS(SRL_W,'val'):1;} if($sum!==21)$spans=false;
     }
+    // Inspect every header/name cell, including empty cells and continuation sheets.
+    $nameCells = 0; $naturalNames = true;
+    foreach ($xp->query('//w:tbl/w:tr[position() >= 2 and position() <= 31]') as $row) {
+        foreach ($xp->query('./w:tc', $row) as $i => $cell) {
+            if ($i % 7 === 0) continue; // The three row-number columns.
+            $nameCells++;
+            if ($xp->query('./w:tcPr/w:tcFitText | .//w:rPr/w:fitText | .//w:rPr/w:spacing | .//w:rPr/w:w', $cell)->length !== 0) $naturalNames = false;
+            if ($xp->evaluate('string(./w:p/w:pPr/w:jc/@w:val)', $cell) !== 'center') $naturalNames = false;
+        }
+    }
     $original = new ZipArchive(); $original->open(srl_template_path()); $unchanged=true;
     for($i=0;$i<$original->numFiles;$i++){ $n=$original->getNameIndex($i);if($n!=='word/document.xml' && $original->getFromName($n)!==$z->getFromName($n))$unchanged=false; }
     $ox = new DOMDocument(); $ox->loadXML($original->getFromName('word/document.xml'));$oxp=srl_xpath($ox);
     $layout=$doc->saveXML($xp->query('//w:sectPr')->item(0))===$ox->saveXML($oxp->query('//w:sectPr')->item(0));
     $z->close();$original->close();
     return ['valid'=>$valid,'title'=>$text,'tables'=>$xp->query('//w:tbl')->length,'cols'=>$xp->query('./w:tblGrid/w:gridCol',$t)->length,'rows'=>$rows->length,
+        'nameCells'=>$nameCells, 'naturalNames'=>$naturalNames,
         'width'=>$width,'spans'=>$spans,'unchanged'=>$unchanged,'layout'=>$layout,
         'firstCode'=>$xp->evaluate('string(./w:tr[1]/w:tc[2])',$t),
         'codeLTR'=>$xp->evaluate('string(./w:tr[1]/w:tc[2]/w:p/w:r/w:rPr/w:rtl/@w:val)',$t),
@@ -79,6 +90,8 @@ let r;
 try { r = JSON.parse(output.out.trim()); } catch { console.log(output); process.exit(1); }
 const b = r.base, o = r.overflow;
 ok('DOCX parses as XML', b.valid);
+ok('all 540 name/header cells have natural unscaled centered text', b.nameCells === 540 && b.naturalNames);
+ok('all 1620 continuation name/header cells have natural unscaled centered text', o.nameCells === 1620 && o.naturalNames);
 ok('academic year range explicitly LTR', b.xml.includes('<w:dir w:val="ltr">'));
 ok('exact current-year active students only', r.data.total === 18);
 ok('unknown year counted separately', r.data.unassigned_year === 1);

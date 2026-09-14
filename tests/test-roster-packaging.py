@@ -30,6 +30,17 @@ class RosterPackages(unittest.TestCase):
     def test_desktop_only_changed_files(self):
         self.check_archive('SchoolDeskPro-v2.83.0-win64.zip', 'SchoolDeskPro/www/')
 
+    def test_spacing_hotfixes_ship_only_one_file(self):
+        for archive, prefix in [
+            ('SITE-FIX-v4.152.0-name-spacing.zip', 'site-update-v4.152.0/'),
+            ('SchoolDeskPro-FIX-v2.83.0-name-spacing.zip', 'SchoolDeskPro/www/'),
+        ]:
+            with self.subTest(archive=archive), ZipFile(ROOT / archive) as z:
+                name = 'includes/docx_school_list.php'
+                self.assertIsNone(z.testzip())
+                self.assertEqual(z.namelist(), [prefix + name])
+                self.assertEqual(z.read(prefix + name), (ROOT / 'update-v4.152.0' / name).read_bytes())
+
     def test_platform_payloads_identical(self):
         with ZipFile(ROOT / 'SITE-UPDATE-v4.152.0.zip') as site, ZipFile(ROOT / 'SchoolDeskPro-v2.83.0-win64.zip') as desktop:
             for name in FILES:

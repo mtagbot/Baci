@@ -140,13 +140,10 @@ function srl_split_cell(DOMElement $cell, $last, $first) {
     $width->setAttributeNS(SRL_W, 'w:w', (string)$lastW);
     $xp->query('./w:tcPr/w:tcW', $copy)->item(0)->setAttributeNS(SRL_W, 'w:w', (string)($w - $lastW));
     srl_cell_text($cell, $last); srl_cell_text($copy, $first);
-    foreach ([$cell, $copy] as $c) {
-        // Fixed widths, shrink-to-fit text rather than growing the row for long surnames.
-        $pr = $xp->query('./w:tcPr', $c)->item(0);
-        $fit = $c->ownerDocument->createElementNS(SRL_W, 'w:tcFitText');
-        $before = $xp->query('./w:vAlign', $pr)->item(0);
-        $pr->insertBefore($fit, $before);
-    }
+    // Do not add w:tcFitText: Word fits text by changing character spacing,
+    // which stretches short Persian names and even the two column headers.
+    // Keep the template's centered paragraphs, natural glyph widths and font sizes.
+    // Long names may wrap normally; never stretch or condense them to fill a cell.
 }
 
 /** Preserve title spacing and mixed run formatting; change only zero placeholders. */

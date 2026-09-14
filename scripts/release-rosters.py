@@ -27,19 +27,25 @@ ARCHIVES = {
 
 def build():
     payload = {name: (PATCH / name).read_bytes() for name in FILES}
-    for archive, prefix in ARCHIVES.items():
+    deliveries = [(name, prefix, payload) for name, prefix in ARCHIVES.items()]
+    spacing_fix = {'includes/docx_school_list.php': payload['includes/docx_school_list.php']}
+    deliveries.extend([
+        ('SITE-FIX-v4.152.0-name-spacing.zip', 'site-update-v4.152.0/', spacing_fix),
+        ('SchoolDeskPro-FIX-v2.83.0-name-spacing.zip', 'SchoolDeskPro/www/', spacing_fix),
+    ])
+    for archive, prefix, files in deliveries:
         target = ROOT / archive
         with ZipFile(target, 'w', compression=ZIP_DEFLATED, compresslevel=9) as z:
-            for name, content in sorted(payload.items()):
+            for name, content in sorted(files.items()):
                 info = ZipInfo(prefix + name, STAMP)
                 info.compress_type = ZIP_DEFLATED
                 info.external_attr = 0o100644 << 16
                 z.writestr(info, content)
         with ZipFile(target) as z:
             assert z.testzip() is None
-            assert set(z.namelist()) == {prefix + name for name in FILES}
-            assert len(z.infolist()) == len(FILES)
-            for name, content in payload.items():
+            assert set(z.namelist()) == {prefix + name for name in files}
+            assert len(z.infolist()) == len(files)
+            for name, content in files.items():
                 assert z.read(prefix + name) == content
         print(archive, target.stat().st_size, hashlib.sha256(target.read_bytes()).hexdigest())
 
