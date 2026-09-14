@@ -86,12 +86,78 @@ static int reg_app_path(const char *exe, char *out, DWORD outsz) {
   return 0;
 }
 
+/* WebView2 runtime: روی ویندوز ۱۰/۱۱ تقریباً همیشه هست (حتی وقتی Edge
+   به‌ظاهر حذف شده). مسیر msedgewebview2.exe را از رجیستری می‌خوانیم.
+   این موتور از خودِ Edge می‌آید و همان --app را می‌فهمد. */
+static int find_webview2(char *out, DWORD outsz) {
+  static const char *keys[] = {
+    "SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+    "SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+  };
+  const HKEY roots[2] = { HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER };
+  char ver[128];
+  for (size_t k = 0; k < sizeof(keys) / sizeof(keys[0]); k++) {
+    for (int i = 0; i < 2; i++) {
+      DWORD sz = sizeof(ver);
+      if (RegGetValueA(roots[i], keys[k], "pv", RRF_RT_REG_SZ, NULL, ver, &sz)
+              != ERROR_SUCCESS) continue;
+      static const char *bases[] = {
+        "C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application",
+        "C:\\Program Files\\Microsoft\\EdgeWebView\\Application",
+      };
+      for (size_t b = 0; b < sizeof(bases) / sizeof(bases[0]); b++) {
+        snprintf(out, outsz, "%s\\%s\\msedgewebview2.exe", bases[b], ver);
+        if (file_exists(out)) return 1;
+      }
+    }
+  }
+  return 0;
+}
+
+/* مسیر نصب Edge/Chrome را از کلید BLBeacon هم می‌خوانیم — روی بعضی
+   سیستم‌ها App Paths پاک است ولی این هست. */
+static int reg_install_dir(HKEY root, const char *key, const char *exe,
+                           char *out, DWORD outsz) {
+  char dir[MAX_PATH];
+  DWORD sz = sizeof(dir);
+  if (RegGetValueA(root, key, "InstallLocation", RRF_RT_REG_SZ, NULL, dir, &sz)
+          == ERROR_SUCCESS) {
+    snprintf(out, outsz, "%s\\%s", dir, exe);
+    if (file_exists(out)) return 1;
+  }
+  return 0;
+}
+
+/*
+ * پیدا کردن موتور مدرن برای پنجرهٔ برنامه.
+ *
+ * v2.4 — چرا این تابع این‌قدر سمج شد:
+ * گزارش کاربر این بود که «روی بعضی کامپیوترها برنامه در مرورگر سیستم باز
+ * می‌شود». علتش این بود که جست‌وجو فقط دو کلید App Paths را می‌دید؛ اگر
+ * آن کلید نبود (نصب سازمانی، Edge فقط برای یک کاربر، پاک‌کننده‌های
+ * رجیستری) بلافاصله به مرورگر پیش‌فرض می‌افتاد.
+ *
+ * حالا به ترتیب بررسی می‌شوند:
+ *   ۱) App Paths (سریع‌ترین)
+ *   ۲) InstallLocation در کلیدهای Uninstall
+ *   ۳) مسیرهای متداول نصب، از جمله زیر %LOCALAPPDATA% و %PROGRAMFILES%
+ *   ۴) WebView2 runtime — روی ویندوز ۱۰/۱۱ عملاً همیشه موجود است
+ * فقط اگر هر چهار مورد شکست بخورد سراغ مرورگر پیش‌فرض می‌رویم.
+ */
 static int find_browser(char *out, DWORD outsz) {
   static const char *exes[2] = { "msedge.exe", "chrome.exe" };
   for (int i = 0; i < 2; i++)
     if (reg_app_path(exes[i], out, outsz)) return 1;
 
-  /* common install locations (covers systems with a broken App Paths key) */
+  /* کلیدهای Uninstall */
+  if (reg_install_dir(HKEY_LOCAL_MACHINE,
+        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Microsoft Edge",
+        "msedge.exe", out, outsz)) return 1;
+  if (reg_install_dir(HKEY_LOCAL_MACHINE,
+        "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Microsoft Edge",
+        "msedge.exe", out, outsz)) return 1;
+
+  /* مسیرهای ثابت */
   static const char *fixed[] = {
     "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
     "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
@@ -101,12 +167,26 @@ static int find_browser(char *out, DWORD outsz) {
   for (size_t i = 0; i < sizeof(fixed) / sizeof(fixed[0]); i++)
     if (file_exists(fixed[i])) { strncpy(out, fixed[i], outsz - 1); out[outsz - 1] = 0; return 1; }
 
-  char la[MAX_PATH];
-  DWORD n = GetEnvironmentVariableA("LOCALAPPDATA", la, sizeof(la));
-  if (n > 0 && n < sizeof(la)) {
-    snprintf(out, outsz, "%s\\Google\\Chrome\\Application\\chrome.exe", la);
+  /* نصب‌های کاربری زیر %LOCALAPPDATA% و مسیرهای %PROGRAMFILES% غیرپیش‌فرض */
+  struct { const char *env, *rel; } user_paths[] = {
+    { "LOCALAPPDATA", "Google\\Chrome\\Application\\chrome.exe" },
+    { "LOCALAPPDATA", "Microsoft\\Edge\\Application\\msedge.exe" },
+    { "LOCALAPPDATA", "Chromium\\Application\\chrome.exe" },
+    { "ProgramFiles", "Microsoft\\Edge\\Application\\msedge.exe" },
+    { "ProgramFiles(x86)", "Microsoft\\Edge\\Application\\msedge.exe" },
+    { "ProgramFiles", "Google\\Chrome\\Application\\chrome.exe" },
+    { "ProgramFiles(x86)", "Google\\Chrome\\Application\\chrome.exe" },
+  };
+  for (size_t i = 0; i < sizeof(user_paths) / sizeof(user_paths[0]); i++) {
+    char base[MAX_PATH];
+    DWORD n = GetEnvironmentVariableA(user_paths[i].env, base, sizeof(base));
+    if (n == 0 || n >= sizeof(base)) continue;
+    snprintf(out, outsz, "%s\\%s", base, user_paths[i].rel);
     if (file_exists(out)) return 1;
   }
+
+  /* آخرین و مهم‌ترین شانس: موتور WebView2 */
+  if (find_webview2(out, outsz)) return 1;
   return 0;
 }
 
@@ -130,7 +210,14 @@ static HANDLE launch_app_window(const char *browser, const char *url) {
            "--user-data-dir=\"%s\" "
            "--no-first-run --no-default-browser-check --disable-sync "
            "--disable-features=Translate,msImplicitSignin "
-           "--window-size=1280,860",
+           /* v2.4: پنجره تمام‌صفحه باز شود.
+              --start-maximized پنجره را بیشینه می‌کند (نوار عنوان و دکمه‌های
+              پنجره سر جایشان می‌مانند). عمداً از --start-fullscreen استفاده
+              نشد: در حالت تمام‌صفحهٔ واقعی، کاربر هیچ دکمهٔ بستن نمی‌بیند و
+              در --app mode کلید F11 هم وجود ندارد، یعنی کاربر گیر می‌افتاد.
+              --window-position=0,0 برای وقتی است که ویندوز اندازهٔ ذخیره‌شدهٔ
+              قبلی را بازیابی می‌کند. */
+           "--start-maximized --window-position=0,0",
            browser, url, prof);
   STARTUPINFOA si;
   PROCESS_INFORMATION pi;
@@ -143,43 +230,109 @@ static HANDLE launch_app_window(const char *browser, const char *url) {
 }
 
 /* ------------------------------------------------------------------ */
-/* fallback status window (default browser mode)                       */
+/* حالت پس‌زمینه: آیکون کنار ساعت، بدون هیچ پنجره‌ای                    */
 /* ------------------------------------------------------------------ */
+/*
+ * v2.4 — چرا پنجرهٔ «این پنجره را نبندید» حذف شد:
+ * کاربر گزارش داد که روی بعضی سیستم‌ها یک پنجرهٔ کوچک با این متن باز
+ * می‌شود. آن پنجره تنها کارش زنده نگه داشتن پروسه بود تا سرور محلی
+ * (PHP) بسته نشود — ولی کاربر را می‌ترساند و شبیه نقص به‌نظر می‌رسید.
+ *
+ * حالا به‌جایش یک آیکون کنار ساعت ویندوز می‌نشیند: هیچ پنجره‌ای روی
+ * میز کار نیست، سرویس در پس‌زمینه کار می‌کند، و کاربر هر وقت خواست با
+ * راست‌کلیک روی آیکون «خروج» را می‌زند. دابل‌کلیک هم دوباره برنامه را
+ * باز می‌کند.
+ */
 
-static LRESULT CALLBACK StatusWndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
-  if (m == WM_DESTROY) { PostQuitMessage(0); return 0; }
+#define WM_SDP_TRAY (WM_APP + 1)
+#define IDM_SDP_OPEN 0xE001
+#define IDM_SDP_EXIT 0xE002
+
+static NOTIFYICONDATAW g_nid;
+static char g_tray_url[128];
+
+static void tray_open_again(void) {
+  char browser[MAX_PATH];
+  if (find_browser(browser, sizeof(browser))) {
+    HANDLE b = launch_app_window(browser, g_tray_url);
+    if (b) CloseHandle(b);
+  } else {
+    ShellExecuteA(NULL, "open", g_tray_url, NULL, NULL, SW_SHOWNORMAL);
+  }
+}
+
+static LRESULT CALLBACK TrayWndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
+  if (m == WM_SDP_TRAY) {
+    if (l == WM_LBUTTONDBLCLK) { tray_open_again(); return 0; }
+    if (l == WM_RBUTTONUP || l == WM_CONTEXTMENU) {
+      POINT pt;
+      GetCursorPos(&pt);
+      HMENU menu = CreatePopupMenu();
+      /* «باز کردن برنامه» / «خروج» */
+      AppendMenuW(menu, MF_STRING, IDM_SDP_OPEN,
+          L"\x0628\x0627\x0632 \x06A9\x0631\x062F\x0646 \x0628\x0631\x0646\x0627\x0645\x0647");
+      AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
+      AppendMenuW(menu, MF_STRING, IDM_SDP_EXIT,
+          L"\x062E\x0631\x0648\x062C");
+      /* لازم است وگرنه منو بعد از کلیکِ بیرون بسته نمی‌شود */
+      SetForegroundWindow(h);
+      TrackPopupMenu(menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, h, NULL);
+      PostMessageW(h, WM_NULL, 0, 0);
+      DestroyMenu(menu);
+      return 0;
+    }
+    return 0;
+  }
+  if (m == WM_COMMAND) {
+    if (LOWORD(w) == IDM_SDP_OPEN) { tray_open_again(); return 0; }
+    if (LOWORD(w) == IDM_SDP_EXIT) { DestroyWindow(h); return 0; }
+  }
+  if (m == WM_DESTROY) {
+    Shell_NotifyIconW(NIM_DELETE, &g_nid);
+    PostQuitMessage(0);
+    return 0;
+  }
   return DefWindowProcW(h, m, w, l);
 }
 
-static void run_status_window(void) {
+/* پنجره‌ای می‌سازد که هرگز نمایش داده نمی‌شود؛ فقط گیرندهٔ پیام‌های
+   آیکون کنار ساعت است. */
+static void run_tray_mode(const char *url) {
+  strncpy(g_tray_url, url, sizeof(g_tray_url) - 1);
+  g_tray_url[sizeof(g_tray_url) - 1] = 0;
+
   WNDCLASSW wc;
   memset(&wc, 0, sizeof(wc));
-  wc.lpfnWndProc = StatusWndProc;
+  wc.lpfnWndProc = TrayWndProc;
   wc.hInstance = GetModuleHandleW(NULL);
-  wc.lpszClassName = L"SchoolDeskStatusWnd";
-  wc.hbrBackground = (HBRUSH) (COLOR_WINDOW + 1);
-  wc.hCursor = LoadCursorW(NULL, MAKEINTRESOURCEW(32512)); /* IDC_ARROW */
-  wc.hIcon = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(1));
+  wc.lpszClassName = L"SchoolDeskTrayWnd";
   RegisterClassW(&wc);
 
-  /* "SchoolDesk Pro در مرورگر باز شد. این پنجره را باز نگه دارید؛
-      برای خروج کامل از برنامه، این پنجره را ببندید." */
-  HWND h = CreateWindowExW(WS_EX_APPWINDOW, L"SchoolDeskStatusWnd",
-      L"SchoolDesk Pro",
-      (WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME) | WS_VISIBLE,
-      CW_USEDEFAULT, CW_USEDEFAULT, 460, 170, NULL, NULL, wc.hInstance, NULL);
+  /* HWND_MESSAGE = پنجرهٔ فقط-پیام: نه روی میز کار دیده می‌شود نه در
+     نوار وظیفه. دقیقاً همان «اجرا در پس‌زمینه» که کاربر خواست. */
+  HWND h = CreateWindowExW(0, L"SchoolDeskTrayWnd", L"SchoolDesk Pro",
+                           0, 0, 0, 0, 0, HWND_MESSAGE, NULL, wc.hInstance, NULL);
+  if (!h) return;
 
-  CreateWindowExW(0, L"STATIC",
-      L"SchoolDesk Pro \x062F\x0631 \x0645\x0631\x0648\x0631\x06AF\x0631 \x0628\x0627\x0632 \x0634\x062F.\n"
-      L"\x0627\x06CC\x0646 \x067E\x0646\x062C\x0631\x0647 \x0631\x0627 \x0628\x0627\x0632 \x0646\x06AF\x0647 \x062F\x0627\x0631\x06CC\x062F\x061B "
-      L"\x0628\x0631\x0627\x06CC \x062E\x0631\x0648\x062C \x06A9\x0627\x0645\x0644\x060C \x0627\x06CC\x0646 \x067E\x0646\x062C\x0631\x0647 \x0631\x0627 \x0628\x0628\x0646\x062F\x06CC\x062F.",
-      WS_CHILD | WS_VISIBLE | SS_CENTER, 20, 35, 400, 70, h, NULL, wc.hInstance, NULL);
+  memset(&g_nid, 0, sizeof(g_nid));
+  g_nid.cbSize = sizeof(g_nid);
+  g_nid.hWnd = h;
+  g_nid.uID = 1;
+  g_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+  g_nid.uCallbackMessage = WM_SDP_TRAY;
+  g_nid.hIcon = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(1));
+  if (!g_nid.hIcon) g_nid.hIcon = LoadIconW(NULL, MAKEINTRESOURCEW(32512));
+  /* «SchoolDesk Pro — در حال اجرا» */
+  wcscpy(g_nid.szTip,
+      L"SchoolDesk Pro \x2014 \x062F\x0631 \x062D\x0627\x0644 \x0627\x062C\x0631\x0627");
+  Shell_NotifyIconW(NIM_ADD, &g_nid);
 
   MSG msg;
   while (GetMessageW(&msg, NULL, 0, 0) > 0) {
     TranslateMessage(&msg);
     DispatchMessageW(&msg);
   }
+  Shell_NotifyIconW(NIM_DELETE, &g_nid);
 }
 
 /* ------------------------------------------------------------------ */
@@ -291,9 +444,11 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hp, LPSTR cmd, int show) {
     }
   }
   if (fallback) {
-    /* no Edge/Chrome (e.g. bare Windows 7): default browser + status window */
+    /* v2.4: هیچ موتور مدرنی پیدا نشد (مثلاً ویندوز ۷ خام).
+       مرورگر پیش‌فرض باز می‌شود، ولی به‌جای آن پنجرهٔ «نبندید»، فقط یک
+       آیکون کنار ساعت می‌نشیند و سرور در پس‌زمینه کار می‌کند. */
     ShellExecuteA(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
-    run_status_window();
+    run_tray_mode(url);
   }
 
   TerminateProcess(pi.hProcess, 0);

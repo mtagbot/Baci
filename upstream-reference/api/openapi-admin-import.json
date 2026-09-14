@@ -1,0 +1,22 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "سیستم مدیریت کارنامه - Admin Import REST API",
+    "version": "2.5.0",
+    "description": "رابط مدیریتی جهت مدیریت نشست‌های ایمپورت، صف پردازش و رفع ابهامات"
+  },
+  "paths": {
+    "/admin-import.php?resource=sessions": {
+      "get": {
+        "summary": "دریافت لیست نشست‌های ایمپورت",
+        "responses": { "200": { "description": "لیست نشست‌ها" } }
+      }
+    },
+    "/admin-import.php?resource=queue": {
+      "get": {
+        "summary": "دریافت وضعیت صف پردازش فایل‌های بزرگ",
+        "responses": { "200": { "description": "لیست کارها در صف" } }
+      }
+    }
+  }
+}
