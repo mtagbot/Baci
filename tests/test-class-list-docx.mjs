@@ -150,10 +150,11 @@ if (isset($rm[0][5])) {
     preg_match_all('/<w:tc>.*?<\\/w:tc>/s', $rm[0][5], $c5);
     if (isset($c5[0][1]) && preg_match('/<w:r>.*?<\\/w:r>/s', $c5[0][1], $r5)) $nameRun = $r5[0];
 }
-$gridCount = 0; $gw1 = ''; $gw2 = '';
+$gridCount = 0; $gw1 = ''; $gw2 = ''; $gridSum = 0;
 if (preg_match('/<w:tblGrid>.*?<\\/w:tblGrid>/s', $tm[0][0], $gm)) {
     preg_match_all('/w:w="(\\d+)"/', $gm[0], $gwm);
     $gridCount = count($gwm[1]);
+    $gridSum = array_sum(array_map('intval', $gwm[1]));
     $gw1 = $gwm[1][1] ?? ''; $gw2 = $gwm[1][2] ?? '';
 }
 $cellCount = function ($tr) {
@@ -174,6 +175,7 @@ echo json_encode([
   'classCell' => isset($rm[0][0]) ? $cellText($rm[0][0], 1) : '',
   'r0span'    => (preg_match('/<w:gridSpan w:val="(\\d+)"/', $rm[0][0], $sm0) ? $sm0[1] : '?'),
   'gridCols'  => $gridCount,
+  'gridSum'   => $gridSum,
   'gridW1'    => $gw1,
   'gridW2'    => $gw2,
   'hdrLast'   => isset($rm[0][4]) ? $cellText($rm[0][4], 1) : '',
@@ -201,13 +203,19 @@ ok('هر دو جدول قالب حفظ شده‌اند', D.tables === 2, String(
 ok('جدول اول ۳۵ ردیف دارد (۵ سرستون + ۳۰ دانش‌آموز)', D.rows === 35, String(D.rows));
 ok('سلول کلاس پر شد: «کلاس : 1/7»', D.classCell === 'کلاس : 1/7', String(D.classCell));
 /* v4.146.0 — ستون نام به دو ستون تقسیم شد */
-ok('شبکهٔ جدول یک ستون بیشتر شد (۱۷ ستون)', D.gridCols === 17, String(D.gridCols));
-ok('عرض دو ستون تازه درست است', D.gridW1 === '1256' && D.gridW2 === '1000',
+/* v4.147.0 — یک ستون جلسه حذف شد و عرضش به دو ستون نام رسید، پس
+   تعداد کل ستون‌ها همان ۱۶ می‌ماند و gridSpan سربرگ هم دست‌نخورده. */
+ok('تعداد ستون‌ها همان ۱۶ ماند (یکی اضافه، یکی حذف)', D.gridCols === 16, String(D.gridCols));
+ok('ستون‌های نام پهن‌تر شدند', D.gridW1 === '1563' && D.gridW2 === '1252',
    `${D.gridW1}/${D.gridW2}`);
-ok('gridSpan سربرگ بالا یکی بیشتر شد (۱۴)', D.r0span === '14', String(D.r0span));
+ok('ستون‌های نام از نسخهٔ قبل پهن‌ترند',
+   parseInt(D.gridW1, 10) > 1256 && parseInt(D.gridW2, 10) > 1000);
+ok('عرض کل جدول تغییر نکرده (از کاغذ بیرون نمی‌زند)',
+   D.gridSum === 10652, String(D.gridSum));
+ok('gridSpan سربرگ بالا دست‌نخورده ماند (۱۳)', D.r0span === '13', String(D.r0span));
 ok('سرستون راست «نام خانوادگی» است', D.hdrLast === 'نام خانوادگی', String(D.hdrLast));
 ok('سرستون بعدی «نام» است', D.hdrFirst === 'نام', String(D.hdrFirst));
-ok('هر ردیف حالا ۱۷ سلول دارد', D.r5cells === 17, String(D.r5cells));
+ok('هر ردیف ۱۶ سلول دارد', D.r5cells === 16, String(D.r5cells));
 ok('نام خانوادگی اول در ستون راست', D.n1last === 'آبادی', String(D.n1last));
 ok('نام اول در ستون کناری', D.n1first === 'بهار', String(D.n1first));
 ok('نام خانوادگی دوم درست است', D.n2last === 'ابراهیمی', String(D.n2last));
@@ -225,6 +233,74 @@ ok('فونت B Titr روی خودِ نام دانش‌آموز اعمال شده
 ok('جدول دوم (ثبت میزان تدریس) دست‌نخورده است', D.tbl2 === 1);
 
 /* ═══ ۶) امنیت و مقاومت ═══ */
+console.log('\n══ جا شدن نام‌های بلند (v4.147.0) ══');
+/* مشکل گزارش‌شده: نام‌های چندکلمه‌ای در ستون باریک به خط دوم
+   می‌رفتند و ارتفاع ردیف را می‌شکستند، که صفحه‌بندی دو صفحه‌ای را
+   به‌هم می‌ریخت. رفع: حذف یک ستون جلسه و دادن عرضش به دو ستون نام. */
+ok('یک ستون جلسه حذف شده (تعداد ستون ثابت مانده)', libC.includes('$DROP_W'));
+ok('عرض ستون حذف‌شده به دو ستون نام رسیده', (() => {
+    const l = libC.match(/\$W_LAST\s*=\s*(\d+)/);
+    const f = libC.match(/\$W_FIRST\s*=\s*(\d+)/);
+    const d = libC.match(/\$DROP_W\s*=\s*(\d+)/);
+    if (!l || !f || !d) return false;
+    /* ۱۲۵۶+۱۰۰۰ قبلی + ۵۵۹ آزادشده = عرض جدید دو ستون */
+    return (parseInt(l[1]) + parseInt(f[1])) === (1256 + 1000 + parseInt(d[1]));
+})(), (libC.match(/\$W_LAST\s*=\s*(\d+)/) || [])[1] + '/' + (libC.match(/\$W_FIRST\s*=\s*(\d+)/) || [])[1]);
+ok('نام خانوادگی سهم بیشتری گرفته (بلندتر است)', (() => {
+    const l = parseInt((libC.match(/\$W_LAST\s*=\s*(\d+)/) || [])[1], 10);
+    const f = parseInt((libC.match(/\$W_FIRST\s*=\s*(\d+)/) || [])[1], 10);
+    return l > f;
+})());
+ok('سلول دارای vMerge قربانی حذف نمی‌شود (ادغام عمودی نمی‌شکند)',
+   libC.includes('vMerge') && libC.includes("w:val=\"restart\""));
+ok('نمای PDF هم یک ستون جلسه کمتر دارد', /\$sessions = 9;/.test(libC));
+ok('عرض ستون‌های نام در PDF با Word هم‌نسبت است',
+   /\.cl\{width:28mm\}/.test(libC) && /\.cf\{width:22mm\}/.test(libC));
+
+/* نام واقعاً بلند نباید ساختار را بشکند */
+php.writeFile('/harness/longname.php', `<?php
+ini_set('display_errors','0'); error_reporting(0);
+require_once '/www/includes/db.php';
+require_once '/www/includes/functions.php';
+require_once '/www/includes/school_sort.php';
+require_once '/www/includes/class_schedule_sync.php';
+require_once '/www/includes/docx_class_list.php';
+$doc = dcl_generate('1/9', [
+  ['last' => 'حسینی نژاد اصفهانی', 'first' => 'محمدرضا'],
+  ['last' => 'آبادی',              'first' => 'بهار'],
+]);
+if ($doc === null) { echo 'NULL'; exit; }
+file_put_contents('/tmp/long.docx', $doc);
+$z = new ZipArchive(); $z->open('/tmp/long.docx');
+$xml = $z->getFromName('word/document.xml'); $z->close();
+preg_match_all('/<w:tbl>.*?<\\/w:tbl>/s', $xml, $tm);
+preg_match_all('/<w:tr[ >].*?<\\/w:tr>/s', $tm[0][0], $rm);
+$nc = function ($tr) { preg_match_all('/<w:tc>.*?<\\/w:tc>/s', $tr, $c); return count($c[0]); };
+$ct = function ($tr, $i) {
+    preg_match_all('/<w:tc>.*?<\\/w:tc>/s', $tr, $c);
+    if (!isset($c[0][$i])) return 'MISSING';
+    preg_match_all('/<w:t[^>]*>([^<]*)<\\/w:t>/', $c[0][$i], $t);
+    return trim(implode('', $t[1]));
+};
+$counts = array_map($nc, array_slice($rm[0], 1));
+echo json_encode([
+  'longLast'  => $ct($rm[0][5], 1),
+  'longFirst' => $ct($rm[0][5], 2),
+  'allRowsSameCells' => count(array_unique($counts)) === 1 ? 1 : 0,
+  'cellCount' => $counts[0],
+  'rows'      => count($rm[0]),
+  'tables'    => count($tm[0]),
+], JSON_UNESCAPED_UNICODE);`);
+const L = await j("<?php require '/harness/longname.php';");
+ok('نام خانوادگی سه‌کلمه‌ای کامل درج می‌شود',
+   L.longLast === 'حسینی نژاد اصفهانی', String(L.longLast));
+ok('نام کنارش درست است', L.longFirst === 'محمدرضا', String(L.longFirst));
+ok('همهٔ ردیف‌ها تعداد سلول یکسان دارند (ساختار نشکسته)',
+   L.allRowsSameCells === 1, JSON.stringify(L));
+ok('هر ردیف ۱۶ سلول دارد', L.cellCount === 16, String(L.cellCount));
+ok('جدول همچنان ۳۵ ردیف و ۲ جدول است',
+   L.rows === 35 && L.tables === 2, `${L.rows}/${L.tables}`);
+
 console.log('\n══ خروجی PDF (v4.146.0) ══');
 /* PDF از مسیر مرورگر ساخته می‌شود، چون TCPDF در بسته نیست و برای
    فارسی به فونت تبدیل‌شده نیاز دارد؛ هر خطا در آن مسیر به‌جای فونت
