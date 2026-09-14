@@ -272,7 +272,14 @@ ok('ابعاد A5 درست است', /'A5'\s*=>\s*\['w'\s*=>\s*148,\s*'h'\s*=>\s*
 ok('جهت افقی پشتیبانی می‌شود', orn.includes("'landscape'"));
 ok('کاغذ با allow-list اعتبارسنجی می‌شود', /array_key_exists\(\(\$_GET\['paper'\]/.test(pageC));
 ok('جهت با allow-list اعتبارسنجی می‌شود', /in_array\(\(\$_GET\['orient'\]/.test(pageC));
-ok('مقیاس در بازهٔ امن محدود شده', /min\(1\.6, max\(0\.6/.test(pageC));
+/* عددها به card_scale_min/max منتقل شدند؛ بررسی باید مقدار واقعیِ
+   آن توابع را بسنجد نه رشتهٔ ثابت را. */
+ok('مقیاس در بازهٔ امن محدود شده', (() => {
+    const lo = orn.match(/function card_scale_min\(\) \{ return ([\d.]+); \}/);
+    const hi = orn.match(/function card_scale_max\(\) \{ return ([\d.]+); \}/);
+    return lo && hi && parseFloat(lo[1]) >= 0.4 && parseFloat(hi[1]) <= 3
+        && parseFloat(lo[1]) < parseFloat(hi[1]);
+})());
 ok('انتخاب کاغذ و جهت و مقیاس در ویرایشگر هست',
    pageC.includes('id="cPaper"') && pageC.includes('id="cOrient"') && pageC.includes('id="cScale"'));
 ok('هر سه به نمای چاپ فرستاده می‌شوند',
@@ -284,7 +291,21 @@ ok('در حالت دورو، پشت هر کارت بلافاصله بعد از �
    /\$printItems\[\] = \['s' => \$st, 'back' => false\];[\s\S]{0,120}'back' => true/.test(pageC));
 ok('اگر هیچ کارتی جا نشد، پیام روشن داده می‌شود',
    pageC.includes('$gridFits') && pageC.includes('جا نمی‌شود'));
-ok('پیش‌نمایش فقط یک صفحه است (بهینه)', /array_slice\(\$students, 0, 70\)/.test(pageC));
+/* v4.142.0: سقف پیش‌نمایش دیگر عدد ثابت نیست و از هندسه می‌آید. */
+ok('پیش‌نمایش یک صفحه است ولی سقف ثابت ندارد',
+   /array_slice\(\$students, 0, card_preview_cap\(\)\)/.test(pageC));
+ok('سقف قدیمی ۷۰ حذف شده', !/array_slice\(\$students, 0, 70\)/.test(pageC));
+ok('سقف از پیمایش همهٔ ترکیب‌ها حساب می‌شود',
+   orn.includes('function card_preview_cap') &&
+   /foreach \(array_keys\(card_paper_sizes\(\)\)/.test(orn));
+ok('کف و سقف مقیاس یک منبع واحد دارند',
+   orn.includes('function card_scale_min') && orn.includes('function card_scale_max'));
+ok('اعتبارسنجی مقیاس از همان منبع می‌آید',
+   /min\(card_scale_max\(\), max\(card_scale_min\(\)/.test(pageC));
+ok('نوار مقیاس هم از همان منبع پر می‌شود',
+   /min="<\?php echo \(int\)round\(card_scale_min\(\)\*100\)/.test(pageC));
+ok('پیام پیش‌نمایش بین «دانش‌آموز کم» و «سقف پیش‌نمایش» فرق می‌گذارد',
+   pageC.includes('TOTAL_STUDENTS < perPage'));
 ok('پیش‌نمایش کاغذ واقعی دارد', pageC.includes('id="pvPaper"') && pageC.includes('pv-paper'));
 ok('پیش‌نمایش مقیاس را زنده اعمال می‌کند', pageC.includes("scaleBox.style.transform = 'scale('"));
 ok('کارت‌های خارج از صفحهٔ اول در پیش‌نمایش پنهان می‌شوند',
@@ -324,6 +345,26 @@ ok('A4 با کارت مربع: ۱۲ کارت', G.a4_sq && G.a4_sq.per_page === 1
 ok('A3 عمودی: ۲۱ کارت', G.a3_full && G.a3_full.per_page === 21, String(G.a3_full && G.a3_full.per_page));
 ok('A5 عمودی: ۳ کارت', G.a5_full && G.a5_full.per_page === 3, String(G.a5_full && G.a5_full.per_page));
 ok('A2 با کارت مربع: ۷۰ کارت', G.a2_sq && G.a2_sq.per_page === 70, String(G.a2_sq && G.a2_sq.per_page));
+/* v4.142.0 — هیچ سقف مصنوعی‌ای نباید بماند: حداکثر ظرفیت واقعی
+   (A2 مربع، مقیاس کمینه، بدون حاشیه) باید کامل پشتیبانی شود. */
+php.writeFile('/harness/cap.php', `<?php
+ini_set('display_errors','0'); error_reporting(0);
+require_once '/www/includes/db.php';
+require_once '/www/includes/functions.php';
+require_once '/www/includes/card_ornaments.php';
+echo json_encode([
+  'cap'      => card_preview_cap(),
+  'a2sq_min' => card_grid_info('A2','portrait','sq',card_scale_min(),0,0)['per_page'],
+  'a4sq_min' => card_grid_info('A4','portrait','sq',card_scale_min(),0,0)['per_page'],
+  'zero_gap' => card_grid_info('A4','portrait','full',1.0,0,0)['per_page'],
+]);`);
+const CAP = await j("<?php require '/harness/cap.php';");
+ok('ظرفیت پیش‌نمایش برابر بیشترین حالت ممکن است',
+   CAP.cap === CAP.a2sq_min && CAP.cap >= 200, JSON.stringify(CAP));
+ok('حاشیهٔ صفر پذیرفته می‌شود و ظرفیت را بالا می‌برد',
+   CAP.zero_gap > 8, String(CAP.zero_gap));
+ok('A4 مربع با کمینهٔ مقیاس بیش از ۵۰ کارت می‌گیرد',
+   CAP.a4sq_min >= 50, String(CAP.a4sq_min));
 ok('جهت افقی نتیجهٔ متفاوتی می‌دهد',
    G.a4_land && G.a4_full && G.a4_land.per_page !== G.a4_full.per_page,
    `افقی ${G.a4_land && G.a4_land.per_page} vs عمودی ${G.a4_full && G.a4_full.per_page}`);
