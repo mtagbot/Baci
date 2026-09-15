@@ -1,7 +1,7 @@
 // Real canvas/video + bundled jsQR + actual Worker/XHR in Chromium.
 // Synthetic QR fixtures, NOT a physical phone/camera benchmark.
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync,writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url));
@@ -9,7 +9,7 @@ const require=createRequire((process.env.BROWSER_MODULES||root+'.cache/browser/n
 const {chromium:playwright}=require('playwright'), chromiumModule=require('@sparticuz/chromium');
 const chromium=chromiumModule.default||chromiumModule;
 const acorn=require('acorn');
-const controller=readFileSync(root+'update-v4.152.0/assets/js/attendance-scanner-light.js','utf8');
+const controller=readFileSync(process.env.SCANNER_JS || root+'update-v4.152.0/assets/js/attendance-scanner-light.js','utf8');
 const worker=readFileSync(root+'update-v4.152.0/assets/js/attendance-decoder-worker.js','utf8');
 const qr=readFileSync(root+'update-v4.51.0/assets/js/qrcode-generator.js','utf8');
 const decoder=readFileSync(root+'update-v4.51.0/assets/js/jsqr.min.js','utf8');
@@ -17,7 +17,7 @@ for(const code of [controller,worker,decoder])acorn.parse(code,{ecmaVersion:5});
 console.log('PASS ES5 parsing: controller, worker, bundled decoder');
 const html=readFileSync(root+'.cache/scanner-tests/page.html','utf8');
 let browser;
-let count=0;
+let count=0; const measurements=[];
 try {
  for(const mode of ['worker','compat']) {
   browser=await playwright.launch({executablePath:await chromium.executablePath(),args:[...chromium.args,'--disable-gpu'],headless:true});
@@ -25,7 +25,7 @@ try {
   await context.route('**/*',async route=>{
    const url=new URL(route.request().url());
    if(url.pathname.endsWith('attendance-scan-api.php')) {
-    if(route.request().method()==='POST'){const j=JSON.parse(route.request().postData());posts.push(j.payload);await route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,code:'present',student:j.payload,class:'Demo',time:'08:00',message:'Synthetic test'})})}
+    if(route.request().method()==='POST'){const j=JSON.parse(route.request().postData());posts.push(j.payload);if(process.env.SCANNER_SERVER_DELAY)await new Promise(r=>setTimeout(r,Number(process.env.SCANNER_SERVER_DELAY)));await route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,code:'present',student:j.payload,class:'Demo',time:'08:00',message:'Synthetic test'})})}
     else await route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,present:posts.length,late:0,absent:0,recent:[]})});return;
    }
    const body=url.pathname.endsWith('attendance-scanner.php')?html:url.pathname.endsWith('attendance-scanner-light.js')?controller:url.pathname.endsWith('attendance-decoder-worker.js')?'Uint8ClampedArray.from=undefined;\n'+worker:url.pathname.endsWith('jsqr.min.js')?decoder:null;
@@ -35,13 +35,24 @@ try {
   });
   await context.addInitScript({content:qr+`;(${function(mode){
    const realPromise=window.Promise;
+   window.__shownAt={};window.__scanTimings={};
+   const originalSend=XMLHttpRequest.prototype.send;
+   XMLHttpRequest.prototype.send=function(body){
+    let data;try{data=JSON.parse(body)}catch(e){}
+    if(data&&data.action==='scan'){
+     const started=performance.now(),shown=window.__shownAt[data.payload];
+     window.__scanTimings[data.payload]={detectMs:started-shown};
+     this.addEventListener('load',function(){const t=window.__scanTimings[data.payload];t.serverMs=performance.now()-started;t.totalMs=performance.now()-shown});
+    }
+    return originalSend.call(this,body);
+   };
    const input=document.createElement('canvas');input.width=640;input.height=480;
    const cx=input.getContext('2d');let spec=null,patch=null;
-   window.drawFixture=function(next){spec=next;input.width=next.portrait?480:640;input.height=next.portrait?640:480;const code=qrcode(0,'M');code.addData(next.payload);code.make();const n=code.getModuleCount();patch=document.createElement('canvas');patch.width=patch.height=(n+8)*4;const p=patch.getContext('2d');p.fillStyle=next.inverted?'#111':'#fff';p.fillRect(0,0,patch.width,patch.height);p.fillStyle=next.inverted?'#fff':'#111';for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(code.isDark(y,x))p.fillRect((x+4)*4,(y+4)*4,4,4);paint()};
+   window.drawFixture=function(next){spec=next;input.width=next.portrait?480:640;input.height=next.portrait?640:480;const code=qrcode(0,'M');code.addData(next.payload);code.make();const n=code.getModuleCount();patch=document.createElement('canvas');patch.width=patch.height=(n+8)*4;const p=patch.getContext('2d');p.fillStyle=next.inverted?'#111':'#fff';p.fillRect(0,0,patch.width,patch.height);p.fillStyle=next.inverted?'#fff':'#111';for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(code.isDark(y,x))p.fillRect((x+4)*4,(y+4)*4,4,4);window.__shownAt[next.payload]=performance.now();paint()};
    function paint(){cx.fillStyle=spec&&spec.inverted?'#111':'#fff';cx.fillRect(0,0,input.width,input.height);if(!spec)return;cx.save();cx.translate(spec.x,spec.y);cx.rotate((spec.angle||0)*Math.PI/180);cx.imageSmoothingEnabled=false;cx.drawImage(patch,-spec.size/2,-spec.size/2,spec.size,spec.size);cx.restore()}
-   paint();setInterval(paint,65);
+   paint();setInterval(paint,16);
    const streams=[];window.fixtureStreams=streams;
-   function open(constraints){let id=constraints.video&&constraints.video.deviceId?constraints.video.deviceId.exact:'A';if(constraints.video&&constraints.video.optional)id=constraints.video.optional[0].sourceId;const stream=input.captureStream(15),track=stream.getVideoTracks()[0];track.getSettings=()=>({deviceId:id});streams.push({stream,id});return stream}
+   function open(constraints){let id=constraints.video&&constraints.video.deviceId?constraints.video.deviceId.exact:'A';if(constraints.video&&constraints.video.optional)id=constraints.video.optional[0].sourceId;const stream=input.captureStream(constraints.video&&constraints.video.frameRate?constraints.video.frameRate.ideal:30),track=stream.getVideoTracks()[0];track.getSettings=()=>({deviceId:id});streams.push({stream,id});return stream}
    const devices=['A','B'].map(deviceId=>({kind:'videoinput',deviceId,label:'Camera '+deviceId}));
    Object.defineProperty(navigator,'deviceMemory',{value:2});Object.defineProperty(navigator,'hardwareConcurrency',{value:2});
    window.BarcodeDetector=undefined; // Exercise the real jsQR sensitivity, not an OS implementation.
@@ -71,11 +82,15 @@ try {
    {name:'small-bottom-right-inverted',x:570,y:410,size:110,inverted:true},
    {name:'portrait',x:240,y:320,size:180,portrait:true}
   ];
-  for(const [i,f] of fixtures.entries()){
+  const repeated=Array.from({length:Number(process.env.BENCH_REPEATS||1)},()=>fixtures).flat();
+  for(const [i,f] of repeated.entries()){
    const payload='MTAG-ATT:'+(i+1)+':'+(i+1).toString(16).padStart(32,'0');
    await page.evaluate(spec=>window.drawFixture(spec),{...f,payload});
    await page.waitForFunction(p=>document.getElementById('resName').textContent===p,payload,{timeout:18000});
    assert(posts.includes(payload));
+   const timing=await page.evaluate(p=>window.__scanTimings[p],payload);
+   assert(Number.isFinite(timing.detectMs)&&Number.isFinite(timing.totalMs));
+   measurements.push({mode,fixture:f.name,...timing});
    assert.equal(await page.evaluate(()=>localStorage.getItem('mtag_scanner_cam')),'B');
    assert.equal(await page.evaluate(()=>window.fixtureStreams.filter(s=>s.stream.getVideoTracks()[0].readyState==='live').length),1);
    count++;console.log('PASS',mode,f.name,'actual video -> jsQR -> XHR; B retained');
@@ -88,3 +103,9 @@ try {
  }
  console.log(`PASS ${count} real-browser QR fixtures; synthetic frames, no physical-camera/old-phone guarantee`);
 }finally{await browser.close()}
+for(const mode of ['worker','compat']){
+ const rows=measurements.filter(m=>m.mode===mode), sorted=rows.map(m=>m.detectMs).sort((a,b)=>a-b);
+ const average=key=>Math.round(rows.reduce((s,r)=>s+r[key],0)/rows.length);
+ console.log('TIMING',mode,JSON.stringify({samples:rows.length,detectMeanMs:average('detectMs'),detectP95Ms:Math.round(sorted[Math.ceil(sorted.length*.95)-1]),serverMeanMs:average('serverMs'),totalMeanMs:average('totalMs')}));
+}
+if(process.env.BENCH_REPORT)writeFileSync(process.env.BENCH_REPORT,JSON.stringify(measurements,null,2));

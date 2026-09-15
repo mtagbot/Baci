@@ -162,6 +162,10 @@
   function sendScan(payload, manual) {
     if (busy || (!manual && (now() < sendAfter || seen(payload)))) return false;
     busy = true;
+    // Immediate, neutral acknowledgement is NOT attendance confirmation.
+    resBox.className = 'result'; resIcon.textContent = '⏳';
+    resName.textContent = 'کد خوانده شد'; resStat.textContent = 'در حال ثبت حضور…';
+    resSub.textContent = 'منتظر تأیید سرور باشید';
     forget(payload); recentTags.push({ value: payload, time: now() });
     if (recentTags.length > 32) recentTags.shift();
     function send(attempt) {
@@ -230,11 +234,12 @@
   }
 
   /* Preserve the original full / center / full / overlapping corner pyramid
-   * and attemptBoth inversion. Unknown hardware starts conservatively.
+   * and attemptBoth inversion. Speed-first cadence; no lower-resolution guess
+   * solely because an older browser hides its hardware information.
    * Adapt rest time, not away the pixels needed to read small/distant tags. */
   var mem = navigator.deviceMemory || 0, cores = navigator.hardwareConcurrency || 0;
-  var LOW_END = (!mem && !cores) || (mem && mem <= 3) || (cores && cores <= 4);
-  var FULL_DIM = LOW_END ? 560 : 900, BASE_REST = LOW_END ? 150 : 65;
+  var LOW_END = (mem && mem <= 3) || (cores && cores <= 4);
+  var FULL_DIM = LOW_END ? 560 : 900, BASE_REST = LOW_END ? 25 : 12;
   var scanTimer = null, frameCallback = null, scanning = false, decodeBusy = false;
   var scanEpoch = 0, passCounter = 0, lastFrameTime = -1, decodeJob = 0;
   var worker = null, workerBroken = false, workerDone = null;
@@ -273,25 +278,35 @@
     if (worker) { worker.onmessage = worker.onerror = null; try { worker.terminate(); } catch (e) {} }
     worker = null; workerDone = null;
   }
-  function jsDecode(image, callback) {
+  // Load/compile while the camera is opening, not after the first tag arrives.
+  function prepareDecoder() {
     if (!workerBroken && window.Worker) {
       try {
         if (!worker) {
           worker = new Worker(config.worker || 'assets/js/attendance-decoder-worker.js');
           var owner = worker;
           worker.onmessage = function (event) {
-            if (worker !== owner) return;
-            if (!workerDone || event.data.id !== workerDone.id) return;
+            if (worker !== owner || !workerDone || event.data.id !== workerDone.id) return;
             var job = workerDone; workerDone = null;
-            if (event.data.error) { workerBroken = true; discardWorker(); job.callback(null); }
+            if (event.data.error) { workerBroken = true; discardWorker(); job.callback(null); prepareDecoder(); }
             else job.callback(event.data.data || null);
           };
           worker.onerror = function () {
             if (worker !== owner) return;
             var job = workerDone; workerBroken = true; discardWorker();
             if (job) job.callback(null);
+            prepareDecoder();
           };
         }
+        return;
+      } catch (e) { workerBroken = true; discardWorker(); }
+    }
+    if (!decoderLoading && typeof window.jsQR !== 'function' && now() >= decoderRetryAt) loadDecoder(noop);
+  }
+  function jsDecode(image, callback) {
+    prepareDecoder();
+    if (worker) {
+      try {
         var id = ++decodeJob;
         workerDone = { id: id, callback: callback };
         worker.postMessage({ id: id, pixels: image.data.buffer, width: image.width, height: image.height }, [image.data.buffer]);
@@ -299,7 +314,7 @@
       } catch (e) {
         workerBroken = true; discardWorker();
         // A transferred/detached buffer must not be decoded on the main thread.
-        callback(null); return;
+        callback(null); prepareDecoder(); return;
       }
     }
     var code = null;
@@ -330,6 +345,9 @@
     scanTimer = setTimeout(function () {
       scanTimer = null;
       if (!scanning || document.hidden) return;
+      // A fresh frame may already have arrived during decode/rest. Use it now
+      // instead of unconditionally waiting for yet ANOTHER camera frame.
+      if (video.readyState >= 2 && video.currentTime !== lastFrameTime) { scanTick(); return; }
       if (typeof video.requestVideoFrameCallback === 'function' && typeof video.cancelVideoFrameCallback === 'function') {
         frameCallback = video.requestVideoFrameCallback(function () { frameCallback = null; scanTick(); });
       } else scanTick();
@@ -373,7 +391,7 @@
       if (epoch !== scanEpoch) return;
       activeDecodeCancel = null; decodeBusy = false;
       if (generation === cameraGeneration && camState === 'ready' && !document.hidden && data) sendScan(data, false);
-      scheduleScan(Math.max(BASE_REST, Math.min(2000, Math.round((now() - started) * 1.5))));
+      scheduleScan(Math.max(BASE_REST, Math.min(2000, Math.round((now() - started) * 0.35))));
     }
     try {
       var size = frameImage(passCounter++);
@@ -384,7 +402,7 @@
       } else jsDecode(ctx.getImageData(0, 0, size.width, size.height), complete);
     } catch (e) { complete(null); }
   }
-  function startScanLoop() { scanning = true; scheduleScan(BASE_REST); }
+  function startScanLoop() { scanning = true; scheduleScan(0); }
   function stopScanLoop() {
     scanning = false; scanEpoch++; decodeBusy = false;
     if (activeDecodeCancel) { activeDecodeCancel(); activeDecodeCancel = null; }
@@ -399,7 +417,9 @@
    * the browser is still stuck offers a page reload, never an overlapping open.
    * Every callback/list/track/frame is tied to a generation. */
   var camState = 'idle', cameraGeneration = 0, currentStream = null, pendingOpen = null;
-  var desiredId = null, camList = [], readyTimer = null, recoveryTimer = null, objectURL = null;
+  var desiredId = null, camList = [], readyTimer = null, recoveryTimer = null, objectURL = null, readyCheck = null;
+  video.addEventListener('loadeddata', function () { if (readyCheck) readyCheck(); });
+  video.addEventListener('playing', function () { if (readyCheck) readyCheck(); });
   var recoveryAttempts = 0, stableTicks = 0, frozenCount = 0, lastVideoTime = -1;
   try { desiredId = localStorage.getItem('mtag_scanner_cam') || null; } catch (e) {}
   function stopTracks(stream) {
@@ -441,7 +461,7 @@
   }
   function cameraError(message) {
     cameraGeneration++; clearRecovery(); clearTimeout(readyTimer); readyTimer = null;
-    stopScanLoop(); stopStream(); camState = 'error';
+    readyCheck = null; stopScanLoop(); stopStream(); camState = 'error';
     camMsg.textContent = message + ' — دوربین انتخابی خودکار عوض نمی‌شود.'; setControls();
   }
   function openTimeout(req) {
@@ -461,7 +481,8 @@
   function openCamera(attempt, basic) {
     if (document.hidden) return;
     if (pendingOpen) { if (!pendingOpen.timer) armOpenTimeout(pendingOpen); setControls(); return; }
-    clearRecovery(); clearTimeout(readyTimer); stopScanLoop(); stopStream();
+    clearRecovery(); clearTimeout(readyTimer); readyCheck = null; stopScanLoop(); stopStream();
+    prepareDecoder();
     var generation = ++cameraGeneration;
     camState = 'opening'; frozenCount = 0; stableTicks = 0; lastVideoTime = -1;
     camMsg.textContent = 'در حال راه‌اندازی دوربین انتخابی...';
@@ -503,17 +524,19 @@
       }
       var playing = false, deadline = now() + 15000;
       function checkReady() {
-        if (generation !== cameraGeneration || currentStream !== stream || document.hidden) return;
+        if (generation !== cameraGeneration || currentStream !== stream || document.hidden || camState !== 'warming') return;
+        clearTimeout(readyTimer); readyTimer = null;
         if (playing && video.readyState >= 2 && video.videoWidth && video.videoHeight && !video.paused && trackLive()) {
-          camState = 'ready'; readyTimer = null;
+          camState = 'ready'; readyCheck = null;
           if (!desiredId && settings.deviceId) desiredId = settings.deviceId;
           if (desiredId) { try { localStorage.setItem('mtag_scanner_cam', desiredId); } catch (e) {} }
           camMsg.textContent = 'تگ را هر جای تصویر بگیرید — لازم نیست داخل کادر باشد';
           setControls(); listCams(generation); startScanLoop(); return;
         }
         if (now() >= deadline) { cameraError('تصویر دوربین آماده نشد؛ تلاش مجدد را بزنید'); return; }
-        readyTimer = setTimeout(checkReady, 120);
+        readyTimer = setTimeout(checkReady, 25);
       }
+      readyCheck = checkReady;
       try {
         video.muted = true;
         if ('srcObject' in video) video.srcObject = stream;
@@ -526,7 +549,7 @@
           var caps = track && track.getCapabilities ? track.getCapabilities() : {};
           if (caps.focusMode && caps.focusMode.indexOf('continuous') >= 0 && track.applyConstraints) observe(track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }), noop, noop);
         } catch (e) {}
-        observe(video.play(), function () { playing = true; }, function () {
+        observe(video.play(), function () { playing = true; checkReady(); }, function () {
           if (generation === cameraGeneration) cameraError('پخش تصویر شروع نشد؛ دکمهٔ تلاش مجدد را لمس کنید');
         });
         checkReady();
@@ -538,7 +561,7 @@
       if (!basic) {
         videoConstraints.width = { ideal: LOW_END ? 1280 : 1920 };
         videoConstraints.height = { ideal: LOW_END ? 720 : 1080 };
-        videoConstraints.frameRate = { ideal: LOW_END ? 15 : 20, max: 30 };
+        videoConstraints.frameRate = { ideal: 30, max: 30 };
       }
       if (media && typeof media.getUserMedia === 'function') observe(media.getUserMedia({ video: videoConstraints, audio: false }), opened, failed);
       else {
@@ -572,7 +595,7 @@
   function suspend() {
     cameraGeneration++; clearRecovery(); clearTimeout(readyTimer); readyTimer = null;
     if (pendingOpen) { clearTimeout(pendingOpen.timer); pendingOpen.timer = null; }
-    stopScanLoop(); stopStream(); camState = 'suspended';
+    readyCheck = null; stopScanLoop(); stopStream(); camState = 'suspended';
     clearTimeout(statusTimer); statusTimer = null;
     if (statusCancel) statusCancel();
     setControls();

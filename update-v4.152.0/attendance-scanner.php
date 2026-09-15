@@ -70,7 +70,7 @@ video{width:100%;height:100%;object-fit:cover;display:block}
 </head>
 <body>
 <div class="hdr">
-    <div><b>🎓 <?php echo clean($schoolName); ?></b><div style="font-size:.68rem;color:#94a3b8">اسکنر هوشمند حضور و غیاب — سبک</div><a style="color:#9cd8ff;font-size:.7rem" href="<?php echo clean('attendance-scanner.php?scanner=legacy' . ($byKey ? '&key=' . rawurlencode($key) : '')); ?>">بازگشت به اسکنر قبلی</a></div>
+    <div><b>🎓 <?php echo clean($schoolName); ?></b><div style="font-size:.68rem;color:#94a3b8">اسکنر هوشمند حضور و غیاب — سریع</div><a style="color:#9cd8ff;font-size:.7rem" href="<?php echo clean('attendance-scanner.php?scanner=legacy' . ($byKey ? '&key=' . rawurlencode($key) : '')); ?>">بازگشت به اسکنر قبلی</a></div>
     <div class="clock" id="clock">--:--:--</div>
     <div class="rules">
         حضور تا ساعت <b style="color:#34d399"><?php echo tr_num($times['present_until'], 'fa'); ?></b><br>
@@ -111,10 +111,10 @@ video{width:100%;height:100%;object-fit:cover;display:block}
 window.ATT_SCANNER_CONFIG = {
   key: <?php echo json_encode($byKey ? $key : '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
   api: 'attendance-scan-api.php',
-  worker: 'assets/js/attendance-decoder-worker.js?v=4.152.0-camera1',
+  worker: 'assets/js/attendance-decoder-worker.js?v=4.152.0-camera2',
   decoder: 'assets/js/jsqr.min.js'
 };
 </script>
-<script src="assets/js/attendance-scanner-light.js?v=4.152.0-camera1"></script>
+<script src="assets/js/attendance-scanner-light.js?v=4.152.0-camera2"></script>
 </body>
 </html>

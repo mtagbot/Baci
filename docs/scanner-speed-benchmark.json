@@ -1,0 +1,1001 @@
+{
+  "baselineCommit": "e6b2684",
+  "date": "2026-09-15",
+  "conditions": {
+    "input": "Synthetic canvas video, 640x480 / portrait 480x640",
+    "algorithm": "Unmodified bundled jsQR; native BarcodeDetector disabled",
+    "modes": {
+      "worker": "Real dedicated Worker, 2 GB/2 cores reported",
+      "compat": "Callback camera, no Worker/fetch/finally/TypedArray.from/rVFC initially; Chromium CPU throttling 4x"
+    },
+    "samplesPerMode": 30,
+    "metric": "Milliseconds from painting tag to XHR send; response measured separately",
+    "limitations": "Controlled Chromium run, not physical camera/old OS or power benchmark"
+  },
+  "before": [
+    {
+      "mode": "worker",
+      "fixture": "normal",
+      "detectMs": 268,
+      "serverMs": 4.399999999906868,
+      "totalMs": 272.39999999990687
+    },
+    {
+      "mode": "worker",
+      "fixture": "rotated90",
+      "detectMs": 216.20000000018626,
+      "serverMs": 3.2999999998137355,
+      "totalMs": 219.5
+    },
+    {
+      "mode": "worker",
+      "fixture": "rotated180-inverted",
+      "detectMs": 170.39999999990687,
+      "serverMs": 3.6999999997206032,
+      "totalMs": 174.09999999962747
+    },
+    {
+      "mode": "worker",
+      "fixture": "tilted25",
+      "detectMs": 490.1999999997206,
+      "serverMs": 3.7000000001862645,
+      "totalMs": 493.89999999990687
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-center",
+      "detectMs": 171.6999999997206,
+      "serverMs": 4.5,
+      "totalMs": 176.1999999997206
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-top-left",
+      "detectMs": 175.89999999990687,
+      "serverMs": 3.3999999999068677,
+      "totalMs": 179.29999999981374
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-top-right",
+      "detectMs": 174.40000000037253,
+      "serverMs": 3.1999999997206032,
+      "totalMs": 177.60000000009313
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-bottom-left",
+      "detectMs": 175.8000000002794,
+      "serverMs": 3.3999999999068677,
+      "totalMs": 179.20000000018626
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-bottom-right-inverted",
+      "detectMs": 382.60000000009313,
+      "serverMs": 3,
+      "totalMs": 385.60000000009313
+    },
+    {
+      "mode": "worker",
+      "fixture": "portrait",
+      "detectMs": 392.8000000002794,
+      "serverMs": 2.8999999999068677,
+      "totalMs": 395.70000000018626
+    },
+    {
+      "mode": "worker",
+      "fixture": "normal",
+      "detectMs": 176.6999999997206,
+      "serverMs": 4.100000000093132,
+      "totalMs": 180.79999999981374
+    },
+    {
+      "mode": "worker",
+      "fixture": "rotated90",
+      "detectMs": 159.6999999997206,
+      "serverMs": 3.6000000000931323,
+      "totalMs": 163.29999999981374
+    },
+    {
+      "mode": "worker",
+      "fixture": "rotated180-inverted",
+      "detectMs": 382.70000000018626,
+      "serverMs": 3.1000000000931323,
+      "totalMs": 385.8000000002794
+    },
+    {
+      "mode": "worker",
+      "fixture": "tilted25",
+      "detectMs": 181,
+      "serverMs": 3,
+      "totalMs": 184
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-center",
+      "detectMs": 177.6999999997206,
+      "serverMs": 3.3000000002793968,
+      "totalMs": 181
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-top-left",
+      "detectMs": 176.09999999962747,
+      "serverMs": 3.7000000001862645,
+      "totalMs": 179.79999999981374
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-top-right",
+      "detectMs": 183.70000000018626,
+      "serverMs": 3.3999999999068677,
+      "totalMs": 187.10000000009313
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-bottom-left",
+      "detectMs": 376.10000000009313,
+      "serverMs": 2.8999999999068677,
+      "totalMs": 379
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-bottom-right-inverted",
+      "detectMs": 386.5,
+      "serverMs": 3,
+      "totalMs": 389.5
+    },
+    {
+      "mode": "worker",
+      "fixture": "portrait",
+      "detectMs": 171.89999999990687,
+      "serverMs": 3.5,
+      "totalMs": 175.39999999990687
+    },
+    {
+      "mode": "worker",
+      "fixture": "normal",
+      "detectMs": 179,
+      "serverMs": 2.8999999999068677,
+      "totalMs": 181.89999999990687
+    },
+    {
+      "mode": "worker",
+      "fixture": "rotated90",
+      "detectMs": 375.39999999990687,
+      "serverMs": 3.3999999999068677,
+      "totalMs": 378.79999999981374
+    },
+    {
+      "mode": "worker",
+      "fixture": "rotated180-inverted",
+      "detectMs": 203.89999999990687,
+      "serverMs": 4.199999999720603,
+      "totalMs": 208.09999999962747
+    },
+    {
+      "mode": "worker",
+      "fixture": "tilted25",
+      "detectMs": 230.29999999981374,
+      "serverMs": 3.5,
+      "totalMs": 233.79999999981374
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-center",
+      "detectMs": 175,
+      "serverMs": 3.099999999627471,
+      "totalMs": 178.09999999962747
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-top-left",
+      "detectMs": 177.40000000037253,
+      "serverMs": 3.599999999627471,
+      "totalMs": 181
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-top-right",
+      "detectMs": 386,
+      "serverMs": 3.7000000001862645,
+      "totalMs": 389.70000000018626
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-bottom-left",
+      "detectMs": 379.5,
+      "serverMs": 2.8999999999068677,
+      "totalMs": 382.39999999990687
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-bottom-right-inverted",
+      "detectMs": 387.3000000002794,
+      "serverMs": 3.599999999627471,
+      "totalMs": 390.89999999990687
+    },
+    {
+      "mode": "worker",
+      "fixture": "portrait",
+      "detectMs": 378.89999999990687,
+      "serverMs": 2.8999999999068677,
+      "totalMs": 381.79999999981374
+    },
+    {
+      "mode": "compat",
+      "fixture": "normal",
+      "detectMs": 524.1000000000931,
+      "serverMs": 12.100000000093132,
+      "totalMs": 536.2000000001863
+    },
+    {
+      "mode": "compat",
+      "fixture": "rotated90",
+      "detectMs": 292,
+      "serverMs": 8.100000000093132,
+      "totalMs": 300.10000000009313
+    },
+    {
+      "mode": "compat",
+      "fixture": "rotated180-inverted",
+      "detectMs": 204,
+      "serverMs": 12.799999999813735,
+      "totalMs": 216.79999999981374
+    },
+    {
+      "mode": "compat",
+      "fixture": "tilted25",
+      "detectMs": 570.3999999999069,
+      "serverMs": 11.600000000093132,
+      "totalMs": 582
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-center",
+      "detectMs": 199.3000000002794,
+      "serverMs": 9.399999999906868,
+      "totalMs": 208.70000000018626
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-top-left",
+      "detectMs": 219,
+      "serverMs": 8,
+      "totalMs": 227.10000000009313
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-top-right",
+      "detectMs": 201.10000000009313,
+      "serverMs": 8.5,
+      "totalMs": 209.60000000009313
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-bottom-left",
+      "detectMs": 199.09999999962747,
+      "serverMs": 9,
+      "totalMs": 208.09999999962747
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-bottom-right-inverted",
+      "detectMs": 462.1999999997206,
+      "serverMs": 10.800000000279397,
+      "totalMs": 473
+    },
+    {
+      "mode": "compat",
+      "fixture": "portrait",
+      "detectMs": 460.90000000037253,
+      "serverMs": 10.799999999813735,
+      "totalMs": 471.70000000018626
+    },
+    {
+      "mode": "compat",
+      "fixture": "normal",
+      "detectMs": 198.10000000009313,
+      "serverMs": 14.399999999906868,
+      "totalMs": 212.5
+    },
+    {
+      "mode": "compat",
+      "fixture": "rotated90",
+      "detectMs": 182.60000000009313,
+      "serverMs": 12,
+      "totalMs": 194.60000000009313
+    },
+    {
+      "mode": "compat",
+      "fixture": "rotated180-inverted",
+      "detectMs": 584.8999999999069,
+      "serverMs": 9.400000000372529,
+      "totalMs": 594.3000000002794
+    },
+    {
+      "mode": "compat",
+      "fixture": "tilted25",
+      "detectMs": 259.60000000009313,
+      "serverMs": 13.799999999813735,
+      "totalMs": 273.39999999990687
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-center",
+      "detectMs": 194.89999999990687,
+      "serverMs": 12.100000000093132,
+      "totalMs": 207
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-top-left",
+      "detectMs": 186.5,
+      "serverMs": 18.40000000037253,
+      "totalMs": 204.90000000037253
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-top-right",
+      "detectMs": 171.20000000018626,
+      "serverMs": 13.099999999627471,
+      "totalMs": 184.29999999981374
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-bottom-left",
+      "detectMs": 488.10000000009313,
+      "serverMs": 13.799999999813735,
+      "totalMs": 501.89999999990687
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-bottom-right-inverted",
+      "detectMs": 533.5,
+      "serverMs": 9,
+      "totalMs": 542.5
+    },
+    {
+      "mode": "compat",
+      "fixture": "portrait",
+      "detectMs": 275,
+      "serverMs": 10.300000000279397,
+      "totalMs": 285.3000000002794
+    },
+    {
+      "mode": "compat",
+      "fixture": "normal",
+      "detectMs": 232.70000000018626,
+      "serverMs": 15.100000000093132,
+      "totalMs": 247.8000000002794
+    },
+    {
+      "mode": "compat",
+      "fixture": "rotated90",
+      "detectMs": 537,
+      "serverMs": 14.699999999720603,
+      "totalMs": 551.6999999997206
+    },
+    {
+      "mode": "compat",
+      "fixture": "rotated180-inverted",
+      "detectMs": 247.79999999981374,
+      "serverMs": 9.5,
+      "totalMs": 257.29999999981374
+    },
+    {
+      "mode": "compat",
+      "fixture": "tilted25",
+      "detectMs": 284.39999999990687,
+      "serverMs": 13.100000000093132,
+      "totalMs": 297.5
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-center",
+      "detectMs": 197.39999999990687,
+      "serverMs": 15.600000000093132,
+      "totalMs": 213
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-top-left",
+      "detectMs": 151.3000000002794,
+      "serverMs": 14.299999999813735,
+      "totalMs": 165.60000000009313
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-top-right",
+      "detectMs": 448.39999999990687,
+      "serverMs": 9,
+      "totalMs": 457.39999999990687
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-bottom-left",
+      "detectMs": 463.20000000018626,
+      "serverMs": 30.799999999813735,
+      "totalMs": 494
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-bottom-right-inverted",
+      "detectMs": 407.89999999990687,
+      "serverMs": 9.399999999906868,
+      "totalMs": 417.29999999981374
+    },
+    {
+      "mode": "compat",
+      "fixture": "portrait",
+      "detectMs": 544.5,
+      "serverMs": 9.399999999906868,
+      "totalMs": 553.8999999999069
+    }
+  ],
+  "after": [
+    {
+      "mode": "worker",
+      "fixture": "normal",
+      "detectMs": 119,
+      "serverMs": 4.100000000093132,
+      "totalMs": 123.10000000009313
+    },
+    {
+      "mode": "worker",
+      "fixture": "rotated90",
+      "detectMs": 139.29999999981374,
+      "serverMs": 5,
+      "totalMs": 144.29999999981374
+    },
+    {
+      "mode": "worker",
+      "fixture": "rotated180-inverted",
+      "detectMs": 94.79999999981374,
+      "serverMs": 7,
+      "totalMs": 101.79999999981374
+    },
+    {
+      "mode": "worker",
+      "fixture": "tilted25",
+      "detectMs": 75.1999999997206,
+      "serverMs": 4.2000000001862645,
+      "totalMs": 79.39999999990687
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-center",
+      "detectMs": 16.299999999813735,
+      "serverMs": 3.6000000000931323,
+      "totalMs": 19.899999999906868
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-top-left",
+      "detectMs": 29,
+      "serverMs": 2.7999999998137355,
+      "totalMs": 31.799999999813735
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-top-right",
+      "detectMs": 64,
+      "serverMs": 3.2000000001862645,
+      "totalMs": 67.20000000018626
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-bottom-left",
+      "detectMs": 63.60000000009313,
+      "serverMs": 3.2999999998137355,
+      "totalMs": 66.89999999990687
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-bottom-right-inverted",
+      "detectMs": 68.29999999981374,
+      "serverMs": 3.3999999999068677,
+      "totalMs": 71.6999999997206
+    },
+    {
+      "mode": "worker",
+      "fixture": "portrait",
+      "detectMs": 30.09999999962747,
+      "serverMs": 3,
+      "totalMs": 33.09999999962747
+    },
+    {
+      "mode": "worker",
+      "fixture": "normal",
+      "detectMs": 119.10000000009313,
+      "serverMs": 3.6999999997206032,
+      "totalMs": 122.79999999981374
+    },
+    {
+      "mode": "worker",
+      "fixture": "rotated90",
+      "detectMs": 75.20000000018626,
+      "serverMs": 5.699999999720603,
+      "totalMs": 80.89999999990687
+    },
+    {
+      "mode": "worker",
+      "fixture": "rotated180-inverted",
+      "detectMs": 73,
+      "serverMs": 3.1999999997206032,
+      "totalMs": 76.1999999997206
+    },
+    {
+      "mode": "worker",
+      "fixture": "tilted25",
+      "detectMs": 75.5,
+      "serverMs": 3.7000000001862645,
+      "totalMs": 79.20000000018626
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-center",
+      "detectMs": 78.10000000009313,
+      "serverMs": 3.3999999999068677,
+      "totalMs": 81.5
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-top-left",
+      "detectMs": 76.60000000009313,
+      "serverMs": 3.8999999999068677,
+      "totalMs": 80.5
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-top-right",
+      "detectMs": 70,
+      "serverMs": 3.1000000000931323,
+      "totalMs": 73.10000000009313
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-bottom-left",
+      "detectMs": 94.40000000037253,
+      "serverMs": 3.099999999627471,
+      "totalMs": 97.5
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-bottom-right-inverted",
+      "detectMs": 74.39999999990687,
+      "serverMs": 4.100000000093132,
+      "totalMs": 78.5
+    },
+    {
+      "mode": "worker",
+      "fixture": "portrait",
+      "detectMs": 68.79999999981374,
+      "serverMs": 3.3999999999068677,
+      "totalMs": 72.1999999997206
+    },
+    {
+      "mode": "worker",
+      "fixture": "normal",
+      "detectMs": 86.60000000009313,
+      "serverMs": 3.1999999997206032,
+      "totalMs": 89.79999999981374
+    },
+    {
+      "mode": "worker",
+      "fixture": "rotated90",
+      "detectMs": 30,
+      "serverMs": 3.2999999998137355,
+      "totalMs": 33.299999999813735
+    },
+    {
+      "mode": "worker",
+      "fixture": "rotated180-inverted",
+      "detectMs": 140.09999999962747,
+      "serverMs": 4.600000000093132,
+      "totalMs": 144.6999999997206
+    },
+    {
+      "mode": "worker",
+      "fixture": "tilted25",
+      "detectMs": 75.70000000018626,
+      "serverMs": 3.1000000000931323,
+      "totalMs": 78.8000000002794
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-center",
+      "detectMs": 75.89999999990687,
+      "serverMs": 3.3000000002793968,
+      "totalMs": 79.3000000002794
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-top-left",
+      "detectMs": 73.20000000018626,
+      "serverMs": 4,
+      "totalMs": 77.20000000018626
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-top-right",
+      "detectMs": 63.5,
+      "serverMs": 3.3999999999068677,
+      "totalMs": 66.89999999990687
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-bottom-left",
+      "detectMs": 75.39999999990687,
+      "serverMs": 4,
+      "totalMs": 79.39999999990687
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-bottom-right-inverted",
+      "detectMs": 79.39999999990687,
+      "serverMs": 3.2999999998137355,
+      "totalMs": 82.6999999997206
+    },
+    {
+      "mode": "worker",
+      "fixture": "portrait",
+      "detectMs": 31.100000000093132,
+      "serverMs": 3,
+      "totalMs": 34.10000000009313
+    },
+    {
+      "mode": "compat",
+      "fixture": "normal",
+      "detectMs": 127.70000000018626,
+      "serverMs": 22.600000000093132,
+      "totalMs": 150.3000000002794
+    },
+    {
+      "mode": "compat",
+      "fixture": "rotated90",
+      "detectMs": 296,
+      "serverMs": 16,
+      "totalMs": 312
+    },
+    {
+      "mode": "compat",
+      "fixture": "rotated180-inverted",
+      "detectMs": 143.89999999990687,
+      "serverMs": 10.899999999906868,
+      "totalMs": 154.79999999981374
+    },
+    {
+      "mode": "compat",
+      "fixture": "tilted25",
+      "detectMs": 85.70000000018626,
+      "serverMs": 12,
+      "totalMs": 97.70000000018626
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-center",
+      "detectMs": 113.10000000009313,
+      "serverMs": 13.199999999720603,
+      "totalMs": 126.29999999981374
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-top-left",
+      "detectMs": 190.1999999997206,
+      "serverMs": 10.700000000186265,
+      "totalMs": 200.89999999990687
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-top-right",
+      "detectMs": 203.5,
+      "serverMs": 21.5,
+      "totalMs": 225
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-bottom-left",
+      "detectMs": 300.29999999981374,
+      "serverMs": 10.899999999906868,
+      "totalMs": 311.1999999997206
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-bottom-right-inverted",
+      "detectMs": 248.29999999981374,
+      "serverMs": 16.600000000093132,
+      "totalMs": 264.89999999990687
+    },
+    {
+      "mode": "compat",
+      "fixture": "portrait",
+      "detectMs": 196.89999999990687,
+      "serverMs": 11.5,
+      "totalMs": 208.39999999990687
+    },
+    {
+      "mode": "compat",
+      "fixture": "normal",
+      "detectMs": 100.29999999981374,
+      "serverMs": 19.200000000186265,
+      "totalMs": 119.5
+    },
+    {
+      "mode": "compat",
+      "fixture": "rotated90",
+      "detectMs": 94.70000000018626,
+      "serverMs": 16.899999999906868,
+      "totalMs": 111.60000000009313
+    },
+    {
+      "mode": "compat",
+      "fixture": "rotated180-inverted",
+      "detectMs": 107.10000000009313,
+      "serverMs": 10.699999999720603,
+      "totalMs": 117.79999999981374
+    },
+    {
+      "mode": "compat",
+      "fixture": "tilted25",
+      "detectMs": 298.39999999990687,
+      "serverMs": 19.199999999720603,
+      "totalMs": 317.59999999962747
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-center",
+      "detectMs": 245.5,
+      "serverMs": 27.90000000037253,
+      "totalMs": 273.40000000037253
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-top-left",
+      "detectMs": 212.89999999990687,
+      "serverMs": 11.5,
+      "totalMs": 224.39999999990687
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-top-right",
+      "detectMs": 298.1999999997206,
+      "serverMs": 24,
+      "totalMs": 322.1999999997206
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-bottom-left",
+      "detectMs": 94.20000000018626,
+      "serverMs": 10.799999999813735,
+      "totalMs": 105
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-bottom-right-inverted",
+      "detectMs": 142.3000000002794,
+      "serverMs": 10.699999999720603,
+      "totalMs": 153
+    },
+    {
+      "mode": "compat",
+      "fixture": "portrait",
+      "detectMs": 222.10000000009313,
+      "serverMs": 9.299999999813735,
+      "totalMs": 231.39999999990687
+    },
+    {
+      "mode": "compat",
+      "fixture": "normal",
+      "detectMs": 421.6999999997206,
+      "serverMs": 14.5,
+      "totalMs": 436.1999999997206
+    },
+    {
+      "mode": "compat",
+      "fixture": "rotated90",
+      "detectMs": 456.39999999990687,
+      "serverMs": 5.5,
+      "totalMs": 461.89999999990687
+    },
+    {
+      "mode": "compat",
+      "fixture": "rotated180-inverted",
+      "detectMs": 147,
+      "serverMs": 3.7999999998137355,
+      "totalMs": 150.79999999981374
+    },
+    {
+      "mode": "compat",
+      "fixture": "tilted25",
+      "detectMs": 462.5,
+      "serverMs": 18.200000000186265,
+      "totalMs": 480.70000000018626
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-center",
+      "detectMs": 96.60000000009313,
+      "serverMs": 17.799999999813735,
+      "totalMs": 114.39999999990687
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-top-left",
+      "detectMs": 116,
+      "serverMs": 19.09999999962747,
+      "totalMs": 135.09999999962747
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-top-right",
+      "detectMs": 99,
+      "serverMs": 12.799999999813735,
+      "totalMs": 111.79999999981374
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-bottom-left",
+      "detectMs": 91.20000000018626,
+      "serverMs": 18.5,
+      "totalMs": 109.70000000018626
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-bottom-right-inverted",
+      "detectMs": 99.5,
+      "serverMs": 14.799999999813735,
+      "totalMs": 114.29999999981374
+    },
+    {
+      "mode": "compat",
+      "fixture": "portrait",
+      "detectMs": 118.8000000002794,
+      "serverMs": 12.5,
+      "totalMs": 131.3000000002794
+    }
+  ],
+  "serverDelay250ms": [
+    {
+      "mode": "worker",
+      "fixture": "normal",
+      "detectMs": 137.29999999981374,
+      "serverMs": 255.5,
+      "totalMs": 392.79999999981374
+    },
+    {
+      "mode": "worker",
+      "fixture": "rotated90",
+      "detectMs": 165,
+      "serverMs": 254,
+      "totalMs": 419
+    },
+    {
+      "mode": "worker",
+      "fixture": "rotated180-inverted",
+      "detectMs": 27.40000000037253,
+      "serverMs": 254.5,
+      "totalMs": 281.90000000037253
+    },
+    {
+      "mode": "worker",
+      "fixture": "tilted25",
+      "detectMs": 24.100000000093132,
+      "serverMs": 254.60000000009313,
+      "totalMs": 278.70000000018626
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-center",
+      "detectMs": 19.200000000186265,
+      "serverMs": 254.39999999990687,
+      "totalMs": 273.60000000009313
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-top-left",
+      "detectMs": 114.5,
+      "serverMs": 254.89999999990687,
+      "totalMs": 369.39999999990687
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-top-right",
+      "detectMs": 69.59999999962747,
+      "serverMs": 253.90000000037253,
+      "totalMs": 323.5
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-bottom-left",
+      "detectMs": 72.5,
+      "serverMs": 254.20000000018626,
+      "totalMs": 326.70000000018626
+    },
+    {
+      "mode": "worker",
+      "fixture": "small-bottom-right-inverted",
+      "detectMs": 76,
+      "serverMs": 254.20000000018626,
+      "totalMs": 330.20000000018626
+    },
+    {
+      "mode": "worker",
+      "fixture": "portrait",
+      "detectMs": 24.899999999906868,
+      "serverMs": 255.5,
+      "totalMs": 280.39999999990687
+    },
+    {
+      "mode": "compat",
+      "fixture": "normal",
+      "detectMs": 190.10000000009313,
+      "serverMs": 258.20000000018626,
+      "totalMs": 448.3000000002794
+    },
+    {
+      "mode": "compat",
+      "fixture": "rotated90",
+      "detectMs": 218.39999999990687,
+      "serverMs": 259.6999999997206,
+      "totalMs": 478.09999999962747
+    },
+    {
+      "mode": "compat",
+      "fixture": "rotated180-inverted",
+      "detectMs": 100.39999999990687,
+      "serverMs": 260.5,
+      "totalMs": 360.89999999990687
+    },
+    {
+      "mode": "compat",
+      "fixture": "tilted25",
+      "detectMs": 107.20000000018626,
+      "serverMs": 256.60000000009313,
+      "totalMs": 363.8000000002794
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-center",
+      "detectMs": 204.5,
+      "serverMs": 258.79999999981374,
+      "totalMs": 463.29999999981374
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-top-left",
+      "detectMs": 170.10000000009313,
+      "serverMs": 264.39999999990687,
+      "totalMs": 434.5
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-top-right",
+      "detectMs": 73.89999999990687,
+      "serverMs": 258.90000000037253,
+      "totalMs": 332.8000000002794
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-bottom-left",
+      "detectMs": 281,
+      "serverMs": 261.10000000009313,
+      "totalMs": 542.1000000000931
+    },
+    {
+      "mode": "compat",
+      "fixture": "small-bottom-right-inverted",
+      "detectMs": 135.79999999981374,
+      "serverMs": 260.5,
+      "totalMs": 396.29999999981374
+    },
+    {
+      "mode": "compat",
+      "fixture": "portrait",
+      "detectMs": 262.10000000009313,
+      "serverMs": 257.39999999990687,
+      "totalMs": 519.5
+    }
+  ]
+}
