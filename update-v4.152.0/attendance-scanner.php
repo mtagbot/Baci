@@ -66,11 +66,15 @@ video{width:100%;height:100%;object-fit:cover;display:block}
 .camswitch:disabled{opacity:.5;cursor:wait}
 .camswitch{position:absolute;top:8px;left:8px;z-index:5;background:#1c1c1c;border:1px solid #333;color:#eee;padding:8px 12px;font-family:inherit;font-size:.72rem;font-weight:700;cursor:pointer;display:none}
 .camlabel{position:absolute;top:8px;right:8px;z-index:5;background:rgba(0,0,0,.6);padding:5px 9px;font-size:.6rem;color:#999;max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.optics{background:#1c1c1c;padding:8px;font-size:.72rem;line-height:1.8}
+.optics button{font:inherit;padding:5px;margin:3px;border:1px solid #555;background:#252525;color:#eee;cursor:pointer}
+.optics button:disabled{opacity:.5;cursor:default}
+.optics small{display:block;color:#bbb}
 </style>
 </head>
 <body>
 <div class="hdr">
-    <div><b>🎓 <?php echo clean($schoolName); ?></b><div style="font-size:.68rem;color:#94a3b8">اسکنر هوشمند حضور و غیاب — سریع</div><a style="color:#9cd8ff;font-size:.7rem" href="<?php echo clean('attendance-scanner.php?scanner=legacy' . ($byKey ? '&key=' . rawurlencode($key) : '')); ?>">بازگشت به اسکنر قبلی</a></div>
+    <div><b>🎓 <?php echo clean($schoolName); ?></b><div style="font-size:.68rem;color:#94a3b8">اسکنر هوشمند حضور و غیاب — سریع / فوکوس نزدیک</div><a style="color:#9cd8ff;font-size:.7rem" href="<?php echo clean('attendance-scanner.php?scanner=legacy' . ($byKey ? '&key=' . rawurlencode($key) : '')); ?>">بازگشت به اسکنر قبلی</a></div>
     <div class="clock" id="clock">--:--:--</div>
     <div class="rules">
         حضور تا ساعت <b style="color:#34d399"><?php echo tr_num($times['present_until'], 'fa'); ?></b><br>
@@ -92,6 +96,13 @@ video{width:100%;height:100%;object-fit:cover;display:block}
             <div class="rstat" id="resStat">تگ QR خود را مقابل دوربین بگیرید</div>
             <div class="rsub" id="resSub"></div>
         </div>
+        <div class="optics">
+            <label><input type="checkbox" id="opticsMode" checked disabled> فوکوس نزدیک ثابت / حالت حرکت</label><br>
+            <button type="button" id="opticsFocus" disabled>تنظیم دوباره فوکوس</button>
+            <button type="button" id="opticsTorch" disabled>روشن‌کردن چراغ</button>
+            <div id="opticsStatus">بررسی قابلیت‌های دوربین پس از بازشدن تصویر…</div>
+            <small id="opticsDetails">قفل بی‌نهایت برای فاصله ۱۰ تا ۱۵ سانتی‌متر استفاده نمی‌شود.</small>
+        </div>
         <div class="stats">
             <div class="stat p"><b id="stP">۰</b><span>حضور</span></div>
             <div class="stat l"><b id="stL">۰</b><span>تأخیر</span></div>
@@ -111,10 +122,10 @@ video{width:100%;height:100%;object-fit:cover;display:block}
 window.ATT_SCANNER_CONFIG = {
   key: <?php echo json_encode($byKey ? $key : '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
   api: 'attendance-scan-api.php',
-  worker: 'assets/js/attendance-decoder-worker.js?v=4.152.0-camera2',
+  worker: 'assets/js/attendance-decoder-worker.js?v=4.152.0-camera3',
   decoder: 'assets/js/jsqr.min.js'
 };
 </script>
-<script src="assets/js/attendance-scanner-light.js?v=4.152.0-camera2"></script>
+<script src="assets/js/attendance-scanner-light.js?v=4.152.0-camera3"></script>
 </body>
 </html>

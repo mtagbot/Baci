@@ -33,7 +33,7 @@ try {
    assets.push(url.pathname);
    await route.fulfill({contentType:url.pathname.endsWith('.php')?'text/html':'application/javascript',body});
   });
-  await context.addInitScript({content:qr+`;(${function(mode){
+  await context.addInitScript({content:qr+`;(${function(mode,opticalMock){
    const realPromise=window.Promise;
    window.__shownAt={};window.__scanTimings={};
    const originalSend=XMLHttpRequest.prototype.send;
@@ -49,10 +49,18 @@ try {
    const input=document.createElement('canvas');input.width=640;input.height=480;
    const cx=input.getContext('2d');let spec=null,patch=null;
    window.drawFixture=function(next){spec=next;input.width=next.portrait?480:640;input.height=next.portrait?640:480;const code=qrcode(0,'M');code.addData(next.payload);code.make();const n=code.getModuleCount();patch=document.createElement('canvas');patch.width=patch.height=(n+8)*4;const p=patch.getContext('2d');p.fillStyle=next.inverted?'#111':'#fff';p.fillRect(0,0,patch.width,patch.height);p.fillStyle=next.inverted?'#fff':'#111';for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(code.isDark(y,x))p.fillRect((x+4)*4,(y+4)*4,4,4);window.__shownAt[next.payload]=performance.now();paint()};
-   function paint(){cx.fillStyle=spec&&spec.inverted?'#111':'#fff';cx.fillRect(0,0,input.width,input.height);if(!spec)return;cx.save();cx.translate(spec.x,spec.y);cx.rotate((spec.angle||0)*Math.PI/180);cx.imageSmoothingEnabled=false;cx.drawImage(patch,-spec.size/2,-spec.size/2,spec.size,spec.size);cx.restore()}
+   function paint(){cx.fillStyle=spec&&spec.inverted?'#111':'#fff';cx.fillRect(0,0,input.width,input.height);if(!spec)return;cx.save();const t=performance.now();cx.translate(spec.x+(spec.motion?Math.sin(t/70)*25:0),spec.y+(spec.motion?Math.cos(t/90)*15:0));cx.rotate(((spec.angle||0)+(spec.motion?Math.sin(t/80)*8:0))*Math.PI/180);cx.imageSmoothingEnabled=false;if(spec.blur){cx.globalAlpha=1/3;for(let b=-1;b<=1;b++)cx.drawImage(patch,-spec.size/2+b*spec.blur,-spec.size/2,spec.size,spec.size)}else cx.drawImage(patch,-spec.size/2,-spec.size/2,spec.size,spec.size);cx.restore()}
    paint();setInterval(paint,16);
    const streams=[];window.fixtureStreams=streams;
-   function open(constraints){let id=constraints.video&&constraints.video.deviceId?constraints.video.deviceId.exact:'A';if(constraints.video&&constraints.video.optional)id=constraints.video.optional[0].sourceId;const stream=input.captureStream(constraints.video&&constraints.video.frameRate?constraints.video.frameRate.ideal:30),track=stream.getVideoTracks()[0];track.getSettings=()=>({deviceId:id});streams.push({stream,id});return stream}
+   function open(constraints){let id=constraints.video&&constraints.video.deviceId?constraints.video.deviceId.exact:'A';if(constraints.video&&constraints.video.optional)id=constraints.video.optional[0].sourceId;const stream=input.captureStream(constraints.video&&constraints.video.frameRate?constraints.video.frameRate.ideal:30),track=stream.getVideoTracks()[0];track.getSettings=()=>({deviceId:id});
+    if(opticalMock){
+     const settings={deviceId:id,focusMode:'continuous',focusDistance:8,exposureMode:'continuous',exposureTime:400,iso:100,frameRate:30,torch:false};
+     track.getSettings=()=>({...settings});
+     track.getCapabilities=()=>({focusMode:['continuous','manual','single-shot'],focusDistance:{min:0,max:10,step:.1},exposureMode:['continuous','manual'],exposureTime:{min:1,max:1000,step:1},iso:{min:50,max:3200,step:50},frameRate:{min:1,max:60},torch:true});
+     track.getConstraints=()=>({deviceId:{exact:id},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30,max:30}});
+     track.applyConstraints=c=>{for(const f of c.advanced||[])Object.assign(settings,f);if(c.frameRate)settings.frameRate=c.frameRate.ideal;return realPromise.resolve()};
+    }
+    streams.push({stream,id});return stream}
    const devices=['A','B'].map(deviceId=>({kind:'videoinput',deviceId,label:'Camera '+deviceId}));
    Object.defineProperty(navigator,'deviceMemory',{value:2});Object.defineProperty(navigator,'hardwareConcurrency',{value:2});
    window.BarcodeDetector=undefined; // Exercise the real jsQR sensitivity, not an OS implementation.
@@ -62,7 +70,7 @@ try {
     window.MediaStreamTrack.getSources=fn=>fn(devices.map(d=>({kind:'video',id:d.deviceId,label:d.label})));
     HTMLVideoElement.prototype.requestVideoFrameCallback=undefined;HTMLVideoElement.prototype.cancelVideoFrameCallback=undefined;
    }else Object.defineProperty(navigator,'mediaDevices',{value:{getUserMedia:c=>realPromise.resolve(open(c)),enumerateDevices:()=>realPromise.resolve(devices),addEventListener(){}}});
-  }.toString()})(${JSON.stringify(mode)});`});
+  }.toString()})(${JSON.stringify(mode)},${!!process.env.OPTICS_TEST});`});
   const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
   if(mode==='compat') {const cdp=await context.newCDPSession(page);await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});}
   await page.goto('http://scanner.test/attendance-scanner.php');
@@ -82,6 +90,12 @@ try {
    {name:'small-bottom-right-inverted',x:570,y:410,size:110,inverted:true},
    {name:'portrait',x:240,y:320,size:180,portrait:true}
   ];
+  if(process.env.SCANNER_MOTION_FIXTURES)fixtures.push(
+   {name:'moving-center',x:320,y:240,size:180,motion:true},
+   {name:'moving-tilted',x:320,y:240,size:180,angle:20,motion:true},
+   {name:'moving-light-blur',x:320,y:240,size:200,motion:true,blur:1},
+   {name:'moving-inverted',x:320,y:240,size:180,motion:true,inverted:true}
+  );
   const repeated=Array.from({length:Number(process.env.BENCH_REPEATS||1)},()=>fixtures).flat();
   for(const [i,f] of repeated.entries()){
    const payload='MTAG-ATT:'+(i+1)+':'+(i+1).toString(16).padStart(32,'0');
@@ -91,6 +105,12 @@ try {
    const timing=await page.evaluate(p=>window.__scanTimings[p],payload);
    assert(Number.isFinite(timing.detectMs)&&Number.isFinite(timing.totalMs));
    measurements.push({mode,fixture:f.name,...timing});
+   if(process.env.OPTICS_TEST&&i===0){
+    await page.waitForFunction(()=>document.getElementById('opticsDetails').textContent.includes('فوکوس ثابت'));
+    const settings=await page.evaluate(()=>window.fixtureStreams.find(s=>s.stream.getVideoTracks()[0].readyState==='live').stream.getVideoTracks()[0].getSettings());
+    assert.equal(settings.focusDistance,8);assert.equal(settings.frameRate,60);assert.equal(settings.exposureTime,100);assert.equal(settings.iso,400);
+    console.log('PASS',mode,'optical controls verified against simulated driver settings (not physical lens/shutter)');
+   }
    assert.equal(await page.evaluate(()=>localStorage.getItem('mtag_scanner_cam')),'B');
    assert.equal(await page.evaluate(()=>window.fixtureStreams.filter(s=>s.stream.getVideoTracks()[0].readyState==='live').length),1);
    count++;console.log('PASS',mode,f.name,'actual video -> jsQR -> XHR; B retained');
