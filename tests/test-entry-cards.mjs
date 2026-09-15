@@ -166,7 +166,8 @@ ok('سطح تصحیح خطای QR به Q ارتقا یافت (مقاوم به خ
 ok('حاشیهٔ سفید QR استاندارد است (۴ ماژول)',
    (pageC.match(/quiet = 4/g) || []).length === 2 && !pageC.includes('quiet = 2'));
 ok('هر دو canvas در چاپ رسم می‌شوند',
-   (pageC.match(/canvas\.card-qr\[data-qr\],canvas\.card-back-qr\[data-qr\]/g) || []).length === 2);
+   pageC.includes("document.querySelectorAll('canvas.card-qr[data-qr],canvas.card-back-qr[data-qr]').forEach(draw)") &&
+   pageC.includes("pv.querySelectorAll('canvas[data-qr]').forEach(drawCardQR)"));
 
 console.log('\n══ حالت تگ‌محور (QR-first) ══');
 /* خواستهٔ کارفرما «۸۰٪ کارت را QR بگیرد».
@@ -305,7 +306,7 @@ ok('اعتبارسنجی مقیاس از همان منبع می‌آید',
 ok('نوار مقیاس هم از همان منبع پر می‌شود',
    /min="<\?php echo \(int\)round\(card_scale_min\(\)\*100\)/.test(pageC));
 ok('پیام پیش‌نمایش بین «دانش‌آموز کم» و «سقف پیش‌نمایش» فرق می‌گذارد',
-   pageC.includes('TOTAL_STUDENTS < perPage'));
+   pageC.includes("TOTAL_STUDENTS * d.copies * (d.side === 'both' ? 2 : 1) < perPage"));
 ok('پیش‌نمایش کاغذ واقعی دارد', pageC.includes('id="pvPaper"') && pageC.includes('pv-paper'));
 ok('پیش‌نمایش مقیاس را زنده اعمال می‌کند', pageC.includes("scaleBox.style.transform = 'scale('"));
 ok('کارت‌های خارج از صفحهٔ اول در پیش‌نمایش پنهان می‌شوند',
