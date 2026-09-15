@@ -58,7 +58,7 @@ function expectedScaledNode($node,$factor,$paper='A4') {
 // separately below. Keep every other property (RTL, fonts, borders, run order...).
 function semanticShape($node,$numbers=false) {
     $copy=$node->cloneNode(true);$xp=srl_xpath($copy->ownerDocument);
-    foreach(iterator_to_array($xp->query('.//w:pPr/w:spacing | .//w:pPr/w:ind | .//w:pPr/w:keepNext | .//w:pPr/w:keepLines | .//w:pPr/w:pageBreakBefore | .//w:pPr/w:widowControl | .//w:pPr/w:snapToGrid | .//w:tcPr/w:tcMar | .//w:tcPr/w:noWrap',$copy)) as $e)$e->parentNode->removeChild($e);
+    foreach(iterator_to_array($xp->query('.//w:pPr/w:spacing | .//w:pPr/w:ind | .//w:pPr/w:keepNext | .//w:pPr/w:keepLines | .//w:pPr/w:pageBreakBefore | .//w:pPr/w:widowControl | .//w:pPr/w:snapToGrid | .//w:tcPr/w:tcMar | .//w:tcPr/w:noWrap | .//w:tcPr/w:vAlign | .//w:pPr/w:textAlignment | .//w:tc/w:p/w:pPr/w:rPr/w:sz | .//w:tc/w:p/w:pPr/w:rPr/w:szCs | ./w:p/w:pPr/w:rPr/w:sz | ./w:p/w:pPr/w:rPr/w:szCs',$copy)) as $e)$e->parentNode->removeChild($e);
     return nodeShape($copy,$numbers);
 }
 function inspectDoc($bytes, $mode = 'split', $paper='A4') {
@@ -106,7 +106,7 @@ function inspectDoc($bytes, $mode = 'split', $paper='A4') {
     $targetW=$paper==='A3'?23814:16838;$targetH=$paper==='A3'?16839:11906;
     $layout=$size->getAttributeNS(SRL_W,'w')===(string)$targetW && $size->getAttributeNS(SRL_W,'h')===(string)$targetH && $size->getAttributeNS(SRL_W,'orient')==='landscape' && $size->getAttributeNS(SRL_W,'code')===($paper==='A3'?'8':'9');
     foreach(['top','bottom','left','right'] as $a) if($mar->getAttributeNS(SRL_W,$a)!=='0')$layout=false;
-    $fits=true; $cellsAligned=true; $exact=true; $zeroPadding=true; $totalHeight=0;
+    $fits=true; $cellsAligned=true; $exact=true; $centered=true; $marksMatch=true; $zeroPadding=true; $totalHeight=0;
     foreach($xp->query('//w:tbl') as $tb) {
         $grid=[];foreach($xp->query('./w:tblGrid/w:gridCol',$tb) as $col)$grid[]=(int)$col->getAttributeNS(SRL_W,'w');
         if(array_sum($grid)>$targetW-100)$fits=false;
@@ -123,7 +123,10 @@ function inspectDoc($bytes, $mode = 'split', $paper='A4') {
                 foreach(['top','left','bottom','right'] as $side)if($xp->evaluate('string(./w:tcPr/w:tcMar/w:'.$side.'/@w:w)',$cell)!=='0')$zeroPadding=false;
                 foreach($xp->query('./w:p',$cell) as $p){
                     $line=(int)$xp->evaluate('string(./w:pPr/w:spacing/@w:line)',$p);
-                    if($line>$h || $line<srl_max_font($p)*20 || $xp->evaluate('string(./w:pPr/w:spacing/@w:lineRule)',$p)!=='exact')$exact=false;
+                    if($h<srl_max_font($p)*20 || $line!==240 || $xp->evaluate('string(./w:pPr/w:spacing/@w:lineRule)',$p)!=='auto')$exact=false;
+                    if($xp->evaluate('string(./w:tcPr/w:vAlign/@w:val)',$cell)!=='center' || $xp->evaluate('string(./w:pPr/w:textAlignment/@w:val)',$p)!=='center')$centered=false;
+                    $runMax=0;foreach($xp->query('./w:r[w:t]/w:rPr/w:sz | ./w:r[w:t]/w:rPr/w:szCs',$p) as $sz)$runMax=max($runMax,(int)$sz->getAttributeNS(SRL_W,'val'));
+                    if($runMax)foreach(['sz','szCs'] as $tag)if((int)$xp->evaluate('string(./w:pPr/w:rPr/w:'.$tag.'/@w:val)',$p)!==$runMax)$marksMatch=false;
                     foreach(['before','after'] as $a)if($xp->evaluate('string(./w:pPr/w:spacing/@w:'.$a.')',$p)!=='0')$exact=false;
                     foreach(['keepNext','keepLines','pageBreakBefore','snapToGrid','widowControl'] as $a)if($xp->evaluate('string(./w:pPr/w:'.$a.'/@w:val)',$p)!=='0')$exact=false;
                 }
@@ -158,7 +161,7 @@ function inspectDoc($bytes, $mode = 'split', $paper='A4') {
         if (!$sourceCell || semanticShape(expectedScaledNode($sourceCell,$factor,$paper)) !== semanticShape($cell)) $headersMatch = false;
     }
     $z->close();$original->close();
-    return ['exact'=>$exact,'zeroPadding'=>$zeroPadding,'height'=>$totalHeight,'fits'=>$fits,'cellsAligned'=>$cellsAligned,'stylesScaled'=>$stylesScaled,'breaks'=>$breaks,'valid'=>$valid,'title'=>$text,'tables'=>$xp->query('//w:tbl')->length,'cols'=>$xp->query('./w:tblGrid/w:gridCol',$t)->length,'rows'=>$rows->length,
+    return ['centered'=>$centered,'marksMatch'=>$marksMatch,'yearRuns'=>array_map(function($n){return $n->textContent;},iterator_to_array($xp->query('/w:document/w:body/w:p[1]//w:t[string-length(.)=4 and (starts-with(.,"140"))]'))),'exact'=>$exact,'zeroPadding'=>$zeroPadding,'height'=>$totalHeight,'fits'=>$fits,'cellsAligned'=>$cellsAligned,'stylesScaled'=>$stylesScaled,'breaks'=>$breaks,'valid'=>$valid,'title'=>$text,'tables'=>$xp->query('//w:tbl')->length,'cols'=>$xp->query('./w:tblGrid/w:gridCol',$t)->length,'rows'=>$rows->length,
         'titleMatches'=>$titleMatches,'gridMatches'=>$gridMatches,'headersMatch'=>$headersMatch,
         'singleLineNames'=>$singleLineNames, 'nameCells'=>$nameCells, 'naturalNames'=>$naturalNames,
         'width'=>$width,'spans'=>$spans,'unchanged'=>$unchanged,'layout'=>$layout,
@@ -311,13 +314,15 @@ ok('every scaled cell/merged footer aligns exactly with the grid', b.cellsAligne
 ok('inherited font sizes and borders also scaled, not just document.xml', b.stylesScaled && c.stylesScaled);
 ok('A4 conversion adds no forced page breaks', b.breaks===0 && c.breaks===0 && o.breaks===0 && co.breaks===0);
 ok('all nine classes x 29 long names fit the same logical A4 sheet in both modes', r.full.tables===1 && r.fullCombined.tables===1 && r.full.fits && r.fullCombined.fits && r.full.singleLineNames && r.fullCombined.singleLineNames);
-ok('exact row/line heights include 2x font clearance and disable Word pagination inheritance', b.exact && c.exact && o.exact && co.exact);
+ok('exact rows retain 2x font clearance with natural single-line spacing', b.exact && c.exact && o.exact && co.exact);
 ok('all cell padding is zero, including inherited padding overridden by tcMar', b.zeroPadding && c.zeroPadding && o.zeroPadding && co.zeroPadding);
 ok('all 261 full-roster names retained', (r.full.xml.match(/حسینی‌نژاد/g)||[]).length===261 && (r.fullCombined.xml.match(/حسینی‌نژاد/g)||[]).length===261 && r.full.title.includes('261'));
 for (const paper of ['A4','A3']) for (const mode of ['split','combined']) {
     const docs=r.paperResults[paper][mode];
+    ok(paper+' '+mode+': every cell centered with paragraph mark matching visible font',Object.values(docs).every(x=>x.centered&&x.marksMatch));
+    ok(paper+' '+mode+': year slots swapped without moving the title or total',Object.values(docs).every(x=>JSON.stringify(x.yearRuns)===JSON.stringify(['1406','1405'])));
     ok(paper+' '+mode+': all sample/full/expanded documents have native paper size and zero margins',Object.values(docs).every(x=>x.layout&&x.zeroPadding));
-    ok(paper+' '+mode+': complete height fits ONE sheet, no enabled breaks, exact lines/rows',Object.values(docs).every(x=>x.fits&&x.exact&&x.breaks===0&&x.tables===1));
+    ok(paper+' '+mode+': complete height fits ONE sheet, no enabled breaks, exact rows',Object.values(docs).every(x=>x.fits&&x.exact&&x.breaks===0&&x.tables===1));
     ok(paper+' '+mode+': dynamic grid and merged footers align, natural single-line names retained',Object.values(docs).every(x=>x.cellsAligned&&x.spans&&x.naturalNames&&x.singleLineNames));
     ok(paper+' '+mode+': 30 and 60 students/class add rows, not pages or missing names',docs.rows30.rows===33&&docs.rows60.rows===63&&docs.rows30.namesRetained&&docs.rows60.namesRetained);
 }

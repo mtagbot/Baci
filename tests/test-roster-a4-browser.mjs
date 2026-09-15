@@ -31,6 +31,22 @@ for (const {name,paper} of fixtures) {
         await page.evaluate(async b=>{
             const bytes=Uint8Array.from(atob(b),c=>c.charCodeAt(0));
             await window.docx.renderAsync(bytes,document.getElementById('document'),null,{breakPages:true,ignoreLastRenderedPageBreak:true});
+            // docx-preview 0.4 ignores pPr/rPr font sizes, leaving the paragraph at
+            // the browser's 12pt default even when its runs are 2-7pt. Apply the
+            // actual OOXML paragraph-mark size for the Word-style auto-line test.
+            // This does not alter rows, margins, alignment, paper size or run fonts.
+            const zip=await window.JSZip.loadAsync(bytes);
+            const xml=new DOMParser().parseFromString(await zip.file('word/document.xml').async('string'),'application/xml');
+            const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+            const source=Array.from(xml.getElementsByTagNameNS(ns,'p'));
+            const paragraphs=Array.from(document.querySelectorAll('section.docx p'));
+            if(source.length!==paragraphs.length)throw new Error('Paragraph mapping differs from OOXML');
+            source.forEach((p,i)=>{
+                const pr=Array.from(p.children).find(e=>e.localName==='pPr');
+                const mark=pr&&Array.from(pr.children).find(e=>e.localName==='rPr');
+                const size=mark&&(Array.from(mark.children).find(e=>e.localName==='szCs')||Array.from(mark.children).find(e=>e.localName==='sz'));
+                if(size)paragraphs[i].style.fontSize=(Number(size.getAttributeNS(ns,'val'))/2)+'pt';
+            });
         },bytes);
         await page.addStyleTag({content:`
             @font-face{font-family:'ReferenceTitr';src:url(data:font/ttf;base64,${font})}
@@ -50,6 +66,22 @@ for (const {name,paper} of fixtures) {
         if(geometry.length!==expectedPages || geometry.some(g=>Math.abs(g.pageWidth-paperWidth*4/3)>1 || g.left<0 || g.right>g.pageWidth || g.bottom>paperHeight*4/3)) {
             throw new Error(name+': table overflow or wrong paper width: '+JSON.stringify(geometry));
         }
+        const alignment=await page.evaluate(()=>{
+            let count=0,maxOffset=0,maxTextOffset=0,wrongAlign=0;
+            for(const td of document.querySelectorAll('section.docx td')) {
+                const p=td.querySelector('p');if(!p || !p.textContent.trim())continue;
+                if(getComputedStyle(td).writingMode!=='horizontal-tb' || getComputedStyle(p).writingMode!=='horizontal-tb')continue;
+                const cell=td.getBoundingClientRect(),line=p.getBoundingClientRect();
+                maxOffset=Math.max(maxOffset,Math.abs((line.top+line.bottom-cell.top-cell.bottom)/2));
+                const range=document.createRange();range.selectNodeContents(p);const text=range.getBoundingClientRect();
+                maxTextOffset=Math.max(maxTextOffset,Math.abs((text.top+text.bottom-cell.top-cell.bottom)/2));
+                if(getComputedStyle(td).verticalAlign!=='middle')wrongAlign++;
+                count++;
+            }
+            return {count,maxOffset,maxTextOffset,wrongAlign};
+        });
+        if(!alignment.count || alignment.wrongAlign || alignment.maxOffset>1.5 || alignment.maxTextOffset>1.5)
+            throw new Error(name+': text line is not vertically centered: '+JSON.stringify(alignment));
         const pdf=await page.pdf({preferCSSPageSize:true,printBackground:true});
         const text=pdf.toString('latin1');
         const pages=(text.match(/\/Type\s*\/Page\b/g)||[]).length;
@@ -58,6 +90,6 @@ for (const {name,paper} of fixtures) {
         if(!boxes.length || boxes.some(b=>Math.abs(+b[1]-paperWidth)>1 || Math.abs(+b[2]-paperHeight)>1))throw new Error(name+': PDF paper is not '+paper+' landscape');
         writeFileSync(join(REPO,'.cache/roster-tests',outputName+'.pdf'),pdf);
         await page.screenshot({path:join(REPO,'.cache/roster-tests',outputName+'.png')});
-        console.log(`PASS ${name}: ${pages} ${paper} landscape page(s), no extra pages or horizontal table overflow`);
+        console.log(`PASS ${name}: ${pages} ${paper} landscape page(s), vertically centered text, no extra pages or horizontal table overflow`);
     } finally {await browser.close();}
 }

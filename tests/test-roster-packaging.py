@@ -51,6 +51,17 @@ class RosterPackages(unittest.TestCase):
                 for rel in (name, 'reports-lists.php'):
                     self.assertEqual(z.read(prefix + rel), (ROOT / 'update-v4.152.0' / rel).read_bytes())
 
+    def test_center_year_fixes_ship_only_generator(self):
+        for archive, prefix in [
+            ('SITE-FIX-v4.152.0-center-year.zip', 'site-update-v4.152.0/'),
+            ('SchoolDeskPro-FIX-v2.83.0-center-year.zip', 'SchoolDeskPro/www/'),
+        ]:
+            with self.subTest(archive=archive), ZipFile(ROOT / archive) as z:
+                name = 'includes/docx_school_list.php'
+                self.assertIsNone(z.testzip())
+                self.assertEqual(z.namelist(), [prefix + name])
+                self.assertEqual(z.read(prefix + name), (ROOT / 'update-v4.152.0' / name).read_bytes())
+
     def test_platform_payloads_identical(self):
         with ZipFile(ROOT / 'SITE-UPDATE-v4.152.0.zip') as site, ZipFile(ROOT / 'SchoolDeskPro-v2.83.0-win64.zip') as desktop:
             for name in FILES:

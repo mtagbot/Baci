@@ -267,7 +267,7 @@ function srl_split_cell(DOMElement $cell, $last, $first) {
 
 /** Preserve title spacing and mixed run formatting; change only zero placeholders. */
 function srl_title(DOMElement $p, $year, $total) {
-    $years = explode('/', $year); $i = 0;
+    $years = array_reverse(explode('/', $year)); $i = 0;
     foreach (srl_xpath($p->ownerDocument)->query('.//w:t', $p) as $t) {
         if ($t->textContent === '0000') {
             $t->nodeValue = $years[$i++] ?? '';
@@ -378,15 +378,16 @@ function srl_scale_dimensions(DOMDocument $doc, $factor) {
 }
 
 /** Set paragraph properties in OOXML schema order; override inherited pagination. */
-function srl_print_paragraph(DOMElement $p, $line) {
+function srl_print_paragraph(DOMElement $p, $line, $cell = false) {
     $xp=srl_xpath($p->ownerDocument);
     $pr=$xp->query('./w:pPr',$p)->item(0);
     if (!$pr) { $pr=$p->ownerDocument->createElementNS(SRL_W,'w:pPr'); $p->insertBefore($pr,$p->firstChild); }
     $order=explode(' ','pStyle keepNext keepLines pageBreakBefore framePr widowControl numPr suppressLineNumbers pBdr shd tabs suppressAutoHyphens kinsoku wordWrap overflowPunct topLinePunct autoSpaceDE autoSpaceDN bidi adjustRightInd snapToGrid spacing ind contextualSpacing mirrorIndents suppressOverlap jc textDirection textAlignment textboxTightWrap outlineLvl divId cnfStyle rPr sectPr pPrChange');
     $props=['keepNext'=>['val'=>0],'keepLines'=>['val'=>0],'pageBreakBefore'=>['val'=>0],
         'widowControl'=>['val'=>0],'snapToGrid'=>['val'=>0],
-        'spacing'=>['before'=>0,'after'=>0,'beforeAutospacing'=>0,'afterAutospacing'=>0,'line'=>$line,'lineRule'=>'exact'],
+        'spacing'=>['before'=>0,'after'=>0,'beforeAutospacing'=>0,'afterAutospacing'=>0,'line'=>$cell ? 240 : $line,'lineRule'=>$cell ? 'auto' : 'exact'],
         'ind'=>['left'=>0,'right'=>0,'firstLine'=>0]];
+    if ($cell) $props['textAlignment']=['val'=>'center'];
     foreach ($props as $tag=>$attrs) {
         foreach (iterator_to_array($xp->query('./w:'.$tag,$pr)) as $old) $pr->removeChild($old);
         $node=srl_prop($pr,$tag,$attrs); $rank=array_search($tag,$order,true);
@@ -394,6 +395,36 @@ function srl_print_paragraph(DOMElement $p, $line) {
             if ($other===$node) continue;
             $otherRank=array_search($other->localName,$order,true);
             if ($otherRank!==false && $otherRank>$rank) { $pr->insertBefore($node,$other); break; }
+        }
+    }
+}
+
+/** Center the natural text line, not a row-sized exact line box.
+ * Word uses the paragraph mark's font when measuring a line, even for a small
+ * fitted name. Match it to the visible runs to avoid a hidden larger baseline.
+ * Rows remain exact and already reserve >=2em, so natural Titr leading fits.
+ */
+function srl_center_cell(DOMElement $cell) {
+    $doc=$cell->ownerDocument; $xp=srl_xpath($doc);
+    $pr=$xp->query('./w:tcPr',$cell)->item(0);
+    foreach (iterator_to_array($xp->query('./w:vAlign',$pr)) as $old) $pr->removeChild($old);
+    $align=$doc->createElementNS(SRL_W,'w:vAlign');$align->setAttributeNS(SRL_W,'w:val','center');
+    $pr->insertBefore($align,$xp->query('./w:hideMark | ./w:headers | ./w:tcPrChange',$pr)->item(0));
+    foreach ($xp->query('./w:p',$cell) as $p) {
+        srl_print_paragraph($p,240,true);
+        $max=0;
+        foreach ($xp->query('./w:r[w:t]/w:rPr/w:sz | ./w:r[w:t]/w:rPr/w:szCs',$p) as $sz) $max=max($max,(int)$sz->getAttributeNS(SRL_W,'val'));
+        if (!$max) continue; // Empty vertical-merge continuation, no visible baseline.
+        $pPr=$xp->query('./w:pPr',$p)->item(0);
+        $mark=$xp->query('./w:rPr',$pPr)->item(0);
+        if (!$mark) $mark=srl_prop($pPr,'rPr');
+        foreach (['sz','szCs'] as $tag) {
+            $sz=$xp->query('./w:'.$tag,$mark)->item(0);
+            if (!$sz) {
+                $sz=$doc->createElementNS(SRL_W,'w:'.$tag);
+                $mark->insertBefore($sz,$xp->query($tag==='sz'?'./w:szCs | ./w:rtl | ./w:lang':'./w:rtl | ./w:lang',$mark)->item(0));
+            }
+            $sz->setAttributeNS(SRL_W,'w:val',(string)$max);
         }
     }
 }
@@ -406,7 +437,7 @@ function srl_max_font(DOMNode $node) {
 
 /** One physical sheet, not one page per 29 students. No shrink-to-printer setting needed.
  * Account for ALL tables, title lines and the mandatory final paragraph before fitting.
- * Exact row/line heights and zero spacing prevent Word's font metrics growing the table.
+ * Exact row heights and zero paragraph spacing bound the page independently of font metrics.
  * A 2x font-size line box leaves room for the tall Windows metrics of Persian Titr fonts.
  */
 function srl_fit_page(DOMDocument $doc, DOMDocument $styles, $paper) {
@@ -462,7 +493,6 @@ function srl_fit_page(DOMDocument $doc, DOMDocument $styles, $paper) {
         foreach ($xp->query('./w:tr',$table) as $row) {
             $height=$xp->query('./w:trPr/w:trHeight',$row)->item(0);
             $height->setAttributeNS(SRL_W,'w:hRule','exact');
-            $line=max(20,(int)$height->getAttributeNS(SRL_W,'val')-max(4,(int)ceil(48*$factor)));
             $offset=0;
             foreach ($xp->query('./w:tc',$row) as $cell) {
                 $pr=$xp->query('./w:tcPr',$cell)->item(0);
@@ -489,7 +519,7 @@ function srl_fit_page(DOMDocument $doc, DOMDocument $styles, $paper) {
                         }
                     }
                 }
-                foreach ($xp->query('./w:p',$cell) as $p) srl_print_paragraph($p,$line);
+                srl_center_cell($cell);
             }
         }
     }
