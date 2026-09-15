@@ -77,3 +77,18 @@ cd tests && node verify.mjs
 
 > `short_open_tag` از نوع `PHP_INI_PERDIR` است، پس با `ini_set` در زمان اجرا
 > عوض نمی‌شود. به همین دلیل lint همان معنای `Off` را بازسازی می‌کند.
+
+## اسکنر برگشت‌پذیر (اصلاح همان نسخه 4.152.0)
+
+دو سوئیت `test-scanner-lifecycle.mjs` و `test-scanner-page.mjs` به اجرای کلی اضافه شده‌اند (اکنون ۲۱ مجموعه). اولی کنترلر واقعی با دوربین/زمان‌بندی شبیه‌سازی‌شده را بدون شبکه یا دیتابیس اجرا می‌کند؛ دومی احراز هویت و هر دو مسیر نسخه قدیمی را با PHP و داده آزمایشی می‌سنجد. متغیر اختیاری `SCANNER_JS` مسیر کنترلر را برای کنترل منفی تعیین می‌کند؛ فایل پیش‌فرض، سورس انتشار جدید است.
+
+آزمون اختیاری `test-scanner-browser.mjs` به HTML تولیدشده توسط `test-scanner-page.mjs` و بسته‌های آزمایشی `playwright`, `@sparticuz/chromium`, `acorn` نیاز دارد. با `BROWSER_MODULES` مسیر آن‌ها تعیین می‌شود. در محیط فعلی:
+
+```bash
+SITE=.cache/desktop/SchoolDeskPro/www PATCH=update-v4.152.0 node tests/test-scanner-page.mjs
+LD_LIBRARY_PATH=.cache/chrome-libs/lib node tests/test-scanner-browser.mjs
+python3 scripts/release-scanner.py
+python3 tests/test-scanner-packaging.py
+```
+
+۲۰ نمونه QR روی ویدئوی مصنوعی، کتابخانه واقعی و XHR اجرا می‌شوند؛ نصف موارد Worker واقعی دارند و نصف دیگر مسیر سازگاری با CPU کندشده و قابلیت‌های جدید غیرفعال. آزمون مرورگر فیزیکی موبایل نیست. شرح دقیق دامنه/بازگشت در `docs/RELEASE-scanner-v4.152.0-FA.md` است.

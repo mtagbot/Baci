@@ -2018,3 +2018,14 @@ Word می‌تواند برای پرکردن عرض سلول فاصلهٔ نوی
   ۲۰ نمونه با معیار ارتفاع Windows فونت هم پاس شدند. محدودیت موتور مرورگر/نبود Word واقعی همچنان برقرار است.
 - بسته‌های print-options هر دو فقط reports-lists.php و includes/docx_school_list.php دارند.
   ۱۷ آرشیو همان نسخه بازسازی و با شش تست بسته‌بندی بررسی شدند.
+
+### اصلاح برگشت‌پذیر اسکنر — همان نسخه 4.152.0 / 2.83.0
+
+- ورودی جدید: `update-v4.152.0/attendance-scanner.php`؛ پارامتر `scanner=legacy` قبل از اجرای صفحه جدید به نسخه قبلیِ دارای احراز هویت هدایت می‌کند.
+- پشتیبان دقیق: `update-v4.152.0/attendance-scanner-legacy.php`، برابر بایت‌به‌بایت `update-v4.94.0/attendance-scanner.php`.
+- کنترلر ES5/XHR: `update-v4.152.0/assets/js/attendance-scanner-light.js`؛ درخواست یگانه دوربین، محافظ پاسخ دیررس، تثبیت انتخاب، زمان‌انتظار، بازیابی محدود، پروفایل ضعیف، جلوگیری از تحلیل فریم تکراری و تجمیع آمار.
+- Worker اختیاری: `update-v4.152.0/assets/js/attendance-decoder-worker.js`؛ همان کتابخانه موجود `jsqr.min.js`، یک بافر در حال تحلیل، بدون کلید API یا درخواست ثبت.
+- بسته‌ها: `SITE-FIX-v4.152.0-scanner.zip` و `SchoolDeskPro-FIX-v2.83.0-scanner.zip`؛ فقط چهار فایل بالا. سازنده: `scripts/release-scanner.py`.
+- تست‌ها: `tests/test-scanner-{lifecycle,page,browser}.mjs` و `tests/test-scanner-packaging.py`.
+- نصب، بازگشت فوری/کامل، حدود سازگاری و نتایج: `docs/RELEASE-scanner-v4.152.0-FA.md`.
+- API/اعلان/قواعد حضور و همه فایل‌های Word/PDF در این اصلاح دست‌نخورده‌اند.

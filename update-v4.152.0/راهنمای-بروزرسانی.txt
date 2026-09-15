@@ -165,3 +165,10 @@ Word واقعی در محیط آزمون نیست؛ فونت اصلی 2 Titr ب�
 ۹۸۸ تست سبز؛ مدرسه ۱۱۵ تست. ۲۰ نمونهٔ چاپ هر دو اندازه/چیدمان، حتی ۶۰ نفر در کلاس، یک صفحه شدند.
 آزمون مستقیم Word در محیط ممکن نیست؛ فونت اصلی 2 Titr روی دستگاه مقصد لازم است.
 جزئیات و هش: docs/RELEASE-v4.152.0-FA.md
+
+اصلاح مستقل اسکنر، بدون افزایش نسخه:
+بسته‌های SITE-FIX-v4.152.0-scanner.zip و SchoolDeskPro-FIX-v2.83.0-scanner.zip
+فقط attendance-scanner.php، attendance-scanner-legacy.php و دو فایل assets/js/attendance-scanner-light.js و assets/js/attendance-decoder-worker.js را دارند.
+نسخه قبلی بایت‌به‌بایت حفظ شده؛ لینک «بازگشت به اسکنر قبلی» یا پارامتر scanner=legacy آن را فعال می‌کند.
+قواعد حضور، API، اعلان‌ها، دیتابیس و گزارش‌های Word/PDF تغییر نکرده‌اند.
+نصب و بازگردانی کامل: docs/RELEASE-scanner-v4.152.0-FA.md در مخزن.
