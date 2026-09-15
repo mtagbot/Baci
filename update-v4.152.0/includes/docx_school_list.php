@@ -1,7 +1,7 @@
 <?php
 /** Full-school roster, v4.152.0. Transform the school's DOCX, never rebuild its design.
  * Source template: A3 landscape. Outputs: one A4 or A3 landscape sheet, zero margins.
- * Rows and class columns grow dynamically; every student remains on the same sheet.
+ * At least 30 student rows; rows and class columns grow dynamically; every student remains on the same sheet.
  * Font proportions, column proportions and explicit row/line heights are fitted together.
  * No writes to the database. Only active students explicitly assigned to the selected year.
  */
@@ -287,7 +287,7 @@ function srl_table(DOMElement $table, array $groups, $classOffset = 0, $studentO
     $cols = iterator_to_array($xp->query('./w:tblGrid/w:gridCol', $table));
     $rows = iterator_to_array($xp->query('./w:tr', $table));
     if (count($cols) !== 12 || count($rows) !== 32) throw new RuntimeException('ساختار جدول قالب لیست مدرسه معتبر نیست.');
-    $slots = []; $widths = []; $studentRows = 29;
+    $slots = []; $widths = []; $studentRows = 30;
     for ($b=0; $b<3; $b++) {
         $classes = $groups[$b]['classes'] ?? [];
         $slots[$b] = max(3, count($classes));
@@ -378,14 +378,14 @@ function srl_scale_dimensions(DOMDocument $doc, $factor) {
 }
 
 /** Set paragraph properties in OOXML schema order; override inherited pagination. */
-function srl_print_paragraph(DOMElement $p, $line, $cell = false) {
+function srl_print_paragraph(DOMElement $p, $cell = false) {
     $xp=srl_xpath($p->ownerDocument);
     $pr=$xp->query('./w:pPr',$p)->item(0);
     if (!$pr) { $pr=$p->ownerDocument->createElementNS(SRL_W,'w:pPr'); $p->insertBefore($pr,$p->firstChild); }
     $order=explode(' ','pStyle keepNext keepLines pageBreakBefore framePr widowControl numPr suppressLineNumbers pBdr shd tabs suppressAutoHyphens kinsoku wordWrap overflowPunct topLinePunct autoSpaceDE autoSpaceDN bidi adjustRightInd snapToGrid spacing ind contextualSpacing mirrorIndents suppressOverlap jc textDirection textAlignment textboxTightWrap outlineLvl divId cnfStyle rPr sectPr pPrChange');
     $props=['keepNext'=>['val'=>0],'keepLines'=>['val'=>0],'pageBreakBefore'=>['val'=>0],
         'widowControl'=>['val'=>0],'snapToGrid'=>['val'=>0],
-        'spacing'=>['before'=>0,'after'=>0,'beforeAutospacing'=>0,'afterAutospacing'=>0,'line'=>$cell ? 240 : $line,'lineRule'=>$cell ? 'auto' : 'exact'],
+        'spacing'=>['before'=>0,'after'=>0,'beforeAutospacing'=>0,'afterAutospacing'=>0,'line'=>240,'lineRule'=>'auto'],
         'ind'=>['left'=>0,'right'=>0,'firstLine'=>0]];
     if ($cell) $props['textAlignment']=['val'=>'center'];
     foreach ($props as $tag=>$attrs) {
@@ -402,7 +402,7 @@ function srl_print_paragraph(DOMElement $p, $line, $cell = false) {
 /** Center the natural text line, not a row-sized exact line box.
  * Word uses the paragraph mark's font when measuring a line, even for a small
  * fitted name. Match it to the visible runs to avoid a hidden larger baseline.
- * Rows remain exact and already reserve >=2em, so natural Titr leading fits.
+ * Rows remain exact; the font-fit pass reserves room for natural Titr leading.
  */
 function srl_center_cell(DOMElement $cell) {
     $doc=$cell->ownerDocument; $xp=srl_xpath($doc);
@@ -411,7 +411,7 @@ function srl_center_cell(DOMElement $cell) {
     $align=$doc->createElementNS(SRL_W,'w:vAlign');$align->setAttributeNS(SRL_W,'w:val','center');
     $pr->insertBefore($align,$xp->query('./w:hideMark | ./w:headers | ./w:tcPrChange',$pr)->item(0));
     foreach ($xp->query('./w:p',$cell) as $p) {
-        srl_print_paragraph($p,240,true);
+        srl_print_paragraph($p,true);
         $max=0;
         foreach ($xp->query('./w:r[w:t]/w:rPr/w:sz | ./w:r[w:t]/w:rPr/w:szCs',$p) as $sz) $max=max($max,(int)$sz->getAttributeNS(SRL_W,'val'));
         if (!$max) continue; // Empty vertical-merge continuation, no visible baseline.
@@ -435,10 +435,41 @@ function srl_max_font(DOMNode $node) {
     return $max;
 }
 
-/** One physical sheet, not one page per 29 students. No shrink-to-printer setting needed.
- * Account for ALL tables, title lines and the mandatory final paragraph before fitting.
- * Exact row heights and zero paragraph spacing bound the page independently of font metrics.
- * A 2x font-size line box leaves room for the tall Windows metrics of Persian Titr fonts.
+/** Keep the page width budget, but let paired name columns follow their content.
+ * Give AutoFit room for 8pt names before resorting to smaller text.
+ */
+function srl_balance_name_grid(DOMElement $table, array $grid) {
+    $xp=srl_xpath($table->ownerDocument);
+    $needed=array_fill(0,count($grid),20);
+    foreach ($xp->query('./w:tr[position()>2 and position()<last()]',$table) as $row) {
+        foreach ($xp->query('./w:tc',$row) as $i=>$cell) {
+            $needed[$i]=max($needed[$i],(int)ceil(20*(8*srl_name_width_em($cell->textContent)*1.10+1)));
+        }
+    }
+    $offset=0;
+    foreach ($xp->query('./w:tr[1]/w:tc',$table) as $cell) {
+        $span=$xp->query('./w:tcPr/w:gridSpan',$cell)->item(0);
+        $n=$span?(int)$span->getAttributeNS(SRL_W,'val'):1;
+        if ($n===2) {
+            $total=$grid[$offset]+$grid[$offset+1];
+            $last=$needed[$offset];$first=$needed[$offset+1];
+            if ($total>40) {
+                $w=$last+$first<=$total
+                    ? max($last,min($grid[$offset],$total-$first))
+                    : (int)round($total*$last/($last+$first));
+                $grid[$offset]=max(20,min($total-20,$w));
+                $grid[$offset+1]=$total-$grid[$offset];
+            }
+        }
+        $offset+=$n;
+    }
+    return $grid;
+}
+
+/** One physical sheet with at least 30 numbered student rows.
+ * Budget all tables, title lines and the terminal paragraph before fitting.
+ * Start with a 2em row budget; the 8pt target can use available space down to
+ * 1.8em natural leading plus borders, otherwise reduce text to keep one page.
  */
 function srl_fit_page(DOMDocument $doc, DOMDocument $styles, $paper) {
     $xp=srl_xpath($doc);
@@ -464,9 +495,14 @@ function srl_fit_page(DOMDocument $doc, DOMDocument $styles, $paper) {
     if (!$sourceW || !$sourceH) throw new RuntimeException('ابعاد جدول مدرسه معتبر نیست.');
     // Margins and padding are truly zero. Reserves are content-size safety, not margins.
     $xFactor=($targetW-120)/$sourceW;
-    $factor=min(1.0,$xFactor,($targetH-240-20*count($tails))/$sourceH);
+    $factor=min(1.0,$xFactor,($targetH-240-40*count($tails))/$sourceH);
     if ($factor<0.12) throw new RuntimeException('حجم فهرست برای یک صفحه بیش از حد زیاد است؛ اندازهٔ A3 را انتخاب کنید. هیچ نامی حذف نشد.');
     srl_scale_dimensions($doc,$factor); srl_scale_dimensions($styles,$factor);
+    // Single also in inherited styles, not just the table's visible paragraphs.
+    foreach (srl_xpath($styles)->query('//w:pPr/w:spacing') as $spacing) {
+        $spacing->setAttributeNS(SRL_W,'w:line','240');
+        $spacing->setAttributeNS(SRL_W,'w:lineRule','auto');
+    }
     foreach ($xp->query('//w:sectPr') as $section) {
         $size=$xp->query('./w:pgSz',$section)->item(0);
         if (!$size) throw new RuntimeException('اندازهٔ صفحه در قالب مشخص نشده است.');
@@ -477,9 +513,9 @@ function srl_fit_page(DOMDocument $doc, DOMDocument $styles, $paper) {
         foreach ($xp->query('./w:docGrid',$section) as $g) $g->setAttributeNS(SRL_W,'w:type','none');
     }
     foreach (iterator_to_array($xp->query('//w:br[@w:type="page"] | //w:lastRenderedPageBreak')) as $br) $br->parentNode->removeChild($br);
-    foreach ($titles as $p) srl_print_paragraph($p,srl_max_font($p)*20);
+    foreach ($titles as $p) srl_print_paragraph($p);
     foreach ($tails as $p) {
-        srl_print_paragraph($p,20);
+        srl_print_paragraph($p);
         foreach ($xp->query('.//w:sz | .//w:szCs',$p) as $sz) $sz->setAttributeNS(SRL_W,'w:val','2');
     }
     foreach ($tables as $i=>$table) {
@@ -488,9 +524,16 @@ function srl_fit_page(DOMDocument $doc, DOMDocument $styles, $paper) {
             $grid[$c]=(int)round($sourceGrids[$i][$c]*$xFactor);
             $col->setAttributeNS(SRL_W,'w:w',(string)$grid[$c]);
         }
+        $grid=srl_balance_name_grid($table,$grid);
+        foreach ($xp->query('./w:tblGrid/w:gridCol',$table) as $c=>$col) $col->setAttributeNS(SRL_W,'w:w',(string)$grid[$c]);
+        // Word Table Options: Automatically resize to fit contents = checked.
+        // Retain the preferred page-bounded width; fit text before AutoFit runs.
+        $layout=$xp->query('./w:tblPr/w:tblLayout',$table)->item(0);
+        $layout->setAttributeNS(SRL_W,'w:type','autofit');
         $tblW=$xp->query('./w:tblPr/w:tblW',$table)->item(0);
         $tblW->setAttributeNS(SRL_W,'w:type','dxa'); $tblW->setAttributeNS(SRL_W,'w:w',(string)array_sum($grid));
-        foreach ($xp->query('./w:tr',$table) as $row) {
+        $rows=$xp->query('./w:tr',$table);
+        foreach ($rows as $r=>$row) {
             $height=$xp->query('./w:trPr/w:trHeight',$row)->item(0);
             $height->setAttributeNS(SRL_W,'w:hRule','exact');
             $offset=0;
@@ -510,11 +553,20 @@ function srl_fit_page(DOMDocument $doc, DOMDocument $styles, $paper) {
                 // Fit every horizontal cell (including class codes and headers), never clip.
                 if (!$xp->query('./w:textDirection',$pr)->length) {
                     $ems=srl_name_width_em($cell->textContent);
-                    if ($ems>0) {
-                        $limit=(int)floor(2*max(0,(int)$width->getAttributeNS(SRL_W,'w')/20-1)/($ems*1.10));
-                        if ($limit<2) throw new RuntimeException('متن یک سلول برای چاپ تک‌صفحه‌ای بیش از حد بلند است؛ A3 را انتخاب کنید. هیچ متنی حذف نشد.');
-                        $max=srl_max_font($cell);
-                        if ($limit<$max) foreach ($xp->query('.//w:sz | .//w:szCs',$cell) as $sz) {
+                    $limit=$ems>0 ? (int)floor(2*max(0,(int)$width->getAttributeNS(SRL_W,'w')/20-1)/($ems*1.10)) : PHP_INT_MAX;
+                    if ($limit<2) throw new RuntimeException('متن یک سلول برای چاپ تک‌صفحه‌ای بیش از حد بلند است؛ A3 را انتخاب کنید. هیچ متنی حذف نشد.');
+                    $max=srl_max_font($cell);
+                    $isName=$r>=2 && $r<$rows->length-1 && $xp->evaluate('string(./w:p/w:r/w:rPr/w:rtl/@w:val)',$cell)==='1';
+                    if ($isName) {
+                        // Target >=8pt. User explicitly prioritizes one page when
+                        // 8pt cannot fit. 1.8em covers B Titr's 1.7603em Windows
+                        // leading; border clearance is reserved separately.
+                        $heightLimit=(int)floor(((int)$height->getAttributeNS(SRL_W,'val')-max(4,(int)ceil(48*$factor)))/18);
+                        $size=min(max(16,$max),$limit,$heightLimit);
+                        if ($size<2) throw new RuntimeException('فضای چاپ تک‌صفحه‌ای برای متن کافی نیست؛ A3 را انتخاب کنید.');
+                        foreach ($xp->query('.//w:sz | .//w:szCs',$cell) as $sz) $sz->setAttributeNS(SRL_W,'w:val',(string)$size);
+                    } elseif ($limit<$max) {
+                        foreach ($xp->query('.//w:sz | .//w:szCs',$cell) as $sz) {
                             $sz->setAttributeNS(SRL_W,'w:val',(string)max(2,(int)floor((int)$sz->getAttributeNS(SRL_W,'val')*$limit/$max)));
                         }
                     }

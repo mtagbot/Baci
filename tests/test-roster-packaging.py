@@ -32,6 +32,8 @@ class RosterPackages(unittest.TestCase):
 
     def test_hotfixes_ship_only_two_required_files(self):
         for archive, prefix in [
+            ('SITE-FIX-v4.152.0-print-options.zip', 'site-update-v4.152.0/'),
+            ('SchoolDeskPro-FIX-v2.83.0-print-options.zip', 'SchoolDeskPro/www/'),
             ('SITE-FIX-v4.152.0-one-page-a4-a3.zip', 'site-update-v4.152.0/'),
             ('SchoolDeskPro-FIX-v2.83.0-one-page-a4-a3.zip', 'SchoolDeskPro/www/'),
             ('SITE-FIX-v4.152.0-a4-paper.zip', 'site-update-v4.152.0/'),

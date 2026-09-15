@@ -61,11 +61,12 @@ for (const {name,paper} of fixtures) {
         const geometry=await page.evaluate(()=>Array.from(document.querySelectorAll('section.docx table')).map(table=>{
             const p=table.closest('section.docx').getBoundingClientRect();
             const t=table.getBoundingClientRect();
-            return {pageWidth:p.width,tableWidth:t.width,tableHeight:t.height,left:t.left-p.left,right:t.right-p.left,bottom:t.bottom-p.top};
+            return {layout:getComputedStyle(table).tableLayout,pageWidth:p.width,tableWidth:t.width,tableHeight:t.height,left:t.left-p.left,right:t.right-p.left,bottom:t.bottom-p.top};
         }));
-        if(geometry.length!==expectedPages || geometry.some(g=>Math.abs(g.pageWidth-paperWidth*4/3)>1 || g.left<0 || g.right>g.pageWidth || g.bottom>paperHeight*4/3)) {
+        if(geometry.length!==expectedPages || geometry.some(g=>g.layout!=='auto' || Math.abs(g.pageWidth-paperWidth*4/3)>1 || g.left<0 || g.right>g.pageWidth || g.bottom>paperHeight*4/3)) {
             throw new Error(name+': table overflow or wrong paper width: '+JSON.stringify(geometry));
         }
+        if(!await page.evaluate(()=>Array.from(document.querySelectorAll('section.docx p')).every(p=>p.style.lineHeight==='1')))throw new Error(name+': a paragraph is not Single');
         const alignment=await page.evaluate(()=>{
             let count=0,maxOffset=0,maxTextOffset=0,wrongAlign=0;
             for(const td of document.querySelectorAll('section.docx td')) {

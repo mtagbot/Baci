@@ -31,6 +31,8 @@ def build():
     report_fix = {name: payload[name] for name in ('includes/docx_school_list.php', 'reports-lists.php')}
     center_fix = {'includes/docx_school_list.php': payload['includes/docx_school_list.php']}
     deliveries.extend([
+        ('SITE-FIX-v4.152.0-print-options.zip', 'site-update-v4.152.0/', report_fix),
+        ('SchoolDeskPro-FIX-v2.83.0-print-options.zip', 'SchoolDeskPro/www/', report_fix),
         ('SITE-FIX-v4.152.0-center-year.zip', 'site-update-v4.152.0/', center_fix),
         ('SchoolDeskPro-FIX-v2.83.0-center-year.zip', 'SchoolDeskPro/www/', center_fix),
         ('SITE-FIX-v4.152.0-one-page-a4-a3.zip', 'site-update-v4.152.0/', report_fix),
