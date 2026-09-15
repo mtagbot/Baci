@@ -28,15 +28,16 @@ $action = $_GET['action'] ?? '';
 if ($action === 'school_list_docx') {
     try {
         $layout = $_GET['layout'] ?? 'split';
-        $doc = srl_generate(srl_collect($year), null, $layout);
+        $paper = $_GET['paper'] ?? 'A4';
+        $doc = srl_generate(srl_collect($year), null, $layout, $paper);
     } catch (RuntimeException $e) {
         set_flash_message('error', $e->getMessage());
         redirect('reports-lists.php?tab=school');
     }
     $modeName = $layout === 'combined' ? 'نام و نام خانوادگی یکجا' : 'نام و نام خانوادگی جدا';
-    $fname = 'لیست دانش‌آموزان مدرسه ' . $modeName . ' ' . str_replace('/', '-', srl_year($year)) . '.docx';
+    $fname = 'لیست دانش‌آموزان مدرسه ' . $modeName . ' ' . $paper . ' ' . str_replace('/', '-', srl_year($year)) . '.docx';
     header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    header('Content-Disposition: attachment; filename="school-students-' . $layout . '.docx"; filename*=UTF-8\'\'' . rawurlencode($fname));
+    header('Content-Disposition: attachment; filename="school-students-' . $layout . '-' . $paper . '.docx"; filename*=UTF-8\'\'' . rawurlencode($fname));
     header('Content-Length: ' . strlen($doc));
     header('Cache-Control: no-store');
     header('X-Content-Type-Options: nosniff');
@@ -253,7 +254,7 @@ require_once __DIR__ . '/includes/header.php';
     <section class="card" aria-labelledby="school-list-title">
         <h3 id="school-list-title" class="font-bold text-sm">لیست دانش‌آموزان کل مدرسه</h3>
         <p class="text-sm text-muted" style="line-height:2;margin:12px 0">
-            دو خروجی Word از قالب اصلی مدرسه، روی کاغذ A4 افقی: «نام خانوادگی و نام در یک ستون» مطابق قالب منبع، یا «نام خانوادگی و نام در دو ستون جدا».
+            خروجی Word تک‌صفحه‌ای، با انتخاب A4 یا A3 افقی: «نام خانوادگی و نام در یک ستون» مطابق قالب منبع، یا «نام خانوادگی و نام در دو ستون جدا».
             سال تحصیلی، کلاس‌ها، جمع هر پایه و جمع کل به‌صورت خودکار درج می‌شوند.
             فهرست شامل دانش‌آموزان فعالِ ثبت‌شده در سال تحصیلی پیش‌فرض است.
         </p>
@@ -280,16 +281,20 @@ require_once __DIR__ . '/includes/header.php';
                 <tfoot><tr><th colspan="2">جمع کل سال تحصیلی <bdi dir="ltr"><?php echo clean(str_replace('/', ' – ', $schoolData['year'])); ?></bdi></th><th><?php echo clean(tr_num($schoolData['total'], 'fa')); ?> نفر</th></tr></tfoot>
             </table></div>
             <?php if ($schoolReady && $schoolData['groups'] && !$schoolData['missing_class']): ?>
-                <a class="btn btn-primary" style="margin-top:16px" href="reports-lists.php?action=school_list_docx&amp;layout=split">Word — نام خانوادگی و نام جدا</a>
-                <a class="btn btn-accent" style="margin-top:16px" href="reports-lists.php?action=school_list_docx&amp;layout=combined">Word — نام خانوادگی و نام یکجا (قالب اصلی)</a>
-            <?php elseif (!$schoolData['groups']): ?>
-                <p class="text-muted">برای این سال تحصیلی کلاسی ثبت نشده است.</p>
+                <?php foreach (['A4','A3'] as $paperOption): ?>
+                <div style="margin-top:16px">
+                    <strong><?= $paperOption ?> افقی — یک صفحه:</strong>
+                    <a class="btn btn-primary" href="reports-lists.php?action=school_list_docx&amp;layout=split&amp;paper=<?= $paperOption ?>">Word <?= $paperOption ?> — نام خانوادگی و نام جدا</a>
+                    <a class="btn btn-accent" href="reports-lists.php?action=school_list_docx&amp;layout=combined&amp;paper=<?= $paperOption ?>">Word <?= $paperOption ?> — نام خانوادگی و نام یکجا (قالب اصلی)</a>
+                </div>
+                <?php endforeach; ?>
             <?php endif; ?>
         <?php endif; ?>
         <p class="text-xs text-muted" style="line-height:2;margin-top:16px">
-            خروجی مدرسه A4 افقی است؛ جدول و متن با هم کوچک می‌شوند تا هر برگهٔ قبلی روی یک A4 جا شود. لیست کلاسی دبیر A4 عمودی است.
-            قالب ۲۹ ردیف و سه جایگاه کلاس برای هر پایه دارد. اسامی و کلاس‌های بیشتر در صفحات ادامه با همان اندازه‌ها درج می‌شوند؛ جمع هر پایه در صفحات ادامه، جمع کل همان پایه است.
-            فونت اصلی قالب «2 Titr» است و باید روی دستگاهی که سند را باز می‌کند نصب باشد. برای تک‌خطی ماندن نام‌ها، فاصلهٔ داخلی سلول کمتر و فقط قلم اسامی بلند کوچک‌تر می‌شود؛ حروف کشیده یا فشرده نمی‌شوند.
+            کل فهرست روی یک صفحهٔ A4 یا A3 افقی تنظیم می‌شود؛ حاشیهٔ کاغذ و فاصلهٔ داخلی سلول‌ها صفر است. لیست کلاسی دبیر همچنان A4 عمودی است.
+            ردیف‌های بیشتر از ۲۹ و کلاس‌های بیشتر از سه کلاس در هر پایه، در همان جدول اضافه می‌شوند؛ نامی حذف و صفحهٔ ادامه‌ای ساخته نمی‌شود.
+            با افزایش تعداد، قلم و ارتفاع ردیف‌ها کوچک‌تر می‌شوند؛ برای خوانایی بهتر، به‌ویژه فهرست‌های پُرتعداد، A3 را انتخاب کنید.
+            فونت اصلی قالب «2 Titr» باید روی دستگاه نصب باشد. حروف کشیده یا فشرده نمی‌شوند. کاغذ چاپگر را با اندازهٔ دانلود هماهنگ کنید؛ چاپ لب‌به‌لب به پشتیبانی چاپگر نیاز دارد.
         </p>
     </section>
     <?php endif; ?>

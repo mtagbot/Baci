@@ -28,16 +28,18 @@ ARCHIVES = {
 def build():
     payload = {name: (PATCH / name).read_bytes() for name in FILES}
     deliveries = [(name, prefix, payload) for name, prefix in ARCHIVES.items()]
-    spacing_fix = {name: payload[name] for name in ('includes/docx_school_list.php', 'reports-lists.php')}
+    report_fix = {name: payload[name] for name in ('includes/docx_school_list.php', 'reports-lists.php')}
     deliveries.extend([
-        ('SITE-FIX-v4.152.0-a4-paper.zip', 'site-update-v4.152.0/', spacing_fix),
-        ('SchoolDeskPro-FIX-v2.83.0-a4-paper.zip', 'SchoolDeskPro/www/', spacing_fix),
-        ('SITE-FIX-v4.152.0-roster-layouts.zip', 'site-update-v4.152.0/', spacing_fix),
-        ('SchoolDeskPro-FIX-v2.83.0-roster-layouts.zip', 'SchoolDeskPro/www/', spacing_fix),
-        ('SITE-FIX-v4.152.0-single-line-names.zip', 'site-update-v4.152.0/', spacing_fix),
-        ('SchoolDeskPro-FIX-v2.83.0-single-line-names.zip', 'SchoolDeskPro/www/', spacing_fix),
-        ('SITE-FIX-v4.152.0-name-spacing.zip', 'site-update-v4.152.0/', spacing_fix),
-        ('SchoolDeskPro-FIX-v2.83.0-name-spacing.zip', 'SchoolDeskPro/www/', spacing_fix),
+        ('SITE-FIX-v4.152.0-one-page-a4-a3.zip', 'site-update-v4.152.0/', report_fix),
+        ('SchoolDeskPro-FIX-v2.83.0-one-page-a4-a3.zip', 'SchoolDeskPro/www/', report_fix),
+        ('SITE-FIX-v4.152.0-a4-paper.zip', 'site-update-v4.152.0/', report_fix),
+        ('SchoolDeskPro-FIX-v2.83.0-a4-paper.zip', 'SchoolDeskPro/www/', report_fix),
+        ('SITE-FIX-v4.152.0-roster-layouts.zip', 'site-update-v4.152.0/', report_fix),
+        ('SchoolDeskPro-FIX-v2.83.0-roster-layouts.zip', 'SchoolDeskPro/www/', report_fix),
+        ('SITE-FIX-v4.152.0-single-line-names.zip', 'site-update-v4.152.0/', report_fix),
+        ('SchoolDeskPro-FIX-v2.83.0-single-line-names.zip', 'SchoolDeskPro/www/', report_fix),
+        ('SITE-FIX-v4.152.0-name-spacing.zip', 'site-update-v4.152.0/', report_fix),
+        ('SchoolDeskPro-FIX-v2.83.0-name-spacing.zip', 'SchoolDeskPro/www/', report_fix),
     ])
     for archive, prefix, files in deliveries:
         target = ROOT / archive
