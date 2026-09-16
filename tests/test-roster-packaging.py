@@ -2,6 +2,7 @@
 from pathlib import Path
 from zipfile import ZipFile
 import unittest
+import hashlib
 
 ROOT = Path(__file__).resolve().parent.parent
 FILES = {
@@ -19,7 +20,13 @@ class RosterPackages(unittest.TestCase):
             self.assertEqual(len(z.infolist()), 4)
             self.assertEqual(set(z.namelist()), {prefix + name for name in FILES})
             for name in FILES:
-                self.assertEqual(z.read(prefix + name), (ROOT / 'update-v4.152.0' / name).read_bytes())
+                if name == 'includes/docx_class_list.php':
+                    # Historical roster ZIP predates the PDF-only class-code hotfix.
+                    # Keep that archive immutable; new staff ZIP carries the new renderer.
+                    self.assertEqual(hashlib.sha256(z.read(prefix + name)).hexdigest(),
+                                     'a948fa18066d09ceb06da8b9e48aaae2f0acc0857f65129ae907eb16031c2e8c')
+                else:
+                    self.assertEqual(z.read(prefix + name), (ROOT / 'update-v4.152.0' / name).read_bytes())
 
     def test_site_only_changed_files(self):
         self.check_archive('SITE-UPDATE-v4.152.0.zip', 'site-update-v4.152.0/')

@@ -262,7 +262,7 @@ $html=dcl_render_print_html(dcl_class_code('هفتم1','هفتم'),[], '',false)
 file_put_contents('/harness/teacher-print.html',$html);
 echo json_encode(['paperResults'=>$paperResults,'extraFiles'=>$extraFiles,'badPaper'=>$badPaper,'tooLongBlocked'=>$tooLongBlocked,'full'=>$full,'fullCombined'=>$fullCombined,'combined'=>$combined,'combinedOverflow'=>$combinedOverflow,'invalidMode'=>$invalidMode,'missingPart'=>$missingDoc,'long'=>$longInfo,'data'=>$d,'base'=>$base,'more'=>$more,'overflow'=>$overflow,'blocked'=>$blocked,'missing'=>$missing,'invalid'=>$invalid,
     'numeric'=>srl_class_info('۷/۴','۷'),'reversed'=>srl_class_info('4/7','هفتم'),
-    'pdfLTR'=>strpos($html,'<bdi dir="ltr" class="class-code">1/7</bdi>')!==false,
+    'pdfLTR'=>strpos($html,'<bdi dir="ltr" class="class-code">7/1</bdi>')!==false,
     'pdfTitle'=>strpos($html,'.title-row{height:8mm}')!==false],JSON_UNESCAPED_UNICODE);
 `);
 const output = await run("<?php require '/harness/school-test.php';");

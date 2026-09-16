@@ -626,7 +626,7 @@ body.nobold .nm{font-weight:400}
         <?php /* r0 — عنوان + سلول کلاس (در قالب span13 و span3) */ ?>
         <tr class="title-row">
             <td class="t" colspan="<?php echo $nCols - 3; ?>">جدول ثبت گزارش تدریس و نمرات ارزشیابی مستمر و حضور و غیاب دانش آموزان</td>
-            <td class="t" colspan="3">کلاس : <bdi dir="ltr" class="class-code"><?php echo htmlspecialchars($classCode, ENT_QUOTES, 'UTF-8'); ?></bdi></td>
+            <td class="t" colspan="3">کلاس : <bdi dir="ltr" class="class-code"><?php echo htmlspecialchars(preg_replace('/^(\d+)\/(\d+)$/', '$2/$1', $classCode), ENT_QUOTES, 'UTF-8'); ?></bdi></td>
         </tr>
         <?php /* r1..r4 — «ردیف» عمودی و روی چهار ردیف ادغام شده */ ?>
         <?php /* v4.151.0 — «جلسات» و «تاریخ»:

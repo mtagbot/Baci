@@ -348,7 +348,7 @@ echo json_encode([
   'rows'       => substr_count($html, 'class="nm"') / 2,
   'hdrLast'    => (strpos($html, '>نام خانوادگی<') !== false) ? 1 : 0,
   'hdrFirst'   => (strpos($html, '>نام<') !== false) ? 1 : 0,
-  'hasClass'   => (strpos($html, '<bdi dir="ltr" class="class-code">1/9</bdi>') !== false) ? 1 : 0,
+  'hasClass'   => (strpos($html, '<bdi dir="ltr" class="class-code">9/1</bdi>') !== false) ? 1 : 0,
   'tbl2'       => (strpos($html, 'جدول ثبت میزان تدریس') !== false) ? 1 : 0,
   'portrait'   => (strpos($html, 'size:A4 portrait') !== false) ? 1 : 0,
   'firstName'  => (strpos($html, '>آبادی<') !== false) ? 1 : 0,
