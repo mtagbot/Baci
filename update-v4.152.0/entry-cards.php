@@ -197,6 +197,7 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
 :root{--cp:<?php echo clean($themeColor); ?>;--ca:<?php echo clean($accentColor); ?>;<?php echo $fontVars; ?>}
 .sheet{font-size:0;line-height:0}
 <?php include __DIR__ . '/includes/card_styles.php'; ?>
+<?php include __DIR__ . '/includes/card_sheet_layout.php'; ?>
 .cut{outline:0.25mm dashed #cbd5e1;outline-offset:0}
 .toolbar{position:fixed;top:10px;left:10px;display:flex;gap:8px;font-family:<?php echo $fontStack; ?>;z-index:9}
 .toolbar button{padding:8px 18px;border:0;border-radius:8px;background:var(--cp);color:#fff;font-family:inherit;font-size:13px;cursor:pointer}
@@ -208,7 +209,8 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
 .page{
   position:relative;
   width:<?php echo $grid['paper_w']; ?>mm;
-  min-height:<?php echo $grid['paper_h']; ?>mm;
+  height:<?php echo $grid['paper_h']; ?>mm;
+  box-sizing:border-box;overflow:hidden;
   padding:<?php echo $D['margin']; ?>mm;
   margin:0 auto 8mm auto;
   background:#fff;
@@ -218,13 +220,15 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
 }
 .page:last-child{page-break-after:auto;break-after:auto;margin-bottom:0}
 .page-scale{
-  /* مقیاس کارت‌ها. transform-origin راست-بالا چون صفحه RTL است. */
-  -webkit-transform:scale(<?php echo $D['scale']; ?>);
-  transform:scale(<?php echo $D['scale']; ?>);
-  -webkit-transform-origin:top right;
-  transform-origin:top right;
-  width:<?php echo ($grid['paper_w'] - 2 * $D['margin']) / max(0.0001, $D['scale']); ?>mm;
+  position:absolute;
+  top:<?php echo $D['margin']; ?>mm;right:<?php echo $D['margin']; ?>mm;
+  width:<?php echo max(0,$grid['paper_w']-2*$D['margin']); ?>mm;
+  height:<?php echo max(0,$grid['paper_h']-2*$D['margin']); ?>mm;
 }
+.sheet{--card-scale:<?php echo $D['scale']; ?>}
+<?php for($slot=0;$slot<$grid['per_page'];$slot++): ?>
+.sheet > :nth-child(<?php echo $slot+1; ?>){right:<?php echo sprintf('%.8F',($slot%$grid['cols'])*($grid['card_w']+$D['gap'])); ?>mm;top:<?php echo sprintf('%.8F',floor($slot/$grid['cols'])*($grid['card_h']+$D['gap'])); ?>mm}
+<?php endfor; ?>
 .nofit{
   font-family:<?php echo $fontStack; ?>;font-size:3.4mm;line-height:1.8;
   color:#b91c1c;padding:6mm;border:0.4mm dashed #fca5a5;border-radius:2mm;
@@ -233,7 +237,7 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
   .toolbar{display:none!important}
   @page{size:<?php echo $grid['paper_w']; ?>mm <?php echo $grid['paper_h']; ?>mm;margin:0}
   html,body{background:#fff}
-  .page{box-shadow:none;margin:0 auto;min-height:<?php echo $grid['paper_h']; ?>mm}
+  .page{box-shadow:none;margin:0;page-break-inside:avoid;break-inside:avoid}
 }
 </style>
 </head>
@@ -248,7 +252,7 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
         <?php echo tr_num($grid['cols'], 'fa'); ?>×<?php echo tr_num($grid['rows'], 'fa'); ?>
         = <?php echo tr_num($grid['per_page'], 'fa'); ?> کارت در هر صفحه ·
         <?php echo tr_num(count($pages), 'fa'); ?> صفحه ·
-        مقیاس <?php echo tr_num(round($D['scale'] * 100), 'fa'); ?>٪
+        مقیاس کارت <?php echo tr_num(round($D['scale'] * 100), 'fa'); ?>٪ · تنظیم چاپگر: مقیاس ۱۰۰٪، یک صفحه در هر برگ، بدون سربرگ/پابرگ
     </span>
 </div>
 <?php if (!$gridFits): ?>
@@ -260,7 +264,7 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
     <?php foreach ($pages as $pageItems): ?>
     <div class="page">
         <div class="page-scale">
-            <div class="sheet" style="--gap:<?php echo $D['gap'] / max(0.0001, $D['scale']); ?>mm">
+            <div class="sheet">
             <?php foreach ($pageItems as $it):
                 $s = $it['s'];
                 $fullName = trim($s['first_name'] . ' ' . $s['last_name']);
@@ -517,6 +521,7 @@ require_once __DIR__ . '/includes/header.php';
 <?php echo card_font_faces(); ?>
 :root{--cp:<?php echo clean($themeColor); ?>;--ca:<?php echo clean($accentColor); ?>;<?php echo card_font_vars(); ?>}
 <?php include __DIR__ . '/includes/card_styles.php'; ?>
+<?php include __DIR__ . '/includes/card_sheet_layout.php'; ?>
 .cut{outline:0.25mm dashed #cbd5e1}
 
 /* v4.141.0 — کاغذ پیش‌نمایش.
@@ -526,12 +531,12 @@ require_once __DIR__ . '/includes/header.php';
 .pv-wrap{overflow:auto;background:#e9eef5;border:1px solid var(--border-color);
   border-radius:.6rem;padding:14px;text-align:center}
 .pv-paper{
-  position:relative;display:inline-block;vertical-align:top;
+  position:relative;display:inline-block;vertical-align:top;box-sizing:border-box;overflow:hidden;
   background:#fff;box-shadow:0 3px 14px rgba(15,23,42,.18);
   -webkit-transform-origin:top center;transform-origin:top center;
   font-size:0;line-height:0;
 }
-.pv-scale{-webkit-transform-origin:top right;transform-origin:top right}
+.pv-scale{position:absolute}
 .pv-over{outline:2px dashed #dc2626;outline-offset:-2px}
 @media print{ .no-print{display:none!important} }
 </style>
@@ -629,9 +634,7 @@ function gridInfo(d){
   var cb = CARD_BASE[d.layout] || CARD_BASE.full;
   var cw = cb.w * d.scale, ch = cb.h * d.scale;
   var uw = Math.max(0, pw - 2 * d.margin), uh = Math.max(0, ph - 2 * d.margin);
-  /* همان فرمول PHP (card_grid_info). فاصله فقط بین کارت‌ها شمرده
-     می‌شود؛ margin سمت راستِ کارت آخر با margin-right منفیِ .sheet
-     خنثی می‌شود، پس این محاسبه با رندر واقعی یکی است. */
+  /* همان فرمول PHP (card_grid_info): جای ثابت میلی‌متری، فاصله فقط بین کارت‌ها. */
   var cols = cw > 0 ? Math.floor((uw + d.gap) / (cw + d.gap)) : 0;
   var rows = ch > 0 ? Math.floor((uh + d.gap) / (ch + d.gap)) : 0;
   cols = Math.max(0, cols); rows = Math.max(0, rows);
@@ -639,18 +642,18 @@ function gridInfo(d){
 }
 
 function applyCardDesign(){
-  var d = getCardDesign();
-  buildCopyPreview(d, gridInfo(d).perPage);
+  var d = getCardDesign(), g = gridInfo(d);
+  buildCopyPreview(d, g.perPage);
   document.getElementById('vCGap').textContent    = faNum(d.gap);
   document.getElementById('vCMargin').textContent = faNum(d.margin);
   document.getElementById('vCScale').textContent  = faNum(Math.round(d.scale * 100));
 
   var pv = document.getElementById('cardPreview');
-  /* فاصله بر مقیاس تقسیم می‌شود چون داخل عنصرِ scale شده است؛
-     وگرنه فاصلهٔ روی کاغذ با عدد انتخابی کاربر فرق می‌کرد. */
-  pv.style.setProperty('--gap', (d.gap / Math.max(0.0001, d.scale)) + 'mm');
-
-  pv.querySelectorAll('.card-id,.card-back').forEach(function(c){
+  // The card, not its flow container, scales. Both renderers use the same physical slots.
+  pv.style.setProperty('--card-scale', d.scale);
+  pv.querySelectorAll('.card-id,.card-back').forEach(function(c, slot){
+    c.style.right = ((slot % Math.max(1,g.cols)) * (g.cw+d.gap)) + 'mm';
+    c.style.top = (Math.floor(slot / Math.max(1,g.cols)) * (g.ch+d.gap)) + 'mm';
     if (c.classList.contains('card-id')) {
       THEME_KEYS.forEach(function(k){ c.classList.remove('th-' + k); });
       c.classList.add('th-' + d.theme);
@@ -677,14 +680,14 @@ function applyCardDesign(){
   });
 
   /* ── کاغذ زنده ── */
-  var g = gridInfo(d);
   var paper = document.getElementById('pvPaper');
   var scaleBox = document.getElementById('pvScale');
   paper.style.width     = g.pw + 'mm';
   paper.style.height    = g.ph + 'mm';
   paper.style.padding   = d.margin + 'mm';
-  scaleBox.style.transform = 'scale(' + d.scale + ')';
-  scaleBox.style.width  = ((g.pw - 2 * d.margin) / Math.max(0.0001, d.scale)) + 'mm';
+  scaleBox.style.top = scaleBox.style.right = d.margin + 'mm';
+  scaleBox.style.width = Math.max(0,g.pw-2*d.margin) + 'mm';
+  scaleBox.style.height = Math.max(0,g.ph-2*d.margin) + 'mm';
 
   /* فقط کارت‌هایی که در صفحهٔ اول جا می‌شوند نمایش داده شوند —
      پیش‌نمایش باید «یک صفحه» باشد، نه همهٔ کارت‌ها. */
@@ -743,6 +746,7 @@ function applyCardDesign(){
 
   try { localStorage.setItem(CARD_LS, JSON.stringify(d)); } catch(e){}
 }
+document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&String(e.key||'').toLowerCase()==='p'){e.preventDefault();openCardPrint();}});
 function resetCardDesign(){
   setCardDesign({copies:1,paper:'A4',orient:'portrait',scale:1,layout:'full',theme:'classic',gap:4,margin:8,side:'front',photo:true,nid:true,year:true,cut:true});
   applyCardDesign();

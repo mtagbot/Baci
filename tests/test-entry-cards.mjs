@@ -308,7 +308,7 @@ ok('نوار مقیاس هم از همان منبع پر می‌شود',
 ok('پیام پیش‌نمایش بین «دانش‌آموز کم» و «سقف پیش‌نمایش» فرق می‌گذارد',
    pageC.includes("TOTAL_STUDENTS * d.copies * (d.side === 'both' ? 2 : 1) < perPage"));
 ok('پیش‌نمایش کاغذ واقعی دارد', pageC.includes('id="pvPaper"') && pageC.includes('pv-paper'));
-ok('پیش‌نمایش مقیاس را زنده اعمال می‌کند', pageC.includes("scaleBox.style.transform = 'scale('"));
+ok('پیش‌نمایش مقیاس را زنده اعمال می‌کند', pageC.includes("pv.style.setProperty('--card-scale', d.scale)"));
 ok('کارت‌های خارج از صفحهٔ اول در پیش‌نمایش پنهان می‌شوند',
    /i < g\.perPage/.test(pageC));
 ok('کاغذ بزرگ برای نمایش کوچک می‌شود (fit)', pageC.includes('avail / (g.pw * pxPerMm)'));
@@ -321,8 +321,8 @@ ok('فرمول چیدمان در PHP و JS یکسان است', (() => {
     const jsF  = pageC.match(/Math\.floor\(\(uw \+ d\.gap\) \/ \(cw \+ d\.gap\)\)/);
     return !!phpF && !!jsF;
 })());
-ok('فاصله داخل مقیاس تقسیم می‌شود (تا روی کاغذ درست بماند)',
-   /--gap', \(d\.gap \/ Math\.max\(0\.0001, d\.scale\)\)/.test(pageC));
+ok('فاصله در جای ثابت میلی‌متری است، نه حاشیهٔ انتهایی مقیاس‌شده',
+   pageC.includes('(g.cw+d.gap)') && pageC.includes('(g.ch+d.gap)') && pageC.includes("includes/card_sheet_layout.php"));
 
 /* محاسبهٔ واقعی چیدمان در PHP */
 php.writeFile('/harness/grid.php', `<?php
