@@ -1,12 +1,20 @@
 <?php
 // File: exam-print.php
 require_once __DIR__ . '/includes/auth.php';
-require_once __DIR__ . '/includes/exams_helper.php';
-ensure_exams_schema();
+require_once __DIR__ . '/includes/class_exam_groups.php';
+ensure_exams_schema(); ceg_schema();
 $type = $_GET['type'] ?? 'schedule';
 $school = get_setting('school_name','آموزشگاه');
 
 function exam_pdf_pages_to_images($pdfRelPath, $examId, $declaredPages = 0) {
+    $e=DB::fetch('SELECT * FROM exam_schedules WHERE id=?',[(int)$examId]);
+    ceg_write_begin($e);
+    try {
+        if($e && ($e['exam_kind']??'')==='class')$pdfRelPath=DB::fetch('SELECT question_file FROM exam_schedules WHERE id=?',[(int)$examId])['question_file'];
+        return exam_pdf_pages_to_images_unlocked($pdfRelPath,$examId,$declaredPages);
+    } finally {ceg_write_end(true);}
+}
+function exam_pdf_pages_to_images_unlocked($pdfRelPath, $examId, $declaredPages = 0) {
     $out = [];
     $pdfRelPath = (string)$pdfRelPath;
     if ($pdfRelPath === '') return $out;
@@ -116,6 +124,25 @@ if (!$exam) die('امتحان یافت نشد');
 $designToken = $_GET['dt'] ?? '';
 $designTokenOk = verify_exam_design_token($designToken, $examId);
 if (($type === 'questions' || $type === 'questions_editor') && !$designTokenOk && !exam_can_design($examId)) die('شما مجاز به طراحی سوالات این آزمون نیستید.');
+if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['upload_question_source']))ceg_write_begin($exam);
+$classGroup=ceg_for_exam($exam);
+if(ceg_pending_sync($exam,$classGroup))die('اطلاعات گروه هنوز همگام نشده است؛ پس از تکمیل همگام‌سازی صفحه را باز کنید.');
+if ($classGroup && !$classGroup['excluded'] && (int)$classGroup['design_exam_id']!==$examId && in_array($type,['questions','questions_editor'],true)) {
+    if($_SERVER['REQUEST_METHOD']==='POST')die('این کلاس عضو آزمون پایه شده است؛ صفحه را تازه‌سازی کنید.');
+    $qs=$_GET; $qs['exam_id']=(int)$classGroup['design_exam_id'];
+    if(empty($_GET['grade_all']))$qs['class_only']=(int)$classGroup['member_exam_id']; else unset($qs['class_only']);
+    $qs['dt']=make_exam_design_token($qs['exam_id'],'teacher',(int)$classGroup['teacher_id']);
+    redirect('exam-print.php?'.http_build_query($qs));
+}
+if($classGroup && $classGroup['excluded'] && (int)$classGroup['member_exam_id']===$examId && !empty($classGroup['detached_exam_id']) && in_array($type,['questions','questions_editor'],true)) {
+    if($_SERVER['REQUEST_METHOD']==='POST')die('این کلاس مستثنی شده است؛ صفحهٔ طراحی مستقل را باز کنید.');
+    $fork=(int)$classGroup['detached_exam_id'];
+    redirect('exam-print.php?type=questions&exam_id='.$fork.'&dt='.urlencode(make_exam_design_token($fork,'teacher',(int)$classGroup['teacher_id'])));
+}
+if($classGroup && !$classGroup['excluded'] && !empty($_GET['class_only'])) {
+    if(!ceg_validate_member($classGroup,(int)$_GET['class_only']))die('این کلاس دیگر عضو فعال آزمون پایه نیست.');
+}
+$groupScope = ($classGroup && !$classGroup['excluded']) ? ceg_scope($classGroup) : '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_question_source']) && ($designTokenOk || exam_can_design($examId))) {
     if (isset($_FILES['question_source']) && $_FILES['question_source']['error'] === UPLOAD_ERR_OK) {
         $extUp = strtolower(pathinfo($_FILES['question_source']['name'], PATHINFO_EXTENSION));
@@ -128,20 +155,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_question_sourc
             $cacheDir = __DIR__ . '/uploads/exams/pdf-pages/exam_' . (int)$examId;
             foreach (glob($cacheDir . '/page_*.jpg') ?: [] as $oldp) @unlink($oldp);
             $qs = $_GET; $qs['type']='questions'; $qs['exam_id']=$examId; if($designToken) $qs['dt']=$designToken;
+            ceg_write_end(true);
             header('Location: exam-print.php?' . http_build_query($qs)); exit;
         }
     }
 }
+ceg_write_end(true);
 if (is_student_logged_in()) {
     $students = DB::fetchAll('SELECT * FROM students WHERE id=?',[$_SESSION['student_id']]);
 } else {
-    $gradeAll = isset($_GET['grade_all']) && $_GET['grade_all'] === '1';
+    $gradeAll = isset($_GET['grade_all']) && $_GET['grade_all'] === '1' && (!$classGroup || !$classGroup['excluded']);
     $targetGrade = $exam['grade_level'] ?: infer_grade_from_class_name($exam['class_name'] ?? '');
     // v4.78.0: print sheets ONLY for students active in the exam's OWN
     // academic year — a 1405/1406 exam must never produce sheets/headers
     // for students of any other year.
     list($exySql, $exyParams) = exam_year_students_sql($exam['academic_year'] ?? '');
-    if ($gradeAll && ($exam['exam_kind'] ?? '') === 'class') {
+    if ($classGroup && !$classGroup['excluded'] && (int)$classGroup['design_exam_id']===$examId) {
+        $ownedClasses=ceg_classes($classGroup);
+        if(!empty($_GET['class_only'])) {
+            $m=DB::fetch('SELECT * FROM class_exam_group_members WHERE group_id=? AND exam_id=? AND excluded=0',[$classGroup['id'],(int)$_GET['class_only']]);
+            if(!$m || !in_array($m['class_name'],$ownedClasses,true))die('این کلاس عضو فعال آزمون پایه نیست.');
+            $wanted=norm_class_str($m['class_name']);
+            $ownedClasses=array_values(array_filter($ownedClasses,function($c)use($wanted){return norm_class_str($c)===$wanted;}));
+        }
+        if(!$ownedClasses)die('هیچ کلاس فعالی در این آزمون پایه باقی نمانده است.');
+        $marks=implode(',',array_fill(0,count($ownedClasses),'?'));
+        $students=DB::fetchAll("SELECT s.* FROM students s WHERE s.status='active' AND s.class_name IN ($marks) AND $exySql",array_merge($ownedClasses,$exyParams));
+    } elseif ($gradeAll && ($exam['exam_kind'] ?? '') === 'class') {
         require_once __DIR__ . '/includes/class_exam_helpers.php';
         $ownedClasses = class_exam_grade_classes($exam);
         if (!$ownedClasses) die('برای این درس و پایه، کلاسی به دبیر آزمون تخصیص ندارد.');
@@ -404,7 +444,7 @@ body.modal-open{overflow:hidden}
   <span class="tb-sep"></span>
   <div class="tb-group"><span class="tb-title">دست‌نویس</span><label class="tb-color" title="رنگ قلم"><input type="color" id="penColor" value="#111111"></label><button id="toolBtnPen" onclick="setTool('pen')">قلم</button><button id="toolBtnEraser" onclick="setTool('eraser')">پاک‌کن</button><button id="toolBtnOff" class="tool-active" onclick="setTool('off')">خاموش</button><button onclick="clearDrawings()">پاک‌کردن</button></div>
   <span class="tb-spacer"></span>
-  <div class="tb-group tb-actions"><button class="btn-save" onclick="saveDesign()">ذخیره طراحی</button><button class="btn-print" onclick="prepareAllAndPrint()">چاپ نهایی</button></div>
+  <div class="tb-group tb-actions"><?php if($groupScope!==''): ?><b class="group-design-notice">آزمون مشترک پایه — تغییرات برای همهٔ اعضای گروه است</b><?php endif; ?><button class="btn-save" onclick="saveDesign()">ذخیره طراحی</button><button class="btn-print" onclick="prepareAllAndPrint()">چاپ نهایی</button></div>
 </div>
 <div class="editor-panel collapsed" id="questionEditorPanel">
   <div class="panel-head"><b>تنظیمات برگه</b><button type="button" class="panel-close" onclick="toggleEditor()" aria-label="بستن">×</button></div>
@@ -589,6 +629,8 @@ setTimeout(syncToolbarOffset,1200);
 const studentsData=<?php echo json_encode($studentsData, JSON_UNESCAPED_UNICODE); ?>;
 const examData=<?php echo json_encode($examData, JSON_UNESCAPED_UNICODE); ?>;
 const examId=<?php echo (int)$examId; ?>;
+const classGroupMember=<?php echo (int)($_GET['class_only']??0); ?>;
+const classGroupScope=<?php echo json_encode($groupScope); ?>;
 const designToken=<?php echo json_encode($designToken, JSON_UNESCAPED_UNICODE); ?>;
 const canEditBank=<?php echo is_admin_logged_in() ? 'true' : 'false'; ?>;
 let previewOnly=true;
@@ -948,9 +990,9 @@ document.addEventListener('pointermove',e=>{if(!drawing||!e.target.classList.con
 function drawStrokeOnPage(page,a,b,t){canvasTouched[page]=true; document.querySelectorAll(`.page[data-page-index="${page}"] .drawCanvas`).forEach(c=>{const ctx=c.getContext('2d');ctx.lineCap='round';ctx.lineJoin='round';if(t==='eraser'){ctx.globalCompositeOperation='destination-out';ctx.lineWidth=18;}else{ctx.globalCompositeOperation='source-over';ctx.strokeStyle=(document.getElementById('penColor')?.value||'#111111');ctx.lineWidth=2;}ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.globalCompositeOperation='source-over';/* v4.103.0 */}); collectDrawings(); autosaveLocal();}
 function clearDrawings(){document.querySelectorAll('.drawCanvas').forEach(c=>{c.getContext('2d').clearRect(0,0,c.width,c.height); const pg=c.closest('.page'); if(pg) canvasTouched[pg.dataset.pageIndex]=true;}); drawingsData={}; applyDrawingOverlays(); autosaveLocal();}
 function designPayload(){collectDrawings();printNote=document.getElementById('printNote')?.value||printNote||'';return {questions:qItems,headerFields,drawings:drawingsData,sourceCrops,sourceOrder,style:pageStyle,printNote,academicYear:'<?php echo addslashes($exam['academic_year'] ?? ''); ?>',examMonth:'<?php echo addslashes($exam['exam_month'] ?? ''); ?>',updatedAt:new Date().toISOString()};}
-function saveDesign(silent=false){const payload=designPayload(); autosaveLocal(); return fetch('exam-design-api.php?action=save&exam_id='+examId+'&dt='+encodeURIComponent(designToken),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({design:payload})}).then(r=>r.json()).then(j=>{if(!silent){if(j.ok)showToast(j.message||'طراحی ذخیره شد'); else alert(j.error||'خطا در ذخیره');} return j;});}
-function loadDesignAndBank(){fetch('exam-design-api.php?action=load&exam_id='+examId+'&dt='+encodeURIComponent(designToken)).then(r=>r.json()).then(j=>{if(j.ok){let loaded=false; if(j.design){qItems=j.design.questions||[]; if(j.design.headerFields) headerFields=fixHeaderFieldOrder(j.design.headerFields); drawingsData=j.design.drawings||{}; sourceCrops=j.design.sourceCrops||{}; sourceOrder=j.design.sourceOrder||[]; pageStyle=fixLoadedHeaderH(j.design.style||{}); printNote=j.design.printNote||''; const pn=document.getElementById('printNote'); if(pn)pn.value=printNote; loaded=true; try{localStorage.removeItem(draftKey());}catch(e){} } const local=(!loaded)?loadLocalDraft():null; if(local){qItems=local.questions||[]; if(local.headerFields) headerFields=fixHeaderFieldOrder(local.headerFields); drawingsData=local.drawings||{}; sourceCrops=local.sourceCrops||{}; sourceOrder=local.sourceOrder||[]; pageStyle=fixLoadedHeaderH(local.style||{}); printNote=local.printNote||''; const pn=document.getElementById('printNote'); if(pn)pn.value=printNote; loaded=true;} renderHeaderEditor(); rerenderPages(); showBankSubject(j.subject,j.grade); populateBankFilters(j.filters); renderBank(j.bank||[]); renderDesignBank(j.designBank||[]); booting=false; autosaveLocal();}});}
-function loadBank(){const q=document.getElementById('bankSearch').value||'', y=document.getElementById('bankYear').value||'', m=document.getElementById('bankMonth').value||'', t=document.getElementById('bankType').value||'', d=document.getElementById('bankDesigner').value||''; fetch('exam-design-api.php?action=load&exam_id='+examId+'&dt='+encodeURIComponent(designToken)+'&subject='+encodeURIComponent(q)+'&year='+encodeURIComponent(y)+'&month='+encodeURIComponent(m)+'&type='+encodeURIComponent(t)+'&designer='+encodeURIComponent(d)).then(r=>r.json()).then(j=>{if(j.ok){showBankSubject(j.subject,j.grade); populateBankFilters(j.filters); renderBank(j.bank||[]); renderDesignBank(j.designBank||[]);}});}
+function saveDesign(silent=false){const payload=designPayload(); autosaveLocal(); return fetch('exam-design-api.php?group_member='+classGroupMember+'&action=save&exam_id='+examId+'&dt='+encodeURIComponent(designToken),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({design:payload})}).then(r=>r.json()).then(j=>{if(!silent){if(j.ok)showToast(j.message||'طراحی ذخیره شد'); else alert(j.error||'خطا در ذخیره');} return j;});}
+function loadDesignAndBank(){fetch('exam-design-api.php?group_member='+classGroupMember+'&action=load&exam_id='+examId+'&dt='+encodeURIComponent(designToken)).then(r=>r.json()).then(j=>{if(j.ok){let loaded=false; if(j.design){qItems=j.design.questions||[]; if(j.design.headerFields) headerFields=fixHeaderFieldOrder(j.design.headerFields); drawingsData=j.design.drawings||{}; sourceCrops=j.design.sourceCrops||{}; sourceOrder=j.design.sourceOrder||[]; pageStyle=fixLoadedHeaderH(j.design.style||{}); printNote=j.design.printNote||''; const pn=document.getElementById('printNote'); if(pn)pn.value=printNote; loaded=true; try{localStorage.removeItem(draftKey());}catch(e){} } const local=(!loaded)?loadLocalDraft():null; if(local){qItems=local.questions||[]; if(local.headerFields) headerFields=fixHeaderFieldOrder(local.headerFields); drawingsData=local.drawings||{}; sourceCrops=local.sourceCrops||{}; sourceOrder=local.sourceOrder||[]; pageStyle=fixLoadedHeaderH(local.style||{}); printNote=local.printNote||''; const pn=document.getElementById('printNote'); if(pn)pn.value=printNote; loaded=true;} renderHeaderEditor(); rerenderPages(); showBankSubject(j.subject,j.grade); populateBankFilters(j.filters); renderBank(j.bank||[]); renderDesignBank(j.designBank||[]); booting=false; autosaveLocal();}});}
+function loadBank(){const q=document.getElementById('bankSearch').value||'', y=document.getElementById('bankYear').value||'', m=document.getElementById('bankMonth').value||'', t=document.getElementById('bankType').value||'', d=document.getElementById('bankDesigner').value||''; fetch('exam-design-api.php?group_member='+classGroupMember+'&action=load&exam_id='+examId+'&dt='+encodeURIComponent(designToken)+'&subject='+encodeURIComponent(q)+'&year='+encodeURIComponent(y)+'&month='+encodeURIComponent(m)+'&type='+encodeURIComponent(t)+'&designer='+encodeURIComponent(d)).then(r=>r.json()).then(j=>{if(j.ok){showBankSubject(j.subject,j.grade); populateBankFilters(j.filters); renderBank(j.bank||[]); renderDesignBank(j.designBank||[]);}});}
 function bankScoreNum(v){const t=String(v??'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace('/','.'); const n=parseFloat(t); return isNaN(n)?Infinity:n;}
 /* ============ v4.116.0: صفحه‌بندی بانک — ۵ مورد در هر صفحه + ناوبری ============ */
 const BANK_PAGE_SIZE=5;
@@ -1006,8 +1048,8 @@ function renderDesignBankPage(){const box=document.getElementById('designBankLis
   box.insertAdjacentHTML('beforeend',bankPagerHtml(designBankItems.length,designBankPage,'gotoDesignBankPage'));}
 function openExamZoom(ref){const x=designBankItems.find(e=>(e.ref||('e'+e.exam_id))===String(ref)); if(!x)return; /* v4.100.0: وسط‌چینی فلکس مثل صفحه اصلی — تصویر با عرض بیش از ۱۰۰٪ دیگر از یک طرف بریده نمی‌شود */ document.getElementById('examZoomPages').innerHTML=`<div style="margin-bottom:8px"><b>${esc(x.subject||'')}</b> — طراح: ${esc(x.designer||'—')} | ماه: ${esc(x.month||'—')} | سال: ${esc(x.year||'—')}</div>`+bankPageViews(x).map(p=>`<div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:8px;overflow:hidden;display:flex;justify-content:center;align-items:flex-start"><img src="${esc(p.src)}" style="${p.style};border:0;margin:0;flex:none"></div>`).join(''); document.getElementById('examZoomModal').style.display='flex';}
 function closeExamZoom(){document.getElementById('examZoomModal').style.display='none';}
-function importSavedExam(ref){if(!confirm('آزمون انتخابی از بانک در ویرایشگر فعلی درج شود؟ طراحی فعلی جایگزین می‌شود.'))return; const fd=new FormData(); fd.append('action','import_design'); fd.append('exam_id',examId); fd.append('dt',designToken); fd.append('source_ref',ref); fetch('exam-design-api.php',{method:'POST',body:fd}).then(r=>r.json()).then(j=>{if(!j.ok){alert(j.error||'خطا در درج آزمون'); return;} examData.sourcePages=j.sourcePages||[]; const d=j.design||{}; qItems=d.questions||[]; if(d.headerFields) headerFields=fixHeaderFieldOrder(d.headerFields); drawingsData=d.drawings||{}; sourceCrops=d.sourceCrops||{}; sourceOrder=d.sourceOrder||[]; pageStyle=fixLoadedHeaderH(d.style||{}); printNote=d.printNote||''; const pn=document.getElementById('printNote'); if(pn)pn.value=printNote; renderHeaderEditor(); rerenderPages(); autosaveLocal(); alert(j.message||'آزمون درج شد.');});}
-function deleteSavedExam(ref){if(!confirm('این آزمون ذخیره‌شده به‌طور کامل از بانک حذف شود؟'))return; const fd=new FormData(); fd.append('action','delete_design'); fd.append('exam_id',examId); fd.append('dt',designToken); fd.append('source_ref',ref); fetch('exam-design-api.php',{method:'POST',body:fd}).then(r=>r.json()).then(j=>{if(j.ok)loadBank(); else alert(j.error||'خطا');});}
+function importSavedExam(ref){if(!confirm('آزمون انتخابی از بانک در ویرایشگر فعلی درج شود؟ طراحی فعلی جایگزین می‌شود.'))return; const fd=new FormData(); fd.append('action','import_design'); fd.append('exam_id',examId); fd.append('dt',designToken); fd.append('source_ref',ref); fetch('exam-design-api.php?group_member='+classGroupMember,{method:'POST',body:fd}).then(r=>r.json()).then(j=>{if(!j.ok){alert(j.error||'خطا در درج آزمون'); return;} examData.sourcePages=j.sourcePages||[]; const d=j.design||{}; qItems=d.questions||[]; if(d.headerFields) headerFields=fixHeaderFieldOrder(d.headerFields); drawingsData=d.drawings||{}; sourceCrops=d.sourceCrops||{}; sourceOrder=d.sourceOrder||[]; pageStyle=fixLoadedHeaderH(d.style||{}); printNote=d.printNote||''; const pn=document.getElementById('printNote'); if(pn)pn.value=printNote; renderHeaderEditor(); rerenderPages(); autosaveLocal(); alert(j.message||'آزمون درج شد.');});}
+function deleteSavedExam(ref){if(!confirm('این آزمون ذخیره‌شده به‌طور کامل از بانک حذف شود؟'))return; const fd=new FormData(); fd.append('action','delete_design'); fd.append('exam_id',examId); fd.append('dt',designToken); fd.append('source_ref',ref); fetch('exam-design-api.php?group_member='+classGroupMember,{method:'POST',body:fd}).then(r=>r.json()).then(j=>{if(j.ok)loadBank(); else alert(j.error||'خطا');});}
 function measureBankQuestionHeightMM(html,fontFamily,fontSizePx){
   /* v4.114.0: اندازه‌گیری ارتفاع واقعی محتوا در سلول آزمایشی هم‌عرض ستون سوال */
   const probe=document.createElement('div');
@@ -1032,7 +1074,7 @@ function insertBankQuestion(id){const b=(bankItems||[]).find(x=>+x.id===+id); if
   const font='BTitr', fontSize=14;
   const height=measureBankQuestionHeightMM(b.question_html,font+',Vazirmatn,Tahoma,sans-serif',fontSize);
   qItems.push({type:'q',id:'q_'+Date.now(),bank_id:b.id,qtype:b.question_type||'text',no:mx+1,score:b.score||'',html:b.question_html,height,font,fontSize}); renderQuestions(); showToast('سوال از بانک درج شد');}
-function deleteBankQuestion(id){if(!confirm('سوال از بانک حذف شود؟'))return; const fd=new FormData(); fd.append('action','delete_bank'); fd.append('exam_id',examId); fd.append('question_id',id); fetch('exam-design-api.php',{method:'POST',body:fd}).then(r=>r.json()).then(j=>{if(j.ok)loadBank();else alert(j.error||'خطا');});}
+function deleteBankQuestion(id){if(!confirm('سوال از بانک حذف شود؟'))return; const fd=new FormData(); fd.append('action','delete_bank'); fd.append('exam_id',examId); fd.append('question_id',id); fetch('exam-design-api.php?group_member='+classGroupMember,{method:'POST',body:fd}).then(r=>r.json()).then(j=>{if(j.ok)loadBank();else alert(j.error||'خطا');});}
 /* v4.79.0: خط لوله چاپ برای «بدترین سناریو» بازطراحی شد — ۳ کلاس × ۱۰۰
    دانش‌آموز × ۴ صفحه = ۴۰۰ صفحه چاپی باید بدون فریز و بدون کمبود حافظه
    آماده شود:
@@ -1157,7 +1199,14 @@ function designedPageCount(){
   const n=first?document.querySelectorAll(`.page[data-student-id="${first.id}"]`).length:0;
   return Math.max(1,n,sourcePageCount());
 }
-function startQualityPrint(){
+function checkClassGroupScope(){
+  if(!classGroupScope)return Promise.resolve(true);
+  return fetch('exam-design-api.php?group_member='+classGroupMember+'&action=group_scope&exam_id='+examId+'&dt='+encodeURIComponent(designToken)).then(r=>r.json()).then(j=>{
+    if(!j.ok || j.scope!==classGroupScope){alert('اعضای آزمون پایه تغییر کرده‌اند؛ پیش از چاپ صفحه را تازه‌سازی کنید. کلاس مستثنی‌شده باید از طراحی مستقل باز شود.');return false;}return true;
+  }).catch(()=>{alert('بررسی اعضای گروه ممکن نشد؛ دوباره تلاش کنید.');return false;});
+}
+function startQualityPrint(){checkClassGroupScope().then(ok=>{if(ok)startQualityPrintChecked();});}
+function startQualityPrintChecked(){
   if(printPrepBusy)return;
   const q=document.querySelector('input[name="printQuality"]:checked')?.value||'high';
   try{localStorage.setItem('examPrintQuality',q);}catch(e){}
@@ -1172,7 +1221,7 @@ function startQualityPrint(){
     prepareAllStudentsAsync(assetMap,(d,t)=>pqProgress('ساخت صفحات چاپ... ('+Math.min(d*perStudent,totalPages)+' از '+totalPages+' صفحه)',40+Math.round(d/Math.max(1,t)*45)),()=>{
       // مرحله ۳: انتظار برای decode شدن تصاویر (سقف زمان متناسب با حجم کار).
       pqProgress('آماده‌سازی نهایی برای چاپ...',88);
-      waitForPrintReady(()=>{pqProgress('ارسال به چاپگر...',100); restore(); closePrintQualityModal(); window.print();}, Math.min(120000, 15000+totalPages*150));
+      waitForPrintReady(()=>{pqProgress('ارسال به چاپگر...',100); restore(); closePrintQualityModal(); checkClassGroupScope().then(ok=>{if(ok)window.print();});}, Math.min(120000, 15000+totalPages*150));
     });
   });
 }
@@ -1314,7 +1363,7 @@ function uploadLiveSource(){
   setUploadStep(3);
   document.getElementById('uploadProgressText').textContent='در حال بارگذاری فایل...'; document.getElementById('uploadProgressBar').style.width='0%'; document.getElementById('renderProgressText').textContent='';
   const xhr=new XMLHttpRequest();
-  xhr.open('POST','exam-source-api.php',true);
+  xhr.open('POST','exam-source-api.php?group_member='+classGroupMember,true);
   xhr.upload.onprogress=function(e){if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);document.getElementById('uploadProgressBar').style.width=pct+'%';document.getElementById('uploadProgressText').textContent='بارگذاری: '+pct+'٪'; if(pct===100) document.getElementById('renderProgressText').textContent='فایل دریافت شد؛ در حال تبدیل و آماده‌سازی صفحات...';}};
   xhr.onload=function(){try{applySourceResponse(JSON.parse(xhr.responseText));}catch(e){alert('پاسخ سرور نامعتبر بود.');setUploadStep(1);}};
   xhr.onerror=function(){alert('خطا در ارتباط با سرور.');setUploadStep(1);};
@@ -1323,7 +1372,7 @@ function uploadLiveSource(){
 function deleteLiveSource(){
   if(!confirm('فایل منبع این آزمون حذف شود؟')) return;
   const fd=new FormData(); fd.append('action','delete'); fd.append('exam_id',examId); fd.append('dt',designToken);
-  fetch('exam-source-api.php',{method:'POST',body:fd}).then(r=>r.json()).then(applySourceResponse).catch(e=>alert('خطا در حذف: '+e));
+  fetch('exam-source-api.php?group_member='+classGroupMember,{method:'POST',body:fd}).then(r=>r.json()).then(applySourceResponse).catch(e=>alert('خطا در حذف: '+e));
 }
 
 

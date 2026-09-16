@@ -1,9 +1,9 @@
 <?php
 // Create once per teacher/year/class/subject, or open any owned legacy exam.
 require_once __DIR__ . '/includes/auth.php';
-require_once __DIR__ . '/includes/class_exam_helpers.php';
+require_once __DIR__ . '/includes/class_exam_groups.php';
 if (empty($_SESSION['teacher_id']) && !is_admin_logged_in()) redirect('admin-login.php?tab=teacher');
-ensure_exams_schema();
+ensure_exams_schema(); ceg_schema();
 $input = $_SERVER['REQUEST_METHOD'] === 'POST' ? $_POST : $_GET;
 $teacherId = (int)($_SESSION['teacher_id'] ?? ($input['teacher_id'] ?? 0));
 $class = norm_class_str($input['class'] ?? '');
@@ -14,6 +14,11 @@ $gradeAll = ($input['grade_all'] ?? '') === '1';
 $back = 'teacher-panel.php?tab=exams&year='.urlencode($year);
 if (!$teacherId || $class === '' || $subject === '') { set_flash_message('error','اطلاعات آزمون کلاسی کامل نیست.'); redirect($back); }
 if (isset($input['year']) && unify_academic_year($input['year']) !== $year) { set_flash_message('error','سال تحصیلی نامعتبر است.'); redirect($back); }
+if ($gradeAll) {
+    $grade = '';
+    foreach(class_exam_assignments($teacherId,$year) as $as) if(norm_class_str($as['class_name'])===$class && $as['subject_name']===$subject) $grade=$as['grade_level'];
+    redirect('class-exam-group.php?'.http_build_query(['year'=>$year,'grade'=>$grade,'subject'=>$subject]));
+}
 $existing = class_exam_existing($teacherId,$year,$class,$subject);
 $examId = 0;
 if ($requestedExamId) {

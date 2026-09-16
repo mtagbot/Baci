@@ -102,8 +102,9 @@ await request('class-exam-create.php',{sid:teacher,post:exbase});assert.deepEqua
 panel=await request('teacher-panel.php',{sid:teacher,query:'tab=exams'});
 const classRow=[...panel.page.matchAll(/<tr class="class-exam-row"[\s\S]*?<\/tr>/g)].map(m=>m[0]).find(x=>x.includes('data-class="هفتم1"')&&x.includes('data-subject="ریاضی"'));
 assert(!classRow.includes('➕ طراحی آزمون جدید'));assert(classRow.includes(`value="${exam.id}"`));assert(classRow.includes(`value="${legacy.id}"`));assert(classRow.includes('ویرایش آزمون کلاسی'));count++;
-const owned=await request('class-exam-create.php',{sid:teacher,query:new URLSearchParams({...exbase,exam_id:String(exam.id),grade_all:'1'}).toString()});assert(owned.redirect.includes('grade_all=1'));
-const target=owned.redirect.split('?')[1];
+const owned=await request('class-exam-create.php',{sid:teacher,query:new URLSearchParams({...exbase,exam_id:String(exam.id),grade_all:'1'}).toString()});assert(owned.redirect.includes('class-exam-group.php'));
+const choice=await request('class-exam-group.php',{sid:teacher,query:owned.redirect.split('?')[1]});assert(choice.page.includes('value="copy"')&&choice.page.includes('value="fresh"'));
+const target='type=questions&exam_id='+exam.id+'&grade_all=1';
 const printed=await request('exam-print.php',{sid:teacher,query:target,issues:true});
 assert(printed.page.includes('Student0'));assert(printed.page.includes('Student1'));assert(!printed.page.includes('Student2'));assert(!printed.page.includes('Student3'));assert(!printed.page.includes('Student4'));count++;
 const wrong=await request('class-exam-create.php',{sid:teacher,query:new URLSearchParams({...exbase,subject:'علوم',exam_id:String(exam.id)}).toString()});assert(wrong.redirect.includes('teacher-panel.php'));count++;

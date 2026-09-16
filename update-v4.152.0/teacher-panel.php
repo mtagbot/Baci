@@ -257,8 +257,8 @@ $tab = $_GET['tab'] ?? 'schedule';
     </div>
 
     <?php elseif ($tab === 'exams'):
-        require_once __DIR__ . '/includes/class_exam_helpers.php';
-        ensure_exams_schema();
+        require_once __DIR__ . '/includes/class_exam_groups.php';
+        ensure_exams_schema(); ceg_schema();
         /* v4.70.0: مرتب‌سازی طوری که آزمون‌های «پایه یکسان + درس یکسان» پشت‌سرهم
          * قرار بگیرند تا خانه مشترک «طراحی پایه‌ای» با rowspan روی همه ردیف‌های
          * گروه بنشیند. */
@@ -276,7 +276,7 @@ $tab = $_GET['tab'] ?? 'schedule';
             $key = json_encode([norm_class_str($as['class_name']),$as['subject_name']]);
             $classRows[$key] = $as + ['assigned'=>true,'exams'=>[]];
         }
-        foreach (DB::fetchAll("SELECT * FROM exam_schedules WHERE teacher_id=? AND academic_year=? AND exam_kind='class' ORDER BY id DESC",[$teacherId,$teacherYear]) as $ce) {
+        foreach (DB::fetchAll("SELECT * FROM exam_schedules WHERE teacher_id=? AND academic_year=? AND exam_kind='class' AND exam_month<>'آزمون مشترک پایه' AND NOT EXISTS (SELECT 1 FROM class_exam_groups cg WHERE cg.design_exam_id=exam_schedules.id) ORDER BY id DESC",[$teacherId,$teacherYear]) as $ce) {
             $key = json_encode([norm_class_str($ce['class_name']),$ce['subject_name']]);
             if (!isset($classRows[$key])) $classRows[$key] = ['class_name'=>$ce['class_name'],'subject_name'=>$ce['subject_name'],'academic_year'=>$ce['academic_year'],'grade_level'=>$ce['grade_level'],'assigned'=>false,'exams'=>[]];
             $classRows[$key]['exams'][] = $ce;
@@ -285,35 +285,9 @@ $tab = $_GET['tab'] ?? 'schedule';
     ?>
     <div class="card shadow-lg">
         <h3 class="font-bold mb-4">📝 آزمون‌های فعال من و طراحی سوالات</h3>
-        <div class="table-container"><table><thead><tr><th>سال/ماه</th><th>کلاس/پایه</th><th>درس</th><th>تاریخ</th><th>ساعت</th><th>طراحی</th><th>طراحی پایه‌ای (مشترک کلاس‌های پایه)</th></tr></thead><tbody>
-        <?php foreach ($classRows as $as): ?>
-        <tr class="class-exam-row" data-class="<?php echo clean($as['class_name']); ?>" data-subject="<?php echo clean($as['subject_name']); ?>">
-            <td><?php echo clean($as['academic_year']); ?><br>آزمون کلاسی</td>
-            <td><?php echo clean($as['grade_level'].' / '.$as['class_name']); ?></td>
-            <td><?php echo clean($as['subject_name']); ?></td><td>—</td><td>—</td>
-            <td colspan="2">
-                <form method="<?php echo $as['exams'] ? 'GET' : 'POST'; ?>" action="class-exam-create.php" target="_blank" class="no-ajax flex flex-wrap gap-2 items-center" onsubmit="if(this.method.toLowerCase()==='post') window.classExamPending=true;">
-                    <input type="hidden" name="class" value="<?php echo clean($as['class_name']); ?>">
-                    <input type="hidden" name="subject" value="<?php echo clean($as['subject_name']); ?>">
-                    <input type="hidden" name="year" value="<?php echo clean($as['academic_year']); ?>">
-                    <?php if ($as['exams']): ?>
-                        <select name="exam_id" class="form-select text-xs" aria-label="انتخاب آزمون کلاسی">
-                        <?php foreach ($as['exams'] as $ce): ?>
-                            <option value="<?php echo (int)$ce['id']; ?>"><?php echo clean(($ce['exam_month'] ?: 'آزمون کلاسی').' — #'.$ce['id'].(!empty($ce['is_printed']) ? ' — چاپ شده' : '').(empty($ce['is_active']) ? ' — غیرفعال' : '')); ?></option>
-                        <?php endforeach; ?>
-                        </select>
-                        <button class="btn btn-warning text-xs">🧪 ویرایش آزمون کلاسی</button>
-                    <?php else: ?>
-                        <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
-                        <button class="btn btn-success text-xs">➕ طراحی آزمون جدید</button>
-                    <?php endif; ?>
-                    <?php if ($as['assigned'] && $as['grade_level'] !== ''): ?>
-                        <button name="grade_all" value="1" class="btn btn-primary text-xs">طراحی پایه‌ای کلاسی — <?php echo clean($as['grade_level']); ?></button>
-                    <?php endif; ?>
-                </form>
-            </td>
-        </tr>
-        <?php endforeach; ?>
+        <?php include __DIR__.'/includes/teacher_class_exams.php'; ?>
+        <h3 class="font-bold mt-4 mb-3">آزمون‌های ماهانه فعال‌شده توسط مدرسه</h3>
+        <div class="table-container"><table id="teacherMonthlyExams"><thead><tr><th>سال/ماه</th><th>کلاس/پایه</th><th>درس</th><th>تاریخ</th><th>ساعت</th><th>طراحی</th><th>طراحی پایه‌ای (مشترک کلاس‌های پایه)</th></tr></thead><tbody>
         <?php foreach($teacherExams as $ex):
             $gk = $ex['academic_year'] . '|' . $ex['exam_month'] . '|' . trim($ex['grade_level'] ?? '') . '|' . trim($ex['subject_name'] ?? '');
             $gCount = $tpGroupCounts[$gk] ?? 1;
@@ -329,9 +303,9 @@ $tab = $_GET['tab'] ?? 'schedule';
                 <?php else: ?><span class="text-xs text-muted">—</span><?php endif; ?>
             </td>
         <?php endif; ?>
-        </tr><?php endforeach; if(!$teacherExams && !$classRows): ?><tr><td colspan="7" class="text-center text-muted">آزمون فعالی برای شما ثبت نشده است.</td></tr><?php endif; ?>
+        </tr><?php endforeach; if(!$teacherExams): ?><tr><td colspan="7" class="text-center text-muted">آزمون فعالی برای شما ثبت نشده است.</td></tr><?php endif; ?>
         </tbody></table></div>
-        <p class="text-xs text-muted mt-2">آزمون کلاسی: برای هر درس و کلاس در هر سال، یک آزمون جدید مجاز است. آزمون‌های قبلی، حتی تکراری‌ها، در فهرست ویرایش حفظ شده‌اند. طراحی پایه‌ای کلاسی، طرح آزمون انتخابی را برای کلاس‌های تخصیص‌یافتهٔ خودتان در همان درس و پایه چاپ می‌کند؛ طرح ذخیره‌شدهٔ آزمون‌های دیگر بازنویسی نمی‌شود.</p>
+
         <p class="text-xs text-muted mt-2">ستون «طراحی پایه‌ای»: برای درس‌های یکسان با پایه همسان، یک خانه مشترک بین همه ردیف‌های آن گروه است — طراحی یک‌بار انجام می‌شود و برای تمام دانش‌آموزان همه کلاس‌های آن پایه تکثیر و چاپ می‌گردد.</p>
         <p class="text-xs text-muted mt-3">دبیر می‌تواند از بانک سوالات استفاده کند و سوال درج‌شده روی برگه آزمون خود را ویرایش کند؛ ویرایش مستقیم بانک اطلاعاتی سوالات فقط برای مدیر سیستم فعال است.</p>
     </div>
