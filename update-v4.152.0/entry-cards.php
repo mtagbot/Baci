@@ -111,6 +111,10 @@ $province    = get_setting('school_province', '');
 $region      = get_setting('school_region', '');
 $unitType    = get_setting('school_unit_type', '');
 $logoUrl     = get_setting('logo_url', '');
+// Plain display text, not a link/HTML: independent of the student's scan token.
+$cardCustomText = isset($_GET['custom_text']) && is_string($_GET['custom_text'])
+    ? mb_substr(trim($_GET['custom_text']), 0, 80)
+    : mb_substr((string)get_setting('school_website', 'Bacirat.ir'), 0, 80);
 $themeColor  = get_setting('theme_color', '#2563eb');
 $accentColor = get_setting('accent_color', '#d97706');
 
@@ -135,7 +139,7 @@ if (isset($_GET['print'])) {
              full  = کارت کامل ۸۵٫۶×۵۴ با همهٔ اطلاعات (QR ۴۰mm)
              qrmax = همان اندازه ولی بزرگ‌ترین QR ممکن (۵۰mm، ۹۳٪ ارتفاع)
              sq    = مربع ۵۴×۵۴، QR ۴۸mm = ۷۹٪ مساحت کارت */
-        'layout' => in_array(($_GET['layout'] ?? 'full'), ['full', 'qrmax', 'sq'], true) ? ($_GET['layout'] ?? 'full') : 'full',
+        'layout' => in_array(($_GET['layout'] ?? 'full'), ['full', 'qrmax', 'sq', 'custom'], true) ? ($_GET['layout'] ?? 'full') : 'full',
         /* v4.141.0 — کاغذ، جهت و مقیاس کارت */
         'paper'  => array_key_exists(($_GET['paper'] ?? 'A4'), card_paper_sizes()) ? ($_GET['paper'] ?? 'A4') : 'A4',
         'orient' => in_array(($_GET['orient'] ?? 'portrait'), ['portrait', 'landscape'], true) ? ($_GET['orient'] ?? 'portrait') : 'portrait',
@@ -198,6 +202,7 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
 .sheet{font-size:0;line-height:0}
 <?php include __DIR__ . '/includes/card_styles.php'; ?>
 <?php include __DIR__ . '/includes/card_sheet_layout.php'; ?>
+<?php include __DIR__ . '/includes/card_custom_styles.php'; ?>
 .cut{outline:0.25mm dashed #cbd5e1;outline-offset:0}
 .toolbar{position:fixed;top:10px;left:10px;display:flex;gap:8px;font-family:<?php echo $fontStack; ?>;z-index:9}
 .toolbar button{padding:8px 18px;border:0;border-radius:8px;background:var(--cp);color:#fff;font-family:inherit;font-size:13px;cursor:pointer}
@@ -276,6 +281,7 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
     </div>
     <?php endforeach; ?>
 <?php endif; ?>
+<script src="assets/js/card-custom.js"></script>
 <script src="assets/js/qrcode-generator.js"></script>
 <script>
 (function(){
@@ -320,7 +326,7 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
   function printOnce(){
     if (printed) return;
     printed = true;
-    setTimeout(function(){ window.print(); }, 250);
+    setTimeout(function(){ fitCustomCards(document); window.print(); }, 250);
   }
   whenFontsReady(function(){
     drawAll();
@@ -401,6 +407,7 @@ require_once __DIR__ . '/includes/header.php';
                 <label class="text-xs">شکل کارت</label>
                 <select id="cLayout" class="form-select" data-no-search="1" onchange="applyCardDesign()">
                     <option value="full">کامل — ۸۵٫۶×۵۴ با همهٔ اطلاعات (QR ۴۰mm)</option>
+                    <option value="custom">سفارشی</option>
                     <option value="qrmax">تگ‌محور — همان اندازه، بزرگ‌ترین QR (۵۰mm)</option>
                     <option value="sq">مربع تگ‌محور — ۵۴×۵۴، QR ۴۸mm (۷۹٪ کارت)</option>
                 </select>
@@ -467,6 +474,11 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 
     <div class="card no-print">
+        <div id="customCardOptions" class="no-print" style="display:none;margin-bottom:12px">
+            <label for="cCustomText" class="text-xs font-bold">نوشتهٔ پایین کارت سفارشی</label>
+            <input id="cCustomText" type="text" dir="ltr" maxlength="80" class="form-input" value="<?php echo clean($cardCustomText); ?>" oninput="applyCardDesign()">
+            <p class="text-xs text-muted">مانند Bacirat.ir؛ برای حذف نوشته، کادر را خالی کنید. عکس، نام، کلاس و کد ملی از اطلاعات هر دانش‌آموز خوانده می‌شوند.</p>
+        </div>
         <div class="flex justify-between items-center" style="margin-bottom:10px;flex-wrap:wrap;gap:8px">
             <h3 class="font-bold text-sm">پیش‌نمایش زندهٔ صفحهٔ چاپ</h3>
             <div class="text-xs text-muted" id="pvInfo"></div>
@@ -522,6 +534,7 @@ require_once __DIR__ . '/includes/header.php';
 :root{--cp:<?php echo clean($themeColor); ?>;--ca:<?php echo clean($accentColor); ?>;<?php echo card_font_vars(); ?>}
 <?php include __DIR__ . '/includes/card_styles.php'; ?>
 <?php include __DIR__ . '/includes/card_sheet_layout.php'; ?>
+<?php include __DIR__ . '/includes/card_custom_styles.php'; ?>
 .cut{outline:0.25mm dashed #cbd5e1}
 
 /* v4.141.0 — کاغذ پیش‌نمایش.
@@ -541,6 +554,7 @@ require_once __DIR__ . '/includes/header.php';
 @media print{ .no-print{display:none!important} }
 </style>
 
+<script src="assets/js/card-custom.js"></script>
 <script src="assets/js/qrcode-generator.js"></script>
 <script>
 var CARD_LS = 'mtag_card_design_v1';
@@ -558,6 +572,7 @@ var CARD_BASE = <?php echo json_encode([
   'full'  => card_base_size('full'),
   'qrmax' => card_base_size('qrmax'),
   'sq'    => card_base_size('sq'),
+  'custom'=> card_base_size('custom'),
 ]); ?>;
 var TOTAL_STUDENTS = <?php echo (int)count($students); ?>;
 var PREVIEW_CARDS  = <?php echo (int)count($previewList); ?>;
@@ -596,6 +611,7 @@ function getCardDesign(){
     orient: document.getElementById('cOrient').value,
     scale:  +document.getElementById('cScale').value / 100,
     layout: document.getElementById('cLayout').value,
+    customText: document.getElementById('cCustomText').value.replace(/^\s+|\s+$/g,'').slice(0,80),
     theme:  document.getElementById('cTheme').value,
     gap:    +document.getElementById('cGap').value,
     margin: +document.getElementById('cMargin').value,
@@ -613,6 +629,7 @@ function setCardDesign(d){
   if(d.orient) document.getElementById('cOrient').value = d.orient;
   if(d.scale  !== undefined) document.getElementById('cScale').value = Math.round(d.scale * 100);
   if(d.layout) document.getElementById('cLayout').value = d.layout;
+  if(typeof d.customText === 'string') document.getElementById('cCustomText').value = d.customText.slice(0,80);
   if(d.theme)  document.getElementById('cTheme').value  = d.theme;
   if(d.side)   document.getElementById('cSide').value   = d.side;
   if(d.gap    !== undefined) document.getElementById('cGap').value    = d.gap;
@@ -666,7 +683,11 @@ function applyCardDesign(){
         use.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href);
       }
     });
-    c.classList.remove('sq','qrmax');
+    c.classList.remove('sq','qrmax','custom');
+    if (d.layout === 'custom' && c.classList.contains('card-id')) c.classList.add('custom');
+    var customSite = c.querySelector('.card-custom-site');
+    if(customSite) customSite.textContent=d.customText;
+    c.querySelectorAll('[data-custom-fit]').forEach(function(el){el.style.fontSize='';el.removeAttribute('data-custom-fit');});
     if (d.layout === 'sq') c.classList.add('sq');
     else if (d.layout === 'qrmax') c.classList.add('qrmax');
     c.classList.toggle('cut', d.cut);
@@ -744,10 +765,13 @@ function applyCardDesign(){
     note.textContent = t;
   }
 
+  document.getElementById('customCardOptions').style.display = d.layout === 'custom' ? '' : 'none';
+  fitCustomCards(pv);
   try { localStorage.setItem(CARD_LS, JSON.stringify(d)); } catch(e){}
 }
 document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&String(e.key||'').toLowerCase()==='p'){e.preventDefault();openCardPrint();}});
 function resetCardDesign(){
+  document.getElementById('cCustomText').value = <?php echo json_encode($cardCustomText, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
   setCardDesign({copies:1,paper:'A4',orient:'portrait',scale:1,layout:'full',theme:'classic',gap:4,margin:8,side:'front',photo:true,nid:true,year:true,cut:true});
   applyCardDesign();
 }
@@ -758,6 +782,7 @@ function openCardPrint(oneId){
   params.set('copies', d.copies);
   if (oneId) params.set('student_id', String(oneId));
   params.set('layout', d.layout);
+  params.set('custom_text',d.customText);
   params.set('paper', d.paper); params.set('orient', d.orient);
   params.set('scale', d.scale);
   params.set('theme', d.theme); params.set('gap', d.gap); params.set('margin', d.margin);
@@ -788,6 +813,7 @@ function drawCardQR(cv){
     try { var sv = localStorage.getItem(CARD_LS); if (sv) setCardDesign(JSON.parse(sv)); } catch(e){}
     <?php if (isset($_GET['copies'])): ?>document.getElementById('cCopies').value = <?php echo $copies; ?>;<?php endif; ?>
     applyCardDesign();
+    if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){fitCustomCards(document.getElementById('cardPreview'));});
   });
 })();
 </script>

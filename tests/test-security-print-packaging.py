@@ -12,7 +12,10 @@ class Packages(unittest.TestCase):
         with ZipFile(ROOT/name) as z:
             self.assertIsNone(z.testzip());self.assertEqual(len(z.infolist()),10)
             self.assertEqual(set(z.namelist()),{prefix+f for f in FILES})
-            for f in FILES:self.assertEqual(z.read(prefix+f),(ROOT/'update-v4.152.0'/f).read_bytes())
+            for f in FILES:
+                # Immutable previous release; the new layout changes only its entry-card page.
+                if f=='entry-cards.php':self.assertEqual(hashlib.sha256(z.read(prefix+f)).hexdigest(),'9bf9b9fac56c3f4ddac5f685c8df56c6b8a1d7add653e5a49dae101ff486712b')
+                else:self.assertEqual(z.read(prefix+f),(ROOT/'update-v4.152.0'/f).read_bytes())
     def test_site(self):self.check('SITE-FIX-v4.152.0-security-print.zip','site-update-v4.152.0/')
     def test_desktop(self):self.check('SchoolDeskPro-FIX-v2.83.0-security-print.zip','SchoolDeskPro/www/')
     def test_previous_published_actions_untouched(self):

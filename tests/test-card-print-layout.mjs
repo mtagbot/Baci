@@ -36,7 +36,7 @@ if(process.env.PRINT_BROWSER){
     const page=await context.newPage(),printed=await context.newPage();page.on('pageerror',e=>errors.push(e.message));printed.on('pageerror',e=>errors.push(e.message));
     await page.goto('https://cards.test/entry-cards.php');await page.evaluate(()=>document.fonts.ready);
     const cases=[];
-    for(const orient of ['portrait','landscape'])for(const layout of ['full','qrmax','sq'])for(const scale of [.6,1,1.6]){
+    for(const orient of ['portrait','landscape'])for(const layout of ['full','qrmax','sq','custom'])for(const scale of [.6,1,1.6]){
       const i=cases.length;cases.push({paper:'A4',orient,layout,scale,margin:i%2?8:0,gap:i%3?4:0,side:i%2?'both':'front',copies:i%3?3:10,theme:['classic','tile','sarv'][i%3],cut:true,photo:true,nid:true,year:true});
     }
     for(const paper of ['A5','A3','A2'])cases.push({...cases[0],paper,layout:'sq',side:'both',copies:10});

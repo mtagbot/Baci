@@ -179,8 +179,8 @@ const qrOf = (sel) => {
     const m = styles.match(re);
     return m ? parseFloat(m[1]) : 0;
 };
-ok('سه شکل کارت وجود دارد (کامل، تگ‌محور، مربع)',
-   /\['full', 'qrmax', 'sq'\]/.test(pageC));
+ok('چهار شکل کارت وجود دارد (کامل، سفارشی، تگ‌محور، مربع)',
+   /\['full', 'qrmax', 'sq', 'custom'\]/.test(pageC));
 ok('کارت مربع ۵۴×۵۴ تعریف شده', /\.card-id\.sq\{width:54mm;height:54mm/.test(styles));
 ok('QR کارت مربع دست‌کم ۴۹ میلی‌متر است', qrOf('.card-id.sq .card-qr') >= 49,
    String(qrOf('.card-id.sq .card-qr')));
