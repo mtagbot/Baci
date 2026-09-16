@@ -14,6 +14,7 @@
  */
 $_cardTheme = $D['theme'] ?? 'classic';
 $_cardCut   = !empty($D['cut']);
+$_customLogo = $cardCustomLogo ?? $logoUrl ?? '';
 /* v4.139.0: شکل کارت — کلاس اضافی روی همان قالب، تا یک منبع بماند.
    نکته: clean() روی مقدار trim می‌زند، پس فاصلهٔ جداکنندهٔ کلاس‌ها
    باید بیرون از clean() چاپ شود؛ وگرنه کلاس‌ها به‌هم می‌چسبند. */
@@ -22,12 +23,12 @@ $_layCls    = ($_layout === 'sq') ? 'sq' : (($_layout === 'qrmax') ? 'qrmax' : (
 $_metaLine  = trim(implode(' · ', array_filter([$province, $region, $unitType])));
 list($_heroArt, $_headArt, ) = card_theme_art($_cardTheme);
 ?>
-<div class="card-id th-<?php echo clean($_cardTheme); ?><?php echo $_layCls !== '' ? ' ' . clean($_layCls) : ''; ?><?php echo $_cardCut ? ' cut' : ''; ?>">
+<div class="card-id th-<?php echo clean($_cardTheme); ?><?php echo $_customLogo !== '' ? ' has-custom-logo' : ''; ?><?php echo $_layCls !== '' ? ' ' . clean($_layCls) : ''; ?><?php echo $_cardCut ? ' cut' : ''; ?>">
     <svg class="card-bg" aria-hidden="true"><rect width="100%" height="100%"/></svg>
     <?php if ($_cardTheme === 'tile'): ?><div class="card-frame"></div><?php endif; ?>
 
     <div class="card-head">
-        <?php if (empty($logoUrl)): ?>
+        <img class="card-custom-logo card-custom-only" <?php if($_customLogo !== ''): ?>src="<?php echo clean($_customLogo); ?>"<?php endif; ?> alt="">
         <svg class="card-custom-mark card-custom-only" viewBox="0 0 100 65" aria-hidden="true">
             <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M50 59C31 43 6 57 3 38M50 59C69 43 94 57 97 38M50 58C30 36 8 43 8 21C24 16 42 32 50 58M50 58C70 36 92 43 92 21C76 16 58 32 50 58"/>
@@ -35,7 +36,6 @@ list($_heroArt, $_headArt, ) = card_theme_art($_cardTheme);
                 <circle cx="50" cy="4" r="2"/>
             </g>
         </svg>
-        <?php endif; ?>
         <svg class="card-head-orn" viewBox="0 0 100 100" aria-hidden="true"><use href="#orn-<?php echo clean($_headArt); ?>" xlink:href="#orn-<?php echo clean($_headArt); ?>"></use></svg>
         <?php if (!empty($logoUrl)): ?>
             <img class="card-logo" src="<?php echo clean($logoUrl); ?>" alt="">

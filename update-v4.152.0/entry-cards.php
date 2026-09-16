@@ -111,6 +111,7 @@ $province    = get_setting('school_province', '');
 $region      = get_setting('school_region', '');
 $unitType    = get_setting('school_unit_type', '');
 $logoUrl     = get_setting('logo_url', '');
+$cardCustomLogo = get_setting('card_custom_logo', '') ?: $logoUrl;
 // Plain display text, not a link/HTML: independent of the student's scan token.
 $cardCustomText = isset($_GET['custom_text']) && is_string($_GET['custom_text'])
     ? mb_substr(trim($_GET['custom_text']), 0, 80)
@@ -269,7 +270,7 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
     <?php foreach ($pages as $pageItems): ?>
     <div class="page">
         <div class="page-scale">
-            <div class="sheet">
+            <div class="sheet" data-card-layout="<?php echo clean($D['layout']); ?>">
             <?php foreach ($pageItems as $it):
                 $s = $it['s'];
                 $fullName = trim($s['first_name'] . ' ' . $s['last_name']);
@@ -475,9 +476,16 @@ require_once __DIR__ . '/includes/header.php';
 
     <div class="card no-print">
         <div id="customCardOptions" class="no-print" style="display:none;margin-bottom:12px">
-            <label for="cCustomText" class="text-xs font-bold">نوشتهٔ پایین کارت سفارشی</label>
-            <input id="cCustomText" type="text" dir="ltr" maxlength="80" class="form-input" value="<?php echo clean($cardCustomText); ?>" oninput="applyCardDesign()">
-            <p class="text-xs text-muted">مانند Bacirat.ir؛ برای حذف نوشته، کادر را خالی کنید. عکس، نام، کلاس و کد ملی از اطلاعات هر دانش‌آموز خوانده می‌شوند.</p>
+            <div style="margin-bottom:12px">
+                <label for="cCustomLogo" class="text-xs font-bold">تعویض لوگوی کارت سفارشی</label>
+                <input id="cCustomLogo" type="file" accept="image/png,image/jpeg,image/webp" onchange="uploadCustomCardLogo(this)" data-csrf="<?php echo clean(csrf_token()); ?>">
+                <button id="cLogoReset" type="button" class="btn btn-outline text-xs" onclick="resetCustomCardLogo()">بازگشت به لوگوی پیش‌فرض</button>
+                <p class="text-xs text-muted">PNG، JPG یا WebP تا ۲ مگابایت؛ فقط لوگوی کارت سفارشی در همین نصب تغییر می‌کند، نه لوگوی عمومی مدرسه.</p>
+                <p id="cLogoStatus" class="text-xs" role="status" aria-live="polite"></p>
+            </div>
+            <label for="cCustomText" class="text-xs font-bold">متن یا نشانی پایین کارت — تنظیم دستی</label>
+            <input id="cCustomText" style="max-width:360px" type="text" dir="ltr" maxlength="80" class="form-input" value="<?php echo clean($cardCustomText); ?>" oninput="applyCardDesign()">
+            <p class="text-xs text-muted">نشانی مانند bacirat.ir یا هر متن دلخواه را بنویسید؛ تغییر بلافاصله در پیش‌نمایش و چاپ اعمال و در همین مرورگر ذخیره می‌شود. برای حذف نوشته، کادر را خالی کنید.</p>
         </div>
         <div class="flex justify-between items-center" style="margin-bottom:10px;flex-wrap:wrap;gap:8px">
             <h3 class="font-bold text-sm">پیش‌نمایش زندهٔ صفحهٔ چاپ</h3>
@@ -666,6 +674,7 @@ function applyCardDesign(){
   document.getElementById('vCScale').textContent  = faNum(Math.round(d.scale * 100));
 
   var pv = document.getElementById('cardPreview');
+  pv.setAttribute('data-card-layout',d.layout);
   // The card, not its flow container, scales. Both renderers use the same physical slots.
   pv.style.setProperty('--card-scale', d.scale);
   pv.querySelectorAll('.card-id,.card-back').forEach(function(c, slot){
