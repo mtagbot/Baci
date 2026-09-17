@@ -1,0 +1,14 @@
+[
+  "api/docs.php",
+  "assets/css/management-hub.css",
+  "assets/js/desk-connection.js",
+  "assets/js/management-hub.js",
+  "courses-management.php",
+  "includes/footer.php",
+  "includes/header.php",
+  "includes/management_hub.php",
+  "messages-management.php",
+  "other-settings.php",
+  "reports-management.php",
+  "student-recovery.php"
+]

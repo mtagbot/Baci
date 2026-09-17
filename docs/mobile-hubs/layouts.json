@@ -1,0 +1,4152 @@
+{
+  "checks": 685,
+  "results": [
+    {
+      "phase": "before",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "classes",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 366,
+        "scroll": 366,
+        "height": 798.40625,
+        "mainWidth": 366,
+        "cards": [
+          {
+            "width": 342,
+            "parent": 342,
+            "columns": "342px",
+            "span": "span 1 / span 1"
+          },
+          {
+            "width": 342,
+            "parent": 342,
+            "columns": "342px",
+            "span": "span 1 / span 1"
+          }
+        ],
+        "controls": [
+          {
+            "width": 180.609375,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          }
+        ],
+        "embedded": false,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "before",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "teachers",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 366,
+        "scroll": 366,
+        "height": 1389.296875,
+        "mainWidth": 366,
+        "cards": [
+          {
+            "width": 342,
+            "parent": 342,
+            "columns": "342px",
+            "span": "span 1 / span 1"
+          },
+          {
+            "width": 342,
+            "parent": 342,
+            "columns": "342px",
+            "span": "span 1 / span 1"
+          }
+        ],
+        "controls": [
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 315.625,
+            "height": 44
+          }
+        ],
+        "embedded": false,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "before",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "schedule",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 366,
+        "scroll": 366,
+        "height": 336.765625,
+        "mainWidth": 366,
+        "cards": [],
+        "controls": [
+          {
+            "width": 317.625,
+            "height": 44.1875
+          }
+        ],
+        "embedded": false,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "before",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "years",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [
+          {
+            "cls": "grid grid-cols-4 gap-3 items-end",
+            "height": 55,
+            "scroll": 218
+          }
+        ],
+        "width": 366,
+        "scroll": 366,
+        "height": 538.4375,
+        "mainWidth": 366,
+        "cards": [],
+        "controls": [
+          {
+            "width": 301.625,
+            "height": 44
+          },
+          {
+            "width": 301.625,
+            "height": 44
+          }
+        ],
+        "embedded": false,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "before",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "reports",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [
+          {
+            "cls": "grid grid-cols-5 gap-3 items-end",
+            "height": 55,
+            "scroll": 361
+          }
+        ],
+        "width": 366,
+        "scroll": 366,
+        "height": 356.75,
+        "mainWidth": 366,
+        "cards": [],
+        "controls": [
+          {
+            "width": 301.625,
+            "height": 44
+          },
+          {
+            "width": 301.625,
+            "height": 44
+          },
+          {
+            "width": 301.625,
+            "height": 44
+          },
+          {
+            "width": 301.625,
+            "height": 44
+          }
+        ],
+        "embedded": false,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "before",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "wizard",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 366,
+        "scroll": 366,
+        "height": 308.5,
+        "mainWidth": 366,
+        "cards": [],
+        "controls": [],
+        "embedded": false,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "before",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "analytics",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [
+          {
+            "cls": "grid grid-cols-5 gap-4 items-end",
+            "height": 55,
+            "scroll": 361
+          }
+        ],
+        "width": 366,
+        "scroll": 366,
+        "height": 1573.3125,
+        "mainWidth": 366,
+        "cards": [
+          {
+            "width": 342,
+            "parent": 342,
+            "columns": "342px",
+            "span": "auto"
+          },
+          {
+            "width": 342,
+            "parent": 342,
+            "columns": "342px",
+            "span": "auto"
+          },
+          {
+            "width": 342,
+            "parent": 342,
+            "columns": "342px",
+            "span": "auto"
+          },
+          {
+            "width": 342,
+            "parent": 342,
+            "columns": "342px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 301.625,
+            "height": 44
+          },
+          {
+            "width": 301.625,
+            "height": 44
+          },
+          {
+            "width": 301.625,
+            "height": 44
+          },
+          {
+            "width": 301.625,
+            "height": 44
+          }
+        ],
+        "embedded": false,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "before",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "grades",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 366,
+        "scroll": 366,
+        "height": 308.5,
+        "mainWidth": 366,
+        "cards": [],
+        "controls": [],
+        "embedded": false,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "before",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "broadcast",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [
+          {
+            "cls": "grid grid-cols-4 gap-3 items-end",
+            "height": 55,
+            "scroll": 291
+          }
+        ],
+        "width": 366,
+        "scroll": 366,
+        "height": 175.375,
+        "mainWidth": 366,
+        "cards": [],
+        "controls": [
+          {
+            "width": 301.625,
+            "height": 44
+          },
+          {
+            "width": 301.625,
+            "height": 44
+          }
+        ],
+        "embedded": false,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "before",
+      "file": "student-recovery.php",
+      "title": "بازیابی دانش‌آموز",
+      "key": "students",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 366,
+        "scroll": 366,
+        "height": 1373.5,
+        "mainWidth": 366,
+        "cards": [
+          {
+            "width": 342,
+            "parent": 342,
+            "columns": "342px",
+            "span": "auto"
+          },
+          {
+            "width": 342,
+            "parent": 342,
+            "columns": "342px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44.1875
+          }
+        ],
+        "embedded": false,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "before",
+      "file": "student-recovery.php",
+      "title": "بازیابی دانش‌آموز",
+      "key": "photos",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 366,
+        "scroll": 366,
+        "height": 308.5,
+        "mainWidth": 366,
+        "cards": [],
+        "controls": [],
+        "embedded": false,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "before",
+      "file": "messages-management.php",
+      "title": "پیامک و اعلان‌ها",
+      "key": "notifications",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 366,
+        "scroll": 366,
+        "height": 575.078125,
+        "mainWidth": 366,
+        "cards": [
+          {
+            "width": 342,
+            "parent": 342,
+            "columns": "342px",
+            "span": "span 1 / span 1"
+          },
+          {
+            "width": 342,
+            "parent": 342,
+            "columns": "342px",
+            "span": "span 1 / span 1"
+          }
+        ],
+        "controls": [
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          }
+        ],
+        "embedded": false,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "before",
+      "file": "messages-management.php",
+      "title": "پیامک و اعلان‌ها",
+      "key": "sms",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 366,
+        "scroll": 366,
+        "height": 921.890625,
+        "mainWidth": 366,
+        "cards": [
+          {
+            "width": 342,
+            "parent": 342,
+            "columns": "342px",
+            "span": "span 1 / span 1"
+          },
+          {
+            "width": 342,
+            "parent": 342,
+            "columns": "342px",
+            "span": "span 1 / span 1"
+          }
+        ],
+        "controls": [
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          }
+        ],
+        "embedded": false,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "before",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "logs",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 366,
+        "scroll": 366,
+        "height": 461.046875,
+        "mainWidth": 366,
+        "cards": [],
+        "controls": [
+          {
+            "width": 317.625,
+            "height": 44
+          },
+          {
+            "width": 317.625,
+            "height": 44
+          }
+        ],
+        "embedded": false,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "before",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "migration",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 366,
+        "scroll": 366,
+        "height": 422.15625,
+        "mainWidth": 366,
+        "cards": [],
+        "controls": [],
+        "embedded": false,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "before",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "backups",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 366,
+        "scroll": 366,
+        "height": 248,
+        "mainWidth": 366,
+        "cards": [],
+        "controls": [],
+        "embedded": false,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "before",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "api",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 150,
+        "frameWidth": 366,
+        "frameCount": 1,
+        "active": 0
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 366,
+        "scroll": 366,
+        "height": 1957.359375,
+        "mainWidth": 326,
+        "cards": [],
+        "controls": [],
+        "embedded": false,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "classes",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 1138,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 1135.375,
+        "mainWidth": 294,
+        "cards": [
+          {
+            "width": 274,
+            "parent": 274,
+            "columns": "274px",
+            "span": "auto"
+          },
+          {
+            "width": 274,
+            "parent": 274,
+            "columns": "274px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 182.3125,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "teachers",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 1725,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 1722.28125,
+        "mainWidth": 294,
+        "cards": [
+          {
+            "width": 274,
+            "parent": 274,
+            "columns": "274px",
+            "span": "auto"
+          },
+          {
+            "width": 274,
+            "parent": 274,
+            "columns": "274px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 242,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "schedule",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 350,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 347.015625,
+        "mainWidth": 294,
+        "cards": [],
+        "controls": [
+          {
+            "width": 244,
+            "height": 47.1875
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "years",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 921,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 918.109375,
+        "mainWidth": 294,
+        "cards": [],
+        "controls": [
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "classes",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 1138,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 1135.375,
+        "mainWidth": 364,
+        "cards": [
+          {
+            "width": 344,
+            "parent": 344,
+            "columns": "344px",
+            "span": "auto"
+          },
+          {
+            "width": 344,
+            "parent": 344,
+            "columns": "344px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 182.3125,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "teachers",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 1585,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 1582.28125,
+        "mainWidth": 364,
+        "cards": [
+          {
+            "width": 344,
+            "parent": 344,
+            "columns": "344px",
+            "span": "auto"
+          },
+          {
+            "width": 344,
+            "parent": 344,
+            "columns": "344px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 312,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "schedule",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 350,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 347.015625,
+        "mainWidth": 364,
+        "cards": [],
+        "controls": [
+          {
+            "width": 314,
+            "height": 47.1875
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "years",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 857,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 854.40625,
+        "mainWidth": 364,
+        "cards": [],
+        "controls": [
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "classes",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 1033,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 1030.375,
+        "mainWidth": 734,
+        "cards": [
+          {
+            "width": 714,
+            "parent": 714,
+            "columns": "714px",
+            "span": "auto"
+          },
+          {
+            "width": 714,
+            "parent": 714,
+            "columns": "714px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 182.3125,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "teachers",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 1511,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 1508.28125,
+        "mainWidth": 734,
+        "cards": [
+          {
+            "width": 714,
+            "parent": 714,
+            "columns": "714px",
+            "span": "auto"
+          },
+          {
+            "width": 714,
+            "parent": 714,
+            "columns": "714px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 682,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "schedule",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 335,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 332.40625,
+        "mainWidth": 734,
+        "cards": [],
+        "controls": [
+          {
+            "width": 684,
+            "height": 47.1875
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "years",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 743,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 740.671875,
+        "mainWidth": 734,
+        "cards": [],
+        "controls": [
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "classes",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 1030.375,
+        "mainWidth": 778,
+        "cards": [
+          {
+            "width": 758,
+            "parent": 758,
+            "columns": "758px",
+            "span": "auto"
+          },
+          {
+            "width": 758,
+            "parent": 758,
+            "columns": "758px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 182.3125,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "teachers",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 1508.28125,
+        "mainWidth": 778,
+        "cards": [
+          {
+            "width": 758,
+            "parent": 758,
+            "columns": "758px",
+            "span": "auto"
+          },
+          {
+            "width": 758,
+            "parent": 758,
+            "columns": "758px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 726,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "schedule",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 332.40625,
+        "mainWidth": 778,
+        "cards": [],
+        "controls": [
+          {
+            "width": 728,
+            "height": 47.1875
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "years",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 740.671875,
+        "mainWidth": 778,
+        "cards": [],
+        "controls": [
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "classes",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 1023,
+        "mainWidth": 1142,
+        "cards": [
+          {
+            "width": 549.75,
+            "parent": 1110,
+            "columns": "549.75px 549.75px",
+            "span": "span 1 / span 1"
+          },
+          {
+            "width": 1110,
+            "parent": 1110,
+            "columns": "549.75px 549.75px",
+            "span": "span 2 / span 2"
+          }
+        ],
+        "controls": [
+          {
+            "width": 180.609375,
+            "height": 44
+          },
+          {
+            "width": 522.5625,
+            "height": 44
+          },
+          {
+            "width": 522.5625,
+            "height": 44
+          },
+          {
+            "width": 522.5625,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "teachers",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 1110.9375,
+        "mainWidth": 1142,
+        "cards": [
+          {
+            "width": 549.75,
+            "parent": 1110,
+            "columns": "549.75px 549.75px",
+            "span": "span 1 / span 1"
+          },
+          {
+            "width": 1110,
+            "parent": 1110,
+            "columns": "549.75px 549.75px",
+            "span": "span 2 / span 2"
+          }
+        ],
+        "controls": [
+          {
+            "width": 256.03125,
+            "height": 44
+          },
+          {
+            "width": 256.03125,
+            "height": 44
+          },
+          {
+            "width": 256.03125,
+            "height": 44
+          },
+          {
+            "width": 256.03125,
+            "height": 44
+          },
+          {
+            "width": 256.03125,
+            "height": 44
+          },
+          {
+            "width": 256.03125,
+            "height": 44
+          },
+          {
+            "width": 256.03125,
+            "height": 44
+          },
+          {
+            "width": 1027.953125,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "schedule",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 640,
+        "mainWidth": 1142,
+        "cards": [],
+        "controls": [
+          {
+            "width": 1082.8125,
+            "height": 44.1875
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "courses-management.php",
+      "title": "مدیریت دروس",
+      "key": "years",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 640,
+        "mainWidth": 1142,
+        "cards": [],
+        "controls": [
+          {
+            "width": 536.15625,
+            "height": 44
+          },
+          {
+            "width": 536.15625,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "reports",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 769,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 766.109375,
+        "mainWidth": 294,
+        "cards": [],
+        "controls": [
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "wizard",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 318,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 315.984375,
+        "mainWidth": 294,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "analytics",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 1742,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 1739.703125,
+        "mainWidth": 294,
+        "cards": [
+          {
+            "width": 274,
+            "parent": 274,
+            "columns": "274px",
+            "span": "auto"
+          },
+          {
+            "width": 274,
+            "parent": 274,
+            "columns": "274px",
+            "span": "auto"
+          },
+          {
+            "width": 274,
+            "parent": 274,
+            "columns": "274px",
+            "span": "auto"
+          },
+          {
+            "width": 274,
+            "parent": 274,
+            "columns": "274px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "grades",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 318,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 315.984375,
+        "mainWidth": 294,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "broadcast",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 413,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 410.84375,
+        "mainWidth": 294,
+        "cards": [],
+        "controls": [
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "reports",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 717,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 714.109375,
+        "mainWidth": 364,
+        "cards": [],
+        "controls": [
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "wizard",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 297,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 294.75,
+        "mainWidth": 364,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "analytics",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 1927,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 1924.09375,
+        "mainWidth": 364,
+        "cards": [
+          {
+            "width": 344,
+            "parent": 344,
+            "columns": "344px",
+            "span": "auto"
+          },
+          {
+            "width": 344,
+            "parent": 344,
+            "columns": "344px",
+            "span": "auto"
+          },
+          {
+            "width": 344,
+            "parent": 344,
+            "columns": "344px",
+            "span": "auto"
+          },
+          {
+            "width": 344,
+            "parent": 344,
+            "columns": "344px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "grades",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 297,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 294.75,
+        "mainWidth": 364,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "broadcast",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 413,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 410.84375,
+        "mainWidth": 364,
+        "cards": [],
+        "controls": [
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "reports",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 667,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 664.328125,
+        "mainWidth": 734,
+        "cards": [],
+        "controls": [
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "wizard",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 240,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 219.890625,
+        "mainWidth": 734,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "analytics",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 3012,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 3009.28125,
+        "mainWidth": 734,
+        "cards": [
+          {
+            "width": 714,
+            "parent": 714,
+            "columns": "714px",
+            "span": "auto"
+          },
+          {
+            "width": 714,
+            "parent": 714,
+            "columns": "714px",
+            "span": "auto"
+          },
+          {
+            "width": 714,
+            "parent": 714,
+            "columns": "714px",
+            "span": "auto"
+          },
+          {
+            "width": 714,
+            "parent": 714,
+            "columns": "714px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "grades",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 240,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 219.890625,
+        "mainWidth": 734,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "broadcast",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 399,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 396.84375,
+        "mainWidth": 734,
+        "cards": [],
+        "controls": [
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "reports",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 664.328125,
+        "mainWidth": 778,
+        "cards": [],
+        "controls": [
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "wizard",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 219.890625,
+        "mainWidth": 778,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "analytics",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 3138.46875,
+        "mainWidth": 778,
+        "cards": [
+          {
+            "width": 758,
+            "parent": 758,
+            "columns": "758px",
+            "span": "auto"
+          },
+          {
+            "width": 758,
+            "parent": 758,
+            "columns": "758px",
+            "span": "auto"
+          },
+          {
+            "width": 758,
+            "parent": 758,
+            "columns": "758px",
+            "span": "auto"
+          },
+          {
+            "width": 758,
+            "parent": 758,
+            "columns": "758px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "grades",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 219.890625,
+        "mainWidth": 778,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "broadcast",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 396.84375,
+        "mainWidth": 778,
+        "cards": [],
+        "controls": [
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "reports",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 640,
+        "mainWidth": 1142,
+        "cards": [],
+        "controls": [
+          {
+            "width": 1082.8125,
+            "height": 44
+          },
+          {
+            "width": 1082.8125,
+            "height": 44
+          },
+          {
+            "width": 1082.8125,
+            "height": 44
+          },
+          {
+            "width": 1082.8125,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "wizard",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 640,
+        "mainWidth": 1142,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "analytics",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 1556.21875,
+        "mainWidth": 1142,
+        "cards": [
+          {
+            "width": 549.75,
+            "parent": 1110,
+            "columns": "549.75px 549.75px",
+            "span": "auto"
+          },
+          {
+            "width": 549.75,
+            "parent": 1110,
+            "columns": "549.75px 549.75px",
+            "span": "auto"
+          },
+          {
+            "width": 549.75,
+            "parent": 1110,
+            "columns": "549.75px 549.75px",
+            "span": "auto"
+          },
+          {
+            "width": 549.75,
+            "parent": 1110,
+            "columns": "549.75px 549.75px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 1082.8125,
+            "height": 44
+          },
+          {
+            "width": 1082.8125,
+            "height": 44
+          },
+          {
+            "width": 1082.8125,
+            "height": 44
+          },
+          {
+            "width": 1082.8125,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "grades",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 640,
+        "mainWidth": 1142,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "reports-management.php",
+      "title": "مدیریت کارنامه‌ها",
+      "key": "broadcast",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 640,
+        "mainWidth": 1142,
+        "cards": [],
+        "controls": [
+          {
+            "width": 536.15625,
+            "height": 44
+          },
+          {
+            "width": 536.15625,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "student-recovery.php",
+      "title": "بازیابی دانش‌آموز",
+      "key": "students",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 1646,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 1643.40625,
+        "mainWidth": 294,
+        "cards": [
+          {
+            "width": 274,
+            "parent": 274,
+            "columns": "274px",
+            "span": "auto"
+          },
+          {
+            "width": 274,
+            "parent": 274,
+            "columns": "274px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 47.1875
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "student-recovery.php",
+      "title": "بازیابی دانش‌آموز",
+      "key": "photos",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 318,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 315.984375,
+        "mainWidth": 294,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "student-recovery.php",
+      "title": "بازیابی دانش‌آموز",
+      "key": "students",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 1452,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 1449.265625,
+        "mainWidth": 364,
+        "cards": [
+          {
+            "width": 344,
+            "parent": 344,
+            "columns": "344px",
+            "span": "auto"
+          },
+          {
+            "width": 344,
+            "parent": 344,
+            "columns": "344px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 47.1875
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "student-recovery.php",
+      "title": "بازیابی دانش‌آموز",
+      "key": "photos",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 297,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 294.75,
+        "mainWidth": 364,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "student-recovery.php",
+      "title": "بازیابی دانش‌آموز",
+      "key": "students",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 1242,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 1239.0625,
+        "mainWidth": 734,
+        "cards": [
+          {
+            "width": 714,
+            "parent": 714,
+            "columns": "714px",
+            "span": "auto"
+          },
+          {
+            "width": 714,
+            "parent": 714,
+            "columns": "714px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 47.1875
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "student-recovery.php",
+      "title": "بازیابی دانش‌آموز",
+      "key": "photos",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 240,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 219.890625,
+        "mainWidth": 734,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "student-recovery.php",
+      "title": "بازیابی دانش‌آموز",
+      "key": "students",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 1239.0625,
+        "mainWidth": 778,
+        "cards": [
+          {
+            "width": 758,
+            "parent": 758,
+            "columns": "758px",
+            "span": "auto"
+          },
+          {
+            "width": 758,
+            "parent": 758,
+            "columns": "758px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 47.1875
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "student-recovery.php",
+      "title": "بازیابی دانش‌آموز",
+      "key": "photos",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 219.890625,
+        "mainWidth": 778,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "student-recovery.php",
+      "title": "بازیابی دانش‌آموز",
+      "key": "students",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 860.921875,
+        "mainWidth": 1142,
+        "cards": [
+          {
+            "width": 549.75,
+            "parent": 1110,
+            "columns": "549.75px 549.75px",
+            "span": "auto"
+          },
+          {
+            "width": 549.75,
+            "parent": 1110,
+            "columns": "549.75px 549.75px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 522.5625,
+            "height": 44
+          },
+          {
+            "width": 256.03125,
+            "height": 44
+          },
+          {
+            "width": 256.03125,
+            "height": 44
+          },
+          {
+            "width": 522.5625,
+            "height": 44.1875
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "student-recovery.php",
+      "title": "بازیابی دانش‌آموز",
+      "key": "photos",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 640,
+        "mainWidth": 1142,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": true
+      }
+    },
+    {
+      "phase": "after",
+      "file": "messages-management.php",
+      "title": "پیامک و اعلان‌ها",
+      "key": "notifications",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 605,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 602.890625,
+        "mainWidth": 294,
+        "cards": [
+          {
+            "width": 274,
+            "parent": 274,
+            "columns": "274px",
+            "span": "auto"
+          },
+          {
+            "width": 274,
+            "parent": 274,
+            "columns": "274px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "messages-management.php",
+      "title": "پیامک و اعلان‌ها",
+      "key": "sms",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 989,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 986.9375,
+        "mainWidth": 294,
+        "cards": [
+          {
+            "width": 274,
+            "parent": 274,
+            "columns": "274px",
+            "span": "auto"
+          },
+          {
+            "width": 274,
+            "parent": 274,
+            "columns": "274px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "messages-management.php",
+      "title": "پیامک و اعلان‌ها",
+      "key": "notifications",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 605,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 602.890625,
+        "mainWidth": 364,
+        "cards": [
+          {
+            "width": 344,
+            "parent": 344,
+            "columns": "344px",
+            "span": "auto"
+          },
+          {
+            "width": 344,
+            "parent": 344,
+            "columns": "344px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "messages-management.php",
+      "title": "پیامک و اعلان‌ها",
+      "key": "sms",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 968,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 965.703125,
+        "mainWidth": 364,
+        "cards": [
+          {
+            "width": 344,
+            "parent": 344,
+            "columns": "344px",
+            "span": "auto"
+          },
+          {
+            "width": 344,
+            "parent": 344,
+            "columns": "344px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "messages-management.php",
+      "title": "پیامک و اعلان‌ها",
+      "key": "notifications",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 605,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 602.890625,
+        "mainWidth": 734,
+        "cards": [
+          {
+            "width": 714,
+            "parent": 714,
+            "columns": "714px",
+            "span": "auto"
+          },
+          {
+            "width": 714,
+            "parent": 714,
+            "columns": "714px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "messages-management.php",
+      "title": "پیامک و اعلان‌ها",
+      "key": "sms",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 916,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 913.703125,
+        "mainWidth": 734,
+        "cards": [
+          {
+            "width": 714,
+            "parent": 714,
+            "columns": "714px",
+            "span": "auto"
+          },
+          {
+            "width": 714,
+            "parent": 714,
+            "columns": "714px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "messages-management.php",
+      "title": "پیامک و اعلان‌ها",
+      "key": "notifications",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 602.890625,
+        "mainWidth": 778,
+        "cards": [
+          {
+            "width": 758,
+            "parent": 758,
+            "columns": "758px",
+            "span": "auto"
+          },
+          {
+            "width": 758,
+            "parent": 758,
+            "columns": "758px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "messages-management.php",
+      "title": "پیامک و اعلان‌ها",
+      "key": "sms",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 861.703125,
+        "mainWidth": 778,
+        "cards": [
+          {
+            "width": 758,
+            "parent": 758,
+            "columns": "758px",
+            "span": "auto"
+          },
+          {
+            "width": 758,
+            "parent": 758,
+            "columns": "758px",
+            "span": "auto"
+          }
+        ],
+        "controls": [
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "messages-management.php",
+      "title": "پیامک و اعلان‌ها",
+      "key": "notifications",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 640,
+        "mainWidth": 1142,
+        "cards": [
+          {
+            "width": 549.75,
+            "parent": 1110,
+            "columns": "549.75px 549.75px",
+            "span": "span 1 / span 1"
+          },
+          {
+            "width": 1110,
+            "parent": 1110,
+            "columns": "549.75px 549.75px",
+            "span": "span 2 / span 2"
+          }
+        ],
+        "controls": [
+          {
+            "width": 522.5625,
+            "height": 44
+          },
+          {
+            "width": 522.5625,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "messages-management.php",
+      "title": "پیامک و اعلان‌ها",
+      "key": "sms",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 885.515625,
+        "mainWidth": 1142,
+        "cards": [
+          {
+            "width": 549.75,
+            "parent": 1110,
+            "columns": "549.75px 549.75px",
+            "span": "span 1 / span 1"
+          },
+          {
+            "width": 1110,
+            "parent": 1110,
+            "columns": "549.75px 549.75px",
+            "span": "span 2 / span 2"
+          }
+        ],
+        "controls": [
+          {
+            "width": 522.5625,
+            "height": 44
+          },
+          {
+            "width": 522.5625,
+            "height": 44
+          },
+          {
+            "width": 522.5625,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "logs",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 474,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 471.703125,
+        "mainWidth": 294,
+        "cards": [],
+        "controls": [
+          {
+            "width": 244,
+            "height": 44
+          },
+          {
+            "width": 244,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "migration",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 439,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 436.65625,
+        "mainWidth": 294,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "backups",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 261,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 258.15625,
+        "mainWidth": 294,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "api",
+      "width": 320,
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "frameHeight": 2188,
+        "frameWidth": 294,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 294,
+        "scroll": 294,
+        "height": 2185.65625,
+        "mainWidth": 274,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "logs",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 474,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 471.703125,
+        "mainWidth": 364,
+        "cards": [],
+        "controls": [
+          {
+            "width": 314,
+            "height": 44
+          },
+          {
+            "width": 314,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "migration",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 411,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 408.65625,
+        "mainWidth": 364,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "backups",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 261,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 258.15625,
+        "mainWidth": 364,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "api",
+      "width": 390,
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "frameHeight": 1773,
+        "frameWidth": 364,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 364,
+        "scroll": 364,
+        "height": 1770.046875,
+        "mainWidth": 344,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "logs",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 474,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 471.703125,
+        "mainWidth": 734,
+        "cards": [],
+        "controls": [
+          {
+            "width": 684,
+            "height": 44
+          },
+          {
+            "width": 684,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "migration",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 343,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 340.265625,
+        "mainWidth": 734,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "backups",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 261,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 258.15625,
+        "mainWidth": 734,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "api",
+      "width": 768,
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "frameHeight": 1287,
+        "frameWidth": 734,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 734,
+        "scroll": 734,
+        "height": 1284.53125,
+        "mainWidth": 714,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "logs",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 471.703125,
+        "mainWidth": 778,
+        "cards": [],
+        "controls": [
+          {
+            "width": 728,
+            "height": 44
+          },
+          {
+            "width": 728,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "migration",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 326.265625,
+        "mainWidth": 778,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "backups",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 258.15625,
+        "mainWidth": 778,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "api",
+      "width": 1024,
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "frameHeight": 640,
+        "frameWidth": 778,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 778,
+        "scroll": 778,
+        "height": 1284.53125,
+        "mainWidth": 758,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "logs",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 640,
+        "mainWidth": 1142,
+        "cards": [],
+        "controls": [
+          {
+            "width": 356.734375,
+            "height": 44
+          },
+          {
+            "width": 356.75,
+            "height": 44
+          }
+        ],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "migration",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 640,
+        "mainWidth": 1142,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "backups",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 640,
+        "mainWidth": 1142,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    },
+    {
+      "phase": "after",
+      "file": "other-settings.php",
+      "title": "تنظیمات دیگر",
+      "key": "api",
+      "width": 1440,
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "frameHeight": 640,
+        "frameWidth": 1142,
+        "frameCount": 1,
+        "active": 1
+      },
+      "child": {
+        "clippedForms": [],
+        "width": 1142,
+        "scroll": 1142,
+        "height": 1473.5,
+        "mainWidth": 900,
+        "cards": [],
+        "controls": [],
+        "embedded": true,
+        "unavailable": false
+      }
+    }
+  ],
+  "errors": []
+}

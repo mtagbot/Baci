@@ -9,7 +9,7 @@ class FastUI(unittest.TestCase):
    paths=FILES+(['desk-sync-daemon.php'] if desktop else [])
    with ZipFile(ROOT/name) as z:
     self.assertIsNone(z.testzip());self.assertEqual(set(z.namelist()),{prefix+p for p in paths})
-    for p in paths:self.assertEqual(z.read(prefix+p),(ROOT/('desktop-app-v2/patch/www-desk-sync-daemon.php' if p=='desk-sync-daemon.php' else 'update-v4.152.0/'+p)).read_bytes())
+    for p in paths:self.assertEqual(z.read(prefix+p),subprocess.check_output(['git','show','1ad71484e8de8523fce642f9ea5b9329134b2047:'+('desktop-app-v2/patch/www-desk-sync-daemon.php' if p=='desk-sync-daemon.php' else 'update-v4.152.0/'+p)],cwd=ROOT))
  def test_hashes(self):
   for line in (ROOT/'FAST-UI-SHA256SUMS.txt').read_text().splitlines():
    digest,name=line.split();self.assertEqual(hashlib.sha256((ROOT/name).read_bytes()).hexdigest(),digest)

@@ -1,5 +1,6 @@
 /* Local-only monitor. The daemon owns remote I/O, retries and synchronization. */
 (function(w,d){'use strict';
+ if(w.self!==w.top)return; // The containing application owns the only connection monitor.
  var root=d.getElementById('deskConnection');if(!root||root.getAttribute('data-ready'))return;
  root.setAttribute('data-ready','1');
  var monitor=root.getAttribute('data-monitor')==='1',timer=null,xhr=null,pending=0,innerNav=false,stopped=false,last=null;

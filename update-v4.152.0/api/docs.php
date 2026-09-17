@@ -1,6 +1,6 @@
 <!-- File: api/docs.php -->
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl"<?php echo (($_GET['embedded']??'')==='1')?' class="hub-embedded"':''; ?>>
 <head><meta name="viewport" content="width=device-width, initial-scale=1">
     <meta charset="UTF-8">
     <title>مستندات رابط برنامه‌نویسی (API Documentation)</title>
@@ -15,7 +15,7 @@
         .method.post { background: #16a34a; }
         code { font-family: monospace; direction: ltr; display: inline-block; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; }
     </style>
-<link rel="stylesheet" href="../assets/css/school-ui.css?v20260917d"><script defer src="../assets/js/school-icons.js?v20260917d"></script><script defer src="../assets/js/school-ui.js?v20260917d"></script></head>
+<link rel="stylesheet" href="../assets/css/school-ui.css?v20260917d"><script defer src="../assets/js/school-icons.js?v20260917d"></script><script defer src="../assets/js/school-ui.js?v20260917d"></script><link rel="stylesheet" href="../assets/css/management-hub.css?v=20260917f"><script>try{if(window.frameElement&&window.frameElement.id==='hubFrame')document.documentElement.classList.add('hub-embedded');}catch(ignore){}</script></head>
 <body class="ui-docs">
 <div class="container">
     <div class="card">

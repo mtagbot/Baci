@@ -65,7 +65,7 @@ $headerRelease=is_file(dirname(__DIR__).'/config/release.php')?require dirname(_
 $isDeskRuntime=($headerRelease['distribution']??(PHP_SAPI==='cli-server'?'desktop':'site'))==='desktop';
 ?>
 <!DOCTYPE html>
-<html lang="fa" dir="rtl" class="school-shell">
+<html lang="fa" dir="rtl" class="school-shell<?php echo $isEmbedded?' hub-embedded':''; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -115,7 +115,9 @@ $isDeskRuntime=($headerRelease['distribution']??(PHP_SAPI==='cli-server'?'deskto
     <?php endforeach; ?>
 <?php if(st_current_user()): ?><script defer src="assets/js/session-watch.js"></script><?php endif; ?>
 <?php echo app_appearance_head(true); ?>
-<link rel=stylesheet href=assets/css/school-ui.css?v20260917e><script defer src=assets/js/school-icons.js?v20260917e></script><script defer src=assets/js/school-ui.js?v20260917e></script><?php require_once __DIR__.'/school_ui_theme.php'; echo school_ui_theme(); ?><noscript><style>@media screen and (max-width:900px){body.school-app>.flex.flex-1{display:block}body.school-app .sidebar{position:static!important;transform:none!important;visibility:visible!important;width:100%!important;max-width:none;height:auto!important}body.school-app .hamburger-btn,body.school-app .ui-drawer-close{display:none!important}}</style></noscript></head>
+<link rel=stylesheet href=assets/css/school-ui.css?v20260917e><script defer src=assets/js/school-icons.js?v20260917e></script><script defer src=assets/js/school-ui.js?v20260917e></script><?php require_once __DIR__.'/school_ui_theme.php'; echo school_ui_theme(); ?><noscript><style>@media screen and (max-width:900px){body.school-app>.flex.flex-1{display:block}body.school-app .sidebar{position:static!important;transform:none!important;visibility:visible!important;width:100%!important;max-width:none;height:auto!important}body.school-app .hamburger-btn,body.school-app .ui-drawer-close{display:none!important}}</style></noscript><link rel="stylesheet" href="assets/css/management-hub.css?v=20260917f">
+<script>try{if(window.frameElement&&window.frameElement.id==='hubFrame')document.documentElement.classList.add('hub-embedded');}catch(ignore){}</script>
+</head>
 <body class="school-app <?php echo $isDeskRuntime&&!$isEmbedded?'desk-runtime':''; ?> <?php echo $isEmbedded ? 'embedded-mode' : ''; ?> bg-body text-main min-h-screen flex flex-col font-sans">
 <a class="ui-skip" href="#main-content">رفتن به محتوای اصلی</a>
 <script>
