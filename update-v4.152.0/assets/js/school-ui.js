@@ -120,16 +120,28 @@
  w.SchoolUI={refresh:enqueue,icon:svg,metrics:stats};
  if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',start);else start();
 })(window,document);
-/* Deterministic GET return routes. Never history.back() into POST/print/delete actions. */
+/* Explicit preview opt-in only. Deterministic GET return routes. Never history.back() into POST/print/delete actions. */
 (function(w,d){'use strict';if(w.SchoolNavigation)return;
  var parents={'student-bulk-report.php':'students.php','discipline-bulk-report.php':'students.php','student-modal.php':'students.php','report-print.php':'reports.php','report-view.php':'reports.php','bulk-print.php':'reports.php','reports-lists.php':'reports.php','exam-print.php':'exams.php','entry-cards.php':'entry-cards.php','attendance-tags.php':'attendance-tags.php','attendance-scanner.php':'attendance-tags.php','online-exam-result.php':'index.php','api/docs.php':'../index.php'};
  var safe=/^(index|students|reports|exams|teacher-panel|student-panel|student-online-exams|online-exams|attendance-tags|entry-cards|settings|reports-lists|reports-management|courses-management)\.php$/;
  function start(){
-  if(d.querySelector('.school-return-nav'))return;
+  if(!d.body||d.body.getAttribute('data-school-return')!=='preview')return;
+  if(d.querySelector('.school-return-nav,.school-editor-return,.school-preview-return'))return;
   var path=location.pathname,base=path.slice(path.lastIndexOf('/')+1),fallback=parents[base]||'index.php';if(/\/api\/docs.php$/.test(path))fallback='../index.php';
   if(base==='index.php'&&!location.search)return;
   var target=fallback;
   try{var ref=d.createElement('a');ref.href=d.referrer;var name=ref.pathname.split('/').pop();if(d.referrer&&ref.protocol===location.protocol&&ref.host===location.host&&safe.test(name)&&ref.pathname!==path&&!/[?&](action|print|download|export|delete|auto)=/.test(ref.search))target=ref.pathname+ref.search;}catch(ignore){}
+  // The live editor uses its own native toolbar styling, never a page-level return strip.
+  var editor=d.getElementById('mainToolbar');
+  var toolbar=editor||d.querySelector('.seat-toolbar,.toolbar.no-print,#editor.noprint');
+  if(toolbar){
+   var group=d.createElement('div');group.className=editor?'tb-group no-ajax school-editor-return':'school-preview-return';
+   var button=d.createElement('button');button.type='button';button.textContent='بازگشت';button.title=editor?'بازگشت از ویرایشگر آزمون':'بازگشت از پیش‌نمایش';
+   button.onclick=function(){w.location.href=target;};group.appendChild(button);toolbar.insertBefore(group,toolbar.firstChild);
+   // Existing editor layout measurement is bound to resize; account for the added button.
+   if(w.dispatchEvent&&d.createEvent){var resized=d.createEvent('Event');resized.initEvent('resize',false,false);w.dispatchEvent(resized);}
+   return;
+  }
   var nav=d.createElement('nav');nav.className='school-return-nav';nav.setAttribute('aria-label','بازگشت و خروج از صفحه');
   var back=d.createElement('a');back.href=target;back.textContent='بازگشت';nav.appendChild(back);
   var home=d.createElement('a');home.href=/\/api\//.test(path)?'../index.php':'index.php';home.textContent='صفحهٔ اصلی';nav.appendChild(home);

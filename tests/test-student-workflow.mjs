@@ -38,8 +38,8 @@ for(const font of ['Vazirmatn','Sahel','Yekan','CustomUploadedFont']){
 }
 for(const format of ['xls','doc']){const report=await request('student-bulk-report.php',{post:{...post,format}});assert(!report.page.includes('<script'));assert(!report.page.includes('school-ui'));n++;}
 const subset=await request('student-bulk-report.php',{post:{...post,fields:['national_id','password','serial_letter','home_address']}});assert(subset.page.includes('<th>کد ملی</th>'));assert(!subset.page.includes('<th>موبایل پدر</th>'));assert(!subset.page.includes('password'));n++;
-const empty=await request('student-bulk-report.php',{post:{...post,fields:[]}});assert(empty.page.includes('حداقل یک ستون'));assert(empty.page.includes('href="students.php"'));n++;
+const empty=await request('student-bulk-report.php',{post:{...post,fields:[]}});assert(empty.page.includes('حداقل یک ستون'));assert(!empty.page.includes('href="students.php"'));n++;
 const unauth=await req('',{file:'student-bulk-report.php',sid:'studentWorkflowGuest',post});assert(!unauth.res.page.includes('0012345678'));n++;
-for(const file of ['import.php','import-photos.php','grade-entry-management.php']){const r=await request(file);assert(r.page.includes('در نسخهٔ مبنا موجود نیست'));assert(r.page.includes('بازگشت به بخش مربوط'));n++;}
-for(const file of ['report-print.php','exam-print.php','discipline-bulk-report.php']){const r=await request(file,{query:'id=999999&exam_id=999999'});assert(r.page.includes('امکان نمایش صفحه نیست'));assert(r.page.includes('href="index.php"'));n++;}
+for(const file of ['import.php','import-photos.php','grade-entry-management.php']){const r=await request(file);assert(r.page.includes('در نسخهٔ مبنا موجود نیست'));assert(!r.page.includes('بازگشت به بخش مربوط'));n++;}
+for(const file of ['report-print.php','exam-print.php','discipline-bulk-report.php']){const r=await request(file,{query:'id=999999&exam_id=999999'});assert(r.page.includes('امکان نمایش صفحه نیست'));assert(!r.page.includes('href="index.php"'));n++;}
 writeFileSync(dir+'/fields.json',JSON.stringify(fields));console.log('PASS',n,'student profile/serial/report PHP cases');process.exit(0);

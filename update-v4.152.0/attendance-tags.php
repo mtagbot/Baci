@@ -185,8 +185,8 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
 @media print{ .toolbar{display:none !important} @page{margin:<?php echo $D['margin']; ?>mm} }
 </style>
 <?php echo app_appearance_head(); ?>
-<link rel=stylesheet href=assets/css/school-ui.css?v20260917c><script defer src=assets/js/school-icons.js?v20260917c></script><script defer src=assets/js/school-ui.js?v20260917c></script></head>
-<body>
+<link rel=stylesheet href=assets/css/school-ui.css?v20260917d><script defer src=assets/js/school-icons.js?v20260917d></script><script defer src=assets/js/school-ui.js?v20260917d></script></head>
+<body data-school-return="preview">
 <div class="toolbar no-print">
     <button onclick="appPrint()">چاپ</button>
     <span>تعداد تگ: <?php echo tr_num(count($students) * $copies, 'fa'); ?> — <?php echo tr_num($copies, 'fa'); ?> نسخه برای هر دانش‌آموز — اندازه: <?php echo tr_num($D['size'], 'fa'); ?> میلی‌متر</span>

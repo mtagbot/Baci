@@ -1,0 +1,18 @@
+[
+  "api/docs.php",
+  "assets/js/school-navigation.js",
+  "assets/js/school-ui.js",
+  "attendance-scanner.php",
+  "attendance-tags.php",
+  "bulk-print.php",
+  "discipline-bulk-report.php",
+  "entry-cards.php",
+  "exam-print.php",
+  "includes/docx_class_list.php",
+  "includes/header.php",
+  "includes/page_navigation.php",
+  "includes/student_profile_form.php",
+  "includes/unavailable_route.php",
+  "report-print.php",
+  "student-bulk-report.php"
+]

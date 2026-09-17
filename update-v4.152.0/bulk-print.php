@@ -81,8 +81,8 @@ if (isset($_GET['print'])) {
         @media print { .btn-print, .no-print { display: none !important; } }
     </style>
 <?php echo app_appearance_head(); ?>
-<link rel=stylesheet href=assets/css/school-ui.css?v20260917c><script defer src=assets/js/school-icons.js?v20260917c></script><script defer src=assets/js/school-ui.js?v20260917c></script></head>
-<body>
+<link rel=stylesheet href=assets/css/school-ui.css?v20260917d><script defer src=assets/js/school-icons.js?v20260917d></script><script defer src=assets/js/school-ui.js?v20260917d></script></head>
+<body data-school-return="preview">
 <button onclick="appPrint()" class="btn-print"><svg data-ui-icon="print" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 8V3h10v5M7 17H3V9h18v8h-4M7 14h10v8H7ZM17 11h.1"/></svg> چاپ گروهی (Layout: <?php echo tr_num($layout, 'fa'); ?> کارنامه در صفحه)</button>
 
 <div class="grid-container">

@@ -22,7 +22,7 @@ function st_date($prefix,$label,$st) {
 <link rel="stylesheet" href="assets/css/student-workflow.css?v=20260917c">
 <script defer src="assets/js/student-workflow.js?v=20260917c"></script>
 <div class="student-editor card">
- <div class="student-editor-title"><div><p class="text-muted">پروندهٔ دانش‌آموز</p><h1><?php echo $action==='edit'?'ویرایش اطلاعات دانش‌آموز':'ثبت دانش‌آموز جدید'; ?></h1></div><a class="btn btn-secondary" href="students.php">بازگشت به فهرست</a></div>
+ <div class="student-editor-title"><div><p class="text-muted">پروندهٔ دانش‌آموز</p><h1><?php echo $action==='edit'?'ویرایش اطلاعات دانش‌آموز':'ثبت دانش‌آموز جدید'; ?></h1></div></div>
  <p id="student-entry-help">فیلدهای ستاره‌دار الزامی‌اند. Tab: بعدی، Shift+Tab: قبلی، Enter در ورودی متنی: بعدی. ذخیره فقط با دکمهٔ ذخیره انجام می‌شود.</p>
  <label class="student-check"><input id="student-auto-focus" type="checkbox" checked> انتقال خودکار پس از تکمیل فیلدهای عددی با طول ثابت و حرف سریال</label>
  <nav class="student-section-nav" aria-label="بخش‌های پرونده"><a href="#st-identity">هویت</a><a href="#st-education">تحصیل</a><a href="#st-parents">والدین</a><a href="#st-contact">تماس و نشانی</a><a href="#st-health">سلامت</a></nav>

@@ -1,6 +1,16 @@
 # Baci
 
-## تازه‌ترین اصلاحی: فرم دانش‌آموز، گزارش و پنجرهٔ دسکتاپ
+## تازه‌ترین اصلاحی: محدودکردن بازگشت به پیش‌نمایش‌ها
+
+دکمهٔ اضافهٔ بازگشت از صفحات عادی حذف شده است؛ فقط در پیش‌نمایش‌های مجاز باقی می‌ماند و در ویرایشگر آزمون داخل نوار ابزار خود ویرایشگر است.
+
+- [اصلاحی سایت](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SITE-FIX-v4.152.0-preview-navigation.zip)
+- [اصلاحی دسکتاپ](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SchoolDeskPro-FIX-v2.83.0-preview-navigation.zip)
+- [راهنما و محدودهٔ دقیق تغییر](CORRECTIONS-PREVIEW-NAVIGATION-FA.md) · [SHA256](PREVIEW-NAVIGATION-SHA256SUMS.txt)
+
+این اصلاحی پس از بستهٔ قبلی student-workflow نصب شود. هیچ نسخهٔ کامل یا فایل اجرایی دسکتاپ بازسازی نشده است.
+
+## اصلاحی قبلی: فرم دانش‌آموز، گزارش و پنجرهٔ دسکتاپ
 
 - [اصلاحی سایت](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SITE-FIX-v4.152.0-student-workflow.zip)
 - [اصلاحی دسکتاپ، همراه فایل اجرایی جدید](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SchoolDeskPro-FIX-v2.83.0-student-workflow.zip)

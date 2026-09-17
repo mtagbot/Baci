@@ -15,7 +15,7 @@
         .method.post { background: #16a34a; }
         code { font-family: monospace; direction: ltr; display: inline-block; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; }
     </style>
-<link rel="stylesheet" href="../assets/css/school-ui.css?v20260917c"><script defer src="../assets/js/school-icons.js?v20260917c"></script><script defer src="../assets/js/school-ui.js?v20260917c"></script></head>
+<link rel="stylesheet" href="../assets/css/school-ui.css?v20260917d"><script defer src="../assets/js/school-icons.js?v20260917d"></script><script defer src="../assets/js/school-ui.js?v20260917d"></script></head>
 <body class="ui-docs">
 <div class="container">
     <div class="card">

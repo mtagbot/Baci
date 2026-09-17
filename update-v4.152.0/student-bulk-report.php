@@ -5,7 +5,7 @@ require_once __DIR__.'/includes/school_roles.php';
 require_once __DIR__.'/includes/student_profile_fields.php';
 require_permission('manage_students');
 ensure_school_roles_schema();
-function student_report_error($text){http_response_code(400);echo '<!doctype html><html lang="fa" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>گزارش دانش‌آموزان</title><body><p>'.clean($text).'</p><a href="students.php">بازگشت به فهرست دانش‌آموزان</a></body></html>';exit;}
+function student_report_error($text){http_response_code(400);echo '<!doctype html><html lang="fa" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>گزارش دانش‌آموزان</title><body><p>'.clean($text).'</p></body></html>';exit;}
 if($_SERVER['REQUEST_METHOD']!=='POST'||!verify_csrf($_POST['csrf_token']??''))student_report_error('درخواست نامعتبر است؛ گزارش را از فهرست دانش‌آموزان انتخاب کنید.');
 $ids=array_values(array_unique(array_filter(array_map('intval',is_array($_POST['student_ids']??null)?$_POST['student_ids']:[]),fn($i)=>$i>0)));
 if(!$ids)student_report_error('دانش‌آموزی انتخاب نشده است.');
@@ -62,8 +62,8 @@ body{direction:rtl;margin:16px;color:#111;background:#fff}body,body *{font-famil
 table{width:100%;border-collapse:collapse}th,td{border:1px solid #555;padding:7px;font-size:12px;vertical-align:top;overflow-wrap:anywhere}th{background:#eee}thead{display:table-header-group}.sign{margin-top:30px;display:flex;justify-content:space-around}.report-actions{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;align-items:center}.report-actions button,.report-actions a{font-size:14px;padding:10px 16px;border:1px solid #64748b;border-radius:8px;color:#173a65;background:#f1f5f9;text-decoration:none}.report-scroll{overflow:auto}#report-print-status{font-size:13px}
 @media print{@page{size:<?php echo count($columns)>18?'A3':'A4'; ?> <?php echo count($columns)>7?'landscape':'portrait'; ?>;margin:10mm}.report-actions,.school-return-nav{display:none!important}.report-scroll{overflow:visible}body{margin:0}th,td{padding:3px;font-size:<?php echo count($columns)>12?'8':'10'; ?>pt}tr{break-inside:avoid}}
 </style>
-<?php if($format==='html'): ?><script defer src="assets/js/school-navigation.js?v=20260917c"></script><script defer src="assets/js/student-report-print.js?v=20260917c"></script><?php endif; ?>
-</head><body data-report-font="<?php echo clean($font['family']); ?>" data-report-local-font="<?php echo $font['url']!==''?'1':'0'; ?>">
+<?php if($format==='html'): ?><script defer src="assets/js/school-navigation.js?v=20260917d"></script><script defer src="assets/js/student-report-print.js?v=20260917c"></script><?php endif; ?>
+</head><body data-school-return="preview" data-report-font="<?php echo clean($font['family']); ?>" data-report-local-font="<?php echo $font['url']!==''?'1':'0'; ?>">
 <?php if($format==='html'): ?><div class="report-actions"><a href="students.php">بازگشت به دانش‌آموزان</a><button type="button" id="report-print">چاپ / ذخیره PDF</button><span id="report-print-status" role="status">آماده‌سازی قلم برای چاپ…</span></div><?php endif; ?>
 <div class="report-heading"><h2><?php echo clean($school); ?></h2><h3><?php echo clean($title); ?></h3><div class="report-meta"><span>تاریخ: <?php echo tr_num(jdate('Y/m/d H:i'),'fa'); ?></span><span>تعداد ردیف‌های گزارش: <?php echo tr_num(count($rows),'fa'); ?> | دانش‌آموزان انتخاب‌شده: <?php echo tr_num(count($students),'fa'); ?></span></div></div>
 <div class="report-scroll"><table><thead><tr><th>ردیف</th><?php foreach($columns as $label): ?><th><?php echo clean($label); ?></th><?php endforeach; ?></tr></thead><tbody>
