@@ -9,6 +9,8 @@ require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/academic_year_helpers.php';
 require_once __DIR__ . '/includes/school_roles.php';
 require_once __DIR__ . '/includes/school_sort.php';
+require_once __DIR__ . '/includes/student_profile_fields.php';
+$formErrors=[]; $submittedStudent=null;
 ensure_school_roles_schema();
 
 
@@ -148,9 +150,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_student'])) {
         set_flash_message('error', 'خطای امنیتی CSRF');
         redirect('students.php');
     }
-    $nid    = tr_num(trim($_POST['national_id'] ?? ''), 'en');
+    $nid    = student_ascii_digits($_POST['national_id'] ?? '');
     $code   = trim($_POST['student_code'] ?? '');
-    $ser    = trim($_POST['serial_number'] ?? '');
+    try { $oldSerial=$studentId>0?student_record_serial(DB::fetch('SELECT serial_number,student_code FROM students WHERE id=?',[$studentId])?:[]):''; $ser=student_serial_from_form($_POST,$oldSerial); } catch(InvalidArgumentException $e) { $formErrors[]=$e->getMessage(); $ser=''; }
     $fname  = trim($_POST['first_name'] ?? '');
     $lname  = trim($_POST['last_name'] ?? '');
     $father = trim($_POST['father_name'] ?? '');
@@ -160,15 +162,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_student'])) {
     // v4.29.2: academic year is now selected in the form and saved with the record
     $stYear = unify_academic_year(trim($_POST['academic_year'] ?? get_setting('current_academic_year', '1404/1405')));
     if ($grade === '' && $cname !== '') { $grade = infer_grade_from_class_name($cname); }
-    $phone  = tr_num(trim($_POST['phone'] ?? ''), 'en');
-    $fMob   = tr_num(trim($_POST['father_phone'] ?? ''), 'en');
-    $mMob   = tr_num(trim($_POST['mother_phone'] ?? ''), 'en');
+    $phone  = student_ascii_digits($_POST['phone'] ?? '');
+    $fMob   = student_ascii_digits($_POST['father_phone'] ?? '');
+    $mMob   = student_ascii_digits($_POST['mother_phone'] ?? '');
     $status = $_POST['status'] ?? 'active';
 
     // New comprehensive fields
-    $postal = tr_num(trim($_POST['postal_code'] ?? ''), 'en');
+    $postal = student_ascii_digits($_POST['postal_code'] ?? '');
     $homeAddr = trim($_POST['home_address'] ?? '');
-    $homePh = tr_num(trim($_POST['home_phone'] ?? ''), 'en');
+    $homePh = student_ascii_digits($_POST['home_phone'] ?? '');
     $birthPlace = trim($_POST['birth_place'] ?? '');
     $placeIssued = trim($_POST['place_issued'] ?? '');
     $religion = trim($_POST['religion_title'] ?? '');
@@ -184,19 +186,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_student'])) {
     $fatherJob = trim($_POST['father_job'] ?? '');
     $motherName = trim($_POST['mother_name'] ?? '');
     $motherLast = trim($_POST['mother_last_name'] ?? '');
-    $motherFirst = '';
+    $motherFirst = $motherName;
     if ($motherName !== '' && $motherLast === '') {
         $parts = preg_split('/\s+/', $motherName);
         if (count($parts)>=2) { $motherFirst = $parts[0]; $motherLast = implode(' ', array_slice($parts,1)); } else { $motherFirst = $motherName; }
     }
-    $sMobile = tr_num(trim($_POST['student_mobile'] ?? ''), 'en');
+    $sMobile = student_ascii_digits($_POST['student_mobile'] ?? '');
     $lastAvg = trim($_POST['last_year_average'] ?? '');
-    $bYear = (int)trim($_POST['birth_year'] ?? 0);
-    $bMonth = (int)trim($_POST['birth_month'] ?? 0);
-    $bDay = (int)trim($_POST['birth_day'] ?? 0);
+    $bYear = (int)student_ascii_digits($_POST['birth_year'] ?? 0);
+    $bMonth = (int)student_ascii_digits($_POST['birth_month'] ?? 0);
+    $bDay = (int)student_ascii_digits($_POST['birth_day'] ?? 0);
     // v4.68.0: تاریخ تولد والدین (سه‌بخشی؛ اختیاری)
-    $fbY=(int)trim($_POST['father_birth_year']??0); $fbM=(int)trim($_POST['father_birth_month']??0); $fbD=(int)trim($_POST['father_birth_day']??0);
-    $mbY=(int)trim($_POST['mother_birth_year']??0); $mbM=(int)trim($_POST['mother_birth_month']??0); $mbD=(int)trim($_POST['mother_birth_day']??0);
+    $fbY=(int)student_ascii_digits($_POST['father_birth_year']??0); $fbM=(int)student_ascii_digits($_POST['father_birth_month']??0); $fbD=(int)student_ascii_digits($_POST['father_birth_day']??0);
+    $mbY=(int)student_ascii_digits($_POST['mother_birth_year']??0); $mbM=(int)student_ascii_digits($_POST['mother_birth_month']??0); $mbD=(int)student_ascii_digits($_POST['mother_birth_day']??0);
     $fatherBdate = ($fbY && $fbM && $fbD) ? sprintf('%04d/%02d/%02d', $fbY, $fbM, $fbD) : '';
     $motherBdate = ($mbY && $mbM && $mbD) ? sprintf('%04d/%02d/%02d', $mbY, $mbM, $mbD) : '';
     $motherDeceased = isset($_POST['mother_deceased']) ? 1 : 0;
@@ -207,10 +209,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_student'])) {
     if ($bYear && $bMonth && $bDay) { $bdate = sprintf('%04d/%02d/%02d', $bYear, $bMonth, $bDay); }
 
     if (empty($nid) || empty($fname) || empty($lname)) {
-        set_flash_message('error', 'کد ملی، نام و نام خانوادگی الزامی است.');
-        redirect('students.php');
+        $formErrors[]='کد ملی، نام و نام خانوادگی الزامی است.';
     }
-
+    if(!$isForeign && !preg_match('/^[0-9]{10}$/D',$nid))$formErrors[]='کد ملی باید ۱۰ رقم باشد.';
+    if($postal!==''&&!preg_match('/^[0-9]{10}$/D',$postal))$formErrors[]='کد پستی باید ۱۰ رقم باشد.';
+    foreach(['birth','father_birth','mother_birth'] as $prefix)foreach(['year','month','day'] as $part){$raw=student_ascii_digits($_POST[$prefix.'_'.$part]??'');if($raw!==''&&!ctype_digit($raw))$formErrors[]='اجزای تاریخ تولد باید فقط عدد باشند.';}
+    foreach([[$bYear,$bMonth,$bDay],[$fbY,$fbM,$fbD],[$mbY,$mbM,$mbD]] as $dateParts){
+        [$yy,$mm,$dd]=$dateParts;
+        if(($yy||$mm||$dd)&&($yy<1300||$yy>1500||$mm<1||$mm>12||$dd<1||$dd>($mm>6?30:31)))$formErrors[]='تاریخ تولد را کامل و با سال، ماه و روز معتبر وارد کنید.';
+    }
+    if($formErrors){$action=$studentId>0?'edit':'add';$submittedStudent=$_POST;}
+    else {
+    $savedId=$studentId;
     if ($studentId > 0) {
         DB::execute("UPDATE students SET national_id=?, student_code=?, serial_number=?, first_name=?, last_name=?, father_name=?, birth_date=?, birth_year=?, birth_month=?, birth_day=?, grade_level=?, class_name=?, academic_year=?, phone=?, father_phone=?, mother_phone=?, student_mobile=?, postal_code=?, home_address=?, home_phone=?, birth_place=?, place_issued=?, religion_title=?, nationality_title=?, is_foreign=?, housing_title=?, cover_title=?, specific_disease_title=?, has_sport_limitation=?, mother_qualification=?, mother_job=?, father_qualification=?, father_job=?, mother_name=?, mother_first_name=?, mother_last_name=?, mother_deceased=?, father_deceased=?, father_guardian=?, mother_guardian=?, father_birth_date=?, mother_birth_date=?, last_year_average=?, status=?, is_temp=0 WHERE id=?",
         [$nid, $code, $ser, $fname, $lname, $father, $bdate, $bYear, $bMonth, $bDay, $grade, $cname, $stYear, $phone, $fMob, $mMob, $sMobile, $postal, $homeAddr, $homePh, $birthPlace, $placeIssued, $religion, $nationality, $isForeign, $housing, $cover, $disease, $hasSport, $motherQual, $motherJob, $fatherQual, $fatherJob, $motherName, $motherFirst, $motherLast, $motherDeceased, $fatherDeceased, $fatherGuardian, $motherGuardian, $fatherBdate, $motherBdate, $lastAvg, $status, $studentId]);
@@ -220,15 +230,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_student'])) {
         $pass = password_hash($nid, PASSWORD_DEFAULT);
         DB::execute("INSERT INTO students (national_id, student_code, serial_number, first_name, last_name, father_name, birth_date, birth_year, birth_month, birth_day, grade_level, class_name, academic_year, password, phone, father_phone, mother_phone, student_mobile, postal_code, home_address, home_phone, birth_place, place_issued, religion_title, nationality_title, is_foreign, housing_title, cover_title, specific_disease_title, has_sport_limitation, mother_qualification, mother_job, father_qualification, father_job, mother_name, mother_first_name, mother_last_name, mother_deceased, father_deceased, father_guardian, mother_guardian, father_birth_date, mother_birth_date, last_year_average, status, is_temp) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         [$nid, $code, $ser, $fname, $lname, $father, $bdate, $bYear, $bMonth, $bDay, $grade, $cname, $stYear, $pass, $phone, $fMob, $mMob, $sMobile, $postal, $homeAddr, $homePh, $birthPlace, $placeIssued, $religion, $nationality, $isForeign, $housing, $cover, $disease, $hasSport, $motherQual, $motherJob, $fatherQual, $fatherJob, $motherName, $motherFirst, $motherLast, $motherDeceased, $fatherDeceased, $fatherGuardian, $motherGuardian, $fatherBdate, $motherBdate, $lastAvg, $status, 0]);
+        $savedId=(int)DB::lastInsertId();
         log_activity($_SESSION['admin_id'], 'افزودن دانش‌آموز جامع', "دانش‌آموز جدید $fname $lname با پرونده کامل افزوده شد.");
         set_flash_message('success', 'دانش‌آموز جدید با پرونده کامل و تمام فیلدهای جدید با موفقیت ثبت شد.');
     }
+    if(array_key_exists('gender',$_POST)){ $gender=in_array($_POST['gender'],['male','female'],true)?$_POST['gender']:null; DB::execute('UPDATE students SET gender=? WHERE id=?',[$gender,$savedId]); }
+    if(array_key_exists('sport_limitation_desc',$_POST))DB::execute('UPDATE students SET sport_limitation_desc=? WHERE id=?',[trim($_POST['sport_limitation_desc']),$savedId]);
     // Ensure the class exists for the selected year so it appears in future dropdowns
     if ($cname !== '') {
         $clsRow = DB::fetch("SELECT id FROM classes WHERE name=? AND academic_year=?", [$cname, $stYear]);
         if (!$clsRow) { try { DB::execute("INSERT INTO classes (name, grade, academic_year) VALUES (?,?,?)", [$cname, $grade ?: infer_grade_from_class_name($cname), $stYear]); } catch (Exception $e) {} }
     }
     redirect('students.php');
+    }
 }
 
 /* v4.68.0: ستون تاریخ تولد پدر و مادر — افزودن امن در صورت نبود */
@@ -246,6 +260,7 @@ if ($action === 'add' || $action === 'edit'):
     if ($action === 'edit' && $studentId > 0) {
         $editData = DB::fetch("SELECT * FROM students WHERE id = ?", [$studentId]);
     }
+    if($submittedStudent!==null)$editData=$submittedStudent;
     // v4.29.2: cascading Year -> Grade -> Class selects instead of free text inputs
     $formYearOptions = get_academic_years_for_filter();
     $formYGCMap = get_year_grade_class_map($formYearOptions);
@@ -253,105 +268,7 @@ if ($action === 'add' || $action === 'edit'):
     $formSelectedGrade = $editData['grade_level'] ?? '';
     $formSelectedClass = $editData['class_name'] ?? '';
 ?>
-<div class="max-w-2xl mx-auto card p-6">
-    <h3 class="text-lg font-bold mb-6 text-primary border-b pb-2">
-        <?php echo $action === 'edit' ? 'ویرایش اطلاعات دانش‌آموز' : 'ثبت دانش‌آموز جدید'; ?>
-    </h3>
-    <form method="POST" action="students.php?id=<?php echo $studentId; ?>">
-        <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
-        <input type="hidden" name="save_student" value="1">
-
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-                <label class="block text-xs font-semibold mb-1">نام *</label>
-                <input type="text" name="first_name" class="form-input" value="<?php echo clean($editData['first_name'] ?? ''); ?>" required>
-            </div>
-            <div>
-                <label class="block text-xs font-semibold mb-1">نام خانوادگی *</label>
-                <input type="text" name="last_name" class="form-input" value="<?php echo clean($editData['last_name'] ?? ''); ?>" required>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-                <label class="block text-xs font-semibold mb-1">کد ملی (۱۰ رقم) *</label>
-                <input type="text" name="national_id" class="form-input dir-ltr text-left" value="<?php echo clean($editData['national_id'] ?? ''); ?>" required>
-            </div>
-            <div>
-                <label class="block text-xs font-semibold mb-1">شماره سریال / کد دانش‌آموزی</label>
-                <input type="text" name="serial_number" class="form-input dir-ltr text-left" placeholder="ب/35/356750" value="<?php echo clean($editData['serial_number'] ?? $editData['student_code'] ?? ''); ?>">
-            </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-                <label class="block text-xs font-semibold mb-1">موبایل پدر</label>
-                <input type="text" name="father_phone" class="form-input dir-ltr text-left" placeholder="09120000000" value="<?php echo clean($editData['father_phone'] ?? ''); ?>">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold mb-1">موبایل مادر</label>
-                <input type="text" name="mother_phone" class="form-input dir-ltr text-left" placeholder="09190000000" value="<?php echo clean($editData['mother_phone'] ?? ''); ?>">
-            </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-                <label class="block text-xs font-semibold mb-1">نام پدر</label>
-                <input type="text" name="father_name" class="form-input" value="<?php echo clean($editData['father_name'] ?? ''); ?>">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold mb-1">تاریخ تولد (شمسی)</label>
-                <?php /* v4.68.0: فیلد متنی حذف شد — فقط سه فیلد عددی روز/ماه/سال، جمع‌وجور و پشت‌سرهم با پرش خودکار */ ?>
-                <div class="bd-parts" dir="ltr">
-                    <input type="number" inputmode="numeric" min="1300" max="1500" name="birth_year" id="bdYear" class="form-input bd-y" placeholder="سال" value="<?php echo clean($editData['birth_year'] ?? ''); ?>">
-                    <span class="bd-sep">/</span>
-                    <input type="number" inputmode="numeric" min="1" max="12" name="birth_month" id="bdMonth" class="form-input bd-m" placeholder="ماه" value="<?php echo clean($editData['birth_month'] ?? ''); ?>">
-                    <span class="bd-sep">/</span>
-                    <input type="number" inputmode="numeric" min="1" max="31" name="birth_day" id="bdDay" class="form-input bd-d" placeholder="روز" value="<?php echo clean($editData['birth_day'] ?? ''); ?>">
-                </div>
-                <style>
-                .bd-parts{display:flex;align-items:center;gap:4px}
-                .bd-parts .form-input{text-align:center;padding-left:.35rem;padding-right:.35rem;font-weight:700}
-                .bd-parts .bd-y{width:5.2rem}
-                .bd-parts .bd-m,.bd-parts .bd-d{width:3.6rem}
-                .bd-sep{font-weight:800;color:#94a3b8}
-                .bd-parts input::-webkit-outer-spin-button,.bd-parts input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-                .bd-parts input[type=number]{-moz-appearance:textfield;appearance:textfield}
-                </style>
-                <script>
-                /* پرش خودکار: سال ۴ رقم → ماه، ماه ۲ رقم → روز */
-                (function(){
-                    var y=document.getElementById('bdYear'),m=document.getElementById('bdMonth'),d=document.getElementById('bdDay');
-                    if(y&&m){y.addEventListener('input',function(){if(this.value.length>=4)m.focus();});}
-                    if(m&&d){m.addEventListener('input',function(){if(this.value.length>=2)d.focus();});}
-                })();
-                </script>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-3 gap-4 mb-4 p-3 border-2 border-indigo-100 rounded bg-indigo-50/30">
-            <div>
-                <label class="block text-xs font-semibold mb-1"><svg data-ui-icon="calendar" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18M8 15h2m4 0h2m-8 3h2"/></svg> سال تحصیلی *</label>
-                <select name="academic_year" id="stYearSelect" class="form-select font-bold" onchange="refreshStGrades()" required>
-                    <?php foreach($formYearOptions as $yo): ?>
-                        <option value="<?php echo clean($yo['academic_year']); ?>" <?php echo $formSelectedYear===$yo['academic_year']?'selected':''; ?>><?php echo clean($yo['academic_year']); ?><?php echo !empty($yo['is_default'])?' - پیش‌فرض':''; ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div>
-                <label class="block text-xs font-semibold mb-1"><svg data-ui-icon="student" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m2 7 10-4 10 4-10 4Zm3 2v5c3 3 11 3 14 0V9M22 7v7M5 21c1-5 13-5 14 0"/></svg> پایه تحصیلی *</label>
-                <select name="grade_level" id="stGradeSelect" class="form-select" onchange="refreshStClasses()" required>
-                    <option value="">ابتدا سال را انتخاب کنید</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-xs font-semibold mb-1"><svg data-ui-icon="school" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m3 9 9-6 9 6v12H3Z"/><path d="M9 21v-6h6v6M7 11h.01M17 11h.01M12 7v3M10.5 8.5h3"/></svg> کلاس تحصیلی *</label>
-                <select name="class_name" id="stClassSelect" class="form-select" required>
-                    <option value="">ابتدا پایه را انتخاب کنید</option>
-                </select>
-            </div>
-            <small class="text-[11px] text-muted col-span-3">پایه‌ها و کلاس‌های تعریف‌شده در سال تحصیلی انتخابی نمایش داده می‌شوند. برای تعریف کلاس جدید از بخش «مدیریت دروس / کلاس‌ها» اقدام کنید.</small>
-        </div>
+<?php require __DIR__.'/includes/student_profile_form.php'; ?>
         <script>
         // v4.29.2: cascading Year -> Grade -> Class for the manual student form
         window.stYGCMap = <?php echo json_encode($formYGCMap, JSON_UNESCAPED_UNICODE); ?>;
@@ -381,117 +298,6 @@ if ($action === 'add' || $action === 'edit'):
         }
         document.addEventListener('DOMContentLoaded',()=>setTimeout(refreshStGrades,50));
         </script>
-
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-                <label class="block text-xs font-semibold mb-1">کد پستی (10 رقمی)</label>
-                <input type="text" name="postal_code" class="form-input dir-ltr" maxlength="10" pattern="[0-9۰-۹]{10}" title="کد پستی باید ۱۰ رقم باشد" value="<?php echo clean($editData['postal_code'] ?? ''); ?>" placeholder="مثلا 33544...">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold mb-1">تلفن منزل</label>
-                <input type="text" name="home_phone" class="form-input dir-ltr" value="<?php echo clean($editData['home_phone'] ?? ''); ?>">
-            </div>
-        </div>
-
-        <div class="mb-4">
-            <label class="block text-xs font-semibold mb-1">آدرس منزل</label>
-            <textarea name="home_address" class="form-textarea" rows="2"><?php echo clean($editData['home_address'] ?? ''); ?></textarea>
-        </div>
-
-        <div class="grid grid-cols-3 gap-4 mb-4">
-            <div><label class="block text-xs font-semibold mb-1">محل تولد</label><input type="text" name="birth_place" class="form-input" value="<?php echo clean($editData['birth_place'] ?? ''); ?>"></div>
-            <div><label class="block text-xs font-semibold mb-1">محل صدور</label><input type="text" name="place_issued" class="form-input" value="<?php echo clean($editData['place_issued'] ?? ''); ?>"></div>
-            <div><label class="block text-xs font-semibold mb-1">دین</label><input type="text" name="religion_title" class="form-input" value="<?php echo clean($editData['religion_title'] ?? ''); ?>"></div>
-        </div>
-
-
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div><label class="block text-xs font-semibold mb-1">نام مادر</label><input type="text" name="mother_name" class="form-input" value="<?php echo clean($editData['mother_name'] ?? ''); ?>"></div>
-            <div><label class="block text-xs font-semibold mb-1">نام خانوادگی مادر</label><input type="text" name="mother_last_name" class="form-input" value="<?php echo clean($editData['mother_last_name'] ?? ''); ?>"></div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div><label class="block text-xs font-semibold mb-1">تحصیلات مادر</label><input type="text" name="mother_qualification" class="form-input" value="<?php echo clean($editData['mother_qualification'] ?? ''); ?>"></div>
-            <div><label class="block text-xs font-semibold mb-1">شغل مادر</label><input type="text" name="mother_job" class="form-input" value="<?php echo clean($editData['mother_job'] ?? ''); ?>"></div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div><label class="block text-xs font-semibold mb-1">تحصیلات پدر</label><input type="text" name="father_qualification" class="form-input" value="<?php echo clean($editData['father_qualification'] ?? ''); ?>"></div>
-            <div><label class="block text-xs font-semibold mb-1">شغل پدر</label><input type="text" name="father_job" class="form-input" value="<?php echo clean($editData['father_job'] ?? ''); ?>"></div>
-        </div>
-
-        <?php /* v4.68.0: تاریخ تولد والدین (سه‌بخشی، اختیاری) */
-        $fbParts = array_pad(array_map('intval', explode('/', (string)($editData['father_birth_date'] ?? ''))), 3, 0);
-        $mbParts = array_pad(array_map('intval', explode('/', (string)($editData['mother_birth_date'] ?? ''))), 3, 0);
-        ?>
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-                <label class="block text-xs font-semibold mb-1">تاریخ تولد پدر (شمسی)</label>
-                <div class="bd-parts" dir="ltr">
-                    <input type="number" inputmode="numeric" min="1300" max="1450" name="father_birth_year" class="form-input bd-y" placeholder="سال" value="<?php echo $fbParts[0] ?: ''; ?>">
-                    <span class="bd-sep">/</span>
-                    <input type="number" inputmode="numeric" min="1" max="12" name="father_birth_month" class="form-input bd-m" placeholder="ماه" value="<?php echo $fbParts[1] ?: ''; ?>">
-                    <span class="bd-sep">/</span>
-                    <input type="number" inputmode="numeric" min="1" max="31" name="father_birth_day" class="form-input bd-d" placeholder="روز" value="<?php echo $fbParts[2] ?: ''; ?>">
-                </div>
-            </div>
-            <div>
-                <label class="block text-xs font-semibold mb-1">تاریخ تولد مادر (شمسی)</label>
-                <div class="bd-parts" dir="ltr">
-                    <input type="number" inputmode="numeric" min="1300" max="1450" name="mother_birth_year" class="form-input bd-y" placeholder="سال" value="<?php echo $mbParts[0] ?: ''; ?>">
-                    <span class="bd-sep">/</span>
-                    <input type="number" inputmode="numeric" min="1" max="12" name="mother_birth_month" class="form-input bd-m" placeholder="ماه" value="<?php echo $mbParts[1] ?: ''; ?>">
-                    <span class="bd-sep">/</span>
-                    <input type="number" inputmode="numeric" min="1" max="31" name="mother_birth_day" class="form-input bd-d" placeholder="روز" value="<?php echo $mbParts[2] ?: ''; ?>">
-                </div>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-3 gap-4 mb-4">
-            <div><label class="block text-xs font-semibold mb-1">ملیت</label><input type="text" name="nationality_title" class="form-input" value="<?php echo clean($editData['nationality_title'] ?? 'ایرانی'); ?>"></div>
-            <div><label class="block text-xs font-semibold mb-1">وضعیت مسکن</label><input type="text" name="housing_title" class="form-input" value="<?php echo clean($editData['housing_title'] ?? ''); ?>" placeholder="مالک / مستاجر"></div>
-            <div><label class="block text-xs font-semibold mb-1">پوشش / بیمه</label><input type="text" name="cover_title" class="form-input" value="<?php echo clean($editData['cover_title'] ?? ''); ?>"></div>
-        </div>
-
-        <div class="mb-4">
-            <label class="block text-xs font-semibold mb-1">بیماری خاص</label>
-            <textarea name="specific_disease_title" class="form-textarea" rows="2"><?php echo clean($editData['specific_disease_title'] ?? ''); ?></textarea>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-4 text-xs">
-            <label class="flex gap-2 items-center"><input type="checkbox" name="is_foreign" value="1" <?php echo !empty($editData['is_foreign'])?'checked':''; ?>> اتباع؟ (بله)</label>
-            <label class="flex gap-2 items-center"><input type="checkbox" name="has_sport_limitation" value="1" <?php echo !empty($editData['has_sport_limitation'])?'checked':''; ?>> محدودیت ورزش؟ (بله)</label>
-            <label class="flex gap-2 items-center"><input type="checkbox" name="mother_deceased" value="1" <?php echo !empty($editData['mother_deceased'])?'checked':''; ?>> مادر فوت شده؟</label>
-            <label class="flex gap-2 items-center"><input type="checkbox" name="father_deceased" value="1" <?php echo !empty($editData['father_deceased'])?'checked':''; ?>> پدر فوت شده؟</label>
-            <label class="flex gap-2 items-center"><input type="checkbox" name="father_guardian" value="1" <?php echo !empty($editData['father_guardian'])?'checked':''; ?>> سرپرست پدر؟</label>
-            <label class="flex gap-2 items-center"><input type="checkbox" name="mother_guardian" value="1" <?php echo !empty($editData['mother_guardian'])?'checked':''; ?>> سرپرست مادر؟</label>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div><label class="block text-xs font-semibold mb-1">موبایل دانش‌آموز</label><input type="text" name="student_mobile" class="form-input dir-ltr" value="<?php echo clean($editData['student_mobile'] ?? $editData['mobile'] ?? ''); ?>"></div>
-            <div><label class="block text-xs font-semibold mb-1">معدل سال قبل</label><input type="text" name="last_year_average" class="form-input" value="<?php echo clean($editData['last_year_average'] ?? ''); ?>"></div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-6">
-            <div>
-                <label class="block text-xs font-semibold mb-1">شماره موبایل ولی / دانش‌آموز</label>
-                <input type="text" name="phone" class="form-input dir-ltr text-left" placeholder="09120000000" value="<?php echo clean($editData['phone'] ?? ''); ?>">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold mb-1">وضعیت فعالیت</label>
-                <select name="status" class="form-select">
-                    <option value="active" <?php echo ($editData['status'] ?? '') === 'active' ? 'selected' : ''; ?>>فعال (در حال تحصیل)</option>
-                    <option value="inactive" <?php echo ($editData['status'] ?? '') === 'inactive' ? 'selected' : ''; ?>>غیرفعال / فارغ‌التحصیل</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="flex justify-between items-center">
-            <a href="students.php" class="btn btn-secondary">&rarr; بازگشت</a>
-            <button type="submit" class="btn btn-success px-8 py-2.5 font-bold"><svg data-ui-icon="save" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3h15l3 3v15H3Zm4 0v7h10V3M7 21v-7h10v7"/></svg> ذخیره اطلاعات دانش‌آموز</button>
-        </div>
-    </form>
-</div>
 <?php
 else:
     $search = trim($_GET['q'] ?? '');
@@ -662,7 +468,7 @@ else:
         }
         document.addEventListener('DOMContentLoaded',()=>setTimeout(refreshTransferGrades,50));
         </script>
-        <div id="reportModal" class="modal-backdrop" style="display:none">
+        <link rel="stylesheet" href="assets/css/student-workflow.css?v=20260917c"><div id="reportModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="گزارش دانش‌آموزان انتخاب‌شده" style="display:none">
             <div class="modal-card card">
                 <h3 class="font-bold text-primary mb-3">گزارش دانش‌آموزان انتخاب‌شده</h3>
                 <div class="mb-3"><label class="text-xs font-bold block mb-1">نوع گزارش</label>
@@ -672,11 +478,14 @@ else:
                         <option value="grades">گزارش تحلیلی نمرات</option>
                     </select>
                 </div>
-                <div class="grid grid-cols-2 gap-3 text-sm">
-                    <label><input type="checkbox" name="fields[]" value="identity" checked> اطلاعات هویتی</label>
-                    <label><input type="checkbox" name="fields[]" value="contact" checked> اطلاعات تماس</label>
-                    <label><input type="checkbox" name="fields[]" value="academic" checked> وضعیت تحصیلی/معدل</label>
-                    <label><input type="checkbox" name="fields[]" value="discipline" checked> موارد انضباطی</label>
+                <input type="hidden" name="fields_version" value="2">
+                <p class="text-muted">هر ستون را جداگانه انتخاب کنید. اطلاعات محرمانهٔ ورود در گزارش قرار نمی‌گیرد.</p>
+                <div class="report-field-actions"><button type="button" class="btn btn-secondary" onclick="selectReportFields(true)">انتخاب همهٔ ستون‌ها</button><button type="button" class="btn btn-secondary" onclick="selectReportFields(false)">پاک کردن انتخاب‌ها</button></div>
+                <div class="report-field-groups">
+                <?php foreach(student_profile_groups() as $groupKey=>$group): ?>
+                <fieldset><legend><?php echo clean($group[0]); ?></legend><div class="report-field-options">
+                <?php foreach($group[1] as $fieldKey=>$fieldLabel): ?><label><input type="checkbox" name="fields[]" value="<?php echo $fieldKey; ?>" <?php echo in_array($fieldKey,['first_name','last_name','national_id','father_name','class_name','father_phone','mother_phone'],true)?'checked':''; ?>> <?php echo clean($fieldLabel); ?></label><?php endforeach; ?>
+                </div></fieldset><?php endforeach; ?>
                 </div>
                 <div class="grid grid-cols-3 gap-3 mt-4"><div><label class="text-xs">فرمت خروجی</label><select name="format" class="form-select"><option value="xls">Excel</option><option value="doc">Word</option><option value="html">HTML/چاپ PDF</option></select></div><div><label class="text-xs">از تاریخ شمسی</label><input name="from_jalali" class="form-input" placeholder="1404/01/01"></div><div><label class="text-xs">تا تاریخ شمسی</label><input name="to_jalali" class="form-input" placeholder="1404/12/29"></div><div><label class="text-xs">عنوان انضباطی</label><input name="discipline_title" class="form-input" placeholder="مثلاً تأخیر"></div><div><label class="text-xs">تعداد موارد</label><input name="discipline_count" class="form-input" placeholder="مثلاً 2"></div><div><label class="text-xs">درس</label><input name="grade_subject" class="form-input" placeholder="ریاضی"></div><div><label class="text-xs">ماه نمره</label><select name="grade_month" class="form-select"><option value="">همه</option><?php foreach (['مهر','آبان','آذر','دی','بهمن','اسفند','فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','نوبت اول','نوبت دوم'] as $gmM): ?><option value="<?php echo $gmM; ?>"><?php echo $gmM; ?></option><?php endforeach; ?></select></div><div><label class="text-xs">نمره</label><input name="grade_score" class="form-input" placeholder="20"></div></div>
                 <div class="flex justify-end gap-2 mt-5"><button type="button" class="btn btn-secondary" onclick="closeReportModal()">انصراف</button><button class="btn btn-success">دانلود گزارش</button></div>
@@ -720,13 +529,15 @@ function positionTip(e,tip){
   tip.style.left=Math.max(pad,x)+'px'; tip.style.top=Math.max(pad,y)+'px';
 }
 
+function selectReportFields(on){document.querySelectorAll('#reportModal input[name="fields[]"]').forEach(function(e){e.checked=on;});}
 function openReportModal(){
   if(!document.querySelector('.st-check:checked')){ alert('ابتدا حداقل یک دانش‌آموز را انتخاب کنید.'); return; }
-  document.getElementById('reportModal').style.display='flex';
+  window.reportReturnFocus=document.activeElement;var modal=document.getElementById('reportModal');modal.style.display='flex';modal.querySelector('select').focus();
 }
 // v4.36.0: keep this no-arg version even after main.js loads
 document.addEventListener('DOMContentLoaded', function(){ window.openReportModal = openReportModal; });
-function closeReportModal(){ document.getElementById('reportModal').style.display='none'; }
+function closeReportModal(){ document.getElementById('reportModal').style.display='none';if(window.reportReturnFocus)window.reportReturnFocus.focus(); }
+document.addEventListener('keydown',function(e){var modal=document.getElementById('reportModal');if(!modal||modal.style.display==='none')return;if(e.key==='Escape'){e.preventDefault();closeReportModal();return;}if(e.key==='Tab'){var list=Array.prototype.filter.call(modal.querySelectorAll('input,select,button,a[href]'),function(el){return !el.disabled&&(el.offsetWidth||el.offsetHeight);});var first=list[0],last=list[list.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}},true);
 
 /* v4.36.0: per-row kebab (⋮) actions menu — one shared floating menu */
 let rowMenuEl = null;

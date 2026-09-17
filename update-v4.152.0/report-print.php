@@ -5,6 +5,7 @@
  */
 
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__.'/includes/page_navigation.php';
 require_once __DIR__ . '/includes/school_roles.php';
 ensure_school_roles_schema();
 
@@ -12,16 +13,16 @@ $reportId = (int)($_GET['id'] ?? 0);
 $report = DB::fetch("SELECT r.*, s.first_name, s.last_name, s.national_id, s.father_name, s.grade_level, s.photo_url FROM reports r JOIN students s ON r.student_id = s.id WHERE r.id = ?", [$reportId]);
 
 if (!$report) {
-    die('کارنامه یافت نشد.');
+    app_page_error('کارنامه یافت نشد.');
 }
 
 $staffFileAccess = current_teacher_has_student_file_access();
 $printTokenOk = verify_report_print_token($_GET['pt'] ?? '', $reportId, $report['student_id']);
 if (!$printTokenOk && is_student_logged_in() && ($report['student_id'] != $_SESSION['student_id'] || $report['is_locked'])) {
-    die('غیرمجاز یا مسدود.');
+    app_page_error('غیرمجاز یا مسدود.');
 }
 if (!$printTokenOk && !is_student_logged_in() && !is_admin_logged_in() && !$staffFileAccess) {
-    die('برای مشاهده کارنامه باید وارد سیستم شوید.');
+    app_page_error('برای مشاهده کارنامه باید وارد سیستم شوید.');
 }
 
 $rawGrades = DB::fetchAll("SELECT * FROM report_grades WHERE report_id = ?", [$reportId]);
@@ -76,7 +77,7 @@ $rLine2 = get_setting('report_header_line2', 'دبیرستان غیردولتی 
         @media print { .btn-print { display: none; } .print-container { border: none; padding: 0; } }
     </style>
 <?php echo app_appearance_head(); ?>
-<link rel=stylesheet href=assets/css/school-ui.css?v20260917b><script defer src=assets/js/school-icons.js?v20260917b></script><script defer src=assets/js/school-ui.js?v20260917b></script></head>
+<link rel=stylesheet href=assets/css/school-ui.css?v20260917c><script defer src=assets/js/school-icons.js?v20260917c></script><script defer src=assets/js/school-ui.js?v20260917c></script></head>
 <body>
 
 <button onclick="appPrint()" class="btn-print"><svg data-ui-icon="print" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 8V3h10v5M7 17H3V9h18v8h-4M7 14h10v8H7ZM17 11h.1"/></svg> چاپ یا ذخیره PDF از مرورگر</button>

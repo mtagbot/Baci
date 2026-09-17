@@ -1,5 +1,21 @@
 # SchoolDesk Pro — build notes
 
+## Current corrective launcher (2026-09-17)
+
+The current launcher adds `window-policy.h`: maximized work-area or minimized only.
+It retains the native title bar, Minimize and Close (not borderless F11 fullscreen),
+disables resize/normal Restore, and reapplies maximization via PID-scoped WinEvent hooks.
+Owned dialogs and unrelated browser processes are excluded. A second launch restores
+the managed window. If the supported engine fails, show an error rather than open
+an unmanaged default-browser window; the old tray fallback has been removed.
+
+`python3 scripts/release-student-workflow.py` builds only the new corrective archives,
+including the Windows x64 launcher. Requires `ziglang`. Native policy mock tests:
+`python3 tests/test-desktop-window-policy.py`. These do not certify Windows GUI behavior;
+check taskbar minimize/restore, titlebar controls, Snap and monitor changes on Windows.
+
+## Historical behavior (superseded by the current policy)
+
 v2.65.0 changes (launcher v2.4):
 - app window now opens MAXIMIZED (`--start-maximized`). Deliberately NOT
   `--start-fullscreen`: in `--app` mode there is no F11 and no visible

@@ -72,7 +72,7 @@ video{width:100%;height:100%;object-fit:cover;display:block}
 .optics small{display:block;color:#bbb}
 </style>
 <?php echo app_appearance_head(); ?>
-<link rel=stylesheet href=assets/css/school-ui.css?v20260917b><script defer src=assets/js/school-icons.js?v20260917b></script><script defer src=assets/js/school-ui.js?v20260917b></script></head>
+<link rel=stylesheet href=assets/css/school-ui.css?v20260917c><script defer src=assets/js/school-icons.js?v20260917c></script><script defer src=assets/js/school-ui.js?v20260917c></script></head>
 <body class="ui-scanner">
 <div class="hdr">
     <div><b><svg data-ui-icon="student" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m2 7 10-4 10 4-10 4Zm3 2v5c3 3 11 3 14 0V9M22 7v7M5 21c1-5 13-5 14 0"/></svg> <?php echo clean($schoolName); ?></b><div style="font-size:.68rem;color:#94a3b8">اسکنر هوشمند حضور و غیاب — سریع / فوکوس نزدیک</div><a style="color:#9cd8ff;font-size:.7rem" href="<?php echo clean('attendance-scanner.php?scanner=legacy' . ($byKey ? '&key=' . rawurlencode($key) : '')); ?>">بازگشت به اسکنر قبلی</a></div>

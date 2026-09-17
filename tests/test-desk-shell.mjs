@@ -80,11 +80,13 @@ ok('اندازهٔ ثابت قبلی حذف شد', !launcher.includes('--window-
 ok('پنجرهٔ «این پنجره را نبندید» حذف شد', !launcher.includes('run_status_window'));
 ok('متن «این پنجره را باز نگه دارید» دیگر وجود ندارد',
    !launcher.includes('\\x0628\\x0627\\x0632 \\x0646\\x06AF\\x0647'));
-ok('به‌جایش آیکون کنار ساعت هست', launcher.includes('Shell_NotifyIconW') && launcher.includes('run_tray_mode'));
-ok('پنجرهٔ گیرندهٔ پیام نامرئی است (HWND_MESSAGE)', launcher.includes('HWND_MESSAGE'));
-ok('منوی راست‌کلیک «خروج» دارد', launcher.includes('IDM_SDP_EXIT'));
-ok('دابل‌کلیک برنامه را دوباره باز می‌کند', launcher.includes('WM_LBUTTONDBLCLK'));
-ok('آیکون هنگام خروج پاک می‌شود', launcher.includes('NIM_DELETE'));
+const policy = readFileSync(join(REPO,'desktop-app-v2','launcher','window-policy.h'),'utf8');
+ok('فقط پنجرهٔ پردازش اختصاصی برنامه کنترل می‌شود', policy.includes('pid!=sdp_browser_pid'));
+ok('پنجرهٔ کوچک/تغییر اندازه ممنوع است', policy.includes('WS_THICKFRAME|WS_MAXIMIZEBOX') && policy.includes('IsIconic(hwnd)?MF_ENABLED:MF_GRAYED'));
+ok('Minimize حفظ می‌شود', policy.includes('WS_MINIMIZEBOX') && policy.includes('!IsIconic(hwnd)'));
+ok('بازیابی به حالت بیشینه برمی‌گردد', policy.includes('EVENT_SYSTEM_MINIMIZEEND') && policy.includes('ShowWindow(hwnd,SW_MAXIMIZE)'));
+ok('اجرای دوم پنجرهٔ موجود را برمی‌گرداند', launcher.includes('EnumWindows(sdp_restore_existing'));
+ok('پیام‌های تغییر اندازه با WinEvent دریافت می‌شوند', policy.includes('SetWinEventHook') && launcher.includes('sdp_wait_locked_browser(b)'));
 
 /* جست‌وجوی مرورگر باید سمج باشد تا به مرورگر سیستم نیفتد */
 ok('WebView2 هم به‌عنوان موتور پشتیبان جست‌وجو می‌شود',
@@ -92,12 +94,7 @@ ok('WebView2 هم به‌عنوان موتور پشتیبان جست‌وجو م
 ok('کلید Uninstall هم بررسی می‌شود', launcher.includes('InstallLocation'));
 ok('نصب‌های کاربری زیر LOCALAPPDATA بررسی می‌شوند',
    launcher.includes('LOCALAPPDATA') && launcher.includes('Microsoft\\\\Edge\\\\Application'));
-ok('مرورگر پیش‌فرض فقط آخرین راه‌حل است', (() => {
-    /* ShellExecute نباید قبل از find_browser صدا زده شود */
-    const fb = launcher.indexOf('int fallback = 1;');
-    const seg = launcher.slice(fb, launcher.indexOf('TerminateProcess(pi.hProcess, 0);', fb));
-    return seg.indexOf('find_browser') < seg.indexOf('ShellExecuteA');
-})());
+ok('پنجرهٔ مرورگر پیش‌فرضِ بدون محدودیت باز نمی‌شود', !launcher.slice(launcher.indexOf('int WINAPI WinMain')).includes('ShellExecuteA'));
 
 /* ═══ ۳) منطق واقعی desk-shell.js ═══ */
 console.log('\n══ همه چیز در همان پنجره ══');

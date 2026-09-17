@@ -12,7 +12,7 @@ await code(`<?php require '/www/includes/functions.php';DB::execute("UPDATE teac
 const routes=[],inventory=[];
 for(const file of [...readdirSync(resolveSite()).filter(n=>n.endsWith('.php')),'api/docs.php']){
  const s=readFileSync(join(resolveSite(),file),'utf8');
- const view=/includes\/header.php|<html|<!doctype html/i.test(s);
+ const view=/includes\/header.php|<html|<!doctype html/i.test(s)||s.includes("includes/unavailable_route.php");
  const excluded=/^(installer|attendance-scanner-legacy|migration-|download-|export-|logout|telegram-poll)/.test(file)&&file!=='migration-updater.php';
  inventory.push({file,kind:excluded?'protected/maintenance/export':view?'page':'API/action/fragment'});
  if(!view||excluded)continue;

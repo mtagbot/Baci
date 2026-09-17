@@ -1,6 +1,14 @@
 # Baci
 
-## تازه‌ترین اصلاحی: SVG و رابط واکنش‌گرا
+## تازه‌ترین اصلاحی: فرم دانش‌آموز، گزارش و پنجرهٔ دسکتاپ
+
+- [اصلاحی سایت](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SITE-FIX-v4.152.0-student-workflow.zip)
+- [اصلاحی دسکتاپ، همراه فایل اجرایی جدید](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SchoolDeskPro-FIX-v2.83.0-student-workflow.zip)
+- [راهنمای نصب، جزئیات پنج اصلاح و حدود تأیید ویندوز](CORRECTIONS-STUDENT-WORKFLOW-FA.md) · [SHA256](STUDENT-WORKFLOW-SHA256SUMS.txt)
+
+روی آخرین نصب **همراه اصلاحی SVG قبلی** اعمال شود. فقط بستهٔ اصلاحی ساخته شده؛ Release_V1.0 همچنان نسخهٔ کامل قبلی است.
+
+## اصلاحی قبلی: SVG و رابط واکنش‌گرا
 
 **فقط اصلاحی؛ نسخه‌های کامل در این مرحله بازسازی نشده‌اند.** روی آخرین نصب با اصلاحات قبلی اعمال شود.
 

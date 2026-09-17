@@ -603,7 +603,7 @@ body.nobold .nm{font-weight:400}
 .sheet-inner{width:198mm;transform-origin:top right}
 @media print{html,body{margin:0!important;padding:0!important;width:210mm}.sheet{margin:0!important;break-inside:avoid;page-break-inside:avoid}.sheet:last-of-type{break-after:auto!important;page-break-after:auto!important}}
 </style>
-<link rel=stylesheet href=assets/css/school-ui.css?v20260917b><script defer src=assets/js/school-icons.js?v20260917b></script><script defer src=assets/js/school-ui.js?v20260917b></script></head>
+<link rel=stylesheet href=assets/css/school-ui.css?v20260917c><script defer src=assets/js/school-icons.js?v20260917c></script><script defer src=assets/js/school-ui.js?v20260917c></script></head>
 <body>
 <?php /* ویرایشگر زندهٔ پیش از چاپ — در خروجی چاپ دیده نمی‌شود. */ ?>
 <div class="noprint" id="editor">

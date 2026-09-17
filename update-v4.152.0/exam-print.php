@@ -1,6 +1,7 @@
 <?php
 // File: exam-print.php
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__.'/includes/page_navigation.php';
 require_once __DIR__ . '/includes/class_exam_groups.php';
 ensure_exams_schema(); ceg_schema();
 $type = $_GET['type'] ?? 'schedule';
@@ -90,7 +91,7 @@ function exam_pdf_pages_to_images_unlocked($pdfRelPath, $examId, $declaredPages 
 // For mini-apps (Bale/Telegram) a signed dt token may authorize the design page even if it opens in another browser.
 $earlyExamId = (int)($_GET['exam_id'] ?? 0);
 $earlyTokenOk = $earlyExamId ? verify_exam_design_token($_GET['dt'] ?? '', $earlyExamId) : false;
-if (!$earlyTokenOk && !is_admin_logged_in() && !is_student_logged_in() && empty($_SESSION['teacher_id'])) die('غیرمجاز');
+if (!$earlyTokenOk && !is_admin_logged_in() && !is_student_logged_in() && empty($_SESSION['teacher_id'])) app_page_error('غیرمجاز');
 
 if ($type === 'seatcards') {
     $year = trim($_GET['year'] ?? get_setting('current_academic_year','1404/1405'));
@@ -104,7 +105,7 @@ if ($type === 'seatcards') {
 ?><!DOCTYPE html><html lang="fa" dir="rtl"><head><meta name=viewport content="width=device-width, initial-scale=1"><meta charset="UTF-8"><title>ویرایشگر کارت صندلی</title>
 <style>
 @page{size:A4;margin:var(--pageMargin,7mm)} @font-face{font-family:Vazirmatn;src:url('uploads/Vazirmatn/Vazirmatn-Regular.woff2')}*{box-sizing:border-box}body{font-family:Vazirmatn,Tahoma,sans-serif;margin:0;background:#e5e7eb}.seat-toolbar{position:fixed;top:0;inset-inline:0;background:#111827;color:#fff;z-index:20;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px;font-size:12px}.seat-toolbar input,.seat-toolbar select{width:80px}.sheet{--cols:2;--gap:3mm;--cardH:53mm;--photo:27mm;--font:11px;--seatFont:25px;display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:var(--gap);padding:var(--pageMargin,7mm);margin:52px auto 0;background:#fff;width:210mm;min-height:297mm}.card{border:1.8px solid #000;border-radius:5px;padding:3mm;display:grid;grid-template-columns:1fr var(--photo);gap:3mm;min-height:var(--cardH);page-break-inside:avoid;font-size:var(--font);cursor:move}.info{line-height:2}.seatbox{border:2px solid #000;display:flex;align-items:center;justify-content:center;font-size:var(--seatFont);font-weight:900;min-height:18mm;margin-top:2mm}.photo{width:var(--photo);height:calc(var(--photo) * 4 / 3);border:1px solid #333;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:9px}.photo img{width:100%;height:100%;object-fit:cover}.empty-seat{border-style:dashed;opacity:.6}@media print{.seat-toolbar{display:none}.sheet{margin:0;break-after:page}.card{cursor:default}}
-</style><?php echo app_appearance_head(); ?><link rel=stylesheet href=assets/css/school-ui.css?v20260917b><script defer src=assets/js/school-icons.js?v20260917b></script><script defer src=assets/js/school-ui.js?v20260917b></script></head><body>
+</style><?php echo app_appearance_head(); ?><link rel=stylesheet href=assets/css/school-ui.css?v20260917c><script defer src=assets/js/school-icons.js?v20260917c></script><script defer src=assets/js/school-ui.js?v20260917c></script></head><body>
 <div class="seat-toolbar">تعداد کارت <input type="range" min="4" max="12" value="10" oninput="setCardsPerPage(this.value)"> ستون <input type="range" min="1" max="3" value="2" oninput="setSeatVar('--cols',this.value)"> فاصله <input type="range" min="1" max="8" value="3" oninput="setSeatVar('--gap',this.value+'mm')"> ارتفاع کارت <input type="range" min="35" max="80" value="53" oninput="setSeatVar('--cardH',this.value+'mm')"> عکس <input type="range" min="16" max="38" value="27" oninput="setSeatVar('--photo',this.value+'mm')"> فونت <input type="range" min="8" max="16" value="11" oninput="setSeatVar('--font',this.value+'px')"> شماره <input type="range" min="18" max="42" value="25" oninput="setSeatVar('--seatFont',this.value+'px')"> حاشیه <input type="range" min="0" max="15" value="7" oninput="setSeatVar('--pageMargin',this.value+'mm')"><select id="gradeMix" onchange="filterSeatCards()"><option value="all">همه پایه‌ها</option><option value="هفتم">هفتم</option><option value="هشتم">هشتم</option><option value="نهم">نهم</option><option value="هفتم,هشتم">هفتم+هشتم</option><option value="هشتم,نهم">هشتم+نهم</option><option value="نهم,هفتم">نهم+هفتم</option></select><button onclick="addEmptySeat()">صندلی خالی</button><button onclick="appPrint()">چاپ نهایی</button></div>
 <div class="sheet" id="seatSheet">
 <?php foreach($rows as $r): ?>
@@ -120,28 +121,28 @@ function enableDrag(){document.querySelectorAll('.card').forEach(card=>{card.ond
 
 $examId = (int)($_GET['exam_id'] ?? 0);
 $exam = DB::fetch('SELECT es.*, COALESCE(t.full_name, es.teacher_name) t_name, t.last_name t_last FROM exam_schedules es LEFT JOIN teachers t ON t.id=es.teacher_id WHERE es.id=?',[$examId]);
-if (!$exam) die('امتحان یافت نشد');
-if(($exam['exam_kind']??'')==='class_deleted')die('این آزمون کلاسی حذف شده و قابل ویرایش یا چاپ نیست.');
+if (!$exam) app_page_error('امتحان یافت نشد');
+if(($exam['exam_kind']??'')==='class_deleted')app_page_error('این آزمون کلاسی حذف شده و قابل ویرایش یا چاپ نیست.');
 $designToken = $_GET['dt'] ?? '';
 $designTokenOk = verify_exam_design_token($designToken, $examId);
-if (($type === 'questions' || $type === 'questions_editor') && !$designTokenOk && !exam_can_design($examId)) die('شما مجاز به طراحی سوالات این آزمون نیستید.');
-if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['upload_question_source'])){ceg_write_begin($exam);$fresh=DB::fetch('SELECT exam_kind FROM exam_schedules WHERE id=?',[$examId]);if(!$fresh || $fresh['exam_kind']==='class_deleted')die('این آزمون کلاسی حذف شده است.');}
+if (($type === 'questions' || $type === 'questions_editor') && !$designTokenOk && !exam_can_design($examId)) app_page_error('شما مجاز به طراحی سوالات این آزمون نیستید.');
+if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['upload_question_source'])){ceg_write_begin($exam);$fresh=DB::fetch('SELECT exam_kind FROM exam_schedules WHERE id=?',[$examId]);if(!$fresh || $fresh['exam_kind']==='class_deleted')app_page_error('این آزمون کلاسی حذف شده است.');}
 $classGroup=ceg_for_exam($exam);
-if(ceg_pending_sync($exam,$classGroup))die('اطلاعات گروه هنوز همگام نشده است؛ پس از تکمیل همگام‌سازی صفحه را باز کنید.');
+if(ceg_pending_sync($exam,$classGroup))app_page_error('اطلاعات گروه هنوز همگام نشده است؛ پس از تکمیل همگام‌سازی صفحه را باز کنید.');
 if ($classGroup && !$classGroup['excluded'] && (int)$classGroup['design_exam_id']!==$examId && in_array($type,['questions','questions_editor'],true)) {
-    if($_SERVER['REQUEST_METHOD']==='POST')die('این کلاس عضو آزمون پایه شده است؛ صفحه را تازه‌سازی کنید.');
+    if($_SERVER['REQUEST_METHOD']==='POST')app_page_error('این کلاس عضو آزمون پایه شده است؛ صفحه را تازه‌سازی کنید.');
     $qs=$_GET; $qs['exam_id']=(int)$classGroup['design_exam_id'];
     if(empty($_GET['grade_all']))$qs['class_only']=(int)$classGroup['member_exam_id']; else unset($qs['class_only']);
     $qs['dt']=make_exam_design_token($qs['exam_id'],'teacher',(int)$classGroup['teacher_id']);
     redirect('exam-print.php?'.http_build_query($qs));
 }
 if($classGroup && $classGroup['excluded'] && (int)$classGroup['member_exam_id']===$examId && !empty($classGroup['detached_exam_id']) && in_array($type,['questions','questions_editor'],true)) {
-    if($_SERVER['REQUEST_METHOD']==='POST')die('این کلاس مستثنی شده است؛ صفحهٔ طراحی مستقل را باز کنید.');
+    if($_SERVER['REQUEST_METHOD']==='POST')app_page_error('این کلاس مستثنی شده است؛ صفحهٔ طراحی مستقل را باز کنید.');
     $fork=(int)$classGroup['detached_exam_id'];
     redirect('exam-print.php?type=questions&exam_id='.$fork.'&dt='.urlencode(make_exam_design_token($fork,'teacher',(int)$classGroup['teacher_id'])));
 }
 if($classGroup && !$classGroup['excluded'] && !empty($_GET['class_only'])) {
-    if(!ceg_validate_member($classGroup,(int)$_GET['class_only']))die('این کلاس دیگر عضو فعال آزمون پایه نیست.');
+    if(!ceg_validate_member($classGroup,(int)$_GET['class_only']))app_page_error('این کلاس دیگر عضو فعال آزمون پایه نیست.');
 }
 $groupScope = ($classGroup && !$classGroup['excluded']) ? ceg_scope($classGroup) : '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_question_source']) && ($designTokenOk || exam_can_design($examId))) {
@@ -175,17 +176,17 @@ if (is_student_logged_in()) {
         $ownedClasses=ceg_classes($classGroup);
         if(!empty($_GET['class_only'])) {
             $m=DB::fetch('SELECT * FROM class_exam_group_members WHERE group_id=? AND exam_id=? AND excluded=0',[$classGroup['id'],(int)$_GET['class_only']]);
-            if(!$m || !in_array($m['class_name'],$ownedClasses,true))die('این کلاس عضو فعال آزمون پایه نیست.');
+            if(!$m || !in_array($m['class_name'],$ownedClasses,true))app_page_error('این کلاس عضو فعال آزمون پایه نیست.');
             $wanted=norm_class_str($m['class_name']);
             $ownedClasses=array_values(array_filter($ownedClasses,function($c)use($wanted){return norm_class_str($c)===$wanted;}));
         }
-        if(!$ownedClasses)die('هیچ کلاس فعالی در این آزمون پایه باقی نمانده است.');
+        if(!$ownedClasses)app_page_error('هیچ کلاس فعالی در این آزمون پایه باقی نمانده است.');
         $marks=implode(',',array_fill(0,count($ownedClasses),'?'));
         $students=DB::fetchAll("SELECT s.* FROM students s WHERE s.status='active' AND s.class_name IN ($marks) AND $exySql",array_merge($ownedClasses,$exyParams));
     } elseif ($gradeAll && ($exam['exam_kind'] ?? '') === 'class') {
         require_once __DIR__ . '/includes/class_exam_helpers.php';
         $ownedClasses = class_exam_grade_classes($exam);
-        if (!$ownedClasses) die('برای این درس و پایه، کلاسی به دبیر آزمون تخصیص ندارد.');
+        if (!$ownedClasses) app_page_error('برای این درس و پایه، کلاسی به دبیر آزمون تخصیص ندارد.');
         $marks = implode(',',array_fill(0,count($ownedClasses),'?'));
         $students = DB::fetchAll("SELECT s.* FROM students s WHERE s.status='active' AND s.class_name IN ($marks) AND $exySql",array_merge($ownedClasses,$exyParams));
     } elseif ($gradeAll && $targetGrade !== '') {
@@ -200,7 +201,7 @@ if (is_student_logged_in()) {
 if (!$students) $students=[['id'=>0,'first_name'=>'نمونه','last_name'=>'دانش‌آموز','class_name'=>$exam['class_name'],'grade_level'=>$exam['grade_level'],'national_id'=>'','photo_url'=>'']];
 
 if ($type === 'schedule') {
-?><!DOCTYPE html><html lang="fa" dir="rtl"><head><meta name=viewport content="width=device-width, initial-scale=1"><meta charset="UTF-8"><title>برنامه امتحانی</title><style>@page{size:A4;margin:10mm}@font-face{font-family:Vazirmatn;src:url('uploads/Vazirmatn/Vazirmatn-Regular.woff2')}body{font-family:Vazirmatn,Tahoma,sans-serif;margin:0}table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;padding:7px;text-align:center;font-size:12px}th{background:#eee}.head{text-align:center;margin-bottom:10px}</style><?php echo app_appearance_head(); ?><link rel=stylesheet href=assets/css/school-ui.css?v20260917b><script defer src=assets/js/school-icons.js?v20260917b></script><script defer src=assets/js/school-ui.js?v20260917b></script></head><body><div class="head"><b><?php echo clean($school); ?></b><br>جدول برنامه امتحانی</div><table><thead><tr><th>نام دانش‌آموز</th><th>کلاس</th><th>درس</th><th>تاریخ</th><th>روز</th><th>ساعت</th><th>مدت</th><th>کلاس امتحانی</th><th>صندلی</th></tr></thead><tbody>
+?><!DOCTYPE html><html lang="fa" dir="rtl"><head><meta name=viewport content="width=device-width, initial-scale=1"><meta charset="UTF-8"><title>برنامه امتحانی</title><style>@page{size:A4;margin:10mm}@font-face{font-family:Vazirmatn;src:url('uploads/Vazirmatn/Vazirmatn-Regular.woff2')}body{font-family:Vazirmatn,Tahoma,sans-serif;margin:0}table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;padding:7px;text-align:center;font-size:12px}th{background:#eee}.head{text-align:center;margin-bottom:10px}</style><?php echo app_appearance_head(); ?><link rel=stylesheet href=assets/css/school-ui.css?v20260917c><script defer src=assets/js/school-icons.js?v20260917c></script><script defer src=assets/js/school-ui.js?v20260917c></script></head><body><div class="head"><b><?php echo clean($school); ?></b><br>جدول برنامه امتحانی</div><table><thead><tr><th>نام دانش‌آموز</th><th>کلاس</th><th>درس</th><th>تاریخ</th><th>روز</th><th>ساعت</th><th>مدت</th><th>کلاس امتحانی</th><th>صندلی</th></tr></thead><tbody>
 <?php foreach($students as $s): $seat=DB::fetch('SELECT * FROM exam_student_seating WHERE academic_year=? AND student_id=? ORDER BY id DESC LIMIT 1',[$exam['academic_year'],$s['id']]); ?><tr><td><?php echo clean($s['first_name'].' '.$s['last_name']); ?></td><td><?php echo clean($s['class_name']); ?></td><td><?php echo clean($exam['subject_name']); ?></td><td><?php echo tr_num($exam['exam_date_jalali'],'fa'); ?></td><td><?php echo clean($exam['exam_day_name']); ?></td><td><?php echo tr_num($exam['start_time'],'fa'); ?></td><td><?php echo tr_num($exam['duration_minutes'],'fa'); ?></td><td><?php echo clean(($seat['exam_room']??'') ?: $exam['exam_room_default']); ?></td><td><?php echo tr_num($seat['seat_number']??'---','fa'); ?></td></tr><?php endforeach; ?>
 </tbody></table><script>appPrint()</script></body></html><?php exit; }
 
@@ -435,7 +436,7 @@ body.modal-open{overflow:hidden}
    even with hundreds of print pages; ignored harmlessly by very old browsers.
    Print media is unaffected: all pages always render fully on paper. */
 @media screen{.page{content-visibility:auto;contain-intrinsic-size:210mm 297mm}}
-</style><?php echo app_appearance_head(); ?><link rel=stylesheet href=assets/css/school-ui.css?v20260917b><script defer src=assets/js/school-icons.js?v20260917b></script><script defer src=assets/js/school-ui.js?v20260917b></script></head><body>
+</style><?php echo app_appearance_head(); ?><link rel=stylesheet href=assets/css/school-ui.css?v20260917c><script defer src=assets/js/school-icons.js?v20260917c></script><script defer src=assets/js/school-ui.js?v20260917c></script></head><body>
 <div class="toolbar" id="mainToolbar">
   <div class="tb-group no-ajax"><span class="tb-title">فایل منبع</span><button type="button" onclick="openSourceUploadModal()">بارگذاری PDF/تصویر</button><button type="button" onclick="deleteLiveSource()">حذف/تغییر</button></div>
   <span class="tb-sep"></span>
