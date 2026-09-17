@@ -31,6 +31,9 @@ for(const family of ['Vazirmatn','Sahel','Yekan']){
  const pdf=JSON.parse(await code(`<?php require '/www/includes/functions.php';require '/www/vendor/tcpdf/tcpdf.php';set_setting('font_family','${family}');$f=app_pdf_font();$p=new TCPDF();$p->AddFont($f['name'],'',$f['file']);$p->SetFont($f['name'],'',12);$p->AddPage();$p->Write(0,'گزارش دانش آموز');$b=$p->Output('report.pdf','S');echo json_encode(['prefix'=>substr($b,0,5),'font'=>$f['name'],'size'=>strlen($b)]);`));
  check(pdf.prefix==='%PDF-'&&pdf.size>10000&&pdf.font.toLowerCase().includes(family.toLowerCase()),'Real PDF embeds '+family);
 }
+for(const file of ['export-pdf.php','export-excel.php'])for(const session of ['qualityExportGuest','harnessStu0001']){
+ const denied=await request(file,{session,query:'id='+reportId});check(denied.page.includes('دسترسی غیرمجاز'),'Guest/unrelated student cannot download '+file);
+}
 const custom=JSON.parse(await code(`<?php require '/www/includes/functions.php';set_setting('font_family','CustomUploadedFont');set_setting('custom_font_url','uploads/Sahel/Sahel.ttf');echo json_encode(['family'=>app_export_font_family(),'html'=>'<!doctype html><html><head>'.app_appearance_head().'</head><body><h1>قلم اختصاصی</h1><input value="فارسی"><button>ذخیره</button><table><tr><td>کارنامه</td></tr></table></body></html>']);`));check(custom.family==='Sahel','Custom TTF uses real font name in Excel');writeFileSync(fixtureDir+'font-CustomUploadedFont.html',custom.html);
 const palette=JSON.parse(await code(`<?php require '/www/includes/functions.php';set_setting('success_color','#123456');set_setting('danger_color','#abcdef');echo json_encode(app_palette());`));check(palette.success==='#123456'&&palette.danger==='#abcdef','Four saved palette colors');
 check((await code(`<?php require '/www/includes/functions.php';echo app_color('red;</style>','#123456');`))==='#123456','CSS injection rejected');

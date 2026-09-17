@@ -4,6 +4,8 @@
  */
 
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/school_roles.php';
+ensure_school_roles_schema();
 
 $reportId = (int)($_GET['id'] ?? 0);
 $report = DB::fetch("SELECT r.*, s.first_name, s.last_name, s.national_id, s.father_name, s.grade_level FROM reports r JOIN students s ON r.student_id = s.id WHERE r.id = ?", [$reportId]);
@@ -12,8 +14,12 @@ if (!$report) {
     die("Report not found.");
 }
 
-if (is_student_logged_in() && ($report['student_id'] != $_SESSION['student_id'] || $report['is_locked'])) {
-    die("Unauthorized access.");
+// The downloadable export must enforce the same scope as its report-print preview.
+$printTokenOk=verify_report_print_token($_GET['pt'] ?? '',$reportId,$report['student_id']);
+$staffFileAccess=current_teacher_has_student_file_access();
+if (!$printTokenOk && ((is_student_logged_in() && ($report['student_id'] != $_SESSION['student_id'] || $report['is_locked'])) || (!is_student_logged_in() && !is_admin_logged_in() && !$staffFileAccess))) {
+    http_response_code(403);
+    die('دسترسی غیرمجاز به کارنامه.');
 }
 
 $rawGrades = DB::fetchAll("SELECT * FROM report_grades WHERE report_id = ?", [$reportId]);
