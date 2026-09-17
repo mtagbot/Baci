@@ -71,6 +71,7 @@ video{width:100%;height:100%;object-fit:cover;display:block}
 .optics button:disabled{opacity:.5;cursor:default}
 .optics small{display:block;color:#bbb}
 </style>
+<?php echo app_appearance_head(); ?>
 </head>
 <body>
 <div class="hdr">

@@ -27,8 +27,8 @@ try {
         return {code:el.textContent,xs,height:document.querySelector('.title-row').getBoundingClientRect().height,
             sheets:document.querySelectorAll('.sheet').length,font:document.fonts.check('12px BTitr')};
     });
-    if(metrics.code !== '1/7' || !(metrics.xs[0]<metrics.xs[1] && metrics.xs[1]<metrics.xs[2])) throw new Error('Class number visual direction regressed: '+JSON.stringify(metrics));
-    if(metrics.height < 30 || metrics.sheets !== 2 || !metrics.font) throw new Error('Print dimensions/font regressed: '+JSON.stringify(metrics));
+    if(metrics.code !== '7/1' || !(metrics.xs[0]<metrics.xs[1] && metrics.xs[1]<metrics.xs[2])) throw new Error('Class number visual direction regressed: '+JSON.stringify(metrics));
+    if(metrics.height < 27 || metrics.sheets !== 2 || !metrics.font) throw new Error('Print dimensions/font regressed: '+JSON.stringify(metrics));
     const pdf=await page.pdf({preferCSSPageSize:true,printBackground:true});
     writeFileSync(join(REPO,'.cache/roster-tests/teacher-print.pdf'),pdf);
     const pages=(pdf.toString('latin1').match(/\/Type\s*\/Page\b/g)||[]).length;
@@ -36,5 +36,5 @@ try {
     const boxes=[...pdf.toString('latin1').matchAll(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/g)];
     if(!boxes.length || boxes.some(b=>Math.abs(+b[1]-595.3)>1 || Math.abs(+b[2]-841.9)>1))throw new Error('Teacher PDF paper is not A4 portrait');
     await page.screenshot({path:join(REPO,'.cache/roster-tests/teacher-print.png')});
-    console.log('Browser print: PASS (LTR 1/7, 8mm title, B Titr loaded, exactly two A4 PDF pages)',metrics);
+    console.log('Browser print: PASS (LTR 7/1 (input 1/7), proportionally fitted title, B Titr loaded, exactly two A4 PDF pages)',metrics);
 } finally {await browser.close();}

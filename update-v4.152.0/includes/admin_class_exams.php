@@ -1,6 +1,6 @@
 <?php /* v4.96.0: فیلترهای ماه/چاپ روی آزمون‌های کلاسی هم اعمال می‌شود */
 $pfMonth=trim($_GET['pf_month']??'');$pfPrint=in_array(($_GET['pf_printed']??''),['0','1'],true)?$_GET['pf_printed']:'';
-$ceWhere = "es.exam_kind='class' AND es.exam_month<>'آزمون مشترک پایه' AND es.academic_year=? AND NOT EXISTS (SELECT 1 FROM class_exam_groups hidden_group WHERE hidden_group.design_exam_id=es.id)"; $ceParams = [$year];
+$ceWhere = "es.exam_kind='class' AND es.exam_month<>'آزمون مشترک پایه' AND es.academic_year=? AND NOT EXISTS (SELECT 1 FROM class_exam_group_members shadow_member JOIN exam_schedules shadow_fork ON shadow_fork.id=shadow_member.detached_exam_id AND shadow_fork.exam_kind='class' WHERE shadow_member.exam_id=es.id AND shadow_member.excluded=1) AND NOT EXISTS (SELECT 1 FROM class_exam_groups hidden_group WHERE hidden_group.design_exam_id=es.id)"; $ceParams = [$year];
 if ($pfMonth !== '') {
     /* آزمون کلاسی ماه مشخصی ندارد (exam_month='آزمون کلاسی') — ماهِ تاریخ ایجاد/طراحی معیار است */
     $pfCalMonths = ['فروردین'=>'01','اردیبهشت'=>'02','خرداد'=>'03','تیر'=>'04','مرداد'=>'05','شهریور'=>'06','مهر'=>'07','آبان'=>'08','آذر'=>'09','دی'=>'10','بهمن'=>'11','اسفند'=>'12'];

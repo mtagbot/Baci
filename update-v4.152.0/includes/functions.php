@@ -1,4 +1,6 @@
 <?php
+// Preserve clean-install guards when upgrading Release_V1.0; older installs have no guard file.
+if (is_file(__DIR__.'/install_guard.php')) require_once __DIR__.'/install_guard.php';
 // File: includes/functions.php
 /**
  * Core Helper Functions
@@ -367,12 +369,20 @@ if (!function_exists('check_login_throttle')) {
                 $_SESSION['login_attempts'] = 0;
             }
         }
+        // Independent persistent IP ceiling: clearing cookies must not reset abuse protection.
+        require_once __DIR__.'/header_tiles.php';login_guard_ensure_schema();
+        try {
+            $row=DB::fetch('SELECT fail_count,last_fail FROM login_guard WHERE identity=?',[login_guard_key('ip',hash('sha256',(string)$ip))]);
+            if($row && (int)$row['fail_count']>=30 && (int)$row['last_fail']>time()-600)return false;
+        } catch(Exception $e){return false;}
         return true;
     }
 }
 
 if (!function_exists('record_failed_login')) {
     function record_failed_login() {
+        require_once __DIR__.'/header_tiles.php';
+        login_guard_fail('ip',hash('sha256',(string)($_SERVER['REMOTE_ADDR']??'127.0.0.1')));
         $_SESSION['login_attempts'] = ($_SESSION['login_attempts'] ?? 0) + 1;
         if ($_SESSION['login_attempts'] >= 6) {
             $_SESSION['lockout_time'] = time();
@@ -623,3 +633,5 @@ if (!function_exists('password_store_hash')) {
 // Session revocation must run before request handlers, not only while rendering the header.
 require_once __DIR__.'/session_tracker.php';
 st_bootstrap();
+
+require_once __DIR__.'/appearance.php';

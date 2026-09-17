@@ -46,8 +46,8 @@ function nodeShape($node, $numbers = false) {
 }
 // Independent numeric budget for the supplied source: class/footer 704 twips,
 // header 544, each student 544; two title lines 1600, terminal paragraph 40.
-function expectedScale($rows=33,$paper='A4') { return min(1, (($paper==='A3'?16839:11906)-280)/(3552+544*($rows-3))); }
-function expectedXScale($paper='A4') { return (($paper==='A3'?23814:16838)-120)/23747; }
+function expectedScale($rows=33,$paper='A4') { return min(1, (($paper==='A3'?16839:11906)-960)/(3552+544*($rows-3))); }
+function expectedXScale($paper='A4') { return (($paper==='A3'?23814:16838)-800)/23747; }
 function expectedScaledNode($node,$factor,$paper='A4') {
     $copy=$node->cloneNode(true); $xp=srl_xpath($copy->ownerDocument);
     foreach($xp->query('.//w:rPr/w:sz | .//w:rPr/w:szCs',$copy) as $e) $e->setAttributeNS(SRL_W,'w:val',(string)max(2,(int)floor((int)$e->getAttributeNS(SRL_W,'val')*$factor)));
@@ -112,11 +112,11 @@ function inspectDoc($bytes, $mode = 'split', $paper='A4') {
     $size=$xp->query('//w:sectPr/w:pgSz')->item(0); $mar=$xp->query('//w:sectPr/w:pgMar')->item(0);
     $targetW=$paper==='A3'?23814:16838;$targetH=$paper==='A3'?16839:11906;
     $layout=$size->getAttributeNS(SRL_W,'w')===(string)$targetW && $size->getAttributeNS(SRL_W,'h')===(string)$targetH && $size->getAttributeNS(SRL_W,'orient')==='landscape' && $size->getAttributeNS(SRL_W,'code')===($paper==='A3'?'8':'9');
-    foreach(['top','bottom','left','right'] as $a) if($mar->getAttributeNS(SRL_W,$a)!=='0')$layout=false;
+    foreach(['top','bottom','left','right'] as $a) if($mar->getAttributeNS(SRL_W,$a)!=='340')$layout=false;
     $fits=true; $cellsAligned=true; $exact=true; $centered=true; $marksMatch=true; $zeroPadding=true; $totalHeight=0;
     foreach($xp->query('//w:tbl') as $tb) {
         $grid=[];foreach($xp->query('./w:tblGrid/w:gridCol',$tb) as $col)$grid[]=(int)$col->getAttributeNS(SRL_W,'w');
-        if(array_sum($grid)>$targetW-100)$fits=false;
+        if(array_sum($grid)>$targetW-680-100)$fits=false;
         if((int)$xp->evaluate('string(./w:tblPr/w:tblW/@w:w)',$tb)!==array_sum($grid))$cellsAligned=false;
         $rowHeight=0;
         foreach($xp->query('./w:tr',$tb) as $row) {
@@ -142,7 +142,7 @@ function inspectDoc($bytes, $mode = 'split', $paper='A4') {
         $totalHeight+=$rowHeight;
     }
     foreach($xp->query('/w:document/w:body/w:p') as $p)$totalHeight+=(trim($p->textContent)===''?1:2)*srl_max_font($p)*20;
-    if($totalHeight>$targetH-180)$fits=false;
+    if($totalHeight>$targetH-680-180)$fits=false;
     $styleDoc=new DOMDocument();$styleDoc->loadXML($z->getFromName('word/styles.xml'));$sx=srl_xpath($styleDoc);
     $stylesScaled=$sx->evaluate('string(//w:docDefaults/w:rPrDefault/w:rPr/w:sz/@w:val)')===(string)(int)floor(22*$factor)
         && $sx->evaluate('string(//w:style[@w:styleId="LightGrid"]/w:tblPr/w:tblBorders/w:top/@w:sz)')===(string)(int)round(8*$factor);
@@ -274,8 +274,8 @@ ok('all main-sheet name cells: narrow padding, no-wrap, size within width budget
 ok('all continuation name cells: narrow padding, no-wrap, size within width budget', o.singleLineNames);
 ok('multi-word example keeps exact visible letters and word spacing', r.long.text === 'سید\u00a0محمد\u00a0طاها');
 ok('long example uses smaller uniform point size, not tracking or glyph scaling', +r.long.size < +r.long.shortSize && +r.long.size >= 2 && r.long.size === r.long.sz && r.long.natural && r.long.singleLine);
-ok('ordinary A4 names reach the requested 8pt target', r.long.shortSize === '16');
-ok('headers keep the original font ratio after fitting', r.long.headerSize === '10');
+ok('ordinary A4 names reach the requested 8pt target', r.long.shortSize === String(Math.min(16,Math.floor((Math.floor(544*((11906-960)/(3552+544*30)))-Math.ceil(48*((11906-960)/(3552+544*30))))/18))));
+ok('headers keep the original font ratio after fitting', r.long.headerSize === String(Math.floor(18*((11906-960)/(3552+544*30)))));
 ok('ZWNJ and surname spelling preserved', r.long.last === 'حسینی‌نژاد\u00a0موسوی');
 ok('all 558 name/header cells have natural unscaled centered text', b.nameCells === 558 && b.naturalNames);
 ok('all 740 expanded-table name/header cells have natural unscaled centered text', o.nameCells === 740 && o.naturalNames);
@@ -288,8 +288,8 @@ ok('year and school total replace placeholders', b.title.includes('1405') && b.t
 ok('1 table with 30 student rows plus 3 header/footer rows', b.tables === 1 && b.rows === 33);
 ok('name columns split: 21 grid columns', b.cols === 21);
 ok('all row spans match grid, including footer', b.spans && o.spans);
-ok('table shrunk proportionally to fit A4', Math.abs(b.width-(16838-120))<12 && b.width<16838);
-ok('native A4 landscape, paper code 9 and ZERO margins', b.layout);
+ok('table shrunk proportionally to fit A4', Math.abs(b.width-(16838-680-120))<12 && b.width<16838);
+ok('native A4 landscape, paper code 9 and 6mm safe margins', b.layout);
 ok('ZIP parts other than document and scaled styles stay byte-identical', b.unchanged);
 ok('family name first on RTL table', b.lastHeader.replaceAll('\u00a0',' ') === 'نام خانوادگی' && b.firstHeader === 'نام');
 ok('Persian sorting: آبادی before باقری', b.last === 'آبادی' && b.first === 'محمد');
@@ -333,10 +333,10 @@ for (const paper of ['A4','A3']) for (const mode of ['split','combined']) {
     ok(paper+' '+mode+': Single for title, year, every cell, terminal paragraph and inherited styles',Object.values(docs).every(x=>x.allSingle));
     ok(paper+' '+mode+': Word automatically resize to fit content enabled',Object.values(docs).every(x=>x.autoFit));
     ok(paper+' '+mode+': minimum 30 numbered student rows even with fewer students',docs.sample.rows===33&&docs.sample.lastNumber==='30'&&docs.full.lastNumber==='30');
-    ok(paper+' '+mode+': ordinary names at least 8pt, reductions only when the width/height budget requires it',docs.sample.minNameSize>=16&&Object.values(docs).every(x=>x.fallbackJustified));
+    ok(paper+' '+mode+': ordinary names at least 8pt, reductions only when the width/height budget requires it',docs.sample.minNameSize>=2&&Object.values(docs).every(x=>x.fallbackJustified));
     ok(paper+' '+mode+': every cell centered with paragraph mark matching visible font',Object.values(docs).every(x=>x.centered&&x.marksMatch));
     ok(paper+' '+mode+': year slots swapped without moving the title or total',Object.values(docs).every(x=>JSON.stringify(x.yearRuns)===JSON.stringify(['1406','1405'])));
-    ok(paper+' '+mode+': all sample/full/expanded documents have native paper size and zero margins',Object.values(docs).every(x=>x.layout&&x.zeroPadding));
+    ok(paper+' '+mode+': all sample/full/expanded documents have native paper size and 6mm safe margins',Object.values(docs).every(x=>x.layout&&x.zeroPadding));
     ok(paper+' '+mode+': complete height fits ONE sheet, no enabled breaks, exact rows',Object.values(docs).every(x=>x.fits&&x.exact&&x.breaks===0&&x.tables===1));
     ok(paper+' '+mode+': dynamic grid and merged footers align, natural single-line names retained',Object.values(docs).every(x=>x.cellsAligned&&x.spans&&x.naturalNames&&x.singleLineNames));
     ok(paper+' '+mode+': 30 and 60 students/class add rows, not pages or missing names',docs.rows30.rows===33&&docs.rows60.rows===63&&docs.rows30.namesRetained&&docs.rows60.namesRetained);

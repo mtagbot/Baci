@@ -70,8 +70,6 @@ $isEmbedded = isset($_GET['embedded']) && $_GET['embedded'] === '1';
     <title><?php echo clean($schoolName); ?> - پنل مدیریت و کارنامه</title>
     <script>try{localStorage.setItem('theme','light');document.documentElement.classList.remove('dark');}catch(e){}</script>
     <meta name="theme-color" content="<?php echo clean($themeColor); ?>"><!-- v4.30.0 -->
-    <link rel="preload" href="uploads/Vazirmatn/Vazirmatn-Regular.woff2" as="font" type="font/woff2" crossorigin><!-- v4.30.0: faster first paint -->
-    <link rel="preload" href="uploads/Vazirmatn/Vazirmatn-Bold.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/ui-modern.css"><!-- v4.30.0: high-end UI layer -->
     <style>
@@ -120,6 +118,7 @@ $isEmbedded = isset($_GET['embedded']) && $_GET['embedded'] === '1';
     <link rel="stylesheet" href="<?php echo clean(is_array($pageCss) ? implode('" media="all"><link rel="stylesheet" href="', array_map(function($u){ return clean($u); }, $pageCss)) : $pageCss); ?>">
     <?php endif; ?>
 <?php if(st_current_user()): ?><script defer src="assets/js/session-watch.js"></script><?php endif; ?>
+<?php echo app_appearance_head(); ?>
 </head>
 <body class="bg-body text-main min-h-screen flex flex-col font-sans">
 <script>

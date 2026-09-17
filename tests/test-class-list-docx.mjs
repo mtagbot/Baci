@@ -371,7 +371,7 @@ ok('کاغذ A4 عمودی تنظیم شده', P.portrait === 1, String(P.portra
 ok('اسامی واقعی درج شده‌اند', P.firstName === 1);
 ok('خروجی HTML امن‌سازی می‌شود', P.escaped === 1);
 ok('چاپ تا آماده‌شدن فونت صبر می‌کند', libC.includes('document.fonts.ready'));
-ok('اگر فونت نیامد چاپ گیر نمی‌کند', /setTimeout\(go, 3000\)/.test(libC));
+ok('چاپ زودهنگام با فونت جایگزین تحمیل نمی‌شود', !/setTimeout\(go, 3000\)/.test(libC) && libC.includes('document.fonts.ready'));
 
 console.log('\n══ padding و تطابق PDF با Word (v4.148.0) ══');
 ok('تابع کم‌کردن حاشیهٔ سلول وجود دارد', libC.includes('function dcl_tighten_cell'));
@@ -658,8 +658,8 @@ ok('ارتفاع «جلسات» جای متنش را دارد', G.hdrJal >= 4.8,
 ok('ارتفاع «تاریخ» جای متنش را دارد', G.hdrTar >= 5.2, String(G.hdrTar));
 ok('تراز جدول اول با tblInd قالب یکی است',
    Math.abs(G.ind1 - G.tplInd1) < 0.02, `${G.ind1} vs ${G.tplInd1}`);
-ok('تراز جدول دوم با tblInd قالب یکی است (منفی)',
-   Math.abs(G.ind2 - G.tplInd2) < 0.02 && G.ind2 < 0, `${G.ind2} vs ${G.tplInd2}`);
+ok('جدول دوم وارد حاشیهٔ غیرقابل‌چاپ نمی‌شود',
+   G.ind2 === Math.max(0,G.tplInd2), `${G.ind2} vs ${G.tplInd2}`);
 ok('دو جدول تراز متفاوت دارند (وسط‌چین نیستند)', G.ind1 !== G.ind2);
 ok('ارتفاع برگه دقیقاً فضای محتواست', Math.abs(G.minH - G.wantMinH) < 0.15,
    `${G.minH} vs ${G.wantMinH}`);

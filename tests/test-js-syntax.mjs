@@ -67,7 +67,7 @@ function dephp(js) {
 }
 
 let checked = 0, bad = 0;
-const TMP = join(process.cwd(), '.tmp-jssyntax.js');
+const TMP = join(process.cwd(), `.tmp-jssyntax-${process.pid}.js`);
 
 for (const abs of files) {
   const src = readFileSync(abs, 'utf8');

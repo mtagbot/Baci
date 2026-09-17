@@ -515,7 +515,7 @@ if (!function_exists('dcl_render_print_html')) {
         $need = function ($half) use ($pt) { return round($pt($half) * 1.1 + 1.0, 2); };
         $tin    = dcl_table_indent();
         $ind1   = $mm($tin['t1']);
-        $ind2   = $mm($tin['t2']);
+        $ind2   = max(0,$mm($tin['t2']));
         $hdrJal = max($mm($rh[1]), $need($fs['jalasat']));
         $hdrTar = max($mm($rh[2]), $need($fs['tarikh']));
 
@@ -598,12 +598,16 @@ body.nobold .nm{font-weight:400}
 .noprint .ctl input[type=range]{width:80px}
 .noprint .ghost{background:#fff;color:#334155;border:1px solid #cbd5e1}
 .noprint .hint{font-size:12px;color:#334155;background:#fff;padding:8px 12px;border-radius:8px}
+/* Fixed physical pages, independent of content flow and margin rounding. */
+.sheet{width:210mm;height:296mm;min-height:0;padding:6mm;position:relative;overflow:hidden}
+.sheet-inner{width:198mm;transform-origin:top right}
+@media print{html,body{margin:0!important;padding:0!important;width:210mm}.sheet{margin:0!important;break-inside:avoid;page-break-inside:avoid}.sheet:last-of-type{break-after:auto!important;page-break-after:auto!important}}
 </style>
 </head>
 <body>
 <?php /* ویرایشگر زندهٔ پیش از چاپ — در خروجی چاپ دیده نمی‌شود. */ ?>
 <div class="noprint" id="editor">
-    <button onclick="window.print()">چاپ / ذخیره به‌صورت PDF</button>
+    <button onclick="printClassList()">چاپ / ذخیره به‌صورت PDF</button>
     <label class="ctl">اندازهٔ متن
         <input type="range" id="cFont" min="80" max="130" step="5" value="100">
         <b id="vFont">۱۰۰٪</b>
@@ -618,7 +622,7 @@ body.nobold .nm{font-weight:400}
     <span class="hint">کاغذ A4 عمودی · مقصد «Save as PDF» · Background graphics روشن</span>
 </div>
 
-<div class="sheet">
+<div class="sheet"><div class="sheet-inner">
     <table class="tbl1" style="width:<?php echo $tblPc; ?>%">
         <colgroup>
             <?php foreach ($pc as $w): ?><col style="width:<?php echo $w; ?>%"><?php endforeach; ?>
@@ -645,8 +649,8 @@ body.nobold .nm{font-weight:400}
             <?php for ($i = 0; $i < $nCols - 2; $i++): ?><td class="h"></td><?php endfor; ?>
         </tr>
         <tr style="height:<?php echo $mm($rh[3]); ?>mm">
-            <td class="h h-faa">فعالیت درسی</td>
-            <?php for ($i = 0; $i < $nCols - 2; $i++): ?><td class="h" rowspan="2"></td><?php endfor; ?>
+            <td class="h h-faa" colspan="2">فعالیت درسی</td>
+            <?php for ($i = 0; $i < $nCols - 3; $i++): ?><td class="h" rowspan="2"></td><?php endfor; ?>
         </tr>
         <tr style="height:<?php echo $mm($rh[4]); ?>mm">
             <td class="h h-nam">نام خانوادگی</td>
@@ -676,9 +680,9 @@ body.nobold .nm{font-weight:400}
         </tr>
         <?php endfor; ?>
     </table>
-</div>
+</div></div>
 
-<div class="sheet">
+<div class="sheet"><div class="sheet-inner">
     <?php /* صفحهٔ دوم قالب یک جدول ۷ستونی با دو بخش است:
           «ثبت میزان تدریس» و «دعوت از اولیا». */ ?>
     <table class="tbl2" style="width:<?php echo $tblPc2; ?>%">
@@ -719,7 +723,7 @@ body.nobold .nm{font-weight:400}
         </tr>
         <?php endfor; ?>
     </table>
-</div>
+</div></div>
 
 <script>
 /* ویرایشگر زنده. تنظیمات در همان مرورگر ذخیره می‌شود. همه‌چیز با
@@ -741,6 +745,7 @@ body.nobold .nm{font-weight:400}
     $('vFont').textContent = fa(d.font) + '٪';
     $('vRow').textContent  = fa(d.row) + '٪';
     try { localStorage.setItem(LS, JSON.stringify(d)); } catch(e){}
+    if(window.fitClassSheets)window.fitClassSheets();
   }
   window.resetEditor = function(){
     $('cFont').value = 100; $('cRow').value = 100;
@@ -762,16 +767,36 @@ body.nobold .nm{font-weight:400}
 })();
 </script>
 
+<script>
+window.fitClassSheets=function(){
+ document.querySelectorAll('.sheet-inner').forEach(function(el){
+  el.style.transform='none';
+  var table=el.querySelector('table'),box=el.parentNode;
+  var css=getComputedStyle(box), available=box.clientHeight-parseFloat(css.paddingTop)-parseFloat(css.paddingBottom)-2;
+  var width=Math.max(el.scrollWidth,table.offsetWidth+Math.max(0,parseFloat(getComputedStyle(table).marginRight)||0));
+  var factor=Math.min(1,el.clientWidth/width,available/el.scrollHeight);
+  el.style.transform='scale('+factor+')';
+ });
+};
+window.printClassList=function(){
+ var ready=document.fonts?document.fonts.ready:Promise.resolve();
+ return ready.then(function(){if(document.fonts&&!document.fonts.check('12px BTitr')){alert('فونت تیتر بارگذاری نشده است؛ پیش از چاپ اتصال و فایل قلم را بررسی کنید.');return;}fitClassSheets();window.print();});
+};
+window.addEventListener('beforeprint',fitClassSheets);
+window.addEventListener('load',fitClassSheets);
+if(document.fonts)document.fonts.ready.then(fitClassSheets);
+fitClassSheets();
+</script>
 <?php if ($autoPrint): ?>
 <script>
 /* چاپ باید تا لود شدن فونت صبر کند — همان درسی که در چاپ تگ‌ها و
    کارت ورود گرفتیم: اگر زودتر باز شود، خروجی با فونت جایگزین می‌رود. */
 (function(){
   var done = false;
-  function go(){ if (done) return; done = true; setTimeout(function(){ window.print(); }, 250); }
+  function go(){ if (done) return; done = true; setTimeout(function(){ printClassList(); }, 250); }
   if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
     document.fonts.ready.then(go);
-    setTimeout(go, 3000);
+
   } else { setTimeout(go, 800); }
 })();
 </script>

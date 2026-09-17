@@ -246,11 +246,12 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
   .page{box-shadow:none;margin:0;page-break-inside:avoid;break-inside:avoid}
 }
 </style>
+<?php echo app_appearance_head(); ?>
 </head>
 <body>
 <?php card_ornament_defs($themeColor, $accentColor); ?>
 <div class="toolbar no-print">
-    <button onclick="window.print()">چاپ</button>
+    <button onclick="appPrint()">چاپ</button>
     <span>
         <?php echo tr_num(count($students), 'fa'); ?> دانش‌آموز ·
         <?php echo tr_num($copies, 'fa'); ?> نسخه برای هر نفر = <?php echo tr_num(count($students) * $copies, 'fa'); ?> نسخه کارت ·
@@ -327,7 +328,7 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
   function printOnce(){
     if (printed) return;
     printed = true;
-    setTimeout(function(){ fitCustomCards(document); window.print(); }, 250);
+    setTimeout(function(){ fitCustomCards(document); appPrint(); }, 250);
   }
   whenFontsReady(function(){
     drawAll();

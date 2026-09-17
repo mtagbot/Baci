@@ -196,9 +196,9 @@ ok('بار اول کد امنیتی لازم نیست', g.fresh === 0);
 ok('بعد از اولین اشتباه، کد امنیتی لازم می‌شود', g.after_fail === 1);
 ok('با اشتباه دوم همچنان لازم است', g.after_two === 1);
 ok('بعد از ورود موفق دوباره برداشته می‌شود', g.after_ok === 0);
-ok('خطای یک حساب روی حساب دیگر اثر ندارد', g.other_acct === 0);
+ok('اصلاح نام کاربری پس از خطا، کپچا را دور نمی‌زند', g.other_acct === 1);
 ok('نقش‌ها از هم جدا هستند', g.other_role === 0);
-ok('شناسهٔ خالی کد امنیتی نمی‌خواهد', g.empty_id === 0);
+ok('پس از خطا کپچا حتی با شناسهٔ خالی دیده می‌شود', g.empty_id === 1);
 ok('بزرگی/کوچکی حروف مهم نیست', g.case_ins === 1);
 
 /* دروازه: کپچای غلط باید رد شود و شمارنده را بالا ببرد */
@@ -241,7 +241,7 @@ async function hitEndpoint(role, id) {
   php.writeFile('/harness/ep.php', `<?php
 ini_set('display_errors','0'); error_reporting(0);
 @mkdir('/tmp/sess'); ini_set('session.save_path','/tmp/sess');
-session_id('ep${Math.random().toString(36).slice(2, 10)}'); session_start();
+session_id('qualityEndpointSession'); session_start();
 $_GET = ['role' => ${JSON.stringify(role)}, 'id' => ${JSON.stringify(id)}];
 require '/www/login-captcha-state.php';`);
   return (await run("<?php require '/harness/ep.php';")).out.trim();
@@ -262,6 +262,7 @@ await run("<?php require '/harness/epseed.php';");
 const epFresh = await hitEndpoint('admin', 'epuser');
 
 php.writeFile('/harness/epfail.php', `<?php
+ini_set('session.save_path','/tmp/sess');session_id('qualityEndpointSession');session_start();
 ini_set('display_errors','0'); error_reporting(0);
 require_once '/www/includes/db.php';
 require_once '/www/includes/functions.php';
@@ -306,11 +307,11 @@ ok('admin-login: شکست‌ها ثبت می‌شوند',   (alog.match(/login_g
 /* کادر کپچا باید پیش‌فرض مخفی و disabled باشد */
 ok('کادر کپچا در index پیش‌فرض مخفی است', (idx.match(/js-captcha-wrap/g) || []).length === 3);
 ok('ورودی کپچا پیش‌فرض disabled است (فرم قفل نشود)',
-   !/js-captcha-input[^>]*required/.test(idx) && (idx.match(/js-captcha-input/g) || []).length === 3);
+   idx.includes("? 'required' : 'disabled'") && (idx.match(/js-captcha-input/g) || []).length === 3);
 ok('اسکریپت کپچا در هر دو صفحه لود می‌شود',
    idx.includes('login-captcha.js') && alog.includes('login-captcha.js'));
-ok('در خطای شبکه کپچا نشان داده می‌شود (fail-safe)',
-   js.includes('finish(true)') && js.includes('ontimeout'));
+ok('خطای شبکه، تلاش اول را بی‌دلیل با کپچا مسدود نمی‌کند',
+   js.includes('finish(null)') && js.includes('ontimeout'));
 ok('هدر، نوار کاشی را صدا می‌زند', hdr.includes('render_header_tiles'));
 ok('صفحهٔ سفارشی‌سازی سکشن کاشی‌ها را دارد',
    setts.includes('headerTilesSection') && setts.includes('header_tiles[]'));

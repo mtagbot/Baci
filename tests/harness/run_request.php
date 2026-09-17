@@ -90,7 +90,7 @@ register_shutdown_function(function () use ($file, $query, $sid) {
         'php_issues'   => trim((string)($GLOBALS['__harness_error'] ?? '')),
         'student_sess' => $_SESSION['student_id'] ?? null,
     ];
-    file_put_contents('/harness/result.json', json_encode($res, JSON_UNESCAPED_UNICODE));
+    file_put_contents('/harness/result.json', json_encode($res, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
 });
 
 /* ── ۶) اجرای صفحهٔ واقعی ── */

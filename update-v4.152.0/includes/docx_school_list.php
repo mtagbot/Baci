@@ -494,8 +494,9 @@ function srl_fit_page(DOMDocument $doc, DOMDocument $styles, $paper) {
     }
     if (!$sourceW || !$sourceH) throw new RuntimeException('ابعاد جدول مدرسه معتبر نیست.');
     // Margins and padding are truly zero. Reserves are content-size safety, not margins.
-    $xFactor=($targetW-120)/$sourceW;
-    $factor=min(1.0,$xFactor,($targetH-240-40*count($tails))/$sourceH);
+    $safeMargin=340; // 6 mm safe border on all four sides.
+    $xFactor=($targetW-2*$safeMargin-120)/$sourceW;
+    $factor=min(1.0,$xFactor,($targetH-2*$safeMargin-240-40*count($tails))/$sourceH);
     if ($factor<0.12) throw new RuntimeException('حجم فهرست برای یک صفحه بیش از حد زیاد است؛ اندازهٔ A3 را انتخاب کنید. هیچ نامی حذف نشد.');
     srl_scale_dimensions($doc,$factor); srl_scale_dimensions($styles,$factor);
     // Single also in inherited styles, not just the table's visible paragraphs.
@@ -509,7 +510,7 @@ function srl_fit_page(DOMDocument $doc, DOMDocument $styles, $paper) {
         foreach (['w'=>$targetW,'h'=>$targetH,'orient'=>'landscape','code'=>$code] as $a=>$v) $size->setAttributeNS(SRL_W,'w:'.$a,(string)$v);
         $mar=$xp->query('./w:pgMar',$section)->item(0);
         if (!$mar) { $mar=$doc->createElementNS(SRL_W,'w:pgMar');$section->insertBefore($mar,$size->nextSibling); }
-        foreach (['top','bottom','left','right','header','footer','gutter'] as $a) $mar->setAttributeNS(SRL_W,'w:'.$a,'0');
+        foreach (['top','bottom','left','right','header','footer','gutter'] as $a) $mar->setAttributeNS(SRL_W,'w:'.$a,in_array($a,['top','bottom','left','right'],true)?(string)$safeMargin:'0');
         foreach ($xp->query('./w:docGrid',$section) as $g) $g->setAttributeNS(SRL_W,'w:type','none');
     }
     foreach (iterator_to_array($xp->query('//w:br[@w:type="page"] | //w:lastRenderedPageBreak')) as $br) $br->parentNode->removeChild($br);

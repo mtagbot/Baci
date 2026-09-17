@@ -184,10 +184,11 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
 .toolbar span{background:#f1f5f9;border-radius:8px;padding:8px 14px;font-size:12px;color:#334155}
 @media print{ .toolbar{display:none !important} @page{margin:<?php echo $D['margin']; ?>mm} }
 </style>
+<?php echo app_appearance_head(); ?>
 </head>
 <body>
 <div class="toolbar no-print">
-    <button onclick="window.print()">چاپ</button>
+    <button onclick="appPrint()">چاپ</button>
     <span>تعداد تگ: <?php echo tr_num(count($students) * $copies, 'fa'); ?> — <?php echo tr_num($copies, 'fa'); ?> نسخه برای هر دانش‌آموز — اندازه: <?php echo tr_num($D['size'], 'fa'); ?> میلی‌متر</span>
 </div>
 <div class="sheet">
@@ -265,7 +266,7 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
   function printOnce(){
     if (printed) return;        /* هم load و هم complete ممکن است برسند */
     printed = true;
-    setTimeout(function(){ window.print(); }, 250);
+    setTimeout(function(){ appPrint(); }, 250);
   }
   whenFontsReady(function(){
     drawAll();
