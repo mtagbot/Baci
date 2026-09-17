@@ -1,0 +1,22 @@
+{
+  "layouts": 390,
+  "widths": [
+    320,
+    390,
+    768,
+    1024,
+    1440
+  ],
+  "ordinary_cases": 355,
+  "preview_cases": 35,
+  "document_overflow": 0,
+  "site_footer_overlap": 0,
+  "axe_samples": 5,
+  "axe_violations": 0,
+  "php_regression_suites_per_distribution": 31,
+  "new_php_checks_per_distribution": 117,
+  "browser_feedback_status_stress_checks": 92,
+  "preview_navigation_checks": 79,
+  "student_workflow_browser_checks": 21,
+  "notes": "Controlled fixtures and mocked remote status; native Windows GUI and real school network not validated."
+}

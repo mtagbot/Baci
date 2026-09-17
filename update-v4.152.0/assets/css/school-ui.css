@@ -45,13 +45,20 @@ body.school-app{height:auto!important;max-height:none!important;min-height:100vh
 .school-app .grid{display:block}
 .school-app .grid>*{min-width:0;margin-bottom:12px}
 @supports(display:grid){.school-app .grid{display:grid}.school-app .grid>*{margin-bottom:0}}
-.ui-table-scroll{width:100%;max-width:100%;overflow-x:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;border:1px solid #dbe4ef;border-radius:12px;margin:12px 0;overscroll-behavior-x:contain}
-.school-app .ui-table-scroll table{margin:0;width:100%;border-collapse:separate;border-spacing:0}
-.school-app .ui-table-scroll th{background:#eef3f9;color:#23344d;white-space:nowrap;padding:13px 14px;border-bottom:1px solid #c8d4e3}
-.school-app .ui-table-scroll td{padding:12px 14px;border-bottom:1px solid #e6ecf3;vertical-align:middle;line-height:1.8}
-.school-app .ui-table-scroll tr:last-child td{border-bottom:0}
-.school-app .ui-table-scroll tbody tr:hover{background:#f4f7fb}
-.school-app .ui-table-scroll .btn{min-width:36px}
+.ui-table-scroll,
+.school-app .table-container{width:100%;max-width:100%;overflow-x:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;border:1px solid #dbe4ef;border-radius:12px;margin:12px 0;overscroll-behavior-x:contain}
+.school-app .ui-table-scroll table,
+.school-app .table-container table{margin:0;width:100%;border-collapse:separate;border-spacing:0}
+.school-app .ui-table-scroll th,
+.school-app .table-container th{background:#eef3f9;color:#23344d;white-space:nowrap;padding:13px 14px;border-bottom:1px solid #c8d4e3}
+.school-app .ui-table-scroll td,
+.school-app .table-container td{padding:12px 14px;border-bottom:1px solid #e6ecf3;vertical-align:middle;line-height:1.8}
+.school-app .ui-table-scroll tr:last-child td,
+.school-app .table-container tr:last-child td{border-bottom:0}
+.school-app .ui-table-scroll tbody tr:hover,
+.school-app .table-container tbody tr:hover{background:#f4f7fb}
+.school-app .ui-table-scroll .btn,
+.school-app .table-container .btn{min-width:36px}
 .school-app .modal-content,.school-app .modal-card{max-width:calc(100vw - 24px);max-height:calc(100vh - 32px);overflow-y:auto}
 .school-footer{flex-shrink:0;width:100%;padding:22px 28px;background:#fff;border-top:1px solid #dce4ef;margin-top:auto;color:#475569}
 .school-footer-inner{max-width:1600px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between}
@@ -89,7 +96,8 @@ body.school-app{height:auto!important;max-height:none!important;min-height:100vh
 .school-app main form>.flex,.school-app .filters-line,.school-app .page-hero>.flex{flex-wrap:wrap!important;min-width:0;max-width:100%}
 .school-app .auth-wrap{margin:10px auto}.school-app .auth-brand{padding:22px}.school-app .auth-form-side{padding:22px 18px}.school-app .auth-brand-features{display:none}
 .school-app .card{border-radius:12px}.school-app .school-footer{padding:18px 16px}.school-footer-inner{display:block}.school-footer-links{border-top:1px solid #edf1f5;margin-top:12px;padding-top:8px}.school-footer a{padding:10px 0;margin-left:22px}.school-footer-credit{font-size:10px;line-height:2}
-.school-app .ui-table-scroll td,.school-app .ui-table-scroll th{padding:10px;white-space:nowrap}.school-app .ui-table-scroll td .btn{white-space:nowrap}
+.school-app .ui-table-scroll td,.school-app .ui-table-scroll th,
+.school-app .table-container td,.school-app .table-container th{padding:10px;white-space:nowrap}.school-app .ui-table-scroll td .btn,.school-app .table-container td .btn{white-space:nowrap}
 }
 @media(hover:none){.school-app .card:hover,.school-app .btn:hover{transform:none!important;box-shadow:none!important}}
 @media(prefers-reduced-motion:reduce){.school-app *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
@@ -133,3 +141,77 @@ body.school-app{height:auto!important;max-height:none!important;min-height:100vh
 .school-app .navbar .hdr-tiles{display:grid!important;grid-column:1 / -1;grid-row:2;justify-self:center;flex:none;width:max-content;max-width:100%;margin:0!important}
 }
 @media screen and (min-width:1320px){.school-app .navbar{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important}.school-app .navbar .hdr-tiles{grid-column:2;grid-row:1}.school-app .navbar>.flex:last-child{grid-column:3}}
+
+@media screen{
+/* Stable first paint: no entry motion, invisible rows, or width transition at startup. */
+.school-app main>*:not(script):not(style),.school-app .auth-card,.school-app .auth-panel{animation:none!important}
+.school-app .sidebar,.school-app main.flex-1{transition:none!important}
+.school-app .sidebar-item{position:relative;padding-right:42px!important}
+.school-app .sidebar-item::before{display:none}
+.school-app .sidebar-item .school-icon{position:absolute;right:13px;margin:0;width:18px;height:18px}
+.school-app .auth-feedback{border:1px solid #b8c9de;border-right:3px solid #345879;border-radius:10px;padding:12px 14px;margin:0 0 18px;color:#23344d;background:#f1f5fa;font-size:13px;line-height:1.9;white-space:normal}
+.school-app .auth-feedback-error{border-color:#e3b7b7;border-right-color:#b91c1c;background:#fff5f5;color:#851d1d}
+.school-app .auth-feedback strong{display:block;margin-bottom:3px;font-size:13px}.school-app .auth-feedback p{margin:0}
+.school-app .auth-feedback:focus{outline:2px solid #b91c1c;outline-offset:3px}
+.school-app .auth-panel [aria-invalid="true"]{border-color:#b91c1c!important}
+/* Compact editorial footer: one quiet strip, no repeated navigation panel. */
+.school-app .school-footer{padding:6px 24px;background:#f8fafc;border-top:1px solid #d8e1ec;min-height:56px}
+.school-footer .school-footer-inner{max-width:1600px;display:flex;align-items:center;justify-content:space-between;gap:8px 24px;min-height:42px}
+.school-footer .school-footer-brand{padding:0;min-width:0;gap:9px;flex:1}
+.school-footer .school-footer-brand:before{content:"";width:4px;height:22px;border-radius:2px;background:var(--primary,#2563eb);flex:none}
+.school-footer .school-footer-brand strong{font-size:12px;font-weight:700;line-height:1.8}
+.school-footer .school-footer-credit{border:0;padding:0;margin:0;font-size:11px;line-height:1.8}
+.school-footer .school-footer-links{border:0;padding:0;margin:0;flex:none}
+.school-footer .school-footer-links a{padding:8px 12px;margin:0;font-size:11px;min-height:44px;text-decoration:none;color:#334155}
+@media(max-width:640px){.school-app .school-footer{padding:8px 14px}.school-footer .school-footer-inner{gap:2px 12px;flex-wrap:wrap}.school-footer .school-footer-credit{order:3;width:100%;font-size:10px}.school-footer .school-footer-links a{padding:8px 4px}.school-footer .school-footer-brand strong{font-size:11px}}
+
+}
+/* Desktop only: reserve the status strip at first layout, never cover the last form/table row. */
+@media screen{
+ body.school-app.desk-runtime{padding-bottom:66px}
+ .desk-runtime .school-footer.has-desk-state{position:fixed;bottom:0;left:0;z-index:100;width:100%;box-shadow:0 -2px 10px rgba(24,45,70,.04)}
+ .school-footer .desk-connection{position:relative;flex:0 0 238px;width:238px;max-width:100%;border:1px solid #cfdae7;border-radius:22px;background:#fff;color:#385270;min-height:44px;font-size:11px}
+ .school-footer .desk-connection summary{list-style:none;display:flex;align-items:center;gap:9px;height:42px;padding:0 13px;cursor:pointer;outline-offset:3px}
+ .desk-connection summary::-webkit-details-marker{display:none}
+ .desk-connection-ring{display:inline-block;box-sizing:border-box;width:15px;height:15px;border:2px solid currentColor;border-radius:50%;flex:none}
+ .desk-connection-more{margin-right:auto}
+ .desk-connection[data-state="synced"]{color:#176342;border-color:#b9d5c8}
+ .desk-connection[data-state="synced"] .desk-connection-ring{background:#218454;border-color:#218454;box-shadow:inset 0 0 0 3px #fff}
+ .desk-connection[data-state="retrying"],.desk-connection[data-state="error"],.desk-connection[data-state="warning"]{color:#875011;border-color:#e4cfac}
+ .desk-connection[data-state="checking"] .desk-connection-ring,.desk-connection[data-state="syncing"] .desk-connection-ring{border-left-color:transparent;animation:desk-connect-spin 1s linear infinite}
+ .desk-connection[data-state="offline"],.desk-connection[data-state="disabled"],.desk-connection[data-state="signed-out"]{color:#5c6979}
+ .desk-connection-panel{position:absolute;left:0;bottom:calc(100% + 12px);width:320px;max-width:calc(100vw - 28px);background:#fff;border:1px solid #d2dce8;border-radius:14px;box-shadow:0 10px 32px rgba(25,45,70,.16);padding:18px;color:#334155;line-height:1.9;font-size:12px}
+ .desk-connection:not([open]) .desk-connection-panel{display:none}
+ .school-footer .desk-connection-panel strong{font-size:14px;color:#172f4c}
+ .desk-connection-panel p{margin:8px 0}.desk-connection-panel small{display:block;font-size:11px;color:#536176;border-top:1px solid #e8edf3;padding-top:10px}
+ .school-footer .desk-connection-panel a{display:flex;padding:10px 0 0;color:#174c83;font-size:12px;margin:0}
+ .desk-connection.is-paused .desk-connection-ring{animation-play-state:paused}
+ @keyframes desk-connect-spin{to{transform:rotate(360deg)}}
+ @media(max-width:1000px){.desk-runtime .school-footer-credit{display:none}}
+ @media(max-width:640px){body.school-app.desk-runtime{padding-bottom:116px}.desk-runtime .school-footer .school-footer-inner{gap:2px 12px}.school-footer .desk-connection{flex-basis:100%;width:100%}.desk-connection-panel{width:100%}}
+ @media(prefers-reduced-motion:reduce){.desk-connection-ring{animation:none!important}}
+}
+@media print{.desk-connection{display:none!important}.school-app.desk-runtime{padding-bottom:0!important}}
+
+@media screen{
+.school-app .auth-input-wrap .form-input{padding-left:44px!important}
+/* Identity rows and action cells must not wrap into taller rows while the selected font loads. */
+.school-app #studentsTable td{white-space:nowrap}
+.school-app #studentsTable td:last-child>.flex{flex-wrap:nowrap!important}
+.school-app #studentsTable .btn{line-height:1.6}
+@media(min-width:901px){.school-app .navbar .hdr-tiles{width:calc(var(--hdr-tiles-count,8) * 68px + 11px);max-width:100%}.school-app .hdr-tile-t{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+/* Stable column geometry; long names can wrap without truncation or omitted data. */
+.school-app #studentsTable{table-layout:fixed;min-width:1144px}
+.school-app #studentsTable td{height:68px;line-height:1.5}
+.school-app #studentsTable th{white-space:normal;line-height:1.6}
+.school-app #studentsTable td:nth-child(3),.school-app #studentsTable td:nth-child(4),.school-app #studentsTable td:nth-child(5),.school-app #studentsTable td:nth-child(6){white-space:normal;word-wrap:break-word}
+.school-app .navbar .user-menu-btn{width:92px;flex-shrink:0}
+@media(min-width:1200px){.school-app .navbar .hdr-date{width:180px;flex:0 0 180px}}
+.school-app #studentsTable th{height:68px}
+.school-app .dashboard-actions{flex-wrap:wrap}.school-app .dashboard-actions>.btn{width:190px;flex:none}
+.school-app .student-list-actions>.btn{width:150px;flex:none}
+.school-app .student-list-actions>.btn:nth-child(2){width:190px}
+.school-app .student-list-actions>.btn:nth-child(3){width:80px}
+@media(max-width:640px){.school-app .student-list-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.school-app .student-list-actions>.btn,.school-app .student-list-actions>.btn:nth-child(2),.school-app .student-list-actions>.btn:nth-child(3){width:100%}.school-app .dashboard-actions>.btn{width:100%}}
+
+}

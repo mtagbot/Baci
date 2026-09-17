@@ -1,4 +1,4 @@
-import unittest,json,hashlib
+import unittest,json,hashlib,subprocess
 from pathlib import Path
 from zipfile import ZipFile
 ROOT=Path(__file__).resolve().parents[1]
@@ -8,7 +8,7 @@ class Payload(unittest.TestCase):
   for name,prefix in [('SITE-FIX-v4.152.0-preview-navigation.zip','site-update-v4.152.0/'),('SchoolDeskPro-FIX-v2.83.0-preview-navigation.zip','SchoolDeskPro/www/')]:
    with ZipFile(ROOT/name)as z:
     self.assertIsNone(z.testzip());self.assertEqual(len(z.namelist()),16);self.assertEqual(set(z.namelist()),{prefix+f for f in FILES})
-    for f in FILES:self.assertEqual(z.read(prefix+f),(ROOT/'update-v4.152.0'/f).read_bytes())
+    for f in FILES:self.assertEqual(z.read(prefix+f),subprocess.check_output(['git','show','d60ee429b30d324c6986e823fabe07fed9f25b25:update-v4.152.0/'+f],cwd=ROOT))
  def test_checksums(self):
   for line in (ROOT/'PREVIEW-NAVIGATION-SHA256SUMS.txt').read_text().splitlines():
    digest,name=line.split();self.assertEqual(digest,hashlib.sha256((ROOT/name).read_bytes()).hexdigest())

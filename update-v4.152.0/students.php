@@ -253,6 +253,7 @@ try {
     if (empty($stCols2)) DB::execute("ALTER TABLE students ADD COLUMN mother_birth_date VARCHAR(20) DEFAULT NULL");
 } catch (Throwable $e) { error_log('students parent-birth columns: ' . $e->getMessage()); }
 
+$pageCss=['assets/css/student-workflow.css?v=20260917e'];
 require_once __DIR__ . '/includes/header.php';
 
 if ($action === 'add' || $action === 'edit'):
@@ -389,7 +390,7 @@ else:
         <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
         <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
             <h3 class="font-bold">نتایج: <?php echo tr_num(count($studentsList),'fa'); ?> دانش‌آموز</h3>
-            <div class="flex gap-2 flex-wrap">
+            <div class="flex gap-2 flex-wrap student-list-actions">
                 <?php /* v4.134.0: از سربرگ صفحه به اینجا منتقل شدند. */ ?>
                 <a href="deputy-panel.php" class="btn btn-warning text-xs">موارد انضباطی</a>
                 <a href="students.php?action=add" class="btn btn-primary text-xs">+ افزودن دانش‌آموز جدید</a>
@@ -400,6 +401,7 @@ else:
         </div>
         <div class="table-container">
             <table id="studentsTable">
+                <colgroup><col style="width:44px"><col style="width:108px"><col style="width:124px"><col style="width:118px"><col style="width:68px"><col style="width:72px"><col style="width:86px"><col style="width:76px"><col style="width:90px"><col style="width:98px"><col style="width:80px"><col style="width:180px"></colgroup>
                 <thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.st-check').forEach(c=>c.checked=this.checked)"></th><th>کد ملی</th><th>نام خانوادگی</th><th>نام</th><th>کلاس</th><th>پایه</th><th>آخرین معدل</th><th>انضباط</th><th>بررسی نشده</th><th>بررسی کارنامه</th><th>وضعیت</th><th>عملیات</th></tr></thead>
                 <tbody>
                 <?php foreach ($studentsList as $st): ?>
@@ -468,7 +470,7 @@ else:
         }
         document.addEventListener('DOMContentLoaded',()=>setTimeout(refreshTransferGrades,50));
         </script>
-        <link rel="stylesheet" href="assets/css/student-workflow.css?v=20260917c"><div id="reportModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="گزارش دانش‌آموزان انتخاب‌شده" style="display:none">
+        <div id="reportModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="گزارش دانش‌آموزان انتخاب‌شده" style="display:none">
             <div class="modal-card card">
                 <h3 class="font-bold text-primary mb-3">گزارش دانش‌آموزان انتخاب‌شده</h3>
                 <div class="mb-3"><label class="text-xs font-bold block mb-1">نوع گزارش</label>

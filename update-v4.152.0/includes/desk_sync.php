@@ -312,7 +312,7 @@ class DeskSync {
         $fails   = (int) self::getCfg('desk_sync_fails', '0');
         $nextTry = (int) self::getCfg('desk_sync_next_try', '0');
         $base    = ['pending' => $pending, 'fails' => $fails, 'alert' => $fails >= 15,
-                    'retry_in' => max(0, $nextTry - $now)];
+                    'retry_in' => max(0, $nextTry - $now), 'server_verified' => false];
 
         // offline back-off window still open → wait
         if ($fails > 0 && $now < $nextTry) return ['ok' => true, 'skipped' => 'backoff'] + $base;
@@ -323,10 +323,15 @@ class DeskSync {
         if (!$due) {
             try {
                 $res = self::call('ping', [], true);
+                if (!isset($res['log_max']) || !is_numeric($res['log_max']) || $res['log_max'] < 0) throw new Exception('پاسخ بررسی سرور معتبر نیست');
+                $base['server_verified'] = true;
+                $base['fails'] = 0; $base['alert'] = false; $base['retry_in'] = 0;
                 if ((int)($res['log_max'] ?? 0) > (int) self::getCfg('desk_sync_cursor', '0')) $due = true;
                 if ($fails > 0) { self::setCfg('desk_sync_fails', '0'); self::setCfg('desk_sync_next_try', '0'); $fails = 0; }
             } catch (Throwable $e) {
                 if (self::isOffline($e)) return self::noteFailure($now) + ['ok' => true, 'skipped' => 'offline', 'pending' => $pending];
+                // A rejected/unsupported ping is not proof of a healthy connection.
+                $base['probe_failed'] = true;
                 // old server file (no ping action) → fall back to the periodic cycle
                 $due = ($now - (int) self::getCfg('desk_sync_last', '0')) >= self::MIN_INTERVAL;
             }
@@ -342,7 +347,7 @@ class DeskSync {
         if (!empty($res['ok'])) {
             self::setCfg('desk_sync_fails', '0');
             self::setCfg('desk_sync_next_try', '0');
-            return $res + ['pending' => $pending, 'fails' => 0, 'alert' => false, 'retry_in' => 0];
+            return $res + ['pending' => $pending, 'fails' => 0, 'alert' => false, 'retry_in' => 0, 'server_verified' => !isset($res['skipped'])];
         }
         if (isset($res['error']) && mb_strpos((string)$res['error'], 'اتصال به سرور برقرار نشد') !== false) {
             return self::noteFailure($now) + $res + ['pending' => $pending];

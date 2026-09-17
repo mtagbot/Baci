@@ -1,0 +1,18 @@
+{
+  "uploads/Vazirmatn/Vazirmatn-Regular.ttf": {
+    "sha256": "b69fd4c680b8f3f225feabcc655a2c585d97627b8f5f5c0f9985e894069f3a56",
+    "url": "assets/fonts/screen/Vazirmatn-Regular.woff2"
+  },
+  "uploads/Vazirmatn/Vazirmatn-Bold.ttf": {
+    "sha256": "f635fdbea28f265de395ba83b4b1570dcf2f58d13c65469e61903b1c2d2ae723",
+    "url": "assets/fonts/screen/Vazirmatn-Bold.woff2"
+  },
+  "uploads/Sahel/Sahel.ttf": {
+    "sha256": "5de2fe8cd1995f10fb5a570b66e3ff40183f16bc8c692519b61e8c0281679675",
+    "url": "assets/fonts/screen/Sahel.woff2"
+  },
+  "uploads/Yekan/Yekan.ttf": {
+    "sha256": "60858c0b6d5d8a94e2869e10173050e1920b550e4321dda228acf7dd6737cfb5",
+    "url": "assets/fonts/screen/Yekan.woff2"
+  }
+}

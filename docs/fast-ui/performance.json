@@ -1,0 +1,1958 @@
+{
+  "environment": "Chromium, viewport 1440x960, CPU 4x, fresh context per page, fonts delayed 700ms, CSS/JS 150ms, Chart 600ms; mocked PHP background responses; one sample per route/version",
+  "results": [
+    {
+      "phase": "before",
+      "file": "index.php",
+      "role": "guest",
+      "requestedBytes": 617803,
+      "requests": [
+        {
+          "path": "assets/css/style.css",
+          "bytes": 36442
+        },
+        {
+          "path": "assets/css/ui-modern.css",
+          "bytes": 35617
+        },
+        {
+          "path": "assets/css/school-ui.css",
+          "bytes": 15445
+        },
+        {
+          "path": "assets/js/login-captcha.js",
+          "bytes": 4655
+        },
+        {
+          "path": "assets/vendor/chart.umd.min.js",
+          "bytes": 208522
+        },
+        {
+          "path": "assets/js/main.js",
+          "bytes": 11859
+        },
+        {
+          "path": "assets/js/ui-modern.js",
+          "bytes": 7188
+        },
+        {
+          "path": "assets/js/searchable-select.js",
+          "bytes": 9917
+        },
+        {
+          "path": "assets/js/school-icons.js",
+          "bytes": 24957
+        },
+        {
+          "path": "assets/js/school-ui.js",
+          "bytes": 17413
+        },
+        {
+          "path": "uploads/Vazirmatn/Vazirmatn-Regular.ttf",
+          "bytes": 122752
+        },
+        {
+          "path": "uploads/Vazirmatn/Vazirmatn-Bold.ttf",
+          "bytes": 123036
+        }
+      ],
+      "dom": {
+        "at": 752.8999999985099,
+        "rows": 0,
+        "hidden": 0,
+        "animated": 0
+      },
+      "cls": 0.000013605910564155734,
+      "shifts": [
+        {
+          "at": 3312.39999999851,
+          "value": 0.000013605910564155734,
+          "nodes": [
+            {
+              "tag": "svg",
+              "id": "",
+              "cls": {},
+              "previous": {
+                "x": 813.171875,
+                "y": 164.015625,
+                "width": 16.25,
+                "height": 16.25,
+                "top": 164.015625,
+                "right": 829.421875,
+                "bottom": 180.265625,
+                "left": 813.171875
+              },
+              "current": {
+                "x": 804.71875,
+                "y": 163.40625,
+                "width": 16.25,
+                "height": 16.25,
+                "top": 163.40625,
+                "right": 820.96875,
+                "bottom": 179.65625,
+                "left": 804.71875
+              }
+            },
+            {
+              "tag": "svg",
+              "id": "",
+              "cls": {},
+              "previous": {
+                "x": 588.359375,
+                "y": 165.515625,
+                "width": 16.25,
+                "height": 16.25,
+                "top": 165.515625,
+                "right": 604.609375,
+                "bottom": 181.765625,
+                "left": 588.359375
+              },
+              "current": {
+                "x": 580.21875,
+                "y": 164.90625,
+                "width": 16.25,
+                "height": 16.25,
+                "top": 164.90625,
+                "right": 596.46875,
+                "bottom": 181.15625,
+                "left": 580.21875
+              }
+            },
+            {
+              "tag": "svg",
+              "id": "",
+              "cls": {},
+              "previous": {
+                "x": 334.390625,
+                "y": 165.515625,
+                "width": 16.25,
+                "height": 16.25,
+                "top": 165.515625,
+                "right": 350.640625,
+                "bottom": 181.765625,
+                "left": 334.390625
+              },
+              "current": {
+                "x": 329.65625,
+                "y": 164.90625,
+                "width": 16.25,
+                "height": 16.25,
+                "top": 164.90625,
+                "right": 345.90625,
+                "bottom": 181.15625,
+                "left": 329.65625
+              }
+            },
+            {
+              "tag": "svg",
+              "id": "",
+              "cls": {},
+              "previous": {
+                "x": 639.984375,
+                "y": 445.125,
+                "width": 12.59375,
+                "height": 12.59375,
+                "top": 445.125,
+                "right": 652.578125,
+                "bottom": 457.71875,
+                "left": 639.984375
+              },
+              "current": {
+                "x": 621.546875,
+                "y": 445.515625,
+                "width": 12.59375,
+                "height": 12.59375,
+                "top": 445.515625,
+                "right": 634.140625,
+                "bottom": 458.109375,
+                "left": 621.546875
+              }
+            }
+          ]
+        }
+      ],
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 252
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 524
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Vazirmatn",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        },
+        {
+          "family": "Sahel",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Yekan",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        },
+        {
+          "family": "Sahel",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Yekan",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "block"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "block"
+        }
+      ],
+      "ui": {
+        "icons": 0,
+        "flushes": 1,
+        "initMs": 8
+      }
+    },
+    {
+      "phase": "before",
+      "file": "index.php",
+      "role": "admin",
+      "requestedBytes": 614354,
+      "requests": [
+        {
+          "path": "assets/css/style.css",
+          "bytes": 36442
+        },
+        {
+          "path": "assets/css/ui-modern.css",
+          "bytes": 35617
+        },
+        {
+          "path": "assets/css/school-ui.css",
+          "bytes": 15445
+        },
+        {
+          "path": "assets/vendor/chart.umd.min.js",
+          "bytes": 208522
+        },
+        {
+          "path": "assets/js/main.js",
+          "bytes": 11859
+        },
+        {
+          "path": "assets/js/ui-modern.js",
+          "bytes": 7188
+        },
+        {
+          "path": "assets/js/searchable-select.js",
+          "bytes": 9917
+        },
+        {
+          "path": "assets/js/session-watch.js",
+          "bytes": 1206
+        },
+        {
+          "path": "assets/js/school-icons.js",
+          "bytes": 24957
+        },
+        {
+          "path": "assets/js/school-ui.js",
+          "bytes": 17413
+        },
+        {
+          "path": "uploads/Vazirmatn/Vazirmatn-Regular.ttf",
+          "bytes": 122752
+        },
+        {
+          "path": "uploads/Vazirmatn/Vazirmatn-Bold.ttf",
+          "bytes": 123036
+        }
+      ],
+      "dom": {
+        "at": 714.0999999996275,
+        "rows": 3,
+        "hidden": 0,
+        "animated": 3
+      },
+      "cls": 0.0076911845030608,
+      "shifts": [
+        {
+          "at": 707.0999999996275,
+          "value": 0.00045784886678059897,
+          "nodes": [
+            {
+              "tag": "A",
+              "id": "",
+              "cls": "sidebar-item ",
+              "previous": {
+                "x": 1211,
+                "y": 769.5,
+                "width": 217,
+                "height": 44,
+                "top": 769.5,
+                "right": 1428,
+                "bottom": 813.5,
+                "left": 1211
+              },
+              "current": {
+                "x": 1211,
+                "y": 782.71875,
+                "width": 217,
+                "height": 44,
+                "top": 782.71875,
+                "right": 1428,
+                "bottom": 826.71875,
+                "left": 1211
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "cls": "sidebar-item ",
+              "previous": {
+                "x": 1211,
+                "y": 816.5,
+                "width": 217,
+                "height": 44,
+                "top": 816.5,
+                "right": 1428,
+                "bottom": 860.5,
+                "left": 1211
+              },
+              "current": {
+                "x": 1211,
+                "y": 829.71875,
+                "width": 217,
+                "height": 44,
+                "top": 829.71875,
+                "right": 1428,
+                "bottom": 873.71875,
+                "left": 1211
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "cls": "sidebar-item ",
+              "previous": {
+                "x": 1211,
+                "y": 642.359375,
+                "width": 217,
+                "height": 44,
+                "top": 642.359375,
+                "right": 1428,
+                "bottom": 686.359375,
+                "left": 1211
+              },
+              "current": {
+                "x": 1211,
+                "y": 655.578125,
+                "width": 217,
+                "height": 44,
+                "top": 655.578125,
+                "right": 1428,
+                "bottom": 699.578125,
+                "left": 1211
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "cls": "sidebar-item ",
+              "previous": {
+                "x": 1211,
+                "y": 863.5,
+                "width": 217,
+                "height": 44,
+                "top": 863.5,
+                "right": 1428,
+                "bottom": 907.5,
+                "left": 1211
+              },
+              "current": {
+                "x": 1211,
+                "y": 876.71875,
+                "width": 217,
+                "height": 44,
+                "top": 876.71875,
+                "right": 1428,
+                "bottom": 920.71875,
+                "left": 1211
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "cls": "sidebar-item ",
+              "previous": {
+                "x": 1211,
+                "y": 722.5,
+                "width": 217,
+                "height": 44,
+                "top": 722.5,
+                "right": 1428,
+                "bottom": 766.5,
+                "left": 1211
+              },
+              "current": {
+                "x": 1211,
+                "y": 735.71875,
+                "width": 217,
+                "height": 44,
+                "top": 735.71875,
+                "right": 1428,
+                "bottom": 779.71875,
+                "left": 1211
+              }
+            }
+          ]
+        },
+        {
+          "at": 936,
+          "value": 0.0001584125330418716,
+          "nodes": [
+            {
+              "tag": "DIV",
+              "id": "",
+              "cls": "flex items-center gap-4",
+              "previous": {
+                "x": 24,
+                "y": 26.265625,
+                "width": 273.03125,
+                "height": 40,
+                "top": 26.265625,
+                "right": 297.03125,
+                "bottom": 66.265625,
+                "left": 24
+              },
+              "current": {
+                "x": 24,
+                "y": 26.265625,
+                "width": 261.046875,
+                "height": 40,
+                "top": 26.265625,
+                "right": 285.046875,
+                "bottom": 66.265625,
+                "left": 24
+              }
+            },
+            {
+              "tag": "TD",
+              "id": "",
+              "cls": "",
+              "previous": {
+                "x": 743.390625,
+                "y": 660.03125,
+                "width": 156.109375,
+                "height": 49.0625,
+                "top": 660.03125,
+                "right": 899.5,
+                "bottom": 709.09375,
+                "left": 743.390625
+              },
+              "current": {
+                "x": 745.59375,
+                "y": 660.03125,
+                "width": 149.46875,
+                "height": 49.0625,
+                "top": 660.03125,
+                "right": 895.0625,
+                "bottom": 709.09375,
+                "left": 745.59375
+              }
+            },
+            {
+              "tag": "TD",
+              "id": "",
+              "cls": "",
+              "previous": {
+                "x": 214.515625,
+                "y": 660.03125,
+                "width": 169.03125,
+                "height": 43.65625,
+                "top": 660.03125,
+                "right": 383.546875,
+                "bottom": 703.6875,
+                "left": 214.515625
+              },
+              "current": {
+                "x": 208.640625,
+                "y": 660.03125,
+                "width": 169.5,
+                "height": 43.65625,
+                "top": 660.03125,
+                "right": 378.140625,
+                "bottom": 703.6875,
+                "left": 208.640625
+              }
+            }
+          ]
+        },
+        {
+          "at": 1955,
+          "value": 0.007074923103238329,
+          "nodes": [
+            {
+              "tag": "NAV",
+              "id": "",
+              "cls": "hdr-tiles",
+              "previous": {
+                "x": 361.6875,
+                "y": 18.296875,
+                "width": 716.625,
+                "height": 55.953125,
+                "top": 18.296875,
+                "right": 1078.3125,
+                "bottom": 74.25,
+                "left": 361.6875
+              },
+              "current": {
+                "x": 442.5,
+                "y": 18.296875,
+                "width": 555,
+                "height": 55.953125,
+                "top": 18.296875,
+                "right": 997.5,
+                "bottom": 74.25,
+                "left": 442.5
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "cls": "sidebar-item ",
+              "previous": {
+                "x": 1211,
+                "y": 829.71875,
+                "width": 217,
+                "height": 44,
+                "top": 829.71875,
+                "right": 1428,
+                "bottom": 873.71875,
+                "left": 1211
+              },
+              "current": {
+                "x": 1211,
+                "y": 816.5,
+                "width": 217,
+                "height": 44,
+                "top": 816.5,
+                "right": 1428,
+                "bottom": 860.5,
+                "left": 1211
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "cls": "sidebar-item ",
+              "previous": {
+                "x": 1211,
+                "y": 735.71875,
+                "width": 217,
+                "height": 44,
+                "top": 735.71875,
+                "right": 1428,
+                "bottom": 779.71875,
+                "left": 1211
+              },
+              "current": {
+                "x": 1211,
+                "y": 722.5,
+                "width": 217,
+                "height": 44,
+                "top": 722.5,
+                "right": 1428,
+                "bottom": 766.5,
+                "left": 1211
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "cls": "sidebar-item ",
+              "previous": {
+                "x": 1211,
+                "y": 782.71875,
+                "width": 217,
+                "height": 44,
+                "top": 782.71875,
+                "right": 1428,
+                "bottom": 826.71875,
+                "left": 1211
+              },
+              "current": {
+                "x": 1211,
+                "y": 769.5,
+                "width": 217,
+                "height": 44,
+                "top": 769.5,
+                "right": 1428,
+                "bottom": 813.5,
+                "left": 1211
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "cls": "sidebar-item ",
+              "previous": {
+                "x": 1211,
+                "y": 655.578125,
+                "width": 217,
+                "height": 44,
+                "top": 655.578125,
+                "right": 1428,
+                "bottom": 699.578125,
+                "left": 1211
+              },
+              "current": {
+                "x": 1211,
+                "y": 642.359375,
+                "width": 217,
+                "height": 44,
+                "top": 642.359375,
+                "right": 1428,
+                "bottom": 686.359375,
+                "left": 1211
+              }
+            }
+          ]
+        }
+      ],
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 220
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 476
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Vazirmatn",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        },
+        {
+          "family": "Sahel",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Yekan",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        },
+        {
+          "family": "Sahel",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Yekan",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "block"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "block"
+        }
+      ],
+      "ui": {
+        "icons": 0,
+        "flushes": 1,
+        "initMs": 17
+      }
+    },
+    {
+      "phase": "before",
+      "file": "students.php",
+      "role": "admin",
+      "requestedBytes": 616865,
+      "requests": [
+        {
+          "path": "assets/css/style.css",
+          "bytes": 36442
+        },
+        {
+          "path": "assets/css/ui-modern.css",
+          "bytes": 35617
+        },
+        {
+          "path": "assets/css/school-ui.css",
+          "bytes": 15445
+        },
+        {
+          "path": "assets/css/student-workflow.css",
+          "bytes": 2511
+        },
+        {
+          "path": "assets/vendor/chart.umd.min.js",
+          "bytes": 208522
+        },
+        {
+          "path": "assets/js/main.js",
+          "bytes": 11859
+        },
+        {
+          "path": "assets/js/ui-modern.js",
+          "bytes": 7188
+        },
+        {
+          "path": "assets/js/searchable-select.js",
+          "bytes": 9917
+        },
+        {
+          "path": "assets/js/session-watch.js",
+          "bytes": 1206
+        },
+        {
+          "path": "assets/js/school-icons.js",
+          "bytes": 24957
+        },
+        {
+          "path": "assets/js/school-ui.js",
+          "bytes": 17413
+        },
+        {
+          "path": "uploads/Vazirmatn/Vazirmatn-Regular.ttf",
+          "bytes": 122752
+        },
+        {
+          "path": "uploads/Vazirmatn/Vazirmatn-Bold.ttf",
+          "bytes": 123036
+        }
+      ],
+      "dom": {
+        "at": 776.7999999988824,
+        "rows": 6,
+        "hidden": 0,
+        "animated": 6
+      },
+      "cls": 0.06538400260705517,
+      "shifts": [
+        {
+          "at": 766.8999999985099,
+          "value": 0.0004550466184262877,
+          "nodes": [
+            {
+              "tag": "A",
+              "id": "",
+              "cls": "sidebar-item ",
+              "previous": {
+                "x": 1211,
+                "y": 769.953125,
+                "width": 217,
+                "height": 44,
+                "top": 769.953125,
+                "right": 1428,
+                "bottom": 813.953125,
+                "left": 1211
+              },
+              "current": {
+                "x": 1211,
+                "y": 783.171875,
+                "width": 217,
+                "height": 44,
+                "top": 783.171875,
+                "right": 1428,
+                "bottom": 827.171875,
+                "left": 1211
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "cls": "sidebar-item ",
+              "previous": {
+                "x": 1211,
+                "y": 816.953125,
+                "width": 217,
+                "height": 44,
+                "top": 816.953125,
+                "right": 1428,
+                "bottom": 860.953125,
+                "left": 1211
+              },
+              "current": {
+                "x": 1211,
+                "y": 830.171875,
+                "width": 217,
+                "height": 44,
+                "top": 830.171875,
+                "right": 1428,
+                "bottom": 874.171875,
+                "left": 1211
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "cls": "sidebar-item ",
+              "previous": {
+                "x": 1211,
+                "y": 642.8125,
+                "width": 217,
+                "height": 44,
+                "top": 642.8125,
+                "right": 1428,
+                "bottom": 686.8125,
+                "left": 1211
+              },
+              "current": {
+                "x": 1211,
+                "y": 656.03125,
+                "width": 217,
+                "height": 44,
+                "top": 656.03125,
+                "right": 1428,
+                "bottom": 700.03125,
+                "left": 1211
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "cls": "sidebar-item ",
+              "previous": {
+                "x": 1211,
+                "y": 863.953125,
+                "width": 217,
+                "height": 44,
+                "top": 863.953125,
+                "right": 1428,
+                "bottom": 907.953125,
+                "left": 1211
+              },
+              "current": {
+                "x": 1211,
+                "y": 877.171875,
+                "width": 217,
+                "height": 44,
+                "top": 877.171875,
+                "right": 1428,
+                "bottom": 921.171875,
+                "left": 1211
+              }
+            },
+            {
+              "tag": "A",
+              "id": "",
+              "cls": "sidebar-item ",
+              "previous": {
+                "x": 1211,
+                "y": 722.953125,
+                "width": 217,
+                "height": 44,
+                "top": 722.953125,
+                "right": 1428,
+                "bottom": 766.953125,
+                "left": 1211
+              },
+              "current": {
+                "x": 1211,
+                "y": 736.171875,
+                "width": 217,
+                "height": 44,
+                "top": 736.171875,
+                "right": 1428,
+                "bottom": 780.171875,
+                "left": 1211
+              }
+            }
+          ]
+        },
+        {
+          "at": 1008.5,
+          "value": 0.002715282204710407,
+          "nodes": [
+            {
+              "tag": "TD",
+              "id": "",
+              "cls": "font-bold",
+              "previous": {
+                "x": 769.609375,
+                "y": 778.234375,
+                "width": 122,
+                "height": 108.5,
+                "top": 778.234375,
+                "right": 891.609375,
+                "bottom": 886.734375,
+                "left": 769.609375
+              },
+              "current": {
+                "x": 779.21875,
+                "y": 778.234375,
+                "width": 122,
+                "height": 108.5,
+                "top": 778.234375,
+                "right": 901.21875,
+                "bottom": 886.734375,
+                "left": 779.21875
+              }
+            },
+            {
+              "tag": "TD",
+              "id": "",
+              "cls": "font-bold",
+              "previous": {
+                "x": 769.609375,
+                "y": 561.234375,
+                "width": 122,
+                "height": 108.5,
+                "top": 561.234375,
+                "right": 891.609375,
+                "bottom": 669.734375,
+                "left": 769.609375
+              },
+              "current": {
+                "x": 779.21875,
+                "y": 561.234375,
+                "width": 122,
+                "height": 108.5,
+                "top": 561.234375,
+                "right": 901.21875,
+                "bottom": 669.734375,
+                "left": 779.21875
+              }
+            },
+            {
+              "tag": "TD",
+              "id": "",
+              "cls": "font-bold",
+              "previous": {
+                "x": 769.609375,
+                "y": 452.734375,
+                "width": 122,
+                "height": 108.5,
+                "top": 452.734375,
+                "right": 891.609375,
+                "bottom": 561.234375,
+                "left": 769.609375
+              },
+              "current": {
+                "x": 779.21875,
+                "y": 452.734375,
+                "width": 122,
+                "height": 108.5,
+                "top": 452.734375,
+                "right": 901.21875,
+                "bottom": 561.234375,
+                "left": 779.21875
+              }
+            },
+            {
+              "tag": "TD",
+              "id": "",
+              "cls": "font-bold",
+              "previous": {
+                "x": 769.609375,
+                "y": 669.734375,
+                "width": 122,
+                "height": 108.5,
+                "top": 669.734375,
+                "right": 891.609375,
+                "bottom": 778.234375,
+                "left": 769.609375
+              },
+              "current": {
+                "x": 779.21875,
+                "y": 669.734375,
+                "width": 122,
+                "height": 108.5,
+                "top": 669.734375,
+                "right": 901.21875,
+                "bottom": 778.234375,
+                "left": 779.21875
+              }
+            },
+            {
+              "tag": "TD",
+              "id": "",
+              "cls": "",
+              "previous": {
+                "x": 273.828125,
+                "y": 561.234375,
+                "width": 109.21875,
+                "height": 108.5,
+                "top": 561.234375,
+                "right": 383.046875,
+                "bottom": 669.734375,
+                "left": 273.828125
+              },
+              "current": {
+                "x": 280.5,
+                "y": 561.234375,
+                "width": 109.21875,
+                "height": 108.5,
+                "top": 561.234375,
+                "right": 389.71875,
+                "bottom": 669.734375,
+                "left": 280.5
+              }
+            }
+          ]
+        },
+        {
+          "at": 2060.699999999255,
+          "value": 0.06221367378391847,
+          "nodes": [
+            {
+              "tag": "TR",
+              "id": "",
+              "cls": "student-row",
+              "previous": {
+                "x": 39.59375,
+                "y": 669.734375,
+                "width": 1112.8125,
+                "height": 108.5,
+                "top": 669.734375,
+                "right": 1152.40625,
+                "bottom": 778.234375,
+                "left": 39.59375
+              },
+              "current": {
+                "x": 39.59375,
+                "y": 582.734375,
+                "width": 1112.8125,
+                "height": 65,
+                "top": 582.734375,
+                "right": 1152.40625,
+                "bottom": 647.734375,
+                "left": 39.59375
+              }
+            },
+            {
+              "tag": "TR",
+              "id": "",
+              "cls": "student-row",
+              "previous": {
+                "x": 39.59375,
+                "y": 561.234375,
+                "width": 1112.8125,
+                "height": 108.5,
+                "top": 561.234375,
+                "right": 1152.40625,
+                "bottom": 669.734375,
+                "left": 39.59375
+              },
+              "current": {
+                "x": 39.59375,
+                "y": 517.734375,
+                "width": 1112.8125,
+                "height": 65,
+                "top": 517.734375,
+                "right": 1152.40625,
+                "bottom": 582.734375,
+                "left": 39.59375
+              }
+            },
+            {
+              "tag": "TR",
+              "id": "",
+              "cls": "student-row",
+              "previous": {
+                "x": 39.59375,
+                "y": 778.234375,
+                "width": 1112.8125,
+                "height": 63.5,
+                "top": 778.234375,
+                "right": 1152.40625,
+                "bottom": 841.734375,
+                "left": 39.59375
+              },
+              "current": {
+                "x": 39.59375,
+                "y": 647.734375,
+                "width": 1112.8125,
+                "height": 65,
+                "top": 647.734375,
+                "right": 1152.40625,
+                "bottom": 712.734375,
+                "left": 39.59375
+              }
+            },
+            {
+              "tag": "TR",
+              "id": "",
+              "cls": "student-row",
+              "previous": {
+                "x": 0,
+                "y": 0,
+                "width": 0,
+                "height": 0,
+                "top": 0,
+                "right": 0,
+                "bottom": 0,
+                "left": 0
+              },
+              "current": {
+                "x": 39.59375,
+                "y": 712.734375,
+                "width": 1112.8125,
+                "height": 65,
+                "top": 712.734375,
+                "right": 1152.40625,
+                "bottom": 777.734375,
+                "left": 39.59375
+              }
+            },
+            {
+              "tag": "NAV",
+              "id": "",
+              "cls": "hdr-tiles",
+              "previous": {
+                "x": 361.6875,
+                "y": 18.296875,
+                "width": 716.625,
+                "height": 55.953125,
+                "top": 18.296875,
+                "right": 1078.3125,
+                "bottom": 74.25,
+                "left": 361.6875
+              },
+              "current": {
+                "x": 442.5,
+                "y": 18.296875,
+                "width": 555,
+                "height": 55.953125,
+                "top": 18.296875,
+                "right": 997.5,
+                "bottom": 74.25,
+                "left": 442.5
+              }
+            }
+          ]
+        }
+      ],
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 228
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 404
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Vazirmatn",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        },
+        {
+          "family": "Sahel",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Yekan",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        },
+        {
+          "family": "Sahel",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Yekan",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "block"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "block"
+        }
+      ],
+      "ui": {
+        "icons": 0,
+        "flushes": 2,
+        "initMs": 33
+      }
+    },
+    {
+      "phase": "after",
+      "file": "index.php",
+      "role": "guest",
+      "requestedBytes": 396283,
+      "requests": [
+        {
+          "path": "assets/fonts/screen/Vazirmatn-Regular.woff2",
+          "bytes": 50684
+        },
+        {
+          "path": "assets/fonts/screen/Vazirmatn-Bold.woff2",
+          "bytes": 51020
+        },
+        {
+          "path": "assets/css/style.css",
+          "bytes": 36442
+        },
+        {
+          "path": "assets/css/ui-modern.css",
+          "bytes": 35617
+        },
+        {
+          "path": "assets/css/school-ui.css",
+          "bytes": 23017
+        },
+        {
+          "path": "assets/js/login-captcha.js",
+          "bytes": 4655
+        },
+        {
+          "path": "assets/js/login-feedback.js",
+          "bytes": 948
+        },
+        {
+          "path": "assets/js/school-icons.js",
+          "bytes": 24957
+        },
+        {
+          "path": "assets/js/school-ui.js",
+          "bytes": 17571
+        },
+        {
+          "path": "assets/js/main.js",
+          "bytes": 11859
+        },
+        {
+          "path": "assets/js/ui-modern.js",
+          "bytes": 6498
+        },
+        {
+          "path": "assets/js/searchable-select.js",
+          "bytes": 9979
+        },
+        {
+          "path": "uploads/Vazirmatn/Vazirmatn-Bold.ttf",
+          "bytes": 123036
+        }
+      ],
+      "dom": {
+        "at": 419.59999999962747,
+        "rows": 0,
+        "hidden": 0,
+        "animated": 0
+      },
+      "cls": 0.0005604926686228057,
+      "shifts": [
+        {
+          "at": 782.6999999992549,
+          "value": 0.0005604926686228057,
+          "nodes": [
+            {
+              "tag": "#text",
+              "previous": {
+                "x": 203,
+                "y": 92,
+                "width": 694.109375,
+                "height": 23,
+                "top": 92,
+                "right": 897.109375,
+                "bottom": 115,
+                "left": 203
+              },
+              "current": {
+                "x": 203,
+                "y": 89,
+                "width": 694.3125,
+                "height": 23,
+                "top": 89,
+                "right": 897.3125,
+                "bottom": 112,
+                "left": 203
+              }
+            },
+            {
+              "tag": "#text",
+              "previous": {
+                "x": 203,
+                "y": 447.515625,
+                "width": 694,
+                "height": 15,
+                "top": 447.515625,
+                "right": 897,
+                "bottom": 462.515625,
+                "left": 203
+              },
+              "current": {
+                "x": 203,
+                "y": 445.90625,
+                "width": 694,
+                "height": 15,
+                "top": 445.90625,
+                "right": 897,
+                "bottom": 460.90625,
+                "left": 203
+              }
+            },
+            {
+              "tag": "#text",
+              "previous": {
+                "x": 965,
+                "y": 189.984375,
+                "width": 268.515625,
+                "height": 29,
+                "top": 189.984375,
+                "right": 1233.515625,
+                "bottom": 218.984375,
+                "left": 965
+              },
+              "current": {
+                "x": 965,
+                "y": 186.171875,
+                "width": 268,
+                "height": 29,
+                "top": 186.171875,
+                "right": 1233,
+                "bottom": 215.171875,
+                "left": 965
+              }
+            },
+            {
+              "tag": "#text",
+              "previous": {
+                "x": 655,
+                "y": 165.40625,
+                "width": 250,
+                "height": 20,
+                "top": 165.40625,
+                "right": 905,
+                "bottom": 185.40625,
+                "left": 655
+              },
+              "current": {
+                "x": 655,
+                "y": 163.796875,
+                "width": 250,
+                "height": 20,
+                "top": 163.796875,
+                "right": 905,
+                "bottom": 183.796875,
+                "left": 655
+              }
+            },
+            {
+              "tag": "#text",
+              "previous": {
+                "x": 437,
+                "y": 166.90625,
+                "width": 226,
+                "height": 20,
+                "top": 166.90625,
+                "right": 663,
+                "bottom": 186.90625,
+                "left": 437
+              },
+              "current": {
+                "x": 437,
+                "y": 165.296875,
+                "width": 226,
+                "height": 20,
+                "top": 165.296875,
+                "right": 663,
+                "bottom": 185.296875,
+                "left": 437
+              }
+            }
+          ]
+        }
+      ],
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 412
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 412
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Vazirmatn",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        },
+        {
+          "family": "Sahel",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Yekan",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        }
+      ],
+      "ui": {
+        "icons": 0,
+        "flushes": 1,
+        "initMs": 9
+      }
+    },
+    {
+      "phase": "after",
+      "file": "index.php",
+      "role": "admin",
+      "requestedBytes": 391886,
+      "requests": [
+        {
+          "path": "assets/fonts/screen/Vazirmatn-Regular.woff2",
+          "bytes": 50684
+        },
+        {
+          "path": "assets/fonts/screen/Vazirmatn-Bold.woff2",
+          "bytes": 51020
+        },
+        {
+          "path": "assets/css/style.css",
+          "bytes": 36442
+        },
+        {
+          "path": "assets/css/ui-modern.css",
+          "bytes": 35617
+        },
+        {
+          "path": "assets/css/school-ui.css",
+          "bytes": 23017
+        },
+        {
+          "path": "assets/js/session-watch.js",
+          "bytes": 1206
+        },
+        {
+          "path": "assets/js/school-icons.js",
+          "bytes": 24957
+        },
+        {
+          "path": "assets/js/school-ui.js",
+          "bytes": 17571
+        },
+        {
+          "path": "assets/js/main.js",
+          "bytes": 11859
+        },
+        {
+          "path": "assets/js/ui-modern.js",
+          "bytes": 6498
+        },
+        {
+          "path": "assets/js/searchable-select.js",
+          "bytes": 9979
+        },
+        {
+          "path": "uploads/Vazirmatn/Vazirmatn-Bold.ttf",
+          "bytes": 123036
+        }
+      ],
+      "dom": {
+        "at": 496.2000000011176,
+        "rows": 3,
+        "hidden": 0,
+        "animated": 0
+      },
+      "cls": 0.0009356869591606989,
+      "shifts": [
+        {
+          "at": 762.3000000007451,
+          "value": 0.0009356869591606989,
+          "nodes": [
+            {
+              "tag": "#text",
+              "previous": {
+                "x": 37.59375,
+                "y": 420.015625,
+                "width": 539.984375,
+                "height": 17,
+                "top": 420.015625,
+                "right": 577.578125,
+                "bottom": 437.015625,
+                "left": 37.59375
+              },
+              "current": {
+                "x": 37.59375,
+                "y": 417.015625,
+                "width": 539.5625,
+                "height": 17,
+                "top": 417.015625,
+                "right": 577.15625,
+                "bottom": 434.015625,
+                "left": 37.59375
+              }
+            },
+            {
+              "tag": "#text",
+              "previous": {
+                "x": 615.84375,
+                "y": 433.21875,
+                "width": 537.5625,
+                "height": 17,
+                "top": 433.21875,
+                "right": 1153.40625,
+                "bottom": 450.21875,
+                "left": 615.84375
+              },
+              "current": {
+                "x": 615.84375,
+                "y": 431.21875,
+                "width": 537.5625,
+                "height": 17,
+                "top": 431.21875,
+                "right": 1153.40625,
+                "bottom": 448.21875,
+                "left": 615.84375
+              }
+            },
+            {
+              "tag": "TD",
+              "id": "",
+              "cls": "",
+              "previous": {
+                "x": 214.15625,
+                "y": 634.53125,
+                "width": 169.671875,
+                "height": 43.65625,
+                "top": 634.53125,
+                "right": 383.828125,
+                "bottom": 678.1875,
+                "left": 214.15625
+              },
+              "current": {
+                "x": 218.84375,
+                "y": 634.53125,
+                "width": 179.46875,
+                "height": 43.65625,
+                "top": 634.53125,
+                "right": 398.3125,
+                "bottom": 678.1875,
+                "left": 218.84375
+              }
+            },
+            {
+              "tag": "TD",
+              "id": "",
+              "cls": "",
+              "previous": {
+                "x": 899.546875,
+                "y": 634.53125,
+                "width": 114.859375,
+                "height": 49.0625,
+                "top": 634.53125,
+                "right": 1014.40625,
+                "bottom": 683.59375,
+                "left": 899.546875
+              },
+              "current": {
+                "x": 901.8125,
+                "y": 634.53125,
+                "width": 118.53125,
+                "height": 49.0625,
+                "top": 634.53125,
+                "right": 1020.34375,
+                "bottom": 683.59375,
+                "left": 901.8125
+              }
+            },
+            {
+              "tag": "#text",
+              "previous": {
+                "x": 454.734375,
+                "y": 221.640625,
+                "width": 122.421875,
+                "height": 33,
+                "top": 221.640625,
+                "right": 577.15625,
+                "bottom": 254.640625,
+                "left": 454.734375
+              },
+              "current": {
+                "x": 478.078125,
+                "y": 217.640625,
+                "width": 99.078125,
+                "height": 33,
+                "top": 217.640625,
+                "right": 577.15625,
+                "bottom": 250.640625,
+                "left": 478.078125
+              }
+            }
+          ]
+        }
+      ],
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 464
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 464
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Vazirmatn",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        },
+        {
+          "family": "Sahel",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Yekan",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        }
+      ],
+      "ui": {
+        "icons": 0,
+        "flushes": 1,
+        "initMs": 10
+      }
+    },
+    {
+      "phase": "after",
+      "file": "students.php",
+      "role": "admin",
+      "requestedBytes": 394397,
+      "requests": [
+        {
+          "path": "assets/fonts/screen/Vazirmatn-Regular.woff2",
+          "bytes": 50684
+        },
+        {
+          "path": "assets/fonts/screen/Vazirmatn-Bold.woff2",
+          "bytes": 51020
+        },
+        {
+          "path": "assets/css/style.css",
+          "bytes": 36442
+        },
+        {
+          "path": "assets/css/ui-modern.css",
+          "bytes": 35617
+        },
+        {
+          "path": "assets/css/student-workflow.css",
+          "bytes": 2511
+        },
+        {
+          "path": "assets/css/school-ui.css",
+          "bytes": 23017
+        },
+        {
+          "path": "assets/js/session-watch.js",
+          "bytes": 1206
+        },
+        {
+          "path": "assets/js/school-icons.js",
+          "bytes": 24957
+        },
+        {
+          "path": "assets/js/school-ui.js",
+          "bytes": 17571
+        },
+        {
+          "path": "assets/js/main.js",
+          "bytes": 11859
+        },
+        {
+          "path": "assets/js/ui-modern.js",
+          "bytes": 6498
+        },
+        {
+          "path": "assets/js/searchable-select.js",
+          "bytes": 9979
+        },
+        {
+          "path": "uploads/Vazirmatn/Vazirmatn-Bold.ttf",
+          "bytes": 123036
+        }
+      ],
+      "dom": {
+        "at": 541.8000000007451,
+        "rows": 6,
+        "hidden": 0,
+        "animated": 0
+      },
+      "cls": 0.0007843405405680339,
+      "shifts": [
+        {
+          "at": 776.0999999996275,
+          "value": 0.0007843405405680339,
+          "nodes": [
+            {
+              "tag": "#text",
+              "previous": {
+                "x": 130,
+                "y": 38.515625,
+                "width": 180.46875,
+                "height": 20,
+                "top": 38.515625,
+                "right": 310.46875,
+                "bottom": 58.515625,
+                "left": 130
+              },
+              "current": {
+                "x": 130,
+                "y": 35.515625,
+                "width": 180,
+                "height": 20,
+                "top": 35.515625,
+                "right": 310,
+                "bottom": 55.515625,
+                "left": 130
+              }
+            },
+            {
+              "tag": "#text",
+              "previous": {
+                "x": 1235.734375,
+                "y": 25.78125,
+                "width": 133.328125,
+                "height": 26,
+                "top": 25.78125,
+                "right": 1369.0625,
+                "bottom": 51.78125,
+                "left": 1235.734375
+              },
+              "current": {
+                "x": 1261.28125,
+                "y": 21.78125,
+                "width": 107.78125,
+                "height": 26,
+                "top": 21.78125,
+                "right": 1369.0625,
+                "bottom": 47.78125,
+                "left": 1261.28125
+              }
+            },
+            {
+              "tag": "#text",
+              "previous": {
+                "x": 1035.65625,
+                "y": 338.46875,
+                "width": 118.75,
+                "height": 21,
+                "top": 338.46875,
+                "right": 1154.40625,
+                "bottom": 359.46875,
+                "left": 1035.65625
+              },
+              "current": {
+                "x": 1056.078125,
+                "y": 335.46875,
+                "width": 98.75,
+                "height": 21,
+                "top": 335.46875,
+                "right": 1154.828125,
+                "bottom": 356.46875,
+                "left": 1056.078125
+              }
+            },
+            {
+              "tag": "#text",
+              "previous": {
+                "x": 759.40625,
+                "y": 540.859375,
+                "width": 118,
+                "height": 17,
+                "top": 540.859375,
+                "right": 877.40625,
+                "bottom": 557.859375,
+                "left": 759.40625
+              },
+              "current": {
+                "x": 759.40625,
+                "y": 547.046875,
+                "width": 118,
+                "height": 17,
+                "top": 547.046875,
+                "right": 877.40625,
+                "bottom": 564.046875,
+                "left": 759.40625
+              }
+            },
+            {
+              "tag": "#text",
+              "previous": {
+                "x": 759.40625,
+                "y": 608.859375,
+                "width": 118,
+                "height": 17,
+                "top": 608.859375,
+                "right": 877.40625,
+                "bottom": 625.859375,
+                "left": 759.40625
+              },
+              "current": {
+                "x": 759.40625,
+                "y": 615.046875,
+                "width": 118,
+                "height": 17,
+                "top": 615.046875,
+                "right": 877.40625,
+                "bottom": 632.046875,
+                "left": 759.40625
+              }
+            }
+          ]
+        }
+      ],
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 500
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 500
+        }
+      ],
+      "fonts": [
+        {
+          "family": "Vazirmatn",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        },
+        {
+          "family": "Sahel",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Yekan",
+          "status": "unloaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        },
+        {
+          "family": "Vazirmatn",
+          "status": "loaded",
+          "display": "swap"
+        }
+      ],
+      "ui": {
+        "icons": 0,
+        "flushes": 2,
+        "initMs": 26
+      }
+    }
+  ]
+}

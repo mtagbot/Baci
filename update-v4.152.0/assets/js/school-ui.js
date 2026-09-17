@@ -34,7 +34,7 @@
   if(!root||!root.parentNode&&root!==d.body)return;
   if(root.nodeType===3){textIcon(root);return;}
   if(root.nodeType!==1||skip(root))return;
-  var walker=d.createTreeWalker(root,4,null,false),nodes=[],n;
+  var walker=d.createTreeWalker(root,4,{acceptNode:function(node){pattern.lastIndex=0;return pattern.test(node.nodeValue||'')?1:3;}},false),nodes=[],n;
   while((n=walker.nextNode()))nodes.push(n);
   each(nodes,textIcon);
  }
@@ -50,7 +50,7 @@
   each(tables,function(t){
    if(closest(t,'.page,.sheet,.docx,#cardPreview,[contenteditable],.math-token,[data-ui-no-scroll]'))return;
    if(closest(t,'.ui-table-scroll'))return;
-   var box=d.createElement('div');box.className='ui-table-scroll';box.tabIndex=0;box.setAttribute('role','region');var cap=t.querySelector('caption');box.setAttribute('aria-label',cap?cap.textContent:'جدول اطلاعات؛ برای دیدن ستون‌های بیشتر پیمایش کنید');t.parentNode.insertBefore(box,t);box.appendChild(t);
+   var existing=closest(t,'.table-container'),box=existing||d.createElement('div');box.classList.add('ui-table-scroll');box.tabIndex=0;box.setAttribute('role','region');var cap=t.querySelector('caption');box.setAttribute('aria-label',cap?cap.textContent:'جدول اطلاعات؛ برای دیدن ستون‌های بیشتر پیمایش کنید');if(!existing){t.parentNode.insertBefore(box,t);box.appendChild(t);}
   });
  }
  function labels(root){

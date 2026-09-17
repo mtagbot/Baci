@@ -1,0 +1,23 @@
+[
+  "assets/css/school-ui.css",
+  "assets/fonts/screen/Sahel.woff2",
+  "assets/fonts/screen/Vazirmatn-Bold.woff2",
+  "assets/fonts/screen/Vazirmatn-Regular.woff2",
+  "assets/fonts/screen/Yekan.woff2",
+  "assets/fonts/screen/manifest.json",
+  "assets/js/desk-connection.js",
+  "assets/js/login-feedback.js",
+  "assets/js/school-ui.js",
+  "assets/js/searchable-select.js",
+  "assets/js/ui-modern.js",
+  "desk-connection-status.php",
+  "includes/appearance.php",
+  "includes/desk_connection.php",
+  "includes/desk_sync.php",
+  "includes/footer.php",
+  "includes/header.php",
+  "includes/login_feedback.php",
+  "includes/student_profile_form.php",
+  "index.php",
+  "students.php"
+]

@@ -5,6 +5,7 @@
 
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/header_tiles.php';
+require_once __DIR__ . '/includes/login_feedback.php';
 
 // Check installer lock
 if (!file_exists(__DIR__ . '/config/installed.lock') && !isset($_GET['ignore_install'])) {
@@ -32,16 +33,18 @@ if ($action === 'logout') {
     redirect('index.php?view=login');
 }
 
-// Check Throttle
+// Keep the failed form selected even when the IP throttle rejects the request.
 $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !check_login_throttle($ip)) {
-    set_flash_message('error', 'تعداد تلاش‌های ناموفق شما بیش از حد مجاز است. لطفاً ۱۰ دقیقه دیگر مجدداً تلاش فرمایید.');
-    redirect('index.php');
+    $role=login_post_string('login_type');
+    if(in_array($role,['student','teacher','inquiry'],true))login_error($role,'تلاش‌های ناموفق زیاد بوده است. لطفاً ۱۰ دقیقه صبر کنید و دوباره تلاش کنید؛ در صورت تکرار، با مدرسه تماس بگیرید.');
+    set_flash_message('error','تلاش‌های ناموفق زیاد بوده است. لطفاً ۱۰ دقیقه دیگر تلاش کنید.');
+    redirect('admin-login.php');
 }
 
 // Handle Admin Login POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_POST['login_type'] === 'admin') {
-    if (!verify_csrf($_POST['csrf_token'] ?? '')) {
+    if (!verify_csrf(login_post_string('csrf_token'))) {
         set_flash_message('error', 'خطای امنیتی CSRF رخ داد.');
         redirect('index.php?view=login&tab=admin');
     }
@@ -51,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
     $password = $_POST['password'] ?? '';
 
     require_once __DIR__ . '/includes/header_tiles.php';
-    if (!login_captcha_gate('admin', $username, $_POST['captcha'] ?? '')) {
+    if (!login_captcha_gate('admin', $username, login_post_string('captcha'))) {
         set_flash_message('error', 'پاسخ سوال امنیتی (کد امنیتی) نادرست است.');
         redirect('index.php?view=login&tab=admin');
     }
@@ -80,17 +83,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
 
 // Handle Student Login POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_POST['login_type'] === 'student') {
-    if (!verify_csrf($_POST['csrf_token'] ?? '')) {
-        set_flash_message('error', 'خطای امنیتی CSRF رخ داد.');
-        redirect('index.php?view=login&tab=student');
+    if (!verify_csrf(login_post_string('csrf_token'))) {
+        login_error('student','اعتبار فرم به پایان رسیده است. همین صفحه تازه شده؛ اطلاعات را دوباره وارد و ارسال کنید.');
     }
-    $nationalId = tr_num(clean($_POST['national_id'] ?? ''), 'en');
-    $password   = tr_num($_POST['password'] ?? '', 'en'); // 6 digit serial
+    login_require_fields('student');
+    $nationalId = tr_num(clean(trim(login_post_string('national_id'))), 'en');
+    $password   = tr_num(login_post_string('password'), 'en'); // Preserve existing password/digit compatibility
 
     require_once __DIR__ . '/includes/header_tiles.php';
-    if (!login_captcha_gate('student', $nationalId, $_POST['captcha'] ?? '')) {
-        set_flash_message('error', 'پاسخ سوال امنیتی نادرست است.');
-        redirect('index.php?view=login&tab=student');
+    if (!login_captcha_gate('student', $nationalId, login_post_string('captcha'))) {
+        login_error('student','پاسخ سؤال امنیتی درست نیست یا اعتبار آن تمام شده است. پاسخ سؤال نمایش‌داده‌شده را وارد کنید.',['captcha']);
     }
 
     // Academic year coherence: prefer current default year if student exists in multiple years
@@ -129,24 +131,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
     }
     login_guard_fail('student', $nationalId);
     record_failed_login();
-    set_flash_message('error', 'کد ملی یا سریال ۶ رقمی شناسنامه نادرست است.');
-    redirect('index.php?view=login&tab=student');
+    login_error('student','کد ملی یا رمز ورود درست نیست، یا ورود به این حساب امکان‌پذیر نیست. رمز ثبت‌شده در مدرسه را وارد کنید؛ اگر رمز تغییر کرده است، از رمز جدید استفاده کنید.',['national_id','password']);
 }
 
 // Handle Quick Inquiry POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_POST['login_type'] === 'inquiry') {
-    if (!verify_csrf($_POST['csrf_token'] ?? '')) {
-        set_flash_message('error', 'خطای امنیتی CSRF');
-        redirect('index.php?view=login&tab=inquiry');
+    if (!verify_csrf(login_post_string('csrf_token'))) {
+        login_error('inquiry','اعتبار فرم به پایان رسیده است. همین صفحه تازه شده؛ اطلاعات را دوباره وارد و ارسال کنید.');
     }
-    $year       = trim($_POST['academic_year'] ?? '1404/1405');
-    $nationalId = tr_num(clean($_POST['national_id'] ?? ''), 'en');
-    $serial     = tr_num($_POST['serial_number'] ?? '', 'en');
+    login_require_fields('inquiry');
+    $year       = trim(login_post_string('academic_year')) ?: get_setting('current_academic_year','1404/1405');
+    $nationalId = tr_num(clean(trim(login_post_string('national_id'))), 'en');
+    $serial     = tr_num(login_post_string('serial_number'), 'en');
 
     require_once __DIR__ . '/includes/header_tiles.php';
-    if (!login_captcha_gate('inquiry', $nationalId, $_POST['captcha'] ?? '')) {
-        set_flash_message('error', 'پاسخ سوال امنیتی نادرست است.');
-        redirect('index.php?view=login&tab=inquiry');
+    if (!login_captcha_gate('inquiry', $nationalId, login_post_string('captcha'))) {
+        login_error('inquiry','پاسخ سؤال امنیتی درست نیست یا اعتبار آن تمام شده است. پاسخ سؤال نمایش‌داده‌شده را وارد کنید.',['captcha']);
     }
 
     // Prefer requested year, then current default
@@ -172,23 +172,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
     }
     login_guard_fail('inquiry', $nationalId);
     record_failed_login();
-    set_flash_message('error', 'اطلاعات استعلام (کد ملی یا سریال ۶ رقمی) با سیستم مطابقت ندارد.');
-    redirect('index.php?view=login&tab=inquiry');
+    login_error('inquiry','کد ملی یا سریال ثبت‌شده / رمز ورود مطابقت ندارد، یا دسترسی به حساب امکان‌پذیر نیست. سریال را مطابق ثبت مدرسه وارد کنید؛ نبودن کارنامه پس از ورود موفق، جداگانه اعلام می‌شود.',['national_id','serial_number']);
 }
 
 // Handle Teacher Login POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_POST['login_type'] === 'teacher') {
-    if (!verify_csrf($_POST['csrf_token'] ?? '')) {
-        set_flash_message('error', 'خطای امنیتی CSRF');
-        redirect('index.php?view=login&tab=teacher');
+    if (!verify_csrf(login_post_string('csrf_token'))) {
+        login_error('teacher','اعتبار فرم به پایان رسیده است. همین صفحه تازه شده؛ اطلاعات را دوباره وارد و ارسال کنید.');
     }
-    $nid  = tr_num(clean($_POST['national_id'] ?? ''), 'en');
-    $pass = $_POST['password'] ?? '';
+    login_require_fields('teacher');
+    $nid  = tr_num(clean(trim(login_post_string('national_id'))), 'en');
+    $pass = login_post_string('password');
 
     require_once __DIR__ . '/includes/header_tiles.php';
-    if (!login_captcha_gate('teacher', $nid, $_POST['captcha'] ?? '')) {
-        set_flash_message('error', 'کد امنیتی نادرست است.');
-        redirect('index.php?view=login&tab=teacher');
+    if (!login_captcha_gate('teacher', $nid, login_post_string('captcha'))) {
+        login_error('teacher','پاسخ سؤال امنیتی درست نیست یا اعتبار آن تمام شده است. پاسخ سؤال نمایش‌داده‌شده را وارد کنید.',['captcha']);
     }
 
     $t = DB::fetch("SELECT * FROM teachers WHERE national_id = ? AND status = 1", [$nid]);
@@ -206,8 +204,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
     } else {
         login_guard_fail('teacher', $nid);
         record_failed_login();
-        set_flash_message('error', 'کد ملی یا کلمه عبور دبیر نادرست است.');
-        redirect('index.php?view=login&tab=teacher');
+        login_error('teacher','کد ملی یا رمز ورود دبیر درست نیست، یا ورود به این حساب امکان‌پذیر نیست. کد پرسنلی فقط در صورتی معتبر است که مدرسه آن را رمز ورود شما تعیین کرده باشد. برای بررسی دسترسی با مدرسه تماس بگیرید.',['national_id','password']);
     }
 }
 
@@ -257,7 +254,7 @@ if ($view === 'dashboard' && is_admin_logged_in()):
             <h2 class="text-2xl font-bold">داشبورد مدیریت تحلیلی</h2>
             <p class="text-sm text-muted">نمای کلی وضعیت سیستم، دانش‌آموزان و کارنامه‌ها — سال تحصیلی <?php echo tr_num(clean($dashYear), 'fa'); ?></p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 dashboard-actions">
             <a href="import-students.php" class="btn btn-success gap-1 shadow">
                 <span><svg data-ui-icon="users" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="7" r="3"/><path d="M2 21v-3c0-6 14-6 14 0v3M16 4c5 0 5 6 1 6M19 14c3 1 3 4 3 7"/></svg> ایمپورت دانش‌آموزان</span>
             </a>
@@ -381,7 +378,10 @@ if ($view === 'dashboard' && is_admin_logged_in()):
 </div>
 <?php
 elseif ($view === 'login'):
-    $activeTab = $_GET['tab'] ?? 'student';
+    $activeTab = in_array($_GET['tab']??'', ['student','inquiry','teacher'],true)?$_GET['tab']:'student';
+    $loginFlash=get_flash_message();
+    $loginRetry=$_SESSION['login_retry']??[];unset($_SESSION['login_retry']);
+    if($loginFlash && in_array($loginRetry['role']??'', ['student','inquiry','teacher'],true))$activeTab=$loginRetry['role'];
     $captchaQ = generate_captcha();
     $logoUrl  = get_setting('logo_url', '');
 ?>
@@ -398,7 +398,7 @@ elseif ($view === 'login'):
                 <div class="auth-feature"><span class="fi"><svg data-ui-icon="chart" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3v18h18M7 17v-4m5 4V8m5 9V4"/></svg></span> مشاهده و دریافت کارنامه‌های تحصیلی</div>
                 <div class="auth-feature"><span class="fi"><svg data-ui-icon="science" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 2h8m-6 0v7L3 21h18L14 9V2M7 15h10"/></svg></span> شرکت در آزمون‌های آنلاین مدرسه</div>
                 <div class="auth-feature"><span class="fi"><svg data-ui-icon="bell" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 18h16l-2-4V9c0-8-12-8-12 0v5Zm6 3h4M12 2V1"/></svg></span> اعلان‌ها و پیام‌های آموزشی</div>
-                <div class="auth-feature"><span class="fi"><svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg></span> ورود امن با کد ملی و سریال شناسنامه</div>
+                <div class="auth-feature"><span class="fi"><svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg></span> ورود امن با کد ملی و رمز ثبت‌شده</div>
             </div>
         </div>
         <div class="auth-form-side">
@@ -415,18 +415,19 @@ elseif ($view === 'login'):
         <form id="studentTab" class="auth-panel" method="POST" action="index.php?view=login&tab=student" style="<?php echo $activeTab === 'student' ? 'display:block;' : 'display:none;'; ?>">
             <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
             <input type="hidden" name="login_type" value="student">
+            <?php login_feedback_markup('student',$activeTab,$loginFlash,$loginRetry); ?>
             <div class="auth-field">
                 <label>کد ملی دانش‌آموز (نام کاربری)</label>
                 <div class="auth-input-wrap">
                     <span class="auth-icon"><svg data-ui-icon="user" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2c0-8 16-8 16 0v2"/></svg></span>
-                    <input type="text" name="national_id" class="form-input dir-ltr text-left font-mono js-cap-identity" inputmode="numeric" autocomplete="username" placeholder="کد ملی ۱۰ رقمی" required autofocus>
+                    <input type="text" name="national_id" <?php echo login_field_attributes('student','national_id',$activeTab,$loginFlash,$loginRetry); ?> class="form-input dir-ltr text-left font-mono js-cap-identity" inputmode="numeric" autocomplete="username" placeholder="کد ملی ۱۰ رقمی" required>
                 </div>
             </div>
             <div class="auth-field">
-                <label>سریال ۶ رقمی شناسنامه (رمز عبور)</label>
+                <label>رمز ورود دانش‌آموز</label>
                 <div class="auth-input-wrap">
                     <span class="auth-icon"><svg data-ui-icon="key" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-5-5 3-3m-6 0 3-3"/></svg></span>
-                    <input type="password" name="password" id="stPass" class="form-input dir-ltr text-left font-mono" autocomplete="current-password" placeholder="******" required>
+                    <input type="password" name="password" <?php echo login_field_attributes('student','password',$activeTab,$loginFlash,$loginRetry); ?> id="stPass" class="form-input dir-ltr text-left font-mono" autocomplete="current-password" placeholder="******" required>
                     <button type="button" class="auth-eye" onclick="togglePass('stPass', this)" tabindex="-1" aria-label="نمایش رمز"><svg data-ui-icon="eye" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12c5-10 15-10 20 0-5 10-15 10-20 0Z"/><circle cx="12" cy="12" r="3"/></svg></button>
                 </div>
             </div>
@@ -435,7 +436,7 @@ elseif ($view === 'login'):
             <div class="auth-captcha js-captcha-wrap" data-cap-role="student" <?php echo login_needs_captcha('student','') ? '' : 'hidden'; ?>>
                 <span class="auth-captcha-label">سوال امنیتی:</span>
                 <span class="auth-captcha-q"><?php echo $captchaQ; ?></span>
-                <input type="number" name="captcha" class="form-input js-captcha-input" placeholder="پاسخ" <?php echo login_needs_captcha('student','') ? 'required' : 'disabled'; ?>>
+                <input type="number" name="captcha" <?php echo login_field_attributes('student','captcha',$activeTab,$loginFlash,$loginRetry); ?> class="form-input js-captcha-input" placeholder="پاسخ" <?php echo login_needs_captcha('student','') ? 'required' : 'disabled'; ?>>
             </div>
             <button type="submit" class="btn btn-success auth-submit">ورود و مشاهده کارنامه‌های من &larr;</button>
         </form>
@@ -444,6 +445,7 @@ elseif ($view === 'login'):
         <form id="inquiryTab" class="auth-panel" method="POST" action="index.php?view=login&tab=inquiry" style="<?php echo $activeTab === 'inquiry' ? 'display:block;' : 'display:none;'; ?>">
             <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
             <input type="hidden" name="login_type" value="inquiry">
+            <?php login_feedback_markup('inquiry',$activeTab,$loginFlash,$loginRetry); ?>
             <div class="auth-field">
                 <label>سال تحصیلی مورد استعلام</label>
                 <div class="auth-input-wrap">
@@ -459,14 +461,14 @@ elseif ($view === 'login'):
                 <label>کد ملی دانش‌آموز</label>
                 <div class="auth-input-wrap">
                     <span class="auth-icon"><svg data-ui-icon="user" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2c0-8 16-8 16 0v2"/></svg></span>
-                    <input type="text" name="national_id" class="form-input dir-ltr text-left font-mono js-cap-identity" inputmode="numeric" placeholder="کد ملی ۱۰ رقمی" required>
+                    <input type="text" name="national_id" <?php echo login_field_attributes('inquiry','national_id',$activeTab,$loginFlash,$loginRetry); ?> class="form-input dir-ltr text-left font-mono js-cap-identity" inputmode="numeric" placeholder="کد ملی ۱۰ رقمی" required>
                 </div>
             </div>
             <div class="auth-field">
-                <label>سریال ۶ رقمی شناسنامه</label>
+                <label>سریال ثبت‌شده / رمز ورود</label>
                 <div class="auth-input-wrap">
                     <span class="auth-icon"><svg data-ui-icon="card" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="10" r="2"/><path d="M5 17c0-5 6-5 6 0M14 9h5m-5 5h5"/></svg></span>
-                    <input type="text" name="serial_number" class="form-input dir-ltr text-left font-mono" inputmode="numeric" placeholder="۶ رقم" required>
+                    <input type="text" name="serial_number" <?php echo login_field_attributes('inquiry','serial_number',$activeTab,$loginFlash,$loginRetry); ?> class="form-input dir-ltr text-left font-mono" autocomplete="current-password" placeholder="مطابق اطلاعات ثبت‌شده در مدرسه" required>
                 </div>
             </div>
             <?php /* v4.132.0: کد امنیتی فقط بعد از اولین تلاش ناموفقِ همین حساب.
@@ -474,7 +476,7 @@ elseif ($view === 'login'):
             <div class="auth-captcha js-captcha-wrap" data-cap-role="inquiry" <?php echo login_needs_captcha('inquiry','') ? '' : 'hidden'; ?>>
                 <span class="auth-captcha-label">سوال امنیتی:</span>
                 <span class="auth-captcha-q"><?php echo $captchaQ; ?></span>
-                <input type="number" name="captcha" class="form-input js-captcha-input" placeholder="پاسخ" <?php echo login_needs_captcha('inquiry','') ? 'required' : 'disabled'; ?>>
+                <input type="number" name="captcha" <?php echo login_field_attributes('inquiry','captcha',$activeTab,$loginFlash,$loginRetry); ?> class="form-input js-captcha-input" placeholder="پاسخ" <?php echo login_needs_captcha('inquiry','') ? 'required' : 'disabled'; ?>>
             </div>
             <button type="submit" class="btn btn-primary auth-submit"><svg data-ui-icon="search" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg> استعلام و دریافت کارنامه تحصیلی</button>
         </form>
@@ -483,18 +485,19 @@ elseif ($view === 'login'):
         <form id="teacherTab" class="auth-panel" method="POST" action="index.php?view=login&tab=teacher" style="<?php echo $activeTab === 'teacher' ? 'display:block;' : 'display:none;'; ?>">
             <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
             <input type="hidden" name="login_type" value="teacher">
+            <?php login_feedback_markup('teacher',$activeTab,$loginFlash,$loginRetry); ?>
             <div class="auth-field">
                 <label>کد ملی دبیر (نام کاربری)</label>
                 <div class="auth-input-wrap">
                     <span class="auth-icon"><svg data-ui-icon="user" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2c0-8 16-8 16 0v2"/></svg></span>
-                    <input type="text" name="national_id" class="form-input dir-ltr text-left font-mono js-cap-identity" inputmode="numeric" autocomplete="username" placeholder="کد ملی ۱۰ رقمی" required>
+                    <input type="text" name="national_id" <?php echo login_field_attributes('teacher','national_id',$activeTab,$loginFlash,$loginRetry); ?> class="form-input dir-ltr text-left font-mono js-cap-identity" inputmode="numeric" autocomplete="username" placeholder="کد ملی ۱۰ رقمی" required>
                 </div>
             </div>
             <div class="auth-field">
                 <label>کد پرسنلی / رمز ورود</label>
                 <div class="auth-input-wrap">
                     <span class="auth-icon"><svg data-ui-icon="key" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-5-5 3-3m-6 0 3-3"/></svg></span>
-                    <input type="password" name="password" id="tPass" class="form-input dir-ltr text-left font-mono" autocomplete="current-password" placeholder="******" required>
+                    <input type="password" name="password" <?php echo login_field_attributes('teacher','password',$activeTab,$loginFlash,$loginRetry); ?> id="tPass" class="form-input dir-ltr text-left font-mono" autocomplete="current-password" placeholder="******" required>
                     <button type="button" class="auth-eye" onclick="togglePass('tPass', this)" tabindex="-1" aria-label="نمایش رمز"><svg data-ui-icon="eye" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12c5-10 15-10 20 0-5 10-15 10-20 0Z"/><circle cx="12" cy="12" r="3"/></svg></button>
                 </div>
             </div>
@@ -503,7 +506,7 @@ elseif ($view === 'login'):
             <div class="auth-captcha js-captcha-wrap" data-cap-role="teacher" <?php echo login_needs_captcha('teacher','') ? '' : 'hidden'; ?>>
                 <span class="auth-captcha-label">سوال امنیتی:</span>
                 <span class="auth-captcha-q"><?php echo $captchaQ; ?></span>
-                <input type="number" name="captcha" class="form-input js-captcha-input" placeholder="پاسخ" <?php echo login_needs_captcha('teacher','') ? 'required' : 'disabled'; ?>>
+                <input type="number" name="captcha" <?php echo login_field_attributes('teacher','captcha',$activeTab,$loginFlash,$loginRetry); ?> class="form-input js-captcha-input" placeholder="پاسخ" <?php echo login_needs_captcha('teacher','') ? 'required' : 'disabled'; ?>>
             </div>
             <button type="submit" class="btn btn-primary auth-submit">ورود به پورتال دبیران و ثبت نمرات &larr;</button>
         </form>
@@ -531,5 +534,6 @@ function togglePass(id, btn) {
     btn.textContent = el.type === 'password' ? '👁' : '🙈';
 }
 </script>
-<script src="assets/js/login-captcha.js"></script>
+<script src="assets/js/login-captcha.js?v=20260917e"></script>
+<script src="assets/js/login-feedback.js?v=20260917e"></script>
 <?php endif; require_once __DIR__ . '/includes/footer.php'; ?>

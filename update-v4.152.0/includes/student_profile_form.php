@@ -19,7 +19,6 @@ function st_date($prefix,$label,$st) {
     echo '</div></div>';
 }
 ?>
-<link rel="stylesheet" href="assets/css/student-workflow.css?v=20260917c">
 <script defer src="assets/js/student-workflow.js?v=20260917c"></script>
 <div class="student-editor card">
  <div class="student-editor-title"><div><p class="text-muted">پروندهٔ دانش‌آموز</p><h1><?php echo $action==='edit'?'ویرایش اطلاعات دانش‌آموز':'ثبت دانش‌آموز جدید'; ?></h1></div></div>

@@ -61,6 +61,8 @@ $tBg        = get_setting('table_header_bg', '');
 $customFont = get_setting('custom_font_url', '');
 $logoUrl    = get_setting('logo_url', '');
 $isEmbedded = isset($_GET['embedded']) && $_GET['embedded'] === '1';
+$headerRelease=is_file(dirname(__DIR__).'/config/release.php')?require dirname(__DIR__).'/config/release.php':[];
+$isDeskRuntime=($headerRelease['distribution']??(PHP_SAPI==='cli-server'?'desktop':'site'))==='desktop';
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl" class="school-shell">
@@ -70,16 +72,10 @@ $isEmbedded = isset($_GET['embedded']) && $_GET['embedded'] === '1';
     <title><?php echo clean($schoolName); ?> - پنل مدیریت و کارنامه</title>
     <script>try{localStorage.setItem('theme','light');document.documentElement.classList.remove('dark');}catch(e){}</script>
     <meta name="theme-color" content="<?php echo clean($themeColor); ?>"><!-- v4.30.0 -->
+    <?php echo app_screen_font_preload(); ?>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/ui-modern.css"><!-- v4.30.0: high-end UI layer -->
     <style>
-        @font-face { font-family: 'Vazirmatn'; src: url('uploads/Vazirmatn/Vazirmatn-Regular.woff2') format('woff2'), url('uploads/Vazirmatn/Vazirmatn-Regular.ttf') format('truetype'); font-display: swap; }
-        @font-face { font-family: 'Vazirmatn'; src: url('uploads/Vazirmatn/Vazirmatn-Bold.woff2') format('woff2'), url('uploads/Vazirmatn/Vazirmatn-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
-        @font-face { font-family: 'Sahel'; src: url('uploads/Sahel/Sahel.woff2') format('woff2'), url('uploads/Sahel/Sahel.ttf') format('truetype'); font-display: swap; }
-        @font-face { font-family: 'Yekan'; src: url('uploads/Yekan/Yekan.woff2') format('woff2'), url('uploads/Yekan/Yekan.ttf') format('truetype'); font-display: swap; }
-        <?php if ($fontFamily === 'CustomUploadedFont' && !empty($customFont)): ?>
-        @font-face { font-family: 'CustomUploadedFont'; src: url('<?php echo clean($customFont); ?>'); font-display: swap; }
-        <?php endif; ?>
         :root {
             /* v4.135.0 — رنگ اول و دوم واقعاً همه‌جا اعمال می‌شوند.
                پیش از این فقط --primary و --admin-gold ست می‌شد، ولی:
@@ -114,13 +110,13 @@ $isEmbedded = isset($_GET['embedded']) && $_GET['embedded'] === '1';
     </style>
     <?php /* v4.129.0: صفحه می‌تواند پیش از require، $pageCss را ست کند تا stylesheet
            صفحه‌ای در جای درستِ <head> بنشیند (نه داخل body). پیش‌فرض: هیچ. */
-    if (!empty($pageCss)): ?>
-    <link rel="stylesheet" href="<?php echo clean(is_array($pageCss) ? implode('" media="all"><link rel="stylesheet" href="', array_map(function($u){ return clean($u); }, $pageCss)) : $pageCss); ?>">
-    <?php endif; ?>
+    if (!empty($pageCss)) foreach((array)$pageCss as $sheet): ?>
+    <link rel="stylesheet" href="<?php echo clean($sheet); ?>">
+    <?php endforeach; ?>
 <?php if(st_current_user()): ?><script defer src="assets/js/session-watch.js"></script><?php endif; ?>
-<?php echo app_appearance_head(); ?>
-<link rel=stylesheet href=assets/css/school-ui.css?v20260917d><script defer src=assets/js/school-icons.js?v20260917d></script><script defer src=assets/js/school-ui.js?v20260917d></script><?php require_once __DIR__.'/school_ui_theme.php'; echo school_ui_theme(); ?><noscript><style>@media screen and (max-width:900px){body.school-app>.flex.flex-1{display:block}body.school-app .sidebar{position:static!important;transform:none!important;visibility:visible!important;width:100%!important;max-width:none;height:auto!important}body.school-app .hamburger-btn,body.school-app .ui-drawer-close{display:none!important}}</style></noscript></head>
-<body class="school-app <?php echo $isEmbedded ? 'embedded-mode' : ''; ?> bg-body text-main min-h-screen flex flex-col font-sans">
+<?php echo app_appearance_head(true); ?>
+<link rel=stylesheet href=assets/css/school-ui.css?v20260917e><script defer src=assets/js/school-icons.js?v20260917e></script><script defer src=assets/js/school-ui.js?v20260917e></script><?php require_once __DIR__.'/school_ui_theme.php'; echo school_ui_theme(); ?><noscript><style>@media screen and (max-width:900px){body.school-app>.flex.flex-1{display:block}body.school-app .sidebar{position:static!important;transform:none!important;visibility:visible!important;width:100%!important;max-width:none;height:auto!important}body.school-app .hamburger-btn,body.school-app .ui-drawer-close{display:none!important}}</style></noscript></head>
+<body class="school-app <?php echo $isDeskRuntime&&!$isEmbedded?'desk-runtime':''; ?> <?php echo $isEmbedded ? 'embedded-mode' : ''; ?> bg-body text-main min-h-screen flex flex-col font-sans">
 <a class="ui-skip" href="#main-content">رفتن به محتوای اصلی</a>
 <script>
 /* v4.66.0: یک دکمه، دو رفتار — موبایل: کشوی بازشو (sidebar-open)؛

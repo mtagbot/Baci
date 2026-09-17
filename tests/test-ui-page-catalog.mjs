@@ -5,7 +5,8 @@ import {REPO,resolveSite} from './harness/site.mjs';
 process.env.CLASS_ACTIONS_TEST='1';
 const {code,admin,sid,exec,canonical,php}=await import('./test-class-exam-groups.mjs');
 const {req}=await import('./harness/lib.mjs');
-const dir=join(REPO,'.cache/ui-audit/pages');mkdirSync(dir,{recursive:true});
+const catalogRoot=join(REPO,process.env.UI_CATALOG_ROOT||'.cache/ui-audit');
+const dir=join(catalogRoot,'pages');mkdirSync(dir,{recursive:true});
 await code(`<?php require '/www/includes/functions.php';DB::execute("INSERT OR IGNORE INTO admins(id,username,name,password,role,status) VALUES(1,'audit','مدیر مدرسه','disabled','super_admin',1)");set_setting('school_name','دبیرستان بصیرت');set_setting('font_family','Vazirmatn');set_setting('current_academic_year','1404/1405');DB::execute("INSERT INTO reports(student_id,academic_year,term,report_month,class_name,gpa) VALUES(1,'1404/1405','نوبت اول','آبان','101',18)");`);
 const reportId=await code(`<?php require '/www/includes/functions.php';echo DB::fetch('SELECT MAX(id) n FROM reports')['n'];`);
 await code(`<?php require '/www/includes/functions.php';DB::execute("UPDATE teachers SET is_counselor=1,is_deputy=1 WHERE id=803");DB::execute("UPDATE online_exams SET max_attempts=10");DB::execute("INSERT INTO online_exam_attempts(id,exam_id,student_id,attempt_number,status,start_time,score,max_score,submitted_at,end_time) VALUES(10,1,1,1,'submitted',?,8,12,datetime('now'),datetime('now'))",[date('Y-m-d H:i:s')]);`);
@@ -35,5 +36,5 @@ for(const [i,r] of routes.entries()){
   result.push(item);if(hasHTML)writeFileSync(join(dir,snapshot),h);console.log(hasHTML?'HTML':'SKIP',r.file,r.role,item.fatal||item.redirect||'');
  }catch(e){result.push({...r,error:e.message});console.log('ERROR',r.file,e.message);}
 }
-writeFileSync(join(REPO,'.cache/ui-audit/routes.json'),JSON.stringify({inventory,routes:result},null,2));
+writeFileSync(join(catalogRoot,'routes.json'),JSON.stringify({inventory,routes:result},null,2));
 console.log('Rendered:',result.filter(r=>r.rendered).length,'/',result.length,'requests; root catalog:',inventory.length);const failures=result.filter(r=>r.error||r.fatal||(!r.rendered&&!(r.file.includes('bulk-report.php')&&!r.post)));if(failures.length)console.error('Catalog failures',failures);process.exit(failures.length?1:0);

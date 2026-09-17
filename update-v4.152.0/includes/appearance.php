@@ -18,11 +18,39 @@ function app_color_ink($hex) {
     $c=[];foreach([1,3,5] as $i){$x=hexdec(substr($hex,$i,2))/255;$c[]=$x<=.04045?$x/12.92:pow(($x+.055)/1.055,2.4);}
     $l=.2126*$c[0]+.7152*$c[1]+.0722*$c[2];return ($l+.05)/.05>1.05/($l+.05)?'#000000':'#ffffff';
 }
-function app_appearance_head() {
-    $font=app_font_spec();$bold=app_font_spec(true);$css='<style id="app-appearance">';
+/** Prefer compressed equivalents only when the installed source font is unchanged. */
+function app_screen_font_spec($bold=false) {
+    $spec=app_font_spec($bold);
+    if($spec['family']==='CustomUploadedFont')return $spec;
+    $manifest=__DIR__.'/../assets/fonts/screen/manifest.json';
+    static $map=null,$verified=[];
+    if($map===null)$map=is_file($manifest)?(json_decode(file_get_contents($manifest),true)?:[]):[];
+    if(isset($map[$spec['url']])&&$spec['path']){
+        $item=$map[$spec['url']];$key=$spec['path'];
+        if(!array_key_exists($key,$verified))$verified[$key]=hash_equals($item['sha256'],hash_file('sha256',$key));
+        if($verified[$key]&&is_file(dirname(__DIR__).'/'.$item['url']))$spec['url']=$item['url'];
+    }
+    return $spec;
+}
+function app_screen_font_preload() {
+    $out='';$seen=[];
+    foreach([false,true] as $bold){$font=app_screen_font_spec($bold);$url=$font['url'];if($url===''||isset($seen[$url]))continue;$seen[$url]=true;
+        $ext=strtolower(pathinfo($url,PATHINFO_EXTENSION));$mime=['woff2'=>'font/woff2','woff'=>'font/woff','ttf'=>'font/ttf','otf'=>'font/otf'][$ext]??'font/ttf';
+        $out.='<link rel="preload" as="font" type="'.$mime.'" crossorigin href="'.htmlspecialchars($url,ENT_QUOTES,'UTF-8').'">';
+    }
+    return $out;
+}
+function app_appearance_head($screen=false) {
+    $font=$screen?app_screen_font_spec():app_font_spec();$bold=$screen?app_screen_font_spec(true):app_font_spec(true);$css='<style id="app-appearance">';
     foreach([[$font,'400'],[$bold,'700']] as $item) if($item[0]['url']!=='') {
         $url=str_replace(['<','>'],['%3C','%3E'],json_encode($item[0]['url'],JSON_UNESCAPED_SLASHES));
-        $css.='@font-face{font-family:"'.$font['family'].'";src:url('.$url.');font-weight:'.$item[1].';font-display:block}';
+        $src='url('.$url.')';
+        if($screen && str_ends_with($item[0]['url'],'.woff2')){
+            $original=app_font_spec($item[1]==='700');
+            $fallback=str_replace(['<','>'],['%3C','%3E'],json_encode($original['url'],JSON_UNESCAPED_SLASHES));
+            $src.=' format("woff2"),url('.$fallback.') format("truetype")';
+        }
+        $css.='@font-face{font-family:"'.$font['family'].'";src:'.$src.';font-weight:'.$item[1].';font-display:'.($screen?'swap':'block').'}';
     }
     $css.=':root{--app-font:"'.$font['family'].'",Tahoma,sans-serif;';
     foreach(app_palette() as $name=>$color){$rgb=implode(',',[hexdec(substr($color,1,2)),hexdec(substr($color,3,2)),hexdec(substr($color,5,2))]);$css.='--'.$name.':'.$color.'!important;--'.$name.'-ink:'.app_color_ink($color).';--'.$name.'-soft:rgba('.$rgb.',.12)!important;';}

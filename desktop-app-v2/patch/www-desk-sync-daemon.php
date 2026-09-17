@@ -35,7 +35,15 @@ $hbFile    = $dataDir . '/sync-heartbeat.json';
 $aliveFile = $dataDir . '/app-alive.txt';
 $kickFile  = $dataDir . '/sync-kick.txt';
 
+function desk_write_heartbeat($file,$value) {
+    $temp=$file.'.'.getmypid().'.tmp';
+    if(@file_put_contents($temp,json_encode($value,JSON_UNESCAPED_UNICODE),LOCK_EX)!==false){
+        if(!@rename($temp,$file))@unlink($temp);
+    }
+}
 while (true) {
+    // Publish actual worker activity before potentially slow remote I/O.
+    desk_write_heartbeat($hbFile,['phase'=>'syncing','ts'=>time(),'daemon'=>1]);
     $res = ['ok' => false];
     try {
         $res = DeskSync::tick();
@@ -46,7 +54,8 @@ while (true) {
     if (!is_array($res)) $res = ['ok' => false];
     $res['ts']     = time();
     $res['daemon'] = 1;
-    @file_put_contents($hbFile, json_encode($res, JSON_UNESCAPED_UNICODE));
+    $res['phase']='settled';
+    desk_write_heartbeat($hbFile,$res);
 
     // app closed? (no page request refreshed app-alive for 15 minutes) → stop
     if (!is_file($aliveFile) || time() - (int)@filemtime($aliveFile) > 900) break;
