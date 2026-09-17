@@ -1,6 +1,6 @@
 // Real PHP/SQLite requests: privileged key rotation, device tombstones and cookie replay.
 import assert from 'node:assert/strict';
-import {run,req,php,db} from './harness/lib.mjs';
+import {run,req,php,db,student} from './harness/lib.mjs';
 import {createRequire} from 'node:module';
 import {readFileSync,existsSync} from 'node:fs';
 import {REPO,resolveFile} from './harness/site.mjs';
@@ -102,8 +102,8 @@ assert.equal(JSON.parse((await request('security-probe.php','secPasswordRestore'
 await request('logout.php','secPasswordFresh');
 assert((await request('security-probe.php','secLogoutReplay',null,{school_remember:fresh})).redirect?.includes('session_closed=1'));checks++;
 // Teacher and student devices obey the same central gate.
-await execute(`require '/www/includes/functions.php';DB::execute("UPDATE students SET status='active' WHERE id=4");`);
-for(const [role,id] of [['teacher',701],['student',4]]){
+await execute(`require '/www/includes/functions.php';DB::execute("UPDATE students SET status='active' WHERE id=${student.id}");`);
+for(const [role,id] of [['teacher',701],['student',student.id]]){
   const sid='sec'+role, t=await issue(sid,role,id);
   assert.equal(JSON.parse((await request('security-probe.php',sid+'Restored',null,{school_remember:t})).page).user[0],role);
   await execute(`require '/www/includes/functions.php';DB::execute('UPDATE user_sessions SET is_revoked=1 WHERE session_id=?',['${sid}']);`);

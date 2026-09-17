@@ -1,0 +1,11 @@
+Options -Indexes
+DirectoryIndex index.php
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule (^|/)\. - [F,L]
+RewriteRule ^(?:config|includes|sql|vendor|backups)(?:/|$) - [F,L,NC]
+RewriteRule ^uploads/.*\.(?:php[0-9]?|phtml|phar|cgi|pl|py|sh)(?:/|$) - [F,L,NC]
+</IfModule>
+<FilesMatch "(?i)\.(sqlite(?:3|-wal|-shm)?|db|sql|ini|log|bak|backup|env|lock|py|md|json)$">
+Require all denied
+</FilesMatch>

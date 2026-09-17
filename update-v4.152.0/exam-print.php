@@ -121,10 +121,11 @@ function enableDrag(){document.querySelectorAll('.card').forEach(card=>{card.ond
 $examId = (int)($_GET['exam_id'] ?? 0);
 $exam = DB::fetch('SELECT es.*, COALESCE(t.full_name, es.teacher_name) t_name, t.last_name t_last FROM exam_schedules es LEFT JOIN teachers t ON t.id=es.teacher_id WHERE es.id=?',[$examId]);
 if (!$exam) die('امتحان یافت نشد');
+if(($exam['exam_kind']??'')==='class_deleted')die('این آزمون کلاسی حذف شده و قابل ویرایش یا چاپ نیست.');
 $designToken = $_GET['dt'] ?? '';
 $designTokenOk = verify_exam_design_token($designToken, $examId);
 if (($type === 'questions' || $type === 'questions_editor') && !$designTokenOk && !exam_can_design($examId)) die('شما مجاز به طراحی سوالات این آزمون نیستید.');
-if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['upload_question_source']))ceg_write_begin($exam);
+if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['upload_question_source'])){ceg_write_begin($exam);$fresh=DB::fetch('SELECT exam_kind FROM exam_schedules WHERE id=?',[$examId]);if(!$fresh || $fresh['exam_kind']==='class_deleted')die('این آزمون کلاسی حذف شده است.');}
 $classGroup=ceg_for_exam($exam);
 if(ceg_pending_sync($exam,$classGroup))die('اطلاعات گروه هنوز همگام نشده است؛ پس از تکمیل همگام‌سازی صفحه را باز کنید.');
 if ($classGroup && !$classGroup['excluded'] && (int)$classGroup['design_exam_id']!==$examId && in_array($type,['questions','questions_editor'],true)) {
@@ -444,7 +445,7 @@ body.modal-open{overflow:hidden}
   <span class="tb-sep"></span>
   <div class="tb-group"><span class="tb-title">دست‌نویس</span><label class="tb-color" title="رنگ قلم"><input type="color" id="penColor" value="#111111"></label><button id="toolBtnPen" onclick="setTool('pen')">قلم</button><button id="toolBtnEraser" onclick="setTool('eraser')">پاک‌کن</button><button id="toolBtnOff" class="tool-active" onclick="setTool('off')">خاموش</button><button onclick="clearDrawings()">پاک‌کردن</button></div>
   <span class="tb-spacer"></span>
-  <div class="tb-group tb-actions"><?php if($groupScope!==''): ?><b class="group-design-notice">آزمون مشترک پایه — تغییرات برای همهٔ اعضای گروه است</b><?php endif; ?><button class="btn-save" onclick="saveDesign()">ذخیره طراحی</button><button class="btn-print" onclick="prepareAllAndPrint()">چاپ نهایی</button></div>
+  <div class="tb-group tb-actions"><?php if($groupScope!==''): ?><b class="group-design-notice">آزمون مشترک پایه — تغییرات برای همهٔ اعضای گروه است</b><?php elseif($classGroup && $classGroup['excluded']): ?><b class="independent-design-notice">آزمون مستقل این کلاس — مستثنی از آزمون پایه؛ تغییرات فقط برای این کلاس است</b><?php endif; ?><button class="btn-save" onclick="saveDesign()">ذخیره طراحی</button><button class="btn-print" onclick="prepareAllAndPrint()">چاپ نهایی</button></div>
 </div>
 <div class="editor-panel collapsed" id="questionEditorPanel">
   <div class="panel-head"><b>تنظیمات برگه</b><button type="button" class="panel-close" onclick="toggleEditor()" aria-label="بستن">×</button></div>
@@ -629,6 +630,7 @@ setTimeout(syncToolbarOffset,1200);
 const studentsData=<?php echo json_encode($studentsData, JSON_UNESCAPED_UNICODE); ?>;
 const examData=<?php echo json_encode($examData, JSON_UNESCAPED_UNICODE); ?>;
 const examId=<?php echo (int)$examId; ?>;
+const isClassExam=<?php echo ($exam['exam_kind']??'')==='class'?'true':'false'; ?>;
 const classGroupMember=<?php echo (int)($_GET['class_only']??0); ?>;
 const classGroupScope=<?php echo json_encode($groupScope); ?>;
 const designToken=<?php echo json_encode($designToken, JSON_UNESCAPED_UNICODE); ?>;
@@ -1200,7 +1202,7 @@ function designedPageCount(){
   return Math.max(1,n,sourcePageCount());
 }
 function checkClassGroupScope(){
-  if(!classGroupScope)return Promise.resolve(true);
+  if(!classGroupScope && !isClassExam)return Promise.resolve(true);
   return fetch('exam-design-api.php?group_member='+classGroupMember+'&action=group_scope&exam_id='+examId+'&dt='+encodeURIComponent(designToken)).then(r=>r.json()).then(j=>{
     if(!j.ok || j.scope!==classGroupScope){alert('اعضای آزمون پایه تغییر کرده‌اند؛ پیش از چاپ صفحه را تازه‌سازی کنید. کلاس مستثنی‌شده باید از طراحی مستقل باز شود.');return false;}return true;
   }).catch(()=>{alert('بررسی اعضای گروه ممکن نشد؛ دوباره تلاش کنید.');return false;});

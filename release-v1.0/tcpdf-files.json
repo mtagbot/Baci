@@ -1,0 +1,346 @@
+[
+  {
+    "path": "LICENSE.TXT",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "b85904e8bc693d840f8917ca1f4d76bea6f3d5e9",
+    "size": 43695,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/b85904e8bc693d840f8917ca1f4d76bea6f3d5e9"
+  },
+  {
+    "path": "README.md",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "6aa484439f59d4d027889beacc0e37bab5d639ca",
+    "size": 6073,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/6aa484439f59d4d027889beacc0e37bab5d639ca"
+  },
+  {
+    "path": "config/tcpdf_config.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "d430ee4d0612ab86895b412ff218c00a068a04db",
+    "size": 5730,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/d430ee4d0612ab86895b412ff218c00a068a04db"
+  },
+  {
+    "path": "fonts/courier.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "e935b67681cd86e8f3af9424e0e16398e5dc146d",
+    "size": 2562,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/e935b67681cd86e8f3af9424e0e16398e5dc146d"
+  },
+  {
+    "path": "fonts/courierb.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "acb01b0d68d3f88c5b45d9ba00acd774d9f49e3b",
+    "size": 2569,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/acb01b0d68d3f88c5b45d9ba00acd774d9f49e3b"
+  },
+  {
+    "path": "fonts/courierbi.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "631c623e90848652650451f69fbc94a2f538c825",
+    "size": 2577,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/631c623e90848652650451f69fbc94a2f538c825"
+  },
+  {
+    "path": "fonts/courieri.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "5ae725d4ad21b316ce23c019a119a5400878fd7a",
+    "size": 2572,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/5ae725d4ad21b316ce23c019a119a5400878fd7a"
+  },
+  {
+    "path": "fonts/dejavusans.ctg.z",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "df25b6497f084274a55feb158bb478f237137568",
+    "size": 10454,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/df25b6497f084274a55feb158bb478f237137568"
+  },
+  {
+    "path": "fonts/dejavusans.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "72147beecb9f3c8a1759375baf0ea2c223dd462d",
+    "size": 202079,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/72147beecb9f3c8a1759375baf0ea2c223dd462d"
+  },
+  {
+    "path": "fonts/dejavusans.z",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "d0c4d3de7a82cc63c15cbcc1d29dab60dfc4173a",
+    "size": 375806,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/d0c4d3de7a82cc63c15cbcc1d29dab60dfc4173a"
+  },
+  {
+    "path": "fonts/dejavusansb.ctg.z",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "71cef637e83311b26f0d4325c39b137930335918",
+    "size": 10200,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/71cef637e83311b26f0d4325c39b137930335918"
+  },
+  {
+    "path": "fonts/dejavusansb.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "5214aef7fde367ef32196c2121f960dd665900a7",
+    "size": 197327,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/5214aef7fde367ef32196c2121f960dd665900a7"
+  },
+  {
+    "path": "fonts/dejavusansb.z",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "07031ce34da2e7d17ce67aa85fea28fe941c4444",
+    "size": 347269,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/07031ce34da2e7d17ce67aa85fea28fe941c4444"
+  },
+  {
+    "path": "fonts/dejavusansbi.ctg.z",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "23445ef2f4ba7cbb6b067515a98d6500f62a23f5",
+    "size": 9101,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/23445ef2f4ba7cbb6b067515a98d6500f62a23f5"
+  },
+  {
+    "path": "fonts/dejavusansbi.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "e4a66708be684a676b9f198443d85cf3a5af52dc",
+    "size": 176889,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/e4a66708be684a676b9f198443d85cf3a5af52dc"
+  },
+  {
+    "path": "fonts/dejavusansbi.z",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "ff50412f166db8dc30dd0a2aa0af3a70b0baabca",
+    "size": 326692,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/ff50412f166db8dc30dd0a2aa0af3a70b0baabca"
+  },
+  {
+    "path": "fonts/dejavusansi.ctg.z",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "1b98d135f6843177fd449faf94308ad8f33326d4",
+    "size": 9343,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/1b98d135f6843177fd449faf94308ad8f33326d4"
+  },
+  {
+    "path": "fonts/dejavusansi.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "07c6fd1099dc28bc4e7c22f5fcd02f0ec3dd6386",
+    "size": 181449,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/07c6fd1099dc28bc4e7c22f5fcd02f0ec3dd6386"
+  },
+  {
+    "path": "fonts/dejavusansi.z",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "6a1b2b825c21e6e8e96b841be9ba6335d2b39580",
+    "size": 326859,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/6a1b2b825c21e6e8e96b841be9ba6335d2b39580"
+  },
+  {
+    "path": "fonts/helvetica.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "d1aa6d851d3b6f15ce0567a0bb78c53c1a1fad74",
+    "size": 2575,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/d1aa6d851d3b6f15ce0567a0bb78c53c1a1fad74"
+  },
+  {
+    "path": "fonts/helveticab.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "8d6047f6ab5434e156337465ca0bd009f21bd51a",
+    "size": 2580,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/8d6047f6ab5434e156337465ca0bd009f21bd51a"
+  },
+  {
+    "path": "fonts/helveticabi.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "e2ecf38dfe4477dc2981a314ead0baaa644af56c",
+    "size": 2589,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/e2ecf38dfe4477dc2981a314ead0baaa644af56c"
+  },
+  {
+    "path": "fonts/helveticai.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "0404aebd6abac855db803440319ac31213017208",
+    "size": 2584,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/0404aebd6abac855db803440319ac31213017208"
+  },
+  {
+    "path": "fonts/symbol.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "15f7f1ddd323f449051c799b7130d0dadb10fe7c",
+    "size": 2555,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/15f7f1ddd323f449051c799b7130d0dadb10fe7c"
+  },
+  {
+    "path": "fonts/times.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "cfcaf06cc5d97b1f88618d1d0b4172f380640698",
+    "size": 2572,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/cfcaf06cc5d97b1f88618d1d0b4172f380640698"
+  },
+  {
+    "path": "fonts/timesb.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "9c41a7b51f524f085f68a82acad8af39f448998e",
+    "size": 2577,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/9c41a7b51f524f085f68a82acad8af39f448998e"
+  },
+  {
+    "path": "fonts/timesbi.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "4feed7489c7c3d5cedadd62195b6ef5e747fb10f",
+    "size": 2580,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/4feed7489c7c3d5cedadd62195b6ef5e747fb10f"
+  },
+  {
+    "path": "fonts/timesi.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "1e8b673498cb3a57169a8e9edc365f6a9bcdf5ef",
+    "size": 2575,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/1e8b673498cb3a57169a8e9edc365f6a9bcdf5ef"
+  },
+  {
+    "path": "fonts/zapfdingbats.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "4c0bd75d520662b4345fe677e42ad1d982cb5e6d",
+    "size": 2552,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/4c0bd75d520662b4345fe677e42ad1d982cb5e6d"
+  },
+  {
+    "path": "include/barcodes/datamatrix.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "05fd713c925db8ef928cc0b8e0de4cd1d5537b94",
+    "size": 42767,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/05fd713c925db8ef928cc0b8e0de4cd1d5537b94"
+  },
+  {
+    "path": "include/barcodes/pdf417.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "6a9ef6717d37633b4d5a089a0ddf52feb0109698",
+    "size": 53953,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/6a9ef6717d37633b4d5a089a0ddf52feb0109698"
+  },
+  {
+    "path": "include/barcodes/qrcode.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "1b7c4c2c365dd2b79248eb9b668911cb30b0b707",
+    "size": 78782,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/1b7c4c2c365dd2b79248eb9b668911cb30b0b707"
+  },
+  {
+    "path": "include/tcpdf_colors.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "31435233c339b307a7349ecce7287aed9b41eab9",
+    "size": 15372,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/31435233c339b307a7349ecce7287aed9b41eab9"
+  },
+  {
+    "path": "include/tcpdf_filters.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "32c7dc23d50948a033221ef5212b92537e2da810",
+    "size": 14800,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/32c7dc23d50948a033221ef5212b92537e2da810"
+  },
+  {
+    "path": "include/tcpdf_font_data.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "9bb788e22f34c2fab62f5e644eab9cd4e0524ad1",
+    "size": 313504,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/9bb788e22f34c2fab62f5e644eab9cd4e0524ad1"
+  },
+  {
+    "path": "include/tcpdf_fonts.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "99ed0aca9a8e0b92d6dafc693e18e25b56562a87",
+    "size": 96141,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/99ed0aca9a8e0b92d6dafc693e18e25b56562a87"
+  },
+  {
+    "path": "include/tcpdf_images.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "af61bcb0e52447baedd7a3a5394dcf486d57c44d",
+    "size": 11517,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/af61bcb0e52447baedd7a3a5394dcf486d57c44d"
+  },
+  {
+    "path": "include/tcpdf_static.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "00a9c24365d1230369e8427fd91bcc7efa375138",
+    "size": 109859,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/00a9c24365d1230369e8427fd91bcc7efa375138"
+  },
+  {
+    "path": "tcpdf.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "a7b791cfe38d4ab2c98d76a06983627a296eb5ea",
+    "size": 911792,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/a7b791cfe38d4ab2c98d76a06983627a296eb5ea"
+  },
+  {
+    "path": "tcpdf_autoconfig.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "dd1404e0947b6ba6ecbd0e77d888a748c4274fbd",
+    "size": 7497,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/dd1404e0947b6ba6ecbd0e77d888a748c4274fbd"
+  },
+  {
+    "path": "tcpdf_barcodes_1d.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "81dae8342623ae88cc536380c3729745e572dea1",
+    "size": 73545,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/81dae8342623ae88cc536380c3729745e572dea1"
+  },
+  {
+    "path": "tcpdf_barcodes_2d.php",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "7e616ee32a6ac22a578ca6627762c3db542aeca7",
+    "size": 14909,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/7e616ee32a6ac22a578ca6627762c3db542aeca7"
+  },
+  {
+    "path": "fonts/dejavu-fonts-ttf-2.33/LICENSE",
+    "mode": "100644",
+    "type": "blob",
+    "sha": "254e2cc42a6d0135cccf2047768b9e44f25e666f",
+    "size": 4816,
+    "url": "https://api.github.com/repos/tecnickcom/TCPDF/git/blobs/254e2cc42a6d0135cccf2047768b9e44f25e666f"
+  }
+]

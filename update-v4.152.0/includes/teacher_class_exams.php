@@ -19,13 +19,13 @@ foreach($classRows as $as){$key=ceg_key($teacherId,$as['academic_year'],$as['gra
 <?php if($shared): ?>
     <span class="badge badge-info">عضو آزمون پایه</span>
     <a class="btn btn-primary text-xs" target="_blank" href="class-exam-create.php?<?php echo clean(http_build_query(['class'=>$as['class_name'],'subject'=>$as['subject_name'],'year'=>$as['academic_year'],'exam_id'=>$member['exam_id']])); ?>">ویرایش / چاپ این کلاس</a>
-    <form method="POST" action="class-exam-group.php" target="_blank" class="no-ajax" onsubmit="if(!confirm('این کلاس از گروه جدا شود؟ نسخه‌ای مستقل از آخرین طرح ذخیره‌شده برای آن نگه داشته می‌شود.'))return false;window.classExamPending=true;">
+    <form method="POST" action="class-exam-group.php" class="no-ajax" onsubmit="if(!confirm('این کلاس از گروه جدا شود؟ نسخه‌ای مستقل از آخرین طرح ذخیره‌شده برای آن نگه داشته می‌شود.'))return false;">
         <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>"><input type="hidden" name="mode" value="detach">
         <input type="hidden" name="year" value="<?php echo clean($as['academic_year']); ?>"><input type="hidden" name="group_id" value="<?php echo (int)$group['id']; ?>"><input type="hidden" name="member_id" value="<?php echo (int)$member['exam_id']; ?>">
         <button class="btn btn-outline text-xs">مستثنی کردن از آزمون پایه</button>
     </form>
 <?php else: ?>
-    <?php if($member): ?><span class="badge badge-warning">مستثنی از آزمون پایه — طراحی مستقل</span><?php endif; ?>
+    <?php if($member && !empty($member['detached_exam_id'])): ?><span class="badge badge-warning">مستثنی از آزمون پایه — طراحی مستقل</span><a class="btn btn-primary text-xs" target="_blank" href="exam-print.php?type=questions&amp;exam_id=<?php echo (int)$member['detached_exam_id']; ?>&amp;dt=<?php echo urlencode(make_exam_design_token((int)$member['detached_exam_id'],'teacher',$teacherId)); ?>">طراحی / چاپ مستقل این کلاس</a><?php elseif($member): ?><span class="badge badge-warning">خارج از آزمون پایه</span><?php endif; ?>
     <form method="<?php echo $as['exams']?'GET':'POST'; ?>" action="class-exam-create.php" target="_blank" class="no-ajax flex flex-wrap gap-2" onsubmit="if(this.method.toLowerCase()==='post')window.classExamPending=true;">
         <input type="hidden" name="class" value="<?php echo clean($as['class_name']); ?>"><input type="hidden" name="subject" value="<?php echo clean($as['subject_name']); ?>"><input type="hidden" name="year" value="<?php echo clean($as['academic_year']); ?>">
         <?php if($as['exams']): ?>
@@ -35,6 +35,7 @@ foreach($classRows as $as){$key=ceg_key($teacherId,$as['academic_year'],$as['gra
         <?php elseif($as['assigned']): ?><input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>"><button class="btn btn-success text-xs">➕ طراحی آزمون جدید</button><?php endif; ?>
     </form>
 <?php endif; ?>
+<?php if($as['exams'])ceg_render_delete_form($shared?$member['exam_id']:$as['exams'][0]['id'],$as['academic_year'],false,!$shared); ?>
 </td>
 <?php if($index===0): ?>
 <td rowspan="<?php echo count($bucket); ?>" style="vertical-align:middle;text-align:center;background:rgba(16,185,129,.06)">

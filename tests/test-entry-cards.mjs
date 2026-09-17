@@ -385,6 +385,8 @@ session_id('pgs'.mt_rand()); session_start();
 require_once '/www/includes/db.php';
 require_once '/www/includes/functions.php';
 require_once '/www/includes/auth.php';
+// Explicit pagination fixtures: a clean release intentionally contains no demo students.
+for($i=0;$i<12;$i++)DB::execute("INSERT INTO students(national_id,first_name,last_name,status,academic_year) VALUES (?,?,?,'active','1404/1405')",['PAGINATION'.$i,'آزمون صفحه','ردیف '.$i]);
 DB::execute("UPDATE students SET academic_year='1404/1405' WHERE academic_year IS NULL OR academic_year=''");
 $a = DB::fetch("SELECT * FROM admins WHERE status=1 ORDER BY id LIMIT 1");
 $_SESSION = ['admin_id'=>$a['id'],'admin_role'=>'super_admin'];

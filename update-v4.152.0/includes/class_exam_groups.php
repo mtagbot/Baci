@@ -44,7 +44,10 @@ function ceg_for_exam($exam) {
     if(($exam['exam_kind']??'')!=='class')return null;
     $canonical=DB::fetch('SELECT *, 0 AS excluded, 0 AS member_exam_id FROM class_exam_groups WHERE design_exam_id=?',[(int)$exam['id']]);
     if($canonical)return $canonical;
-    $rows=DB::fetchAll('SELECT g.*, m.exam_id AS member_exam_id, m.class_name AS member_class, m.excluded, m.detached_exam_id FROM class_exam_groups g JOIN class_exam_group_members m ON m.group_id=g.id WHERE g.teacher_id=? AND g.academic_year=? AND g.subject_name=?',[$exam['teacher_id'],$exam['academic_year'],$exam['subject_name']]);
+    $rows=DB::fetchAll('SELECT g.*, m.exam_id AS member_exam_id, m.class_name AS member_class, m.excluded, m.detached_exam_id FROM class_exam_groups g JOIN class_exam_group_members m ON m.group_id=g.id JOIN exam_schedules gd ON gd.id=g.design_exam_id AND gd.exam_kind=\'class\' WHERE g.teacher_id=? AND g.academic_year=? AND g.subject_name=?',[$exam['teacher_id'],$exam['academic_year'],$exam['subject_name']]);
+    // Exact persisted identities win over normalized legacy class aliases.
+    foreach($rows as $r)if((int)$r['member_exam_id']===(int)$exam['id'])return $r;
+    foreach($rows as $r)if((int)($r['detached_exam_id']??0)===(int)$exam['id'])return $r;
     foreach($rows as $r) if(norm_class_str($r['member_class'])===norm_class_str($exam['class_name']))return $r;
     return null;
 }
@@ -157,10 +160,44 @@ function ceg_detach($teacher,$groupId,$memberId) {
         $group=DB::fetch('SELECT * FROM class_exam_groups WHERE id=? AND teacher_id=?',[$groupId,$teacher]);
         $member=DB::fetch('SELECT * FROM class_exam_group_members WHERE group_id=? AND exam_id=?',[$groupId,$memberId]);
         if(!$group||!$member)throw new RuntimeException('کلاس عضو این گروه نیست یا دسترسی ندارید.');
-        if($member['excluded']){ceg_end($tx,true);return (int)$member['detached_exam_id'];}
+        if($member['excluded']){if(empty($member['detached_exam_id']))throw new RuntimeException('آزمون این عضو حذف شده است.');ceg_end($tx,true);return (int)$member['detached_exam_id'];}
         $fork=ceg_insert_exam($teacher,$group['academic_year'],$group['grade_level'],$group['subject_name'],$member['class_name']);
         ceg_copy_design($group['design_exam_id'],$fork,$created);
         DB::execute('UPDATE class_exam_group_members SET excluded=1,detached_exam_id=? WHERE group_id=? AND exam_id=?',[$fork,$groupId,$memberId]);
+        $saved=DB::fetch('SELECT excluded,detached_exam_id FROM class_exam_group_members WHERE group_id=? AND exam_id=?',[$groupId,$memberId]);
+        if(!$saved || !(int)$saved['excluded'] || (int)$saved['detached_exam_id']!==$fork)throw new RuntimeException('استثنای کلاس ثبت نشد؛ دوباره تلاش کنید.');
         ceg_end($tx,true);return $fork;
     }catch(Throwable $e){ceg_end($tx,false);ceg_cleanup($created);throw $e;}
+}
+
+/** Delete only an explicitly selected class exam; keep recoverable design/assets and other classes intact. */
+function ceg_delete_class_exam($examId) {
+    $exam=DB::fetch('SELECT * FROM exam_schedules WHERE id=?',[(int)$examId]);
+    if(!$exam || !in_array($exam['exam_kind']??'',['class','class_deleted'],true) || trim($exam['class_name'])==='')throw new RuntimeException('فقط آزمون یک کلاس را می‌توان از این مسیر حذف کرد.');
+    $tx=ceg_begin((int)$exam['teacher_id']);
+    try {
+        $exam=DB::fetch('SELECT * FROM exam_schedules WHERE id=?',[(int)$examId]);
+        if($exam['exam_kind']==='class_deleted'){ceg_end($tx,true);return;}
+        $group=ceg_for_exam($exam);$ids=[(int)$examId];
+        if($group && (!$group['excluded'] || (int)$group['member_exam_id']===(int)$examId || (int)($group['detached_exam_id']??0)===(int)$examId)) {
+            $ids[]=(int)$group['member_exam_id'];
+            if(!empty($group['detached_exam_id']))$ids[]=(int)$group['detached_exam_id'];
+            DB::execute('UPDATE class_exam_group_members SET excluded=1,detached_exam_id=NULL WHERE group_id=? AND exam_id=?',[$group['id'],$group['member_exam_id']]);
+        }
+        foreach(array_unique($ids) as $id)DB::execute("UPDATE exam_schedules SET exam_kind='class_deleted',is_active=0 WHERE id=? AND teacher_id=? AND class_name<>''",[$id,$exam['teacher_id']]);
+        if($group){
+            $remaining=DB::fetch("SELECT COUNT(*) n FROM class_exam_group_members m JOIN exam_schedules e ON e.id=m.exam_id WHERE m.group_id=? AND (m.excluded=0 OR m.detached_exam_id IS NOT NULL OR e.exam_kind<>'class_deleted')",[$group['id']]);
+            if((int)$remaining['n']===0){
+                // Retain historical records but free the identity for an explicit new group.
+                DB::execute('UPDATE class_exam_groups SET identity_key=? WHERE id=?',[hash('sha256','retired:'.$group['id'].':'.$group['identity_key']),$group['id']]);
+                DB::execute("UPDATE exam_schedules SET exam_kind='class_deleted',is_active=0 WHERE id=?",[$group['design_exam_id']]);
+            }
+        }
+
+        ceg_end($tx,true);
+    }catch(Throwable $e){ceg_end($tx,false);throw $e;}
+}
+function ceg_render_delete_form($id,$year,$management=false,$selectFromRow=false) {
+    ?><form method="POST" action="class-exam-delete.php" class="no-ajax class-exam-delete" onsubmit="<?php if($selectFromRow): ?>var s=this.closest('tr').querySelector('select[name=exam_id]');if(s)this.elements.exam_id.value=s.value;<?php endif; ?>return confirm('آزمون انتخاب‌شده از فهرست حذف شود؟ فقط همین کلاس از گروه خارج می‌شود؛ طراحی سایر کلاس‌ها باقی می‌ماند.');">
+    <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>"><input type="hidden" name="exam_id" value="<?php echo (int)$id; ?>"><input type="hidden" name="year" value="<?php echo clean($year); ?>"><input type="hidden" name="return_to" value="<?php echo $management?'management':'teacher'; ?>"><button type="submit" class="btn btn-danger text-xs">حذف آزمون کلاسی</button></form><?php
 }

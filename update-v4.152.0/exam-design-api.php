@@ -22,7 +22,10 @@ $designTokenOk = verify_exam_design_token($_GET['dt'] ?? $_POST['dt'] ?? '', $ex
 if (!$examId || (!$designTokenOk && !exam_can_design($examId))) json_out(false, ['error'=>'دسترسی غیرمجاز']);
 $exam = DB::fetch("SELECT es.*, COALESCE(t.full_name, es.teacher_name) AS t_name FROM exam_schedules es LEFT JOIN teachers t ON t.id=es.teacher_id WHERE es.id=?", [$examId]);
 if (!$exam) json_out(false, ['error'=>'آزمون یافت نشد']);
+if(($exam['exam_kind']??'')==='class_deleted')json_out(false,['error'=>'این آزمون کلاسی حذف شده است.']);
 if(in_array($action,['save','import_design'],true))ceg_write_begin($exam);
+$exam=DB::fetch('SELECT es.*,COALESCE(t.full_name,es.teacher_name) t_name FROM exam_schedules es LEFT JOIN teachers t ON t.id=es.teacher_id WHERE es.id=?',[$examId]);
+if(($exam['exam_kind']??'')==='class_deleted')json_out(false,['error'=>'این آزمون کلاسی حذف شده است.']);
 $boundGroup=ceg_for_exam($exam);
 if(ceg_pending_sync($exam,$boundGroup))json_out(false,['error'=>'اطلاعات گروه هنوز همگام نشده است.']);
 if($boundGroup && !$boundGroup['excluded'] && (int)$boundGroup['design_exam_id']!==$examId) json_out(false,['error'=>'این کلاس اکنون عضو آزمون پایه است؛ صفحه را تازه‌سازی کنید.']);
@@ -74,7 +77,7 @@ if ($action === 'load') {
     }
     if (count($bank) > 300) $bank = array_slice($bank, 0, 300);
     /* v4.95.0: آزمون‌های طراحی‌شده (با فایل منبع تصویری) هم در بانک نمایش داده می‌شوند */
-    $dWhere = ["1=1"]; $dParams = [];
+    $dWhere = ["COALESCE(es.exam_kind,'official')<>'class_deleted'"]; $dParams = [];
     if (!empty($_GET['year']))     { $dWhere[] = "es.academic_year=?";  $dParams[] = trim($_GET['year']); }
     if (!empty($_GET['month']))    { $dWhere[] = "es.exam_month=?";     $dParams[] = trim($_GET['month']); }
     if (!empty($_GET['designer'])) { $dWhere[] = "ed.designer_name=?"; $dParams[] = trim($_GET['designer']); }
@@ -182,6 +185,7 @@ if ($action === 'import_design') {
     $isArch = $srcRef !== '' && $srcRef[0] === 'a';
     $srcId = (int)ltrim($srcRef, 'ae');
     if ($srcId <= 0) json_out(false, ['error'=>'آزمون منبع نامعتبر است']);
+    if(!$isArch){$sourceExam=DB::fetch('SELECT exam_kind FROM exam_schedules WHERE id=?',[$srcId]);if($sourceExam && $sourceExam['exam_kind']==='class_deleted')json_out(false,['error'=>'آزمون منبع حذف شده است.']);}
     $srcPages = [];
     if ($isArch) {
         $arch = DB::fetch("SELECT * FROM exam_design_archive WHERE id=?", [$srcId]);

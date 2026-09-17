@@ -119,7 +119,9 @@ const fresh=(await db("SELECT * FROM class_exam_groups WHERE subject_name='عل�
 // New metadata participates in the existing ID/change-log/snapshot/push protocol.
 php.writeFile('/www/desk-sync-api.php',"<?php define('DESK_SYNC_KEY','fixture-sync-key-not-real');");
 const legacyEndpoint=php.readFileAsText('/www/desk-sync-api.php');
-const sync=async payload=>JSON.parse((await request('class-exam-sync-api.php',{raw:{key:'fixture-sync-key-not-real',...payload}})).page);
+const fixtureSyncKey=php.fileExists('/www/includes/release_install.php')?'ab'.repeat(32):'fixture-sync-key-not-real';
+if(php.fileExists('/www/includes/release_install.php'))php.writeFile('/www/config/desk-sync-key.php',`<?php return '${fixtureSyncKey}';`);
+const sync=async payload=>JSON.parse((await request('class-exam-sync-api.php',{raw:{key:fixtureSyncKey,...payload}})).page);
 assert(!(await sync({key:'wrong',action:'handshake'})).ok);checks++;
 const handshake=await sync({action:'handshake'});assert(handshake.ok);for(const t of ['class_exam_groups','class_exam_group_members'])assert(handshake.tables.includes(t));checks++;
 for(const t of ['class_exam_groups','class_exam_group_members']){const snap=await sync({action:'snapshot',tbl:t});assert(snap.ok);assert.deepEqual(snap.rows,await db('SELECT * FROM '+t+' ORDER BY id'));assert(snap.rows.every(r=>r.id>=5000000));assert((await db("SELECT * FROM desk_change_log WHERE tbl='"+t+"'")).length>0);const pushed=await sync({action:'push',changes:snap.rows.map(row=>({tbl:t,rid:row.id,op:'U',row}))});assert.equal(pushed.applied,snap.rows.length);checks++;}
@@ -138,9 +140,9 @@ if(process.env.GROUP_BROWSER){
   let queue=Promise.resolve();
   await context.route('**/*',route=>{const task=async()=>{
    const u=new URL(route.request().url()),file=decodeURIComponent(u.pathname).slice(1);
-   if(['teacher-panel.php','class-exam-group.php','class-exam-create.php','exam-print.php','exam-design-api.php','exam-source-api.php','exams.php'].includes(file)){
+   if(['teacher-panel.php','class-exam-group.php','class-exam-create.php','class-exam-delete.php','exam-print.php','exam-design-api.php','exam-source-api.php','exams.php'].includes(file)){
     const body=route.request().postData(),json=route.request().headers()['content-type']?.includes('application/json');
-    const r=await request(file,{query:u.search.slice(1),post:body&&!json?Object.fromEntries(new URLSearchParams(body)):undefined,raw:body&&json?JSON.parse(body):undefined});
+    const r=await request(file,{session:u.hostname.startsWith('manager.')?admin:(u.hostname.startsWith('executive.')?exec:sid),query:u.search.slice(1),post:body&&!json?Object.fromEntries(new URLSearchParams(body)):undefined,raw:body&&json?JSON.parse(body):undefined});
     if(r.redirect)return route.fulfill({contentType:'text/html',body:'<!doctype html><script>location.replace('+JSON.stringify(new URL(r.redirect,u).href)+');</script>'});
     return route.fulfill({contentType:file.endsWith('api.php')?'application/json':'text/html',body:r.page});
    }
@@ -171,15 +173,26 @@ if(process.env.GROUP_BROWSER){
   await sharedEditor.waitForURL('**/exam-print.php?**');await sharedEditor.waitForFunction(()=>!booting);assert.equal(await sharedEditor.locator('#printNote').inputValue(),'COPY_FROM_CLASS');
   await sharedEditor.getByRole('button',{name:'تنظیمات برگه',exact:true}).click();await sharedEditor.locator('#printNote').fill('LATEST_IN_BROWSER');const saving=sharedEditor.waitForResponse('**/exam-design-api.php?**action=save**');await sharedEditor.getByRole('button',{name:'ذخیره طراحی',exact:true}).click();assert((await (await saving).json()).ok);
   await page.reload();const ninthRow=page.locator('.class-exam-row[data-class="نهم1"]');const classPop=page.waitForEvent('popup');await ninthRow.getByRole('link',{name:'ویرایش / چاپ این کلاس'}).click();const oldClass=await classPop;await oldClass.waitForURL('**/exam-print.php?**class_only=**');await oldClass.waitForFunction(()=>!booting);
-  page.once('dialog',d=>d.accept());const forkPop=page.waitForEvent('popup');await ninthRow.getByRole('button',{name:'مستثنی کردن از آزمون پایه'}).click();const forkEditor=await forkPop;await forkEditor.waitForURL('**/exam-print.php?**');await forkEditor.waitForFunction(()=>!booting);assert.equal(await forkEditor.locator('#printNote').inputValue(),'LATEST_IN_BROWSER');
+  page.once('dialog',d=>d.accept());const detachedNav=page.waitForNavigation();await ninthRow.getByRole('button',{name:'مستثنی کردن از آزمون پایه'}).click();await detachedNav;const forkPop=page.waitForEvent('popup');await ninthRow.getByRole('link',{name:'طراحی / چاپ مستقل این کلاس'}).click();const forkEditor=await forkPop;await forkEditor.waitForURL('**/exam-print.php?**');await forkEditor.waitForFunction(()=>!booting);assert.equal(await forkEditor.locator('#printNote').inputValue(),'LATEST_IN_BROWSER');
   const ninthGroup=(await db("SELECT * FROM class_exam_groups WHERE grade_level='نهم'"))[0];const fileSchedules=await all();const canonicalFile=fileSchedules.find(e=>e.id===ninthGroup.design_exam_id).question_file;const forkId=Number(new URL(forkEditor.url()).searchParams.get('exam_id'));const forkFile=fileSchedules.find(e=>e.id===forkId).question_file;assert.notEqual(forkFile,canonicalFile);assert.notEqual(canonicalFile,'uploads/exams/browser-source.png');assert.deepEqual(Buffer.from(php.readFileAsBuffer('/www/'+forkFile)),image);
   assert.equal((await oldClass.evaluate(()=>saveDesign(true))).ok,false);
   sharedEditor.once('dialog',d=>d.accept());assert.equal(await sharedEditor.evaluate(()=>checkClassGroupScope()),false);
   await forkEditor.getByRole('button',{name:'تنظیمات برگه',exact:true}).click();await forkEditor.locator('#printNote').fill('FORK_BROWSER');assert((await forkEditor.evaluate(()=>saveDesign(true))).ok);await sharedEditor.reload();await sharedEditor.waitForFunction(()=>!booting);assert.equal(await sharedEditor.locator('#printNote').inputValue(),'LATEST_IN_BROWSER');
   await page.reload();assert.equal(await page.locator('.ceg-start').count(),4);assert.equal(await ninthRow.getByRole('button',{name:'مستثنی کردن از آزمون پایه'}).count(),0);
+  assert.equal(await forkEditor.locator('.independent-design-notice').count(),1);assert.equal(await forkEditor.locator('.group-design-notice').count(),0);
+  page.once('dialog',d=>d.dismiss());await ninthRow.locator('.class-exam-delete button').click();await queue;assert.equal((await all()).find(e=>e.id===forkId).exam_kind,'class');
+  page.once('dialog',d=>d.accept());const deletedNav=page.waitForNavigation();await ninthRow.locator('.class-exam-delete button').click();await deletedNav;assert.equal((await all()).find(e=>e.id===forkId).exam_kind,'class_deleted');assert.equal(await ninthRow.getByRole('button',{name:'➕ طراحی آزمون جدید',exact:true}).count(),1);
+  assert.equal((await forkEditor.evaluate(()=>saveDesign(true))).ok,false);forkEditor.once('dialog',d=>d.accept());assert.equal(await forkEditor.evaluate(()=>checkClassGroupScope()),false);
+  for(const role of ['manager','executive']){
+   const mpage=await context.newPage();mpage.on('pageerror',e=>errors.push(e.message));await mpage.goto('https://'+role+'.groups.test/exams.php?tab=class&year=1404%2F1405');
+   const gradePop=mpage.waitForEvent('popup');await mpage.getByRole('link',{name:'چاپ پایه‌ای نهم',exact:true}).click();const gradeEditor=await gradePop;await gradeEditor.waitForURL('**/exam-print.php?**');await gradeEditor.waitForFunction(()=>!booting);assert.equal(Number(new URL(gradeEditor.url()).searchParams.get('exam_id')),ninthGroup.design_exam_id);assert(!new URL(gradeEditor.url()).searchParams.has('class_only'));await gradeEditor.close();
+   const targetId=role==='executive'?fixture.foreign:fileSchedules.find(e=>e.class_name==='هشتم1').id;
+   const del=mpage.locator('.class-exam-delete').filter({has:mpage.locator('input[name="exam_id"][value="'+targetId+'"]')});mpage.once('dialog',d=>d.accept());const mn=mpage.waitForNavigation();await del.getByRole('button',{name:'حذف آزمون کلاسی'}).click();await mn;assert.equal((await all()).find(e=>e.id===targetId).exam_kind,'class_deleted');await mpage.close();
+  }
   mkdirSync(REPO+'/.cache/groups',{recursive:true});await page.screenshot({path:REPO+'/.cache/groups/teacher.png',fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('PASS Chromium: separate tables, one button, cancel/copy/fresh windows, real shared save, exception snapshot, independent save, stale-editor and print-scope rejection');
+  console.log('PASS Chromium: separate tables, one button, cancel/copy/fresh windows, real shared save, exception snapshot, independent save, same-tab exception confirmation, delete cancel/confirm in all panels, admin/exec grade print, stale-editor and print-scope rejection');
  }finally{await browser.close();}
 }
-process.exit(0);
+export {request,api,db,code,group,canonical,members,fixture,sid,other,admin,exec,csrf,fork,php};
+if(!process.env.CLASS_ACTIONS_TEST)process.exit(0);

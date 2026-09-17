@@ -1,0 +1,8 @@
+{
+  "chart.js": {
+    "version": "4.5.1",
+    "dist_file": "dist/chart.umd.min.js",
+    "sha256": "48444a82d4edcb5bec0f1965faacdde18d9c17db3063d042abada2f705c9f54a",
+    "license_sha256": "41a84aa2caba645f966a18d9c2056b73e6d3a81d80bc0046bc0011a2634d4cce"
+  }
+}

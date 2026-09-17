@@ -83,6 +83,20 @@ if (process.env.PATCH) {
   console.log(`>>> وصلهٔ ${process.env.PATCH} اورلی شد (${n} فایل${skipped.length ? `، ${skipped.length} فایل راهنما نادیده گرفته شد` : ''})`);
 }
 
+/* Full-release regression mode: run the real fresh installer BEFORE test fixtures.
+   This happens only in isolated MEMFS. Never add demo credentials/data to a ZIP. */
+if (php.fileExists('/www/includes/release_install.php')) {
+  const metadata = php.readFileAsText('/www/config/release.php');
+  php.writeFile('/www/config/release.php', "<?php return ['distribution'=>'desktop'];");
+  const installed = await php.run({code: `<?php define('RELEASE_INSTALLER',true);
+    ini_set('session.save_path','/tmp/sess');session_start();require '/www/includes/release_install.php';
+    release_install(['school_name'=>'مدرسهٔ هارنس','admin_name'=>'مدیر هارنس','admin_username'=>'harness_admin',
+    'admin_password'=>'Harness-Only-Password-2026','admin_password_confirm'=>'Harness-Only-Password-2026','academic_year'=>'1404/1405']);
+    echo 'RELEASE_FIXTURE_READY';`});
+  if (!installed.text.includes('RELEASE_FIXTURE_READY')) throw new Error(installed.errors || installed.text);
+  php.writeFile('/www/config/release.php', metadata);
+}
+
 /* دیتابیس SQLite داخل MEMFS */
 php.writeFile('/www/config/database.php',
   "<?php\nreturn ['driver' => 'sqlite', 'database' => '/data/school.sqlite'];\n");

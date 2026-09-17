@@ -2,3 +2,4 @@
 .venv/
 node_modules/
 .arena/
+__pycache__/

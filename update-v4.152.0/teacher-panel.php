@@ -262,7 +262,7 @@ $tab = $_GET['tab'] ?? 'schedule';
         /* v4.70.0: مرتب‌سازی طوری که آزمون‌های «پایه یکسان + درس یکسان» پشت‌سرهم
          * قرار بگیرند تا خانه مشترک «طراحی پایه‌ای» با rowspan روی همه ردیف‌های
          * گروه بنشیند. */
-        $teacherExams = DB::fetchAll("SELECT * FROM exam_schedules WHERE teacher_id = ? AND is_active = 1 AND COALESCE(exam_kind,'official')<>'class' ORDER BY academic_year DESC, exam_month ASC, grade_level ASC, subject_name ASC, class_name ASC, exam_date_jalali ASC, start_time ASC", [$teacherId]);
+        $teacherExams = DB::fetchAll("SELECT * FROM exam_schedules WHERE teacher_id = ? AND is_active = 1 AND COALESCE(exam_kind,'official') NOT IN ('class','class_deleted') ORDER BY academic_year DESC, exam_month ASC, grade_level ASC, subject_name ASC, class_name ASC, exam_date_jalali ASC, start_time ASC", [$teacherId]);
         // شمارش اعضای هر گروه: سال|ماه|پایه|درس
         $tpGroupCounts = [];
         foreach ($teacherExams as $tex) {
@@ -285,6 +285,7 @@ $tab = $_GET['tab'] ?? 'schedule';
     ?>
     <div class="card shadow-lg">
         <h3 class="font-bold mb-4">📝 آزمون‌های فعال من و طراحی سوالات</h3>
+        <?php if(teacher_has_deputy($teacherId) || current_teacher_is_executive()): ?><a class="btn btn-outline" href="exams.php?tab=class&amp;year=<?php echo urlencode($teacherYear); ?>">آزمون‌های کلاسی دبیران — مشاهده، چاپ و حذف</a><?php endif; ?>
         <?php include __DIR__.'/includes/teacher_class_exams.php'; ?>
         <h3 class="font-bold mt-4 mb-3">آزمون‌های ماهانه فعال‌شده توسط مدرسه</h3>
         <div class="table-container"><table id="teacherMonthlyExams"><thead><tr><th>سال/ماه</th><th>کلاس/پایه</th><th>درس</th><th>تاریخ</th><th>ساعت</th><th>طراحی</th><th>طراحی پایه‌ای (مشترک کلاس‌های پایه)</th></tr></thead><tbody>
@@ -312,47 +313,11 @@ $tab = $_GET['tab'] ?? 'schedule';
 
     <script>
     // Returning from the newly opened designer refreshes the create/edit controls.
+    window.addEventListener('pageshow',function(e){if(e.persisted)window.location.reload();});
     window.addEventListener('focus',function(){if(window.classExamPending){window.classExamPending=false;window.location.reload();}});
     </script>
     <?php else: ?>
-    <div class="card shadow-lg">
-        <h3 class="font-bold mb-4">📅 جدول برنامه هفتگی تدریس شما</h3>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>روز هفته</th>
-                        <th>زنگ اول</th>
-                        <th>زنگ دوم</th>
-                        <th>زنگ سوم</th>
-                        <th>زنگ چهارم</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php 
-                    $days = ['شنبه', 'یک‌شنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه'];
-                    foreach ($days as $d): 
-                    ?>
-                    <tr>
-                        <td class="font-bold bg-slate-100 dark:bg-slate-800"><?php echo clean($d); ?></td>
-                        <?php for ($p=1; $p<=4; $p++): 
-                            $sc = DB::fetch("SELECT class_name, subject_name FROM class_schedules WHERE teacher_id = ? AND day_of_week = ? AND period_num = ?", [$teacherId, $d, 'زنگ ' . $p]);
-                        ?>
-                        <td class="text-center">
-                            <?php if ($sc): ?>
-                                <span class="badge badge-info block mb-1"><?php echo clean($sc['class_name']); ?></span>
-                                <span class="font-bold text-xs block"><?php echo clean($sc['subject_name']); ?></span>
-                            <?php else: ?>
-                                <span class="text-muted text-xs">---</span>
-                            <?php endif; ?>
-                        </td>
-                        <?php endfor; ?>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <?php include __DIR__.'/includes/teacher_weekly_schedule.php'; ?>
     <?php endif; ?>
 </div>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

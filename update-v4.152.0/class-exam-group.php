@@ -16,7 +16,8 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     try{
         if(($input['mode']??'')==='detach'){
             $id=ceg_detach($teacher,(int)($input['group_id']??0),(int)($input['member_id']??0));
-            redirect('exam-print.php?type=questions&exam_id='.$id.'&dt='.urlencode(make_exam_design_token($id,'teacher',$teacher)));
+            set_flash_message('success','کلاس با موفقیت مستثنی شد. از دکمهٔ طراحی مستقل همان ردیف استفاده کنید؛ تغییرات آن روی گروه اثر ندارد.');
+            redirect($back);
         }
         $group=ceg_start($teacher,$year,$grade,$subject,$input['mode']??'',(int)($input['source_exam_id']??0));
     }catch(Throwable $e){set_flash_message('error',$e instanceof PDOException?'ثبت گروه انجام نشد؛ اطلاعات قبلی حفظ شده است.':$e->getMessage());redirect($back);}

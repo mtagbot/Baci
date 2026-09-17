@@ -8,9 +8,11 @@ require_once __DIR__ . '/includes/academic_year_helpers.php';
 require_once __DIR__ . '/includes/class_exam_groups.php';
 require_once __DIR__ . '/includes/school_roles.php';
 ensure_school_roles_schema();
-if (!current_teacher_is_executive()) require_permission('manage_reports');
+$classDeputyOnly=!is_admin_logged_in() && !current_teacher_is_executive() && !empty($_SESSION['teacher_id']) && teacher_has_deputy((int)$_SESSION['teacher_id']);
+if (!current_teacher_is_executive() && !$classDeputyOnly) require_permission('manage_reports');
+if($classDeputyOnly && ($_SERVER['REQUEST_METHOD']==='POST' || isset($_GET['delete']) || isset($_GET['edit'])))die('دسترسی معاون در این بخش فقط مشاهده، چاپ و حذف آزمون کلاسی از دکمهٔ اختصاصی است.');
 ensure_exams_schema(); ceg_schema();
-$tab=$_GET['tab']??'schedule';
+$tab=$classDeputyOnly?'class':($_GET['tab']??'schedule');
 /* v4.71.0: خارج از پنل مدیریت فقط نام خانوادگی دبیر نمایش داده شود */
 if (!function_exists('exams_teacher_label')) { function exams_teacher_label($n){ $n=trim((string)$n); if($n==='') return $n; return is_admin_logged_in() ? $n : teacher_family_name($n); } } $year=resolve_academic_year_request($_GET['year']??get_current_academic_year()); // v4.38.0 unified
 if ($_SERVER['REQUEST_METHOD']==='POST') {
@@ -21,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
   if(count($target)>=3){
     [$tyear,$tclass,$tsubject]=$target;
     $sourceRow=DB::fetch('SELECT * FROM exam_schedules WHERE id=?',[$src]);
+    if($sourceRow && ($sourceRow['exam_kind']??'')==='class_deleted'){set_flash_message('error','آزمون منبع حذف شده است.');redirect('exams.php?tab=class&year='.urlencode($year));}
     ceg_write_begin($sourceRow);
     $sourceGroup=$sourceRow?ceg_for_exam($sourceRow):null;
     if($sourceGroup){ceg_write_end(false);set_flash_message('error','برای آزمون گروهی یا مستثنی‌شده از صفحهٔ طراحی استفاده کنید؛ کپی مستقیم این بخش مجاز نیست.');redirect('exams.php?tab=class&year='.urlencode($year));}
@@ -50,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
  }
  if(isset($_POST['save_exam'])){
   $changing=DB::fetch('SELECT * FROM exam_schedules WHERE id=?',[(int)($_POST['exam_id']??0)]);
-  if($changing && ($changing['exam_kind']??'')==='class'){set_flash_message('error','آزمون کلاسی را از بخش آزمون‌های کلاسی ویرایش کنید.');redirect('exams.php?tab=class&year='.urlencode($year));}
+  if($changing && in_array($changing['exam_kind']??'',['class','class_deleted'],true)){set_flash_message('error','آزمون کلاسی را از بخش آزمون‌های کلاسی ویرایش کنید.');redirect('exams.php?tab=class&year='.urlencode($year));}
 
   $id=(int)($_POST['exam_id']??0); $tid=(int)($_POST['teacher_id']??0); $tname=''; if($tid){$t=DB::fetch('SELECT full_name FROM teachers WHERE id=?',[$tid]);$tname=$t['full_name']??'';}
   $file=$_POST['existing_question_file']??'';
@@ -144,13 +147,13 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 if(isset($_GET['delete'])){
   $delId=(int)$_GET['delete'];
   $deleting=DB::fetch('SELECT * FROM exam_schedules WHERE id=?',[$delId]);
-  if($deleting && ceg_for_exam($deleting)){set_flash_message('error','برای حفاظت از آزمون مشترک، حذف اعضا/منبع گروه از این مسیر مجاز نیست.');redirect('exams.php?tab=class&year='.urlencode($year));}
+  if($deleting && (in_array($deleting['exam_kind']??'',['class','class_deleted'],true) || ceg_for_exam($deleting))){set_flash_message('error','برای حفاظت از آزمون مشترک، حذف اعضا/منبع گروه از این مسیر مجاز نیست.');redirect('exams.php?tab=class&year='.urlencode($year));}
 
   /* v4.99.0: طراحی ذخیره‌شده مستقل از آزمون در بانک می‌ماند — قبل از حذف آزمون، بایگانی می‌شود */
   if(function_exists('exam_archive_design_before_source_change')){try{exam_archive_design_before_source_change($delId);}catch(Exception $e){}}
   DB::execute('DELETE FROM exam_schedules WHERE id=?',[$delId]);DB::execute('DELETE FROM exam_assignments WHERE exam_id=?',[$delId]);set_flash_message('success','امتحان حذف شد.');redirect('exams.php');}
 require_once __DIR__ . '/includes/header.php';
-$exams=DB::fetchAll("SELECT es.*, COALESCE(t.full_name, es.teacher_name) t_name FROM exam_schedules es LEFT JOIN teachers t ON t.id=es.teacher_id WHERE es.academic_year=? AND COALESCE(es.exam_kind,'official')<>'class' ORDER BY es.exam_date_jalali, es.start_time",[$year]);
+$exams=DB::fetchAll("SELECT es.*, COALESCE(t.full_name, es.teacher_name) t_name FROM exam_schedules es LEFT JOIN teachers t ON t.id=es.teacher_id WHERE es.academic_year=? AND COALESCE(es.exam_kind,'official') NOT IN ('class','class_deleted') ORDER BY es.exam_date_jalali, es.start_time",[$year]);
 $classes=get_unified_class_options($year); $grades=get_unified_grade_options($year); $teachers=DB::fetchAll('SELECT id,full_name FROM teachers WHERE status=1'); usort($teachers, fn($a,$b)=>persian_compare($a['full_name'],$b['full_name']));
 $edit=isset($_GET['edit'])?DB::fetch('SELECT * FROM exam_schedules WHERE id=?',[(int)$_GET['edit']]):null; $selectedExam=(int)($_GET['exam_id']??($exams[0]['id']??0));
 /* v4.95.0: ماه آزمون و تاریخ آخرین فعال‌سازی ۱ روز در کوکی می‌ماند تا ثبت آزمون بعدی راحت باشد */
@@ -225,7 +228,7 @@ $pfMonths = ['مهر','آبان','آذر','دی','بهمن','اسفند','فرو
    همان پایه هم آماده باشد — قبل از رندر جدول چاپ، همگام‌سازی خودکار
    (idempotent — طراحی‌های همگام بدون هزینه رد می‌شوند). */
 if (function_exists('exam_replicate_design_to_grade_siblings')) {
-    foreach (DB::fetchAll("SELECT d.exam_id FROM exam_designs d JOIN exam_schedules es ON es.id=d.exam_id WHERE es.academic_year=? AND es.is_active=1 AND COALESCE(es.exam_kind,'official')<>'class' ORDER BY d.id DESC LIMIT 100", [$year]) as $rgd) {
+    foreach (DB::fetchAll("SELECT d.exam_id FROM exam_designs d JOIN exam_schedules es ON es.id=d.exam_id WHERE es.academic_year=? AND es.is_active=1 AND COALESCE(es.exam_kind,'official') NOT IN ('class','class_deleted') ORDER BY d.id DESC LIMIT 100", [$year]) as $rgd) {
         try { exam_replicate_design_to_grade_siblings((int)$rgd['exam_id']); } catch (Exception $e) {}
     }
 }
