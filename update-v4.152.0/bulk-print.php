@@ -28,7 +28,7 @@ if (isset($_GET['print'])) {
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
-<head>
+<head><meta name=viewport content="width=device-width, initial-scale=1">
     <meta charset="UTF-8">
     <title>چاپ گروهی کارنامه‌ها - کلاس <?php echo clean($class ?: 'همه'); ?></title>
     <style>
@@ -81,9 +81,9 @@ if (isset($_GET['print'])) {
         @media print { .btn-print, .no-print { display: none !important; } }
     </style>
 <?php echo app_appearance_head(); ?>
-</head>
+<link rel=stylesheet href=assets/css/school-ui.css?v20260917b><script defer src=assets/js/school-icons.js?v20260917b></script><script defer src=assets/js/school-ui.js?v20260917b></script></head>
 <body>
-<button onclick="appPrint()" class="btn-print">🖨️ چاپ گروهی (Layout: <?php echo tr_num($layout, 'fa'); ?> کارنامه در صفحه)</button>
+<button onclick="appPrint()" class="btn-print"><svg data-ui-icon="print" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 8V3h10v5M7 17H3V9h18v8h-4M7 14h10v8H7ZM17 11h.1"/></svg> چاپ گروهی (Layout: <?php echo tr_num($layout, 'fa'); ?> کارنامه در صفحه)</button>
 
 <div class="grid-container">
     <?php foreach ($reports as $idx => $report): 
@@ -188,7 +188,7 @@ if (isset($_GET['print'])) {
 
         <div>
             <hr style="border: none; border-top: 1px dashed #000; margin: 10px 0;">
-            <p style="font-size: 11px; margin: 4px 0;">✂️ اینجانب ............................................................................ ولی دانش‌آموز <b><?php echo clean($report['first_name'] . ' ' . $report['last_name']); ?></b> عملکرد تحصیلی نوبت <b><?php echo clean($report['term']); ?></b> را مشاهده و بررسی نموده‌ام.</p>
+            <p style="font-size: 11px; margin: 4px 0;"><svg data-ui-icon="crop" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 2v16h16M2 6h16v16M3 21 21 3"/></svg> اینجانب ............................................................................ ولی دانش‌آموز <b><?php echo clean($report['first_name'] . ' ' . $report['last_name']); ?></b> عملکرد تحصیلی نوبت <b><?php echo clean($report['term']); ?></b> را مشاهده و بررسی نموده‌ام.</p>
             <div class="signatures">
                 <div class="sig-box">
                     <p>امضا و تاریخ رویت ولی دانش‌آموز</p>
@@ -225,7 +225,7 @@ $years = get_academic_years_for_filter();
 <div class="space-y-6">
     <div class="flex justify-between items-center">
         <div>
-            <h2 class="text-2xl font-bold">🖨️ چاپ گروهی کارنامه‌ها با چینش انتخابی (A4 Grid Layout)</h2>
+            <h2 class="text-2xl font-bold"><svg data-ui-icon="print" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 8V3h10v5M7 17H3V9h18v8h-4M7 14h10v8H7ZM17 11h.1"/></svg> چاپ گروهی کارنامه‌ها با چینش انتخابی (A4 Grid Layout)</h2>
             <p class="text-sm text-muted">امکان چاپ ۱، ۲ یا ۴ کارنامه در هر صفحه A4 با حداقل حاشیه جهت صرفه‌جویی در مصرف کاغذ</p>
         </div>
         <a href="reports.php" class="btn btn-secondary text-sm">&rarr; بازگشت به مدیریت کارنامه‌ها</a>
@@ -260,19 +260,19 @@ $years = get_academic_years_for_filter();
                 <div class="space-y-2 text-sm font-semibold">
                     <label class="flex items-center gap-2">
                         <input type="radio" name="layout" value="1" checked>
-                        <span>📄 ۱ کارنامه کامل در هر صفحه A4 (استاندارد بزرگ)</span>
+                        <span><svg data-ui-icon="report" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 2H5v20h14V7Zm0 0v5h5M8 17v-3m4 3v-6m4 6v-4"/></svg> ۱ کارنامه کامل در هر صفحه A4 (استاندارد بزرگ)</span>
                     </label>
                     <label class="flex items-center gap-2">
                         <input type="radio" name="layout" value="2">
-                        <span>📑 ۲ کارنامه در هر صفحه A4 (دو کارنامه افقی بالا و پایین)</span>
+                        <span><svg data-ui-icon="report" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 2H5v20h14V7Zm0 0v5h5M8 17v-3m4 3v-6m4 6v-4"/></svg> ۲ کارنامه در هر صفحه A4 (دو کارنامه افقی بالا و پایین)</span>
                     </label>
                     <label class="flex items-center gap-2">
                         <input type="radio" name="layout" value="4">
-                        <span>🏷️ ۴ کارنامه در هر صفحه A4 (شبکه ۲×۲ بسیار فشرده و اقتصادی)</span>
+                        <span><svg data-ui-icon="card" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="10" r="2"/><path d="M5 17c0-5 6-5 6 0M14 9h5m-5 5h5"/></svg> ۴ کارنامه در هر صفحه A4 (شبکه ۲×۲ بسیار فشرده و اقتصادی)</span>
                     </label>
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary w-full py-3.5 text-base font-extrabold shadow-lg">🖨️ تولید و پیش‌نمایش چاپ گروهی کارنامه‌ها &larr;</button>
+            <button type="submit" class="btn btn-primary w-full py-3.5 text-base font-extrabold shadow-lg"><svg data-ui-icon="print" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 8V3h10v5M7 17H3V9h18v8h-4M7 14h10v8H7ZM17 11h.1"/></svg> تولید و پیش‌نمایش چاپ گروهی کارنامه‌ها &larr;</button>
         </form>
     </div>
 </div>

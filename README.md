@@ -1,8 +1,17 @@
 # Baci
 
-## Release_V1.0 — نسخهٔ کامل بازسازی‌شده
+## تازه‌ترین اصلاحی: SVG و رابط واکنش‌گرا
 
-برای **نصب از صفر**؛ همهٔ اصلاحات اخیر در این دو بسته ادغام شده‌اند. شماره‌های داخلی سایت 4.152.0 و دسکتاپ 2.83.0 تغییر نکرده‌اند.
+**فقط اصلاحی؛ نسخه‌های کامل در این مرحله بازسازی نشده‌اند.** روی آخرین نصب با اصلاحات قبلی اعمال شود.
+
+- [اصلاحی سایت — SVG و واکنش‌گرایی](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SITE-FIX-v4.152.0-svg-responsive.zip)
+- [اصلاحی دسکتاپ — SVG و واکنش‌گرایی](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SchoolDeskPro-FIX-v2.83.0-svg-responsive.zip)
+- [راهنما، شواهد آزمون و سه مسیر مفقودِ قبلی](CORRECTIONS-SVG-RESPONSIVE-FA.md) · [SHA256](SVG-RESPONSIVE-SHA256SUMS.txt)
+
+
+## Release_V1.0 — نسخهٔ کامل قبلی
+
+برای **نصب از صفر**؛ اصلاحات تا انتشار قبلی در این دو بسته ادغام شده‌اند؛ رابط SVG تازه را ندارند و برای آن باید اصلاحی بالا نیز نصب شود. شماره‌های داخلی سایت 4.152.0 و دسکتاپ 2.83.0 تغییر نکرده‌اند.
 
 - [دانلود نسخهٔ کامل سایت](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/Release_V1.0-Site.zip)
 - [دانلود نسخهٔ کامل دسکتاپ ویندوز](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/Release_V1.0-Desktop.zip)

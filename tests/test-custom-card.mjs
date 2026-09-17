@@ -72,7 +72,8 @@ if(process.env.PRINT_BROWSER){
   await live.uncheck('#cPhoto');await live.uncheck('#cNid');await live.uncheck('#cYear');
   for(const sel of ['.card-photo','.card-nid','.card-year'])assert.equal(await live.locator('#cardPreview '+sel).first().isVisible(),false);
   await live.evaluate(()=>setCardDesign({scale:1,side:'front',copies:1,photo:true,nid:true,year:true,theme:'classic'}));
-  for(const layout of ['full','qrmax','sq']){await live.selectOption('#cLayout',layout);const after=await geometry(live,'#cardPreview .card-id');for(const k of Object.keys(after))if(k!=='.card-custom-site')assert.deepEqual(after[k],originals[layout][k],layout+' '+k);}
+  for(const layout of ['full','qrmax','sq']){await live.selectOption('#cLayout',layout);const after=await geometry(live,'#cardPreview .card-id');// Normalized DOMRect division can differ by < 1/64 CSS px after scrolling.
+   for(const k of Object.keys(after))if(k!=='.card-custom-site')for(const attr of Object.keys(after[k])){const actual=after[k][attr],expected=originals[layout][k][attr];if(typeof actual==='number')assert(Math.abs(actual-expected)<.02,layout+' '+k+' '+attr);else assert.deepEqual(actual,expected,layout+' '+k+' '+attr);}}
   assert.deepEqual(errors,[]);console.log('PASS Chromium custom: internal geometry parity, photo/QR separation, unclipped long names, QR decoding, A4 PDF pagination, persistence, toggles and original-layout restoration');
  }finally{await browser.close();}
 }

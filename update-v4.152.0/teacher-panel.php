@@ -130,7 +130,7 @@ $tab = $_GET['tab'] ?? 'schedule';
     <div class="card shadow-lg">
         <div class="flex justify-between items-center border-b pb-3 mb-4">
             <div>
-                <h3 class="font-bold text-lg text-primary">📝 لیست نمره‌دهی درس <b><?php echo clean($sub); ?></b> - کلاس <b><?php echo clean($cls); ?></b></h3>
+                <h3 class="font-bold text-lg text-primary"><svg data-ui-icon="exam" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 2h6v4H9Zm0 8h6m-6 4h3m-3 4h6"/></svg> لیست نمره‌دهی درس <b><?php echo clean($sub); ?></b> - کلاس <b><?php echo clean($cls); ?></b></h3>
                 <span class="text-xs text-muted">انتخاب ماه / نوبت تحصیلی جهت ثبت یا ویرایش نمرات:</span>
             </div>
             <a href="teacher-panel.php?tab=grading&year=<?php echo urlencode($year); ?>" class="btn btn-secondary text-xs">&rarr; بازگشت به لیست کلاس‌ها</a>
@@ -196,13 +196,13 @@ $tab = $_GET['tab'] ?? 'schedule';
                     </tbody>
                 </table>
             </div>
-            <button type="submit" class="btn btn-success px-8 py-3 font-bold shadow-lg">💾 ذخیره و ثبت نمرات کلاس &larr;</button>
+            <button type="submit" class="btn btn-success px-8 py-3 font-bold shadow-lg"><svg data-ui-icon="save" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3h15l3 3v15H3Zm4 0v7h10V3M7 21v-7h10v7"/></svg> ذخیره و ثبت نمرات کلاس &larr;</button>
         </form>
     </div>
 
     <?php elseif ($tab === 'grading'): ?>
     <div class="card shadow-lg">
-        <h3 class="font-bold mb-4 text-primary">📚 کلاس‌ها و دروس تخصیص‌یافته به شما جهت ثبت نمره</h3>
+        <h3 class="font-bold mb-4 text-primary"><svg data-ui-icon="book" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5C8 2 4 3 2 4v15c3-1 7-1 10 2 3-3 7-3 10-2V4c-3-1-7-2-10 1Zm0 0v16"/></svg> کلاس‌ها و دروس تخصیص‌یافته به شما جهت ثبت نمره</h3>
         <div class="grid grid-cols-3 gap-4">
             <?php foreach ($assignments as $as): ?>
             <div class="p-5 rounded-xl border border-color bg-slate-50 dark:bg-slate-800 flex flex-col justify-between shadow-sm hover:shadow-md transition">
@@ -211,7 +211,7 @@ $tab = $_GET['tab'] ?? 'schedule';
                     <h4 class="font-extrabold text-lg text-gray-800 dark:text-white"><?php echo clean($as['subject_name']); ?></h4>
                     <span class="text-xs text-muted block mt-1">سال تحصیلی: <?php echo tr_num($as['academic_year'], 'fa'); ?></span>
                 </div>
-                <a href="teacher-panel.php?action=grade&class=<?php echo urlencode($as['class_name']); ?>&subject=<?php echo urlencode($as['subject_name']); ?>&year=<?php echo urlencode($as['academic_year']); ?>" class="btn btn-primary mt-4 w-full text-xs font-bold">📝 ورود به لیست نمرات &larr;</a>
+                <a href="teacher-panel.php?action=grade&class=<?php echo urlencode($as['class_name']); ?>&subject=<?php echo urlencode($as['subject_name']); ?>&year=<?php echo urlencode($as['academic_year']); ?>" class="btn btn-primary mt-4 w-full text-xs font-bold"><svg data-ui-icon="exam" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 2h6v4H9Zm0 8h6m-6 4h3m-3 4h6"/></svg> ورود به لیست نمرات &larr;</a>
             </div>
             <?php endforeach; if (empty($assignments)): ?>
             <p class="col-span-3 text-center text-muted py-8">درسی به شما در برنامه هفتگی تخصیص نیافته است.</p>
@@ -223,7 +223,7 @@ $tab = $_GET['tab'] ?? 'schedule';
         $msgs = DB::fetchAll("SELECT gm.*, s.first_name, s.last_name, s.national_id FROM grade_messages gm JOIN students s ON gm.student_id = s.id WHERE gm.teacher_id = ? ORDER BY gm.id DESC", [$teacherId]);
     ?>
     <div class="card shadow-lg">
-        <h3 class="font-bold mb-4">💬 پیام‌ها و اعتراضات دانش‌آموزان به نمرات دروس شما</h3>
+        <h3 class="font-bold mb-4"><svg data-ui-icon="message" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3h18v14H9l-6 5ZM7 8h10M7 12h7"/></svg> پیام‌ها و اعتراضات دانش‌آموزان به نمرات دروس شما</h3>
         <div class="space-y-4">
             <?php foreach ($msgs as $m): ?>
             <div class="p-4 rounded-xl border bg-slate-50 dark:bg-slate-800 space-y-3">
@@ -284,7 +284,7 @@ $tab = $_GET['tab'] ?? 'schedule';
 
     ?>
     <div class="card shadow-lg">
-        <h3 class="font-bold mb-4">📝 آزمون‌های فعال من و طراحی سوالات</h3>
+        <h3 class="font-bold mb-4"><svg data-ui-icon="exam" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 2h6v4H9Zm0 8h6m-6 4h3m-3 4h6"/></svg> آزمون‌های فعال من و طراحی سوالات</h3>
         <?php if(teacher_has_deputy($teacherId) || current_teacher_is_executive()): ?><a class="btn btn-outline" href="exams.php?tab=class&amp;year=<?php echo urlencode($teacherYear); ?>">آزمون‌های کلاسی دبیران — مشاهده، چاپ و حذف</a><?php endif; ?>
         <?php include __DIR__.'/includes/teacher_class_exams.php'; ?>
         <h3 class="font-bold mt-4 mb-3">آزمون‌های ماهانه فعال‌شده توسط مدرسه</h3>

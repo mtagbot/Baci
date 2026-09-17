@@ -192,7 +192,7 @@ if (isset($_GET['print'])) {
     ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
-<head>
+<head><meta name=viewport content="width=device-width, initial-scale=1">
 <meta charset="UTF-8">
 <title>چاپ کارت ورود دانش‌آموزان</title>
 <style>
@@ -247,7 +247,7 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
 }
 </style>
 <?php echo app_appearance_head(); ?>
-</head>
+<link rel=stylesheet href=assets/css/school-ui.css?v20260917b><script defer src=assets/js/school-icons.js?v20260917b></script><script defer src=assets/js/school-ui.js?v20260917b></script></head>
 <body>
 <?php card_ornament_defs($themeColor, $accentColor); ?>
 <div class="toolbar no-print">

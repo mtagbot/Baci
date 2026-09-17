@@ -142,7 +142,7 @@ $sms_send  = get_setting('sms_sender_number', '');
 <div class="space-y-6">
     <div class="flex justify-between items-center">
         <div>
-            <h2 class="text-2xl font-bold">🎨 سفارشی‌سازی کامل ظاهری، سربرگ کارنامه و تنظیمات</h2>
+            <h2 class="text-2xl font-bold"><svg data-ui-icon="palette" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 2C-1 2-1 22 12 22c5 0-1-6 4-6 9 0 8-14-4-14Z"/><path d="M7 8h.1M12 6h.1M17 9h.1M6 13h.1"/></svg> سفارشی‌سازی کامل ظاهری، سربرگ کارنامه و تنظیمات</h2>
             <p class="text-sm text-muted">مدیریت اطلاعات مدرسه، سربرگ چاپ کارنامه‌ها، تغییر رنگ‌بندی، آپلود فونت‌های محلی، لوگو و درگاه پیامک</p>
         </div>
     </div>
@@ -224,7 +224,7 @@ $sms_send  = get_setting('sms_sender_number', '');
 
             <!-- Visual & Font Settings -->
             <div class="card shadow-lg space-y-4">
-                <h3 class="font-bold text-primary border-b pb-2">🎨 سفارشی‌سازی جلوه‌های بصری و فونت‌ها</h3>
+                <h3 class="font-bold text-primary border-b pb-2"><svg data-ui-icon="palette" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 2C-1 2-1 22 12 22c5 0-1-6 4-6 9 0 8-14-4-14Z"/><path d="M7 8h.1M12 6h.1M17 9h.1M6 13h.1"/></svg> سفارشی‌سازی جلوه‌های بصری و فونت‌ها</h3>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-semibold mb-1">رنگ اصلی سایت (Primary Color)</label>
@@ -389,7 +389,7 @@ $sms_send  = get_setting('sms_sender_number', '');
 
         <div class="flex justify-end mt-6">
             <button type="submit" class="btn btn-success px-8 py-3 font-bold shadow-lg">
-                <span>💾 ذخیره و اعمال تغییرات تنظیمات ظاهری</span>
+                <span><svg data-ui-icon="save" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3h15l3 3v15H3Zm4 0v7h10V3M7 21v-7h10v7"/></svg> ذخیره و اعمال تغییرات تنظیمات ظاهری</span>
             </button>
         </div>
     </form>

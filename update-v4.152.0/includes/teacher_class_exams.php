@@ -31,8 +31,8 @@ foreach($classRows as $as){$key=ceg_key($teacherId,$as['academic_year'],$as['gra
         <?php if($as['exams']): ?>
         <select name="exam_id" class="form-select text-xs" aria-label="انتخاب آزمون کلاسی">
             <?php foreach($as['exams'] as $ce): ?><option value="<?php echo (int)$ce['id']; ?>"><?php echo clean(($ce['exam_month']?:'آزمون کلاسی').' — #'.$ce['id'].(empty($ce['is_active'])?' — غیرفعال':'')); ?></option><?php endforeach; ?>
-        </select><button class="btn btn-warning text-xs">🧪 ویرایش آزمون کلاسی</button>
-        <?php elseif($as['assigned']): ?><input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>"><button class="btn btn-success text-xs">➕ طراحی آزمون جدید</button><?php endif; ?>
+        </select><button class="btn btn-warning text-xs"><svg data-ui-icon="science" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 2h8m-6 0v7L3 21h18L14 9V2M7 15h10"/></svg> ویرایش آزمون کلاسی</button>
+        <?php elseif($as['assigned']): ?><input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>"><button class="btn btn-success text-xs"><svg data-ui-icon="add" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v18M3 12h18"/></svg> طراحی آزمون جدید</button><?php endif; ?>
     </form>
 <?php endif; ?>
 <?php if($as['exams'])ceg_render_delete_form($shared?$member['exam_id']:$as['exams'][0]['id'],$as['academic_year'],false,!$shared); ?>

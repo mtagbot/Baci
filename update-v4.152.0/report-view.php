@@ -101,13 +101,13 @@ $subjectScores = [];
     <div class="flex justify-between items-center no-print">
         <a href="<?php echo is_admin_logged_in() ? 'reports.php' : 'student-panel.php'; ?>" class="btn btn-secondary">&rarr; بازگشت به لیست کارنامه‌ها</a>
         <div class="flex gap-2">
-            <a href="report-print.php?id=<?php echo $reportId; ?><?php echo is_student_logged_in() ? '&pt=' . urlencode(make_report_print_token($reportId, $report['student_id'])) : ''; ?>" target="_self" class="btn btn-primary gap-1 shadow">🖨️ چاپ کارنامه</a>
+            <a href="report-print.php?id=<?php echo $reportId; ?><?php echo is_student_logged_in() ? '&pt=' . urlencode(make_report_print_token($reportId, $report['student_id'])) : ''; ?>" target="_self" class="btn btn-primary gap-1 shadow"><svg data-ui-icon="print" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 8V3h10v5M7 17H3V9h18v8h-4M7 14h10v8H7ZM17 11h.1"/></svg> چاپ کارنامه</a>
             <?php if (is_admin_logged_in() || (function_exists('current_teacher_has_student_file_access') && current_teacher_has_student_file_access())): ?>
-            <a href="reports.php?action=edit&id=<?php echo $reportId; ?>" class="btn btn-warning gap-1 shadow">✏️ ویرایش کارنامه</a>
+            <a href="reports.php?action=edit&id=<?php echo $reportId; ?>" class="btn btn-warning gap-1 shadow"><svg data-ui-icon="edit" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m14 5 5 5M3 21l5-1L21 7c2-2-2-6-4-4L4 16Z"/></svg> ویرایش کارنامه</a>
             <?php endif; ?>
             <?php if (is_admin_logged_in()): ?>
-            <a href="export-excel.php?id=<?php echo $reportId; ?>" class="btn btn-success gap-1 shadow">📊 دانلود Excel</a>
-            <a href="export-pdf.php?id=<?php echo $reportId; ?>" class="btn btn-danger gap-1 shadow">📄 دانلود PDF واقعی</a>
+            <a href="export-excel.php?id=<?php echo $reportId; ?>" class="btn btn-success gap-1 shadow"><svg data-ui-icon="chart" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3v18h18M7 17v-4m5 4V8m5 9V4"/></svg> دانلود Excel</a>
+            <a href="export-pdf.php?id=<?php echo $reportId; ?>" class="btn btn-danger gap-1 shadow"><svg data-ui-icon="report" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 2H5v20h14V7Zm0 0v5h5M8 17v-3m4 3v-6m4 6v-4"/></svg> دانلود PDF واقعی</a>
             <?php endif; ?>
         </div>
     </div>
@@ -137,7 +137,7 @@ $subjectScores = [];
                     <?php if (!empty($report['photo_url'])): ?>
                         <img src="<?php echo clean($report['photo_url']); ?>" alt="عکس دانش‌آموز" class="w-full h-full object-cover">
                     <?php else: ?>
-                        <span class="text-2xl">👤</span>
+                        <span class="text-2xl"><svg data-ui-icon="user" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2c0-8 16-8 16 0v2"/></svg></span>
                     <?php endif; ?>
                 </div>
                 <span class="text-[10px] text-muted font-mono"><?php echo tr_num($report['national_id'], 'fa'); ?></span>
@@ -225,7 +225,7 @@ $subjectScores = [];
 
         <?php if (!empty($report['teacher_comments'])): ?>
         <div class="p-4 rounded-xl bg-amber-50 dark:bg-slate-800 border border-amber-200 text-sm mb-6">
-            <span class="font-bold text-amber-900 dark:text-amber-400 block mb-1">💬 نظر مربی و مدیر راهنما:</span>
+            <span class="font-bold text-amber-900 dark:text-amber-400 block mb-1"><svg data-ui-icon="message" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3h18v14H9l-6 5ZM7 8h10M7 12h7"/></svg> نظر مربی و مدیر راهنما:</span>
             <p class="text-amber-800 dark:text-amber-200 text-xs leading-relaxed"><?php echo nl2br(clean($report['teacher_comments'])); ?></p>
         </div>
         <?php endif; ?>
@@ -236,7 +236,7 @@ $subjectScores = [];
         ?>
         <div class="card p-5 border bg-slate-50 dark:bg-slate-800 rounded-xl mb-6 no-print">
             <h4 class="font-bold text-sm text-primary mb-4 flex items-center gap-1">
-                <span>💬 پرسش، اعتراض و ارتباط مستقیم با دبیران دروس این کارنامه:</span>
+                <span><svg data-ui-icon="message" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3h18v14H9l-6 5ZM7 8h10M7 12h7"/></svg> پرسش، اعتراض و ارتباط مستقیم با دبیران دروس این کارنامه:</span>
             </h4>
             <form method="POST" class="grid grid-cols-4 gap-3 mb-6 bg-white dark:bg-slate-900 p-4 rounded-lg border">
                 <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
@@ -285,7 +285,7 @@ $subjectScores = [];
         <!-- Cutting Slip & Signatures -->
         <div class="mt-8 pt-4">
             <div class="flex items-center gap-2 text-gray-400 my-6">
-                <span class="text-lg">✂️</span>
+                <span class="text-lg"><svg data-ui-icon="crop" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 2v16h16M2 6h16v16M3 21 21 3"/></svg></span>
                 <div class="flex-1 border-t-2 border-dashed border-gray-400"></div>
                 <span class="text-xs font-mono">محل برش و اعاده به مدرسه</span>
             </div>
@@ -309,11 +309,11 @@ $subjectScores = [];
         <!-- Analytical Charts Grid -->
         <div class="grid grid-cols-2 gap-6 no-print">
             <div class="card p-4 border bg-slate-50 dark:bg-slate-800 rounded-xl">
-                <h4 class="font-bold text-sm mb-4">📊 نمودار مقایسه‌ای نمرات دروس:</h4>
+                <h4 class="font-bold text-sm mb-4"><svg data-ui-icon="chart" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3v18h18M7 17v-4m5 4V8m5 9V4"/></svg> نمودار مقایسه‌ای نمرات دروس:</h4>
                 <canvas id="reportSubjectChart" height="180"></canvas>
             </div>
             <div class="card p-4 border bg-slate-50 dark:bg-slate-800 rounded-xl">
-                <h4 class="font-bold text-sm mb-4">📈 روند تغییرات معدل در طول سال تحصیلی:</h4>
+                <h4 class="font-bold text-sm mb-4"><svg data-ui-icon="chart" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3v18h18M7 17v-4m5 4V8m5 9V4"/></svg> روند تغییرات معدل در طول سال تحصیلی:</h4>
                 <canvas id="monthlyProgressChart" height="180"></canvas>
             </div>
         </div>

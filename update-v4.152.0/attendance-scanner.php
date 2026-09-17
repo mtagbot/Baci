@@ -20,7 +20,7 @@ $schoolName = get_setting('school_name', 'آموزشگاه');
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>اسکنر حضور و غیاب — <?php echo clean($schoolName); ?></title>
 <style>
 /* v4.94.0: حداقل استایل — بدون انیمیشن، سایه، گرادیان یا فیلتر (هیچ بار اضافه‌ای روی CPU/GPU) */
@@ -72,10 +72,10 @@ video{width:100%;height:100%;object-fit:cover;display:block}
 .optics small{display:block;color:#bbb}
 </style>
 <?php echo app_appearance_head(); ?>
-</head>
-<body>
+<link rel=stylesheet href=assets/css/school-ui.css?v20260917b><script defer src=assets/js/school-icons.js?v20260917b></script><script defer src=assets/js/school-ui.js?v20260917b></script></head>
+<body class="ui-scanner">
 <div class="hdr">
-    <div><b>🎓 <?php echo clean($schoolName); ?></b><div style="font-size:.68rem;color:#94a3b8">اسکنر هوشمند حضور و غیاب — سریع / فوکوس نزدیک</div><a style="color:#9cd8ff;font-size:.7rem" href="<?php echo clean('attendance-scanner.php?scanner=legacy' . ($byKey ? '&key=' . rawurlencode($key) : '')); ?>">بازگشت به اسکنر قبلی</a></div>
+    <div><b><svg data-ui-icon="student" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m2 7 10-4 10 4-10 4Zm3 2v5c3 3 11 3 14 0V9M22 7v7M5 21c1-5 13-5 14 0"/></svg> <?php echo clean($schoolName); ?></b><div style="font-size:.68rem;color:#94a3b8">اسکنر هوشمند حضور و غیاب — سریع / فوکوس نزدیک</div><a style="color:#9cd8ff;font-size:.7rem" href="<?php echo clean('attendance-scanner.php?scanner=legacy' . ($byKey ? '&key=' . rawurlencode($key) : '')); ?>">بازگشت به اسکنر قبلی</a></div>
     <div class="clock" id="clock">--:--:--</div>
     <div class="rules">
         حضور تا ساعت <b style="color:#34d399"><?php echo tr_num($times['present_until'], 'fa'); ?></b><br>
@@ -92,7 +92,7 @@ video{width:100%;height:100%;object-fit:cover;display:block}
     </div>
     <div class="side">
         <div class="result" id="resBox">
-            <div class="icon" id="resIcon">📷</div>
+            <div class="icon" id="resIcon"><svg data-ui-icon="camera" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6 9 3h6l1 3h5v15H3V6Z"/><circle cx="12" cy="13" r="4"/></svg></div>
             <div class="rname" id="resName">آماده اسکن</div>
             <div class="rstat" id="resStat">تگ QR خود را مقابل دوربین بگیرید</div>
             <div class="rsub" id="resSub"></div>

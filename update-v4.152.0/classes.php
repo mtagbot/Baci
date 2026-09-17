@@ -410,9 +410,9 @@ try { $maxRow = DB::fetch("SELECT MAX(id) m FROM subjects"); $nextSubjectCode = 
                 </select>
             </form>
             <div class="flex gap-2 text-sm border-b pb-1">
-                <a href="classes.php?tab=classes&year=<?php echo urlencode($year); ?>" class="btn <?php echo $tab === 'classes' ? 'btn-primary font-bold' : 'btn-outline'; ?>">🏫 کلاس‌ها</a>
-                <a href="classes.php?tab=schedule&year=<?php echo urlencode($year); ?>" class="btn <?php echo $tab === 'schedule' ? 'btn-primary font-bold' : 'btn-outline'; ?>">📅 برنامه هفتگی و دبیران</a>
-                <a href="classes.php?tab=<?php echo urlencode($tab); ?>&year=<?php echo urlencode($year); ?>&sync_schedule=1&csrf_token=<?php echo urlencode(csrf_token()); ?>" class="btn btn-success text-xs" title="ایجاد رکوردهای کلاس و درس از روی برنامه هفتگی">🔄 همگام‌سازی با برنامه</a>
+                <a href="classes.php?tab=classes&year=<?php echo urlencode($year); ?>" class="btn <?php echo $tab === 'classes' ? 'btn-primary font-bold' : 'btn-outline'; ?>"><svg data-ui-icon="school" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m3 9 9-6 9 6v12H3Z"/><path d="M9 21v-6h6v6M7 11h.01M17 11h.01M12 7v3M10.5 8.5h3"/></svg> کلاس‌ها</a>
+                <a href="classes.php?tab=schedule&year=<?php echo urlencode($year); ?>" class="btn <?php echo $tab === 'schedule' ? 'btn-primary font-bold' : 'btn-outline'; ?>"><svg data-ui-icon="calendar" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18M8 15h2m4 0h2m-8 3h2"/></svg> برنامه هفتگی و دبیران</a>
+                <a href="classes.php?tab=<?php echo urlencode($tab); ?>&year=<?php echo urlencode($year); ?>&sync_schedule=1&csrf_token=<?php echo urlencode(csrf_token()); ?>" class="btn btn-success text-xs" title="ایجاد رکوردهای کلاس و درس از روی برنامه هفتگی"><svg data-ui-icon="refresh" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 3v6h-6M3 21v-6h6M20 9a8 8 0 0 0-14-4M4 15a8 8 0 0 0 14 4"/></svg> همگام‌سازی با برنامه</a>
             </div>
         </div>
     </div>
@@ -524,7 +524,7 @@ try { $maxRow = DB::fetch("SELECT MAX(id) m FROM subjects"); $nextSubjectCode = 
     <div class="card shadow-lg space-y-4">
         <div class="flex justify-between items-center border-b pb-3">
             <div>
-                <h3 class="font-bold text-primary">📅 برنامه هفتگی سال <?php echo tr_num($year, 'fa'); ?> — ۴ زنگ</h3>
+                <h3 class="font-bold text-primary"><svg data-ui-icon="calendar" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18M8 15h2m4 0h2m-8 3h2"/></svg> برنامه هفتگی سال <?php echo tr_num($year, 'fa'); ?> — ۴ زنگ</h3>
                 <p class="text-xs text-muted mt-1">هر خانه را انتخاب کنید؛ تغییرات <b>بلافاصله و خودکار</b> ذخیره می‌شود (نیازی به دکمه تایید نیست).</p>
             </div>
             <div class="flex gap-2 items-center">
@@ -538,7 +538,7 @@ try { $maxRow = DB::fetch("SELECT MAX(id) m FROM subjects"); $nextSubjectCode = 
                         <?php endforeach; ?>
                     </select>
                 </form>
-                <a href="import-schedule.php" class="btn btn-primary text-xs">⚡ ایمپورت barname.csv</a>
+                <a href="import-schedule.php" class="btn btn-primary text-xs"><svg data-ui-icon="bolt" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m14 2-11 12h8l-1 8 11-12h-8Z"/></svg> ایمپورت barname.csv</a>
             </div>
         </div>
 
@@ -670,7 +670,7 @@ try { $maxRow = DB::fetch("SELECT MAX(id) m FROM subjects"); $nextSubjectCode = 
 
         <?php /* v4.68.0: انتقال برنامه هفتگی به سال دیگر */ ?>
         <div class="card" style="border:1px dashed #a5b4fc;background:rgba(99,102,241,.04)">
-            <h4 class="font-bold text-sm mb-2">📤 انتقال برنامه هفتگی به سال تحصیلی دیگر</h4>
+            <h4 class="font-bold text-sm mb-2"><svg data-ui-icon="upload" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 16v5h18v-5M12 16V3m-5 5 5-5 5 5"/></svg> انتقال برنامه هفتگی به سال تحصیلی دیگر</h4>
             <form method="POST" class="flex flex-wrap items-end gap-3" onsubmit="return confirm('برنامه هفتگی سال مبدا به سال مقصد کپی شود؟')">
                 <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
                 <input type="hidden" name="copy_schedule_year" value="1">

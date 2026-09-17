@@ -162,7 +162,7 @@ if (isset($_GET['print'])) {
     ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
-<head>
+<head><meta name=viewport content="width=device-width, initial-scale=1">
 <meta charset="UTF-8">
 <title>چاپ تگ‌های QR</title>
 <style>
@@ -185,7 +185,7 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
 @media print{ .toolbar{display:none !important} @page{margin:<?php echo $D['margin']; ?>mm} }
 </style>
 <?php echo app_appearance_head(); ?>
-</head>
+<link rel=stylesheet href=assets/css/school-ui.css?v20260917b><script defer src=assets/js/school-icons.js?v20260917b></script><script defer src=assets/js/school-ui.js?v20260917b></script></head>
 <body>
 <div class="toolbar no-print">
     <button onclick="appPrint()">چاپ</button>

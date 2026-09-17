@@ -107,15 +107,15 @@ $captchaQ = generate_captcha();
 <div class="auth-wrap my-8">
     <div class="auth-card">
         <div class="auth-brand">
-            <div class="auth-logo">🔐</div>
+            <div class="auth-logo"><svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg></div>
             <div>
                 <div class="auth-brand-title">ورود اختصاصی کادر مدرسه</div>
                 <div class="auth-brand-sub">پنل مدیریت و پورتال اختصاصی دبیران</div>
             </div>
             <div class="auth-brand-features">
-                <div class="auth-feature"><span class="fi">🗂️</span> مدیریت پرونده دانش‌آموزان و کلاس‌ها</div>
-                <div class="auth-feature"><span class="fi">📝</span> ثبت نمرات و صدور کارنامه</div>
-                <div class="auth-feature"><span class="fi">📈</span> گزارش‌های تحلیلی و آماری</div>
+                <div class="auth-feature"><span class="fi"><svg data-ui-icon="folder" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 5h8l3 3h9v13H2Z"/></svg></span> مدیریت پرونده دانش‌آموزان و کلاس‌ها</div>
+                <div class="auth-feature"><span class="fi"><svg data-ui-icon="exam" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 2h6v4H9Zm0 8h6m-6 4h3m-3 4h6"/></svg></span> ثبت نمرات و صدور کارنامه</div>
+                <div class="auth-feature"><span class="fi"><svg data-ui-icon="chart" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3v18h18M7 17v-4m5 4V8m5 9V4"/></svg></span> گزارش‌های تحلیلی و آماری</div>
             </div>
         </div>
         <div class="auth-form-side">
@@ -136,8 +136,8 @@ $captchaQ = generate_captcha();
         <?php endif; ?>
 
         <div class="auth-tabs" role="tablist">
-            <button type="button" onclick="switchAdminTab('adminTab')" id="btnAdminTab" class="auth-tab <?php echo $tab === 'admin' ? 'active' : ''; ?>">⚙️ ورود مدیران</button>
-            <button type="button" onclick="switchAdminTab('teacherTab')" id="btnTeacherTab" class="auth-tab <?php echo $tab === 'teacher' ? 'active' : ''; ?>">👨‍🏫 ورود دبیران</button>
+            <button type="button" onclick="switchAdminTab('adminTab')" id="btnAdminTab" class="auth-tab <?php echo $tab === 'admin' ? 'active' : ''; ?>"><svg data-ui-icon="settings" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-8 0v6"/></svg> ورود مدیران</button>
+            <button type="button" onclick="switchAdminTab('teacherTab')" id="btnTeacherTab" class="auth-tab <?php echo $tab === 'teacher' ? 'active' : ''; ?>"><svg data-ui-icon="users" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="7" r="3"/><path d="M2 21v-3c0-6 14-6 14 0v3M16 4c5 0 5 6 1 6M19 14c3 1 3 4 3 7"/></svg> ورود دبیران</button>
         </div>
 
         <!-- Admin Form -->
@@ -147,16 +147,16 @@ $captchaQ = generate_captcha();
             <div class="auth-field">
                 <label>نام کاربری مدیریت</label>
                 <div class="auth-input-wrap">
-                    <span class="auth-icon">👤</span>
+                    <span class="auth-icon"><svg data-ui-icon="user" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2c0-8 16-8 16 0v2"/></svg></span>
                     <input type="text" name="username" class="form-input dir-ltr text-left font-mono js-cap-identity" autocomplete="username" placeholder="username" required autofocus>
                 </div>
             </div>
             <div class="auth-field">
                 <label>کلمه عبور</label>
                 <div class="auth-input-wrap">
-                    <span class="auth-icon">🔑</span>
+                    <span class="auth-icon"><svg data-ui-icon="key" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-5-5 3-3m-6 0 3-3"/></svg></span>
                     <input type="password" name="password" id="aPass" class="form-input dir-ltr text-left font-mono" autocomplete="current-password" placeholder="******" required>
-                    <button type="button" class="auth-eye" onclick="togglePass('aPass', this)" tabindex="-1" aria-label="نمایش رمز">👁</button>
+                    <button type="button" class="auth-eye" onclick="togglePass('aPass', this)" tabindex="-1" aria-label="نمایش رمز"><svg data-ui-icon="eye" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12c5-10 15-10 20 0-5 10-15 10-20 0Z"/><circle cx="12" cy="12" r="3"/></svg></button>
                 </div>
             </div>
             <?php /* v4.132.0: کد امنیتی فقط بعد از اولین تلاش ناموفقِ همین حساب */ ?>
@@ -175,16 +175,16 @@ $captchaQ = generate_captcha();
             <div class="auth-field">
                 <label>کد ملی دبیر (نام کاربری)</label>
                 <div class="auth-input-wrap">
-                    <span class="auth-icon">👤</span>
+                    <span class="auth-icon"><svg data-ui-icon="user" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2c0-8 16-8 16 0v2"/></svg></span>
                     <input type="text" name="national_id" class="form-input dir-ltr text-left font-mono js-cap-identity" inputmode="numeric" autocomplete="username" placeholder="کد ملی ۱۰ رقمی" required>
                 </div>
             </div>
             <div class="auth-field">
                 <label>کد پرسنلی / کلمه عبور</label>
                 <div class="auth-input-wrap">
-                    <span class="auth-icon">🔑</span>
+                    <span class="auth-icon"><svg data-ui-icon="key" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-5-5 3-3m-6 0 3-3"/></svg></span>
                     <input type="password" name="password" id="tPass" class="form-input dir-ltr text-left font-mono" autocomplete="current-password" placeholder="******" required>
-                    <button type="button" class="auth-eye" onclick="togglePass('tPass', this)" tabindex="-1" aria-label="نمایش رمز">👁</button>
+                    <button type="button" class="auth-eye" onclick="togglePass('tPass', this)" tabindex="-1" aria-label="نمایش رمز"><svg data-ui-icon="eye" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12c5-10 15-10 20 0-5 10-15 10-20 0Z"/><circle cx="12" cy="12" r="3"/></svg></button>
                 </div>
             </div>
             <?php /* v4.132.0: کد امنیتی فقط بعد از اولین تلاش ناموفقِ همین حساب */ ?>

@@ -80,7 +80,7 @@ require_once __DIR__ . '/includes/header.php';
     <div class="card shadow-lg">
         <div class="flex justify-between items-center border-b pb-3 mb-4">
             <div>
-                <h3 class="font-bold text-primary">🖥 نشست‌های فعال حساب «<?php echo clean($uName); ?>»</h3>
+                <h3 class="font-bold text-primary"><svg data-ui-icon="desktop" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M12 17v5m-5 0h10"/></svg> نشست‌های فعال حساب «<?php echo clean($uName); ?>»</h3>
                 <p class="text-xs text-muted mt-1">دستگاه‌هایی که هم‌اکنون با این حساب وارد سیستم شده‌اند. با بستن هر نشست، آن دستگاه با اولین فعالیت بعدی به‌صورت خودکار خارج می‌شود.</p>
             </div>
             <?php if (count($sessions) > 1): ?>
@@ -147,7 +147,7 @@ require_once __DIR__ . '/includes/header.php';
 <!-- v4.89.0: مودال تایید رمز حساب برای بستن نشست -->
 <div id="msPassOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;align-items:center;justify-content:center;padding:16px">
     <div class="card shadow-lg" style="max-width:420px;width:100%">
-        <h4 class="font-bold text-primary mb-2">🔐 تایید هویت برای بستن نشست</h4>
+        <h4 class="font-bold text-primary mb-2"><svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg> تایید هویت برای بستن نشست</h4>
         <p class="text-xs text-muted mb-3">برای بستن <b id="msPassTarget">نشست</b>، رمز حساب کاربری خود را وارد کنید. بدون رمز صحیح، نشست بسته نمی‌شود.</p>
         <form method="POST" id="msPassForm" autocomplete="off">
             <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">

@@ -63,7 +63,7 @@ $logoUrl    = get_setting('logo_url', '');
 $isEmbedded = isset($_GET['embedded']) && $_GET['embedded'] === '1';
 ?>
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" class="school-shell">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -119,8 +119,9 @@ $isEmbedded = isset($_GET['embedded']) && $_GET['embedded'] === '1';
     <?php endif; ?>
 <?php if(st_current_user()): ?><script defer src="assets/js/session-watch.js"></script><?php endif; ?>
 <?php echo app_appearance_head(); ?>
-</head>
-<body class="bg-body text-main min-h-screen flex flex-col font-sans">
+<link rel=stylesheet href=assets/css/school-ui.css?v20260917b><script defer src=assets/js/school-icons.js?v20260917b></script><script defer src=assets/js/school-ui.js?v20260917b></script><?php require_once __DIR__.'/school_ui_theme.php'; echo school_ui_theme(); ?><noscript><style>@media screen and (max-width:900px){body.school-app>.flex.flex-1{display:block}body.school-app .sidebar{position:static!important;transform:none!important;visibility:visible!important;width:100%!important;max-width:none;height:auto!important}body.school-app .hamburger-btn,body.school-app .ui-drawer-close{display:none!important}}</style></noscript></head>
+<body class="school-app <?php echo $isEmbedded ? 'embedded-mode' : ''; ?> bg-body text-main min-h-screen flex flex-col font-sans">
+<a class="ui-skip" href="#main-content">رفتن به محتوای اصلی</a>
 <script>
 /* v4.66.0: یک دکمه، دو رفتار — موبایل: کشوی بازشو (sidebar-open)؛
    دسکتاپ/تبلت: جمع‌کردن سایدبار (sidebar-collapsed) با حافظه در localStorage.
@@ -141,8 +142,8 @@ function mtagToggleSidebar(){
     <?php /* v4.67.0: دکمه ☰ + لوگو + نام مدرسه + زیرنویس در «یک گروه» ابتدای هدر —
           قبلاً ☰ فرزند جدا بود و justify-between برند را وسط هدر می‌انداخت. */ ?>
     <div class="flex items-center gap-3">
-        <button type="button" class="hamburger-btn" id="sidebarToggleBtn" title="باز و بسته کردن منوی کناری" onclick="mtagToggleSidebar()">☰</button>
-        <?php if (!empty($logoUrl)): ?><img src="<?php echo clean($logoUrl); ?>" alt="Logo" class="h-10 w-10 object-contain rounded"><?php endif; ?>
+        <button type="button" class="hamburger-btn" id="sidebarToggleBtn" title="باز و بسته کردن منوی کناری" onclick="mtagToggleSidebar()"><svg data-ui-icon="menu" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 5h18M3 12h18M3 19h18"/></svg></button>
+        <?php if (!empty($logoUrl)): ?><img src="<?php echo clean($logoUrl); ?>" alt="نشان مدرسه" class="h-10 w-10 object-contain rounded"><?php endif; ?>
         <div><h1 class="text-lg font-bold"><?php echo clean($schoolName); ?></h1><span class="text-xs text-muted"><?php echo is_admin_logged_in() ? 'پنل مدیریت سیستم' : (is_student_logged_in() ? 'پنل دانش‌آموزی' : 'پنل دبیران'); ?></span></div>
     </div>
     <?php /* v4.132.0: منوی کاشی‌ای وسط هدر — فقط برای مدیر، یک ردیف، حداکثر ۸ کاشی.
@@ -151,7 +152,7 @@ function mtagToggleSidebar(){
     <div class="flex items-center gap-4">
         <span class="text-sm font-medium hdr-date">مورخ: <?php echo jdate('l j F Y'); ?></span>
         <div class="user-menu-wrap">
-            <button type="button" class="btn btn-secondary user-menu-btn" onclick="document.body.classList.toggle('user-menu-open')">👤 کاربری</button>
+            <button type="button" class="btn btn-secondary user-menu-btn" onclick="document.body.classList.toggle('user-menu-open')"><svg data-ui-icon="user" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2c0-8 16-8 16 0v2"/></svg> کاربری</button>
             <div class="user-menu-dropdown">
                 <?php /* v4.60.0: bg-green-600 / bg-amber-600 don't exist in this project's CSS,
                       which left white text on a white badge. Explicit inline colors. */ ?>
@@ -167,7 +168,7 @@ function mtagToggleSidebar(){
 <div class="flex flex-1">
     <?php if (is_admin_logged_in()): ?>
     <aside class="sidebar w-64 bg-card border-l border-color p-4 flex flex-col gap-1.5 shrink-0 shadow-lg">
-        <div class="sidebar-scroll">
+        <button type="button" class="ui-drawer-close" onclick="document.body.classList.remove('sidebar-open')">بستن فهرست</button><div class="sidebar-scroll">
         <div class="sidebar-section-title">نمای کلی</div>
         <a href="index.php?view=dashboard" class="sidebar-item <?php echo (!isset($_GET['view']) || $_GET['view'] == 'dashboard') && basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>">داشبورد مدیریت</a>
         <?php if (has_permission('manage_students')): ?>
@@ -224,7 +225,7 @@ function mtagToggleSidebar(){
     </aside>
     <?php endif; ?>
 
-    <main class="flex-1 p-6 overflow-y-auto">
+    <main id="main-content" tabindex="-1" class="flex-1 p-6 overflow-y-auto">
         <?php
         $flash = get_flash_message();
         if ($flash):
@@ -232,13 +233,13 @@ function mtagToggleSidebar(){
             $message = $flash['message'];
             // Define colors with inline styles to ensure visibility even without Tailwind
             if ($type === 'success') {
-                $bg = '#dcfce7'; $border = '#86efac'; $textColor = '#14532d'; $icon = '✅'; $title = 'عملیات موفق';
+                $bg = '#dcfce7'; $border = '#86efac'; $textColor = '#14532d'; $icon = '<svg data-ui-icon="check" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m7 12 3 3 7-7"/></svg>'; $title = 'عملیات موفق';
             } elseif ($type === 'error') {
-                $bg = '#fee2e2'; $border = '#fca5a5'; $textColor = '#7f1d1d'; $icon = '❌'; $title = 'خطا / عدم موفقیت';
+                $bg = '#fee2e2'; $border = '#fca5a5'; $textColor = '#7f1d1d'; $icon = '<svg data-ui-icon="error" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m-6 0 6-6"/></svg>'; $title = 'خطا / عدم موفقیت';
             } elseif ($type === 'warning') {
-                $bg = '#fef9c3'; $border = '#fde047'; $textColor = '#713f12'; $icon = '⚠️'; $title = 'هشدار';
+                $bg = '#fef9c3'; $border = '#fde047'; $textColor = '#713f12'; $icon = '<svg data-ui-icon="warning" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 2 21h20Z"/><path d="M12 9v5m0 3v.1"/></svg>'; $title = 'هشدار';
             } else { // info
-                $bg = '#dbeafe'; $border = '#93c5fd'; $textColor = '#1e3a8a'; $icon = 'ℹ️'; $title = 'پیام سیستم';
+                $bg = '#dbeafe'; $border = '#93c5fd'; $textColor = '#1e3a8a'; $icon = '<svg data-ui-icon="info" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.1"/></svg>'; $title = 'پیام سیستم';
             }
         ?>
         <div class="flash-message" style="margin-bottom:16px;padding:14px 18px;border-radius:12px;border:2px solid <?php echo $border; ?>;background:<?php echo $bg; ?>;color:<?php echo $textColor; ?>;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;box-shadow:0 4px 12px rgba(0,0,0,0.08);font-size:13px;line-height:1.8;white-space:pre-line;">
@@ -264,5 +265,5 @@ function mtagToggleSidebar(){
         </script>
         <?php endif; ?>
 <?php else: ?>
-    <main class="flex-1 flex items-center justify-center p-6">
+    <main id="main-content" tabindex="-1" class="flex-1 flex items-center justify-center p-6">
 <?php endif; ?>

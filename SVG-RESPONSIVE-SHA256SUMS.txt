@@ -1,0 +1,2 @@
+fd10fef1ef5d91619fd16c42b178084b0c092dc175f0ad1593490637c8abf786  SITE-FIX-v4.152.0-svg-responsive.zip
+3b92453c8127ee1593fd52a230dbaa9cbd3125f94e05ba179a1fc5fccab71421  SchoolDeskPro-FIX-v2.83.0-svg-responsive.zip

@@ -75,7 +75,7 @@ await checkedRun("<?php require '/www/includes/db.php'; DB::execute(\"UPDATE cla
 const grading=await request('teacher-panel.php',{sid:teacher,query:'tab=grading'});
 assert(!grading.page.includes('class-exam-create.php'));assert(grading.page.includes('ورود به لیست نمرات'));count++;
 let panel=await request('teacher-panel.php',{sid:teacher,query:'tab=exams'});
-assert(panel.page.includes('➕ طراحی آزمون جدید'));assert(panel.page.includes('طراحی پایه‌ای کلاسی'));count++;
+assert(panel.page.includes('طراحی آزمون جدید') && (panel.page.includes('➕ طراحی آزمون جدید') || panel.page.includes('data-ui-icon="add"')));assert(panel.page.includes('طراحی پایه‌ای کلاسی'));count++;
 const exbase={class:'هفتم1',subject:'ریاضی',year:'1404/1405',csrf_token:csrf,new:'1'};
 const exams=()=>db("SELECT * FROM exam_schedules WHERE teacher_id>=901 ORDER BY id");
 const initialExams=await exams();

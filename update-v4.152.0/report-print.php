@@ -51,7 +51,7 @@ $rLine2 = get_setting('report_header_line2', 'دبیرستان غیردولتی 
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
-<head>
+<head><meta name=viewport content="width=device-width, initial-scale=1">
     <meta charset="UTF-8">
     <title>چاپ کارنامه - <?php echo clean($report['first_name'] . ' ' . $report['last_name']); ?></title>
     <style>
@@ -76,10 +76,10 @@ $rLine2 = get_setting('report_header_line2', 'دبیرستان غیردولتی 
         @media print { .btn-print { display: none; } .print-container { border: none; padding: 0; } }
     </style>
 <?php echo app_appearance_head(); ?>
-</head>
+<link rel=stylesheet href=assets/css/school-ui.css?v20260917b><script defer src=assets/js/school-icons.js?v20260917b></script><script defer src=assets/js/school-ui.js?v20260917b></script></head>
 <body>
 
-<button onclick="appPrint()" class="btn-print">🖨️ چاپ یا ذخیره PDF از مرورگر</button>
+<button onclick="appPrint()" class="btn-print"><svg data-ui-icon="print" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 8V3h10v5M7 17H3V9h18v8h-4M7 14h10v8H7ZM17 11h.1"/></svg> چاپ یا ذخیره PDF از مرورگر</button>
 
 <div class="print-container">
     <div class="header">
@@ -162,7 +162,7 @@ $rLine2 = get_setting('report_header_line2', 'دبیرستان غیردولتی 
 
     <div style="margin-top: 30px;">
         <hr style="border: none; border-top: 1.5px dashed #000; margin: 20px 0;">
-        <p style="font-size: 12px; margin: 10px 0;">✂️ اینجانب ولی دانش‌آموز <b><?php echo clean($report['first_name'] . ' ' . $report['last_name']); ?></b> گزارش عملکرد تحصیلی نوبت <b><?php echo clean($report['term']); ?></b> را مشاهده و بررسی نموده‌ام.</p>
+        <p style="font-size: 12px; margin: 10px 0;"><svg data-ui-icon="crop" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 2v16h16M2 6h16v16M3 21 21 3"/></svg> اینجانب ولی دانش‌آموز <b><?php echo clean($report['first_name'] . ' ' . $report['last_name']); ?></b> گزارش عملکرد تحصیلی نوبت <b><?php echo clean($report['term']); ?></b> را مشاهده و بررسی نموده‌ام.</p>
         <div class="signatures">
             <div class="sig-box">
                 <p>امضا و تاریخ رویت ولی دانش‌آموز</p>
