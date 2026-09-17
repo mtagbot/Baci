@@ -1,0 +1,10 @@
+/* Restored Wizard only; loaded in head before the first paint. */
+@media screen {
+.school-app main > .report-import-wizard > .flex.justify-between.items-center:first-child > div:first-child{display:block!important}
+.report-import-wizard .wizard-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.report-import-wizard .wizard-step{min-width:0;font-size:13px;line-height:1.8;color:#475569;background:#f1f5f9}
+.report-import-wizard .wizard-step.active{color:#173a65;background:#eaf0f7}
+.report-import-wizard .wizard-step.completed{color:#166534;background:#eefaf6}
+.report-import-wizard button:disabled{cursor:not-allowed;opacity:.65}
+@media(max-width:900px){.report-import-wizard .wizard-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+}

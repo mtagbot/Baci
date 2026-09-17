@@ -7,7 +7,7 @@ const require=createRequire(join(REPO,'.cache/browser/package.json'));
 const {chromium:pw}=require('playwright'),mod=await import(require.resolve('@sparticuz/chromium')),chromium=mod.default;
 const {default:AxeBuilder}=require('@axe-core/playwright');
 const browser=await pw.launch({executablePath:await chromium.executablePath(),args:chromium.args.filter(a=>!['--single-process','--disable-web-security'].includes(a)),headless:true});
-const dir=join(REPO,'docs/mobile-hubs');mkdirSync(dir,{recursive:true});
+const dir=join(REPO,process.env.HUB_EVIDENCE_DIR||'docs/mobile-hubs');mkdirSync(dir,{recursive:true});
 const results=[],errors=[];let checks=0;const check=(v,m)=>{assert(v,m);checks++;};
 try{
  for(const phase of (process.env.HUB_AFTER_ONLY?['after']:['before','after'])){

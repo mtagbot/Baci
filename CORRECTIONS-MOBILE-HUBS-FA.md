@@ -2,6 +2,8 @@
 
 **بستهٔ اصلاحی پس از fast-ui؛ بدون بازسازی Release_V1.0، تغییر فایل اجرایی یا افزایش شمارهٔ نسخه.**
 
+> به‌روزرسانی پس از این انتشار: دو ابزار «ایمپورت Wizard» و «مدیریت ثبت نمره» در [اصلاحی report-tools](CORRECTIONS-REPORT-TOOLS-FA.md) بازیابی شده‌اند. توضیح سه ماژول غایب و آمار زیر، مربوط به زمان انتشار mobile-hubs است.
+
 ## دانلود و نصب
 
 - [اصلاحی سایت — ۱۲ فایل، حدود ۲۲ کیلوبایت](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SITE-FIX-v4.152.0-mobile-hubs.zip)

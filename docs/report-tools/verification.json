@@ -1,0 +1,52 @@
+{
+  "source": {
+    "repository": "Maxess/mtagbot",
+    "archive_commit": "15b59c2182c5d83e753b3adca3b0ca0acc6a6530",
+    "archive_path": "code.zip",
+    "archive_sha256": "f214979c2652c2011efdf3b07345b50ae63fdd9cee4c0d70f3500e0c3ed1d897",
+    "original_files_sha256": {
+      "import.php": "29f3c8b48448add012189fdac3da9f0e02515d855db3ddfc90265ba2788ffc4d",
+      "grade-entry-management.php": "200f09ffe1c755003ce2edf53d496d5efdc9a7036e49d79d862e93887951105d"
+    },
+    "note": "UI restored from originals; execution hardened. Original archive is not redistributed."
+  },
+  "php": {
+    "site_checks": 128,
+    "desktop_checks": 128,
+    "database": "isolated SQLite",
+    "real_multipart_upload": true,
+    "csv_xlsx_and_legacy_blocks": true,
+    "rollback_injected_failure": true,
+    "teacher_rule_enforcement": true,
+    "api_real_execution_and_bearer": true
+  },
+  "browser": {
+    "site": {
+      "checks": 74,
+      "nested_layouts": 20
+    },
+    "desktop_web_payload": {
+      "checks": 74,
+      "nested_layouts": 20
+    },
+    "all_hubs": {
+      "checks": 715,
+      "tab_layouts": 85
+    },
+    "engine": "Chromium",
+    "physical_device_tested": false,
+    "native_windows_tested": false,
+    "mysql_server_tested": false
+  },
+  "regression": {
+    "site_suites_passed": 31,
+    "desktop_suites_passed": 31
+  },
+  "packaging": {
+    "runtime_paths": 7,
+    "report_tools_checks": 5,
+    "mobile_hubs_checks": 5,
+    "fast_ui_checks": 5,
+    "prior_archives_unchanged": true
+  }
+}
