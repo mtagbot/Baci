@@ -8,10 +8,12 @@
     "server": "node verify.mjs",
     "timer": "node test-timer.mjs",
     "save": "node test-save.mjs",
-    "all": "bash ../scripts/run-tests.sh"
+    "all": "bash ../scripts/run-tests.sh",
+    "postinstall": "node fix-phpwasm.cjs"
   },
   "dependencies": {
     "@php-wasm/node": "3.1.53",
+    "@php-wasm/node-8-3": "^3.1.53",
     "@php-wasm/universal": "3.1.53"
   }
 }

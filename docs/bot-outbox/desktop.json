@@ -4,6 +4,60 @@
   "runtime": "PHP 8.3 WASM + real SQLite",
   "finalJobs": [
     {
+      "platform": "bale",
+      "owner": "relay",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "telegram",
+      "owner": "relay",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "telegram",
+      "owner": "relay",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "bale",
+      "owner": "relay",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "bale",
+      "owner": "relay",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "telegram",
+      "owner": "relay",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "telegram",
+      "owner": "relay",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "bale",
+      "owner": "relay",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "bale",
+      "owner": "relay",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
       "platform": "telegram",
       "owner": "relay",
       "state": "sent",
@@ -23,30 +77,6 @@
     },
     {
       "platform": "telegram",
-      "owner": "relay",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "bale",
-      "owner": "relay",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "telegram",
-      "owner": "relay",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "bale",
-      "owner": "relay",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "bale",
       "owner": "relay",
       "state": "sent",
       "attempts": 1
@@ -60,12 +90,6 @@
     {
       "platform": "telegram",
       "owner": "local",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "telegram",
-      "owner": "relay",
       "state": "sent",
       "attempts": 1
     },
@@ -83,36 +107,12 @@
     },
     {
       "platform": "telegram",
-      "owner": "relay",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "telegram",
-      "owner": "relay",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "telegram",
-      "owner": "relay",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "telegram",
       "owner": "local",
       "state": "sent",
       "attempts": 1
     },
     {
-      "platform": "bale",
-      "owner": "relay",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "bale",
+      "platform": "telegram",
       "owner": "relay",
       "state": "sent",
       "attempts": 1

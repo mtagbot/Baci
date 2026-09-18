@@ -1,0 +1,14 @@
+{
+  "packaging_checks": 19,
+  "baseline_ref": "e77d537",
+  "baseline_archives_unchanged": 0,
+  "baseline_checked": false,
+  "regression_suites": {
+    "site": 31,
+    "desktop": 31
+  },
+  "limits": [
+    "PHP 8.3 WASM/SQLite with mocked network; ZIP upload tested end-to-end in the harness",
+    "No live host or Windows WebView measurement"
+  ]
+}

@@ -3,6 +3,7 @@
   "assets/css/report-import.css",
   "cron/import-queue-worker.php",
   "grade-entry-management.php",
+  "import-photos.php",
   "import.php",
   "includes/grade_permissions.php",
   "includes/report_import_wizard.php"

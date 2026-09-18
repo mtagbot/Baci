@@ -1,0 +1,24 @@
+{
+  "packages": [
+    {
+      "name": "SchoolDeskPro-FIX-v2.83.0-recovery-ui.zip",
+      "bytes": 12269,
+      "sha256": "98edd2fd9944c3913c164838bceb5796a197f97e28acc69b052506531c478002",
+      "files": [
+        "includes/header.php",
+        "import-photos.php"
+      ]
+    },
+    {
+      "name": "SITE-FIX-v4.152.0-recovery-ui.zip",
+      "bytes": 12265,
+      "sha256": "719859f680c6b5357e415bd47b8ed72f3558933ea962e27e729eb2b7768ba989",
+      "files": [
+        "includes/header.php",
+        "import-photos.php"
+      ]
+    }
+  ],
+  "historical_archives_unchanged": 150,
+  "baseline_ref": "e77d537"
+}

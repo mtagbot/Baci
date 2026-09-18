@@ -2,9 +2,7 @@
 // File: includes/header.php - v4.28.13 - Online Exams + Unified Academic Year
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/academic_year_helpers.php';
-// v4.68.0: ردیابی نشست‌های فعال + خروج اجباری نشست‌های بسته‌شده
-require_once __DIR__ . '/session_tracker.php';
-try { track_user_session(); } catch (Throwable $e) { error_log('session tracker: ' . $e->getMessage()); }
+// Revocation is enforced centrally in functions.php, before any request handler.
 // v4.33.0: never let the browser cache panel pages — prevents the Back button
 // from showing a stale page (e.g. old menus after logout/role switch).
 if (!headers_sent()) {
@@ -17,6 +15,40 @@ $schoolName = get_setting('school_name', 'سیستم مدیریت کارنامه
 $themeColor = get_setting('theme_color', '#2563eb');
 $accentColor= get_setting('accent_color', '#d97706');
 $themeMode  = get_setting('theme_mode', 'light');
+
+/* v4.135.0 — رنگ‌های مشتق از دو رنگ انتخابی کاربر.
+   در PHP حساب می‌شوند (نه با color-mix در CSS) تا روی وب‌ویوهای قدیمی
+   ویندوز هم دقیقاً همان نتیجه را بدهند. */
+if (!function_exists('theme_shade')) {
+    /** روشن/تیره کردن یک رنگ hex. $amt مثبت = روشن‌تر، منفی = تیره‌تر. */
+    function theme_shade($hex, $amt) {
+        $hex = ltrim(trim((string)$hex), '#');
+        if (strlen($hex) === 3) $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
+        if (!preg_match('/^[0-9a-fA-F]{6}$/', $hex)) return '#' . ($hex ?: '2563eb');
+        $out = '#';
+        for ($i = 0; $i < 3; $i++) {
+            $c = hexdec(substr($hex, $i * 2, 2));
+            $c = $amt >= 0 ? $c + (255 - $c) * $amt : $c * (1 + $amt);
+            $out .= str_pad(dechex(max(0, min(255, (int)round($c)))), 2, '0', STR_PAD_LEFT);
+        }
+        return $out;
+    }
+}
+if (!function_exists('theme_rgba')) {
+    /** rgba() از یک رنگ hex — برای حالت نرم و حلقهٔ فوکوس. */
+    function theme_rgba($hex, $alpha) {
+        $hex = ltrim(trim((string)$hex), '#');
+        if (strlen($hex) === 3) $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
+        if (!preg_match('/^[0-9a-fA-F]{6}$/', $hex)) $hex = '2563eb';
+        return sprintf('rgba(%d,%d,%d,%s)',
+            hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2)), $alpha);
+    }
+}
+$primaryHover = theme_shade($themeColor, -0.18);
+$primarySoft  = theme_rgba($themeColor, '0.09');
+$primaryRing  = theme_rgba($themeColor, '0.22');
+$accentHover  = theme_shade($accentColor, -0.18);
+$accentSoft   = theme_rgba($accentColor, '0.12');
 $fontFamily = get_setting('font_family', 'Vazirmatn');
 $bSize      = get_setting('body_font_size', '14px');
 $bColor     = get_setting('body_text_color', '');
@@ -29,35 +61,63 @@ $tBg        = get_setting('table_header_bg', '');
 $customFont = get_setting('custom_font_url', '');
 $logoUrl    = get_setting('logo_url', '');
 $isEmbedded = isset($_GET['embedded']) && $_GET['embedded'] === '1';
+$headerRelease=is_file(dirname(__DIR__).'/config/release.php')?require dirname(__DIR__).'/config/release.php':[];
+$isDeskRuntime=($headerRelease['distribution']??(PHP_SAPI==='cli-server'?'desktop':'site'))==='desktop';
 ?>
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" class="school-shell<?php echo $isEmbedded?' hub-embedded':''; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo clean($schoolName); ?> - پنل مدیریت و کارنامه</title>
     <script>try{localStorage.setItem('theme','light');document.documentElement.classList.remove('dark');}catch(e){}</script>
     <meta name="theme-color" content="<?php echo clean($themeColor); ?>"><!-- v4.30.0 -->
-    <link rel="preload" href="uploads/Vazirmatn/Vazirmatn-Regular.woff2" as="font" type="font/woff2" crossorigin><!-- v4.30.0: faster first paint -->
-    <link rel="preload" href="uploads/Vazirmatn/Vazirmatn-Bold.woff2" as="font" type="font/woff2" crossorigin>
+    <?php if ($isDeskRuntime): /* Desktop: NOTHING may open in a new window (design, print,
+           previews, debug). window.open() is re-routed to the app window and
+           target="_blank" links navigate in place; the launcher has
+           back/forward. Middle/right-click and modified clicks are the
+           user's explicit gesture and stay native. The site is unchanged. */ ?>
+    <script>
+    (function(){
+        function go(url){ try { if (typeof url === 'string' && url && url !== 'about:blank') window.location.assign(url); } catch (e) {} }
+        window.open = function (u) { go(u); return null; };
+        document.addEventListener('click', function (e) {
+            try {
+                if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || (e.button !== undefined && e.button !== 0)) return;
+                var a = e.target && e.target.closest ? e.target.closest('a[target="_blank"]') : null;
+                if (a) { var h = a.getAttribute('href'); if (h) { e.preventDefault(); go(h); } }
+            } catch (err) {}
+        }, true);
+    })();
+    </script>
+    <?php endif; ?>
+    <?php echo app_screen_font_preload(); ?>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/ui-modern.css"><!-- v4.30.0: high-end UI layer -->
     <style>
-        @font-face { font-family: 'Vazirmatn'; src: url('uploads/Vazirmatn/Vazirmatn-Regular.woff2') format('woff2'), url('uploads/Vazirmatn/Vazirmatn-Regular.ttf') format('truetype'); font-display: swap; }
-        @font-face { font-family: 'Vazirmatn'; src: url('uploads/Vazirmatn/Vazirmatn-Bold.woff2') format('woff2'), url('uploads/Vazirmatn/Vazirmatn-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
-        @font-face { font-family: 'Sahel'; src: url('uploads/Sahel/Sahel.woff2') format('woff2'), url('uploads/Sahel/Sahel.ttf') format('truetype'); font-display: swap; }
-        @font-face { font-family: 'Yekan'; src: url('uploads/Yekan/Yekan.woff2') format('woff2'), url('uploads/Yekan/Yekan.ttf') format('truetype'); font-display: swap; }
-        <?php if ($fontFamily === 'CustomUploadedFont' && !empty($customFont)): ?>
-        @font-face { font-family: 'CustomUploadedFont'; src: url('<?php echo clean($customFont); ?>'); font-display: swap; }
-        <?php endif; ?>
         :root {
+            /* v4.135.0 — رنگ اول و دوم واقعاً همه‌جا اعمال می‌شوند.
+               پیش از این فقط --primary و --admin-gold ست می‌شد، ولی:
+                 · --primary-hover ثابت می‌ماند، پس هاورِ هر دکمهٔ اصلی
+                   رنگ قدیمی را نشان می‌داد.
+                 · --accent (که ui-modern.css از آن استفاده می‌کند) اصلاً
+                   مقدار نمی‌گرفت، پس رنگ دوم عملاً بی‌اثر بود.
+               رنگ‌های مشتق (هاور، سایه، حالت نرم) در PHP حساب می‌شوند تا
+               به color-mix نیاز نباشد و روی مرورگر قدیمی هم کار کند. */
             --primary: <?php echo clean($themeColor); ?> !important;
+            --primary-hover: <?php echo clean($primaryHover); ?> !important;
+            --primary-soft: <?php echo clean($primarySoft); ?> !important;
+            --primary-ring: <?php echo clean($primaryRing); ?> !important;
+            --accent: <?php echo clean($accentColor); ?> !important;
+            --accent-hover: <?php echo clean($accentHover); ?> !important;
+            --accent-soft: <?php echo clean($accentSoft); ?> !important;
             --admin-gold: <?php echo clean($accentColor); ?> !important;
-            font-family: '<?php echo clean($fontFamily); ?>', Tahoma, sans-serif !important;
+            --admin-gold-light: <?php echo clean($accentHover); ?> !important;
+            font-family: '<?php echo clean($fontFamily); ?>', Vazirmatn, Sahel, Yekan, Tahoma, sans-serif !important;
             font-size: <?php echo clean($bSize); ?>;
         }
-        body { font-family: '<?php echo clean($fontFamily); ?>', Tahoma, sans-serif !important; <?php if ($bColor): ?>color: <?php echo clean($bColor); ?>;<?php endif; ?> }
-        h1, h2, h3, h4, h5, h6 { font-family: '<?php echo clean($hFont === 'CustomUploadedFont' ? $fontFamily : $hFont); ?>', Tahoma, sans-serif !important; font-weight: <?php echo clean($hWeight); ?> !important; <?php if ($hColor): ?>color: <?php echo clean($hColor); ?> !important;<?php endif; ?> }
+        body { font-family: '<?php echo clean($fontFamily); ?>', Vazirmatn, Sahel, Yekan, Tahoma, sans-serif !important; <?php if ($bColor): ?>color: <?php echo clean($bColor); ?>;<?php endif; ?> }
+        h1, h2, h3, h4, h5, h6 { font-family: '<?php echo clean($hFont === 'CustomUploadedFont' ? $fontFamily : $hFont); ?>', Vazirmatn, Sahel, Yekan, Tahoma, sans-serif !important; font-weight: <?php echo clean($hWeight); ?> !important; <?php if ($hColor): ?>color: <?php echo clean($hColor); ?> !important;<?php endif; ?> }
         h1, h2 { font-size: <?php echo clean($hSize); ?>; }
         table { font-size: <?php echo clean($tSize); ?> !important; }
         <?php if ($tBg): ?>th { background-color: <?php echo clean($tBg); ?> !important; }<?php endif; ?>
@@ -67,8 +127,18 @@ $isEmbedded = isset($_GET['embedded']) && $_GET['embedded'] === '1';
         body > .flex { height: 100vh !important; }
         <?php endif; ?>
     </style>
+    <?php /* v4.129.0: صفحه می‌تواند پیش از require، $pageCss را ست کند تا stylesheet
+           صفحه‌ای در جای درستِ <head> بنشیند (نه داخل body). پیش‌فرض: هیچ. */
+    if (!empty($pageCss)) foreach((array)$pageCss as $sheet): ?>
+    <link rel="stylesheet" href="<?php echo clean($sheet); ?>">
+    <?php endforeach; ?>
+<?php if(st_current_user()): ?><script defer src="assets/js/session-watch.js"></script><?php endif; ?>
+<?php echo app_appearance_head(true); ?>
+<link rel=stylesheet href=assets/css/school-ui.css?v20260917e><script defer src=assets/js/school-icons.js?v20260917e></script><script defer src=assets/js/school-ui.js?v20260917e></script><?php require_once __DIR__.'/school_ui_theme.php'; echo school_ui_theme(); ?><noscript><style>@media screen and (max-width:900px){body.school-app>.flex.flex-1{display:block}body.school-app .sidebar{position:static!important;transform:none!important;visibility:visible!important;width:100%!important;max-width:none;height:auto!important}body.school-app .hamburger-btn,body.school-app .ui-drawer-close{display:none!important}}</style></noscript><link rel="stylesheet" href="assets/css/management-hub.css?v=20260917f">
+<script>try{if(window.frameElement&&window.frameElement.id==='hubFrame')document.documentElement.classList.add('hub-embedded');}catch(ignore){}</script>
 </head>
-<body class="bg-body text-main min-h-screen flex flex-col font-sans">
+<body class="school-app <?php echo $isDeskRuntime&&!$isEmbedded?'desk-runtime':''; ?> <?php echo $isEmbedded ? 'embedded-mode' : ''; ?> bg-body text-main min-h-screen flex flex-col font-sans">
+<a class="ui-skip" href="#main-content">رفتن به محتوای اصلی</a>
 <script>
 /* v4.66.0: یک دکمه، دو رفتار — موبایل: کشوی بازشو (sidebar-open)؛
    دسکتاپ/تبلت: جمع‌کردن سایدبار (sidebar-collapsed) با حافظه در localStorage.
@@ -89,14 +159,17 @@ function mtagToggleSidebar(){
     <?php /* v4.67.0: دکمه ☰ + لوگو + نام مدرسه + زیرنویس در «یک گروه» ابتدای هدر —
           قبلاً ☰ فرزند جدا بود و justify-between برند را وسط هدر می‌انداخت. */ ?>
     <div class="flex items-center gap-3">
-        <button type="button" class="hamburger-btn" id="sidebarToggleBtn" title="باز و بسته کردن منوی کناری" onclick="mtagToggleSidebar()">☰</button>
-        <?php if (!empty($logoUrl)): ?><img src="<?php echo clean($logoUrl); ?>" alt="Logo" class="h-10 w-10 object-contain rounded"><?php endif; ?>
+        <button type="button" class="hamburger-btn" id="sidebarToggleBtn" title="باز و بسته کردن منوی کناری" onclick="mtagToggleSidebar()"><svg data-ui-icon="menu" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 5h18M3 12h18M3 19h18"/></svg></button>
+        <?php if (!empty($logoUrl)): ?><img src="<?php echo clean($logoUrl); ?>" alt="نشان مدرسه" class="h-10 w-10 object-contain rounded"><?php endif; ?>
         <div><h1 class="text-lg font-bold"><?php echo clean($schoolName); ?></h1><span class="text-xs text-muted"><?php echo is_admin_logged_in() ? 'پنل مدیریت سیستم' : (is_student_logged_in() ? 'پنل دانش‌آموزی' : 'پنل دبیران'); ?></span></div>
     </div>
+    <?php /* v4.132.0: منوی کاشی‌ای وسط هدر — فقط برای مدیر، یک ردیف، حداکثر ۸ کاشی.
+          چیدمانش در «سفارشی‌سازی → منوی سریع هدر» تنظیم می‌شود. */ ?>
+    <?php require_once __DIR__ . '/header_tiles.php'; render_header_tiles(); ?>
     <div class="flex items-center gap-4">
-        <span class="text-sm font-medium">مورخ: <?php echo jdate('l j F Y'); ?></span>
+        <span class="text-sm font-medium hdr-date"><?php echo jdate('l j F Y'); ?></span>
         <div class="user-menu-wrap">
-            <button type="button" class="btn btn-secondary user-menu-btn" onclick="document.body.classList.toggle('user-menu-open')">👤 کاربری</button>
+            <button type="button" class="btn btn-secondary user-menu-btn" onclick="document.body.classList.toggle('user-menu-open')"><svg data-ui-icon="user" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2c0-8 16-8 16 0v2"/></svg> کاربری</button>
             <div class="user-menu-dropdown">
                 <?php /* v4.60.0: bg-green-600 / bg-amber-600 don't exist in this project's CSS,
                       which left white text on a white badge. Explicit inline colors. */ ?>
@@ -112,18 +185,20 @@ function mtagToggleSidebar(){
 <div class="flex flex-1">
     <?php if (is_admin_logged_in()): ?>
     <aside class="sidebar w-64 bg-card border-l border-color p-4 flex flex-col gap-1.5 shrink-0 shadow-lg">
-        <div class="sidebar-scroll">
+        <button type="button" class="ui-drawer-close" onclick="document.body.classList.remove('sidebar-open')">بستن فهرست</button><div class="sidebar-scroll">
         <div class="sidebar-section-title">نمای کلی</div>
         <a href="index.php?view=dashboard" class="sidebar-item <?php echo (!isset($_GET['view']) || $_GET['view'] == 'dashboard') && basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>">داشبورد مدیریت</a>
         <?php if (has_permission('manage_students')): ?>
             <div class="sidebar-section-title">پرونده دانش‌آموزی</div>
-            <a href="students.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'students.php' ? 'active' : ''; ?>">مدیریت دانش‌آموزان</a>
-            <a href="deputy-panel.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'deputy-panel.php' ? 'active' : ''; ?>">موارد انضباطی</a>
+            <a href="students.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['students.php','deputy-panel.php']) ? 'active' : ''; ?>">مدیریت دانش‌آموزان</a>
+            <?php /* v4.90.0: «موارد انضباطی» از منو حذف شد — دسترسی مدیر از دکمه داخل «مدیریت دانش‌آموزان» */ ?>
             <a href="attendance.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'attendance.php' ? 'active' : ''; ?>">حضور و غیاب</a>
         <?php endif; ?>
         <?php if (has_permission('manage_classes')): ?>
             <div class="sidebar-section-title">آموزش، کلاس و دبیران</div>
             <a href="courses-management.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['courses-management.php','classes.php','import-teachers.php','import-schedule.php']) ? 'active' : ''; ?>">مدیریت دروس</a>
+            <?php /* v4.145.0: خانهٔ لیست‌ها و گزارش‌های اداری */ ?>
+            <a href="reports-lists.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'reports-lists.php' ? 'active' : ''; ?>">لیست‌ها و گزارشات</a>
         <?php endif; ?>
         <?php if (has_permission('manage_reports')): ?>
             <div class="sidebar-section-title">ارزشیابی و امتحانات</div>
@@ -144,11 +219,8 @@ function mtagToggleSidebar(){
             <a href="bot-accounts.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'bot-accounts.php' ? 'active' : ''; ?>">اکانت‌های متصل</a>
         <?php endif; ?>
         <div class="sidebar-section-title">سیستم</div>
-        <a href="other-settings.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['other-settings.php','backups.php','activity-logs.php','migration-updater.php']) ? 'active' : ''; ?>">تنظیمات دیگر</a>
-        <a href="desk-sync.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'desk-sync.php' ? 'active' : ''; ?>">همگام‌سازی با سایت</a>
-        <?php if (has_permission('system_settings')): ?><a href="db-optimizer.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'db-optimizer.php' ? 'active' : ''; ?>">سلامت پایگاه داده</a><?php endif; ?>
+        <a href="other-settings.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['other-settings.php','backups.php','activity-logs.php','migration-updater.php','desk-sync.php','db-optimizer.php','admins.php']) ? 'active' : ''; ?>">تنظیمات دیگر</a>
         <?php if (has_permission('system_settings')): ?><a href="settings.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'settings.php' ? 'active' : ''; ?>">سفارشی‌سازی</a><?php endif; ?>
-        <?php if (($_SESSION['admin_role'] ?? '') === 'super_admin'): ?><a href="admins.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'admins.php' ? 'active' : ''; ?>">مدیریت مدیران</a><?php endif; ?>
         </div>
     </aside>
     <?php elseif (is_student_logged_in()): ?>
@@ -167,7 +239,7 @@ function mtagToggleSidebar(){
     </aside>
     <?php endif; ?>
 
-    <main class="flex-1 p-6 overflow-y-auto">
+    <main id="main-content" tabindex="-1" class="flex-1 p-6 overflow-y-auto">
         <?php
         $flash = get_flash_message();
         if ($flash):
@@ -175,13 +247,13 @@ function mtagToggleSidebar(){
             $message = $flash['message'];
             // Define colors with inline styles to ensure visibility even without Tailwind
             if ($type === 'success') {
-                $bg = '#dcfce7'; $border = '#86efac'; $textColor = '#14532d'; $icon = '✅'; $title = 'عملیات موفق';
+                $bg = '#dcfce7'; $border = '#86efac'; $textColor = '#14532d'; $icon = '<svg data-ui-icon="check" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m7 12 3 3 7-7"/></svg>'; $title = 'عملیات موفق';
             } elseif ($type === 'error') {
-                $bg = '#fee2e2'; $border = '#fca5a5'; $textColor = '#7f1d1d'; $icon = '❌'; $title = 'خطا / عدم موفقیت';
+                $bg = '#fee2e2'; $border = '#fca5a5'; $textColor = '#7f1d1d'; $icon = '<svg data-ui-icon="error" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m-6 0 6-6"/></svg>'; $title = 'خطا / عدم موفقیت';
             } elseif ($type === 'warning') {
-                $bg = '#fef9c3'; $border = '#fde047'; $textColor = '#713f12'; $icon = '⚠️'; $title = 'هشدار';
+                $bg = '#fef9c3'; $border = '#fde047'; $textColor = '#713f12'; $icon = '<svg data-ui-icon="warning" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 2 21h20Z"/><path d="M12 9v5m0 3v.1"/></svg>'; $title = 'هشدار';
             } else { // info
-                $bg = '#dbeafe'; $border = '#93c5fd'; $textColor = '#1e3a8a'; $icon = 'ℹ️'; $title = 'پیام سیستم';
+                $bg = '#dbeafe'; $border = '#93c5fd'; $textColor = '#1e3a8a'; $icon = '<svg data-ui-icon="info" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.1"/></svg>'; $title = 'پیام سیستم';
             }
         ?>
         <div class="flash-message" style="margin-bottom:16px;padding:14px 18px;border-radius:12px;border:2px solid <?php echo $border; ?>;background:<?php echo $bg; ?>;color:<?php echo $textColor; ?>;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;box-shadow:0 4px 12px rgba(0,0,0,0.08);font-size:13px;line-height:1.8;white-space:pre-line;">
@@ -207,5 +279,5 @@ function mtagToggleSidebar(){
         </script>
         <?php endif; ?>
 <?php else: ?>
-    <main class="flex-1 flex items-center justify-center p-6">
+    <main id="main-content" tabindex="-1" class="flex-1 flex items-center justify-center p-6">
 <?php endif; ?>
