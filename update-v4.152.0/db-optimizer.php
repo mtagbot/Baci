@@ -16,7 +16,10 @@
 require_once __DIR__ . '/includes/auth.php';
 require_permission('system_settings');
 
+require_once __DIR__.'/includes/db_health.php';
 $pdo = DB::getInstance()->getPdo();
+$dboptErrors=[]; $dboptIndexCache=[];
+$detailedScan=(($_GET['scan']??'')==='1');
 
 /* ---------------------------------------------------------------
  * v4.131.0 — این صفحه تا اینجا فقط MySQL بود
@@ -34,12 +37,13 @@ $pdo = DB::getInstance()->getPdo();
  *   SQLite → PRAGMA/sqlite_master · CREATE INDEX · ANALYZE · VACUUM
  * --------------------------------------------------------------- */
 $DBOPT_SQLITE = false;
-try { $DBOPT_SQLITE = ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite'); } catch (Exception $e) {}
+try { $driver=$pdo?$pdo->getAttribute(PDO::ATTR_DRIVER_NAME):''; if (!in_array($driver,['sqlite','mysql'],true)) throw new RuntimeException('driver'); $DBOPT_SQLITE=($driver==='sqlite'); }
+catch (Throwable $e) { http_response_code(503); exit('نوع پایگاه داده قابل تشخیص نیست؛ هیچ عملیات بهینه‌سازی انجام نشد.'); }
 $GLOBALS['__dbopt_pdo'] = $pdo;   /* توابع کمکی به PDO خام نیاز دارند (PRAGMA) */
 
 $dbName = null;
 if ($DBOPT_SQLITE) {
-    $dbName = 'SQLite (نسخهٔ دسکتاپ)';
+    $dbName = 'SQLite';
 } else {
     try { $dbName = $pdo->query('SELECT DATABASE()')->fetchColumn(); } catch (Exception $e) {}
 }
@@ -77,34 +81,32 @@ function dbopt_table_exists($table) {
         }
         $r = DB::fetch("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?", [$table]);
         return (bool)$r;
-    } catch (Exception $e) { return false; }
+    } catch (Exception $e) { $GLOBALS['dboptErrors']['tables']='فهرست جدول‌ها کامل خوانده نشد.'; return false; }
 }
 function dbopt_column_exists($table, $column) {
-    global $DBOPT_SQLITE;
+    global $DBOPT_SQLITE,$pdo,$dboptErrors;
+    static $cache=[];
     try {
-        if ($DBOPT_SQLITE) {
-            foreach ($GLOBALS['__dbopt_pdo']->query("PRAGMA table_info(\"$table\")") as $row) {
-                if (($row['name'] ?? '') === $column) return true;
-            }
-            return false;
+        if (!isset($cache[$table])) {
+            if ($DBOPT_SQLITE) $cache[$table]=array_column($pdo->query('PRAGMA table_info('.dbh_quote($table,true).')')->fetchAll(PDO::FETCH_ASSOC),'name');
+            else $cache[$table]=array_column(DB::fetchAll('SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?',[$table]),'COLUMN_NAME');
         }
-        $r = DB::fetch("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?", [$table, $column]);
-        return (bool)$r;
-    } catch (Exception $e) { return false; }
+        return in_array($column,$cache[$table],true);
+    } catch (Throwable $e) { $dboptErrors['columns']='اطلاعات ستون‌ها کامل خوانده نشد.'; return false; }
 }
 function dbopt_index_exists($table, $indexName) {
-    global $DBOPT_SQLITE;
+    global $DBOPT_SQLITE,$pdo,$recommendedIndexes,$dboptIndexCache,$dboptErrors;
     try {
-        if ($DBOPT_SQLITE) {
-            $r = DB::fetch("SELECT name FROM sqlite_master WHERE type='index' AND name=? AND tbl_name=?", [$indexName, $table]);
-            return (bool)$r;
+        if (!isset($dboptIndexCache[$table])) $dboptIndexCache[$table]=dbh_index_metadata($pdo,$DBOPT_SQLITE,$table);
+        foreach ($recommendedIndexes as [$t,$i,$cols]) if ($t===$table && $i===$indexName) {
+            $columns=array_map(function($c){return trim($c,' `');},explode(',',$cols));
+            return dbh_index_covers($dboptIndexCache[$table],$columns);
         }
-        $r = DB::fetch("SELECT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1", [$table, $indexName]);
-        return (bool)$r;
-    } catch (Exception $e) { return true; /* در شک، از ALTER تکراری پرهیز کن */ }
+        return isset($dboptIndexCache[$table][$indexName]);
+    } catch (Throwable $e) { $dboptErrors['indexes']='خواندن اطلاعات ایندکس‌ها ناموفق بود؛ وضعیت نامشخص است.'; return null; }
 }
 function dbopt_count($sql, $params = []) {
-    try { $r = DB::fetch($sql, $params); return (int)($r['c'] ?? 0); } catch (Exception $e) { return -1; }
+    try { $r = DB::fetch($sql, $params); return (int)($r['c'] ?? 0); } catch (Exception $e) { $GLOBALS['dboptErrors']['counts']='برخی شمارش‌ها ناموفق بودند؛ نتیجهٔ آن‌ها سالم فرض نمی‌شود.'; return -1; }
 }
 
 /* NOW() در SQLite وجود ندارد؛ معادلش datetime('now','localtime') است.
@@ -206,9 +208,9 @@ function dbopt_orphan_defs() {
  * --------------------------------------------------------------- */
 $results = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!verify_csrf($_POST['csrf_token'] ?? '')) {
+    if (!is_string($_POST['csrf_token']??null) || !verify_csrf($_POST['csrf_token'])) {
         set_flash_message('error', 'خطای امنیتی CSRF.');
-        redirect('db-optimizer.php');
+        redirect('db-optimizer.php?'.(!empty($_GET['embedded'])?'embedded=1&':'').'scan=1');
     }
     $act = $_POST['do'] ?? '';
 
@@ -217,7 +219,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $added = 0; $skipped = 0; $failed = 0;
         foreach ($recommendedIndexes as [$table, $idxName, $cols, $desc]) {
             if (!dbopt_table_exists($table)) { $skipped++; continue; }
-            if (dbopt_index_exists($table, $idxName)) { $skipped++; continue; }
+            $coverage=dbopt_index_exists($table,$idxName);
+            if ($coverage===null) { $failed++; continue; }
+            if ($coverage) { $skipped++; continue; }
             // اطمینان از وجود همهٔ ستون‌های ایندکس
             $colList = array_map(fn($c) => trim($c, ' `'), explode(',', $cols));
             $allCols = true;
@@ -228,34 +232,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     /* SQLite: ADD INDEX ندارد؛ معادلش CREATE INDEX است و
                        شناسه‌ها با " نقل‌قول می‌شوند نه با backtick. */
                     $sqCols = implode(', ', array_map(fn($c) => '"' . trim($c, ' `') . '"', explode(',', $cols)));
-                    $pdo->exec("CREATE INDEX IF NOT EXISTS \"$idxName\" ON \"$table\" ($sqCols)");
+                    $pdo->exec("CREATE INDEX IF NOT EXISTS \"dbopt_{$table}_{$idxName}\" ON \"$table\" ($sqCols)");
                 } else {
                     $pdo->exec("ALTER TABLE `$table` ADD INDEX `$idxName` ($cols)");
                 }
+                unset($dboptIndexCache[$table]);
+                if (dbopt_index_exists($table,$idxName)!==true) throw new RuntimeException('Index creation not verified');
                 $added++;
             } catch (Exception $e) { $failed++; }
         }
         log_activity($_SESSION['admin_id'] ?? null, 'بهینه‌سازی دیتابیس', "ایندکس‌گذاری: $added ایجاد، $skipped موجود/نامرتبط، $failed ناموفق");
         set_flash_message($failed ? 'warning' : 'success', "ایندکس‌گذاری انجام شد: $added ایندکس جدید ایجاد شد" . ($skipped ? "، $skipped مورد از قبل موجود بود" : '') . ($failed ? "، $failed مورد ناموفق" : '') . '.');
-        redirect('db-optimizer.php');
+        redirect('db-optimizer.php?'.(!empty($_GET['embedded'])?'embedded=1&':'').'scan=1');
     }
 
     /* 2) پاکسازی رکوردهای یتیم و منقضی */
     if ($act === 'cleanup_orphans') {
-        $total = 0; $details = [];
+        $total = 0; $details = []; $failed=0;
         foreach (dbopt_orphan_defs() as $key => [$label, $countSql, $deleteSql]) {
             $n = dbopt_count($countSql);
             if ($n > 0) {
                 try {
-                    DB::execute($deleteSql);
-                    $total += $n;
+                    $stmt=DB::query($deleteSql);
+                    $n=$stmt?$stmt->rowCount():0; $total += $n;
                     $details[] = "$label: $n";
-                } catch (Exception $e) {}
-            }
+                } catch (Exception $e) { $failed++; }
+            } elseif ($n<0) $failed++;
         }
         log_activity($_SESSION['admin_id'] ?? null, 'پاکسازی دیتابیس', $total ? implode(' | ', $details) : 'موردی یافت نشد');
-        set_flash_message('success', $total ? "پاکسازی انجام شد — مجموعاً $total رکورد یتیم/منقضی حذف شد:\n" . implode("\n", $details) : 'هیچ رکورد یتیم یا منقضی‌ای یافت نشد. دیتابیس تمیز است. ✅');
-        redirect('db-optimizer.php');
+        set_flash_message($failed?'warning':'success', $failed?'پاکسازی کامل نشد؛ برخی بررسی‌ها یا حذف‌ها ناموفق بودند. تعداد حذف‌شده: '.$total : ($total ? "پاکسازی انجام شد — مجموعاً $total رکورد یتیم/منقضی حذف شد:\n" . implode("\n", $details) : 'هیچ رکورد یتیم یا منقضی‌ای یافت نشد. دیتابیس در بررسی‌های انجام‌شده تمیز است.'));
+        redirect('db-optimizer.php?'.(!empty($_GET['embedded'])?'embedded=1&':'').'scan=1');
     }
 
     /* 3) حذف دانش‌آموزان تکراری بدون وابستگی */
@@ -266,6 +272,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $dups = DB::fetchAll("
                 SELECT national_id, academic_year, COUNT(*) c, MAX(id) keep_id
                 FROM students
+                WHERE national_id IS NOT NULL AND national_id<>''
                 GROUP BY national_id, academic_year
                 HAVING c > 1");
             foreach ($dups as $d) {
@@ -273,14 +280,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     [$d['national_id'], $d['academic_year'], $d['keep_id']]);
                 foreach ($rows as $row) {
                     $sid = (int)$row['id'];
-                    // فقط اگر هیچ دادهٔ وابسته‌ای ندارد حذف کن (کاملاً امن)
-                    $deps = dbopt_count("SELECT COUNT(*) c FROM reports WHERE student_id = ?", [$sid]);
-                    if ($deps === 0 && dbopt_table_exists('student_discipline_records')) {
-                        $deps += max(0, dbopt_count("SELECT COUNT(*) c FROM student_discipline_records WHERE student_id = ?", [$sid]));
-                    }
-                    if ($deps === 0 && dbopt_table_exists('online_exam_attempts')) {
-                        $deps += max(0, dbopt_count("SELECT COUNT(*) c FROM online_exam_attempts WHERE student_id = ?", [$sid]));
-                    }
+                    $deps=dbh_has_references($pdo,$DBOPT_SQLITE,'students',$sid)?1:0;
                     if ($deps === 0) {
                         DB::execute("DELETE FROM students WHERE id = ?", [$sid]);
                         $removed++;
@@ -293,19 +293,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cdups = DB::fetchAll("SELECT name, academic_year, COUNT(*) c, MIN(id) keep_id FROM classes GROUP BY name, academic_year HAVING c > 1");
             $cRemoved = 0;
             foreach ($cdups as $cd) {
-                $n = DB::execute("DELETE FROM classes WHERE name = ? AND academic_year <=> ? AND id <> ?", [$cd['name'], $cd['academic_year'], $cd['keep_id']]);
-                $cRemoved += (int)$cd['c'] - 1;
+                $original=DB::fetch('SELECT * FROM classes WHERE id=?',[$cd['keep_id']]); unset($original['id']);
+                foreach (DB::fetchAll('SELECT * FROM classes WHERE name=? AND academic_year <=> ? AND id<>?',[$cd['name'],$cd['academic_year'],$cd['keep_id']]) as $duplicate) {
+                    $cid=$duplicate['id']; unset($duplicate['id']);
+                    if ($original!=$duplicate || dbh_has_references($pdo,$DBOPT_SQLITE,'classes',$cid)) continue;
+                    $stmt=DB::query('DELETE FROM classes WHERE id=?',[$cid]); $cRemoved+=$stmt->rowCount();
+                }
             }
         } catch (Exception $e) {
-            set_flash_message('error', 'خطا در حذف رکوردهای تکراری: ' . $e->getMessage());
-            redirect('db-optimizer.php');
+            set_flash_message('error', 'بررسی یا حذف تکراری‌ها کامل نشد؛ برای حفاظت از داده، ادامهٔ عملیات متوقف شد.');
+            redirect('db-optimizer.php?'.(!empty($_GET['embedded'])?'embedded=1&':'').'scan=1');
         }
         log_activity($_SESSION['admin_id'] ?? null, 'حذف رکوردهای تکراری', "دانش‌آموز تکراری حذف‌شده: $removed، دارای وابستگی (نگه‌داشته): $kept، کلاس تکراری: $cRemoved");
         $msg = "حذف تکراری‌ها انجام شد:\n• دانش‌آموزان تکراریِ بدون سابقه: $removed حذف شد";
         if ($kept) $msg .= "\n• $kept ردیف تکراری چون کارنامه/سابقه داشتند حذف نشدند (برای بررسی دستی)";
         $msg .= "\n• کلاس‌های تکراری: $cRemoved حذف شد";
         set_flash_message($kept ? 'warning' : 'success', $msg);
-        redirect('db-optimizer.php');
+        redirect('db-optimizer.php?'.(!empty($_GET['embedded'])?'embedded=1&':'').'scan=1');
     }
 
     /* 4) ANALYZE + OPTIMIZE همهٔ جداول */
@@ -321,22 +325,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_flash_message($fail ? 'warning' : 'success', $fail
                 ? 'بهینه‌سازی ناقص انجام شد (ANALYZE/VACUUM).'
                 : 'بهینه‌سازی انجام شد: ANALYZE اجرا و فضای آزاد با VACUUM بازپس گرفته شد.');
-            redirect('db-optimizer.php');
+            redirect('db-optimizer.php?'.(!empty($_GET['embedded'])?'embedded=1&':'').'scan=1');
         }
         try {
             $tables = DB::fetchAll("SELECT TABLE_NAME t FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'");
             foreach ($tables as $tb) {
                 $t = $tb['t'];
                 try {
-                    $pdo->exec("ANALYZE TABLE `$t`");
-                    $pdo->exec("OPTIMIZE TABLE `$t`");
+                    foreach (['ANALYZE','OPTIMIZE'] as $op) {
+                        $messages=$pdo->query($op.' TABLE '.dbh_quote($t,false))->fetchAll(PDO::FETCH_ASSOC);
+                        if (!dbh_maintenance_ok($messages)) throw new RuntimeException('Maintenance not confirmed');
+                    }
                     $ok++;
                 } catch (Exception $e) { $fail++; }
             }
-        } catch (Exception $e) {}
+        } catch (Exception $e) { $fail++; }
         log_activity($_SESSION['admin_id'] ?? null, 'OPTIMIZE دیتابیس', "$ok جدول بهینه شد، $fail ناموفق");
-        set_flash_message('success', "بهینه‌سازی فیزیکی انجام شد: $ok جدول ANALYZE و OPTIMIZE شد" . ($fail ? " ($fail ناموفق)" : '') . '.');
-        redirect('db-optimizer.php');
+        set_flash_message($fail?'warning':'success', "بهینه‌سازی فیزیکی انجام شد: $ok جدول ANALYZE و OPTIMIZE شد" . ($fail ? " ($fail ناموفق)" : '') . '.');
+        redirect('db-optimizer.php?'.(!empty($_GET['embedded'])?'embedded=1&':'').'scan=1');
     }
 }
 
@@ -353,21 +359,21 @@ if ($DBOPT_SQLITE) {
         $rows = DB::fetchAll("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name");
         foreach ($rows as $r) {
             $n = $r['name'];
-            $cnt = 0;
-            try { $cnt = (int)$pdo->query("SELECT COUNT(*) FROM \"$n\"")->fetchColumn(); } catch (Exception $e) {}
+            $cnt = null;
+            if ($detailedScan) { try { $cnt=(int)$pdo->query('SELECT COUNT(*) FROM '.dbh_quote($n,true))->fetchColumn(); } catch (Exception $e) { $dboptErrors['counts']='شمارش بعضی جدول‌ها ناموفق بود.'; } }
             $nIdx = 0;
             try { $nIdx = (int)DB::fetch("SELECT COUNT(*) c FROM sqlite_master WHERE type='index' AND tbl_name=?", [$n])['c']; } catch (Exception $e) {}
             $tablesInfo[] = ['name'=>$n, 'engine'=>'SQLite', 'collation'=>'—',
                              'rows_est'=>$cnt, 'data_len'=>null, 'index_len'=>$nIdx, 'data_free'=>null];
         }
-        usort($tablesInfo, fn($a,$b) => $b['rows_est'] <=> $a['rows_est']);
+        if ($detailedScan) usort($tablesInfo, fn($a,$b) => $b['rows_est'] <=> $a['rows_est']);
         $pageCount = (int)$pdo->query("PRAGMA page_count")->fetchColumn();
         $pageSize  = (int)$pdo->query("PRAGMA page_size")->fetchColumn();
         $freeList  = (int)$pdo->query("PRAGMA freelist_count")->fetchColumn();
-        $totalData = ($pageCount - $freeList) * $pageSize;
+        $totalData = $pageCount * $pageSize;
         $totalIndex = 0;
         $sqliteFreeBytes = $freeList * $pageSize;
-    } catch (Exception $e) {}
+    } catch (Exception $e) { $dboptErrors['tables']='خواندن فرادادهٔ SQLite کامل نشد.'; }
 } else {
     try {
         $tablesInfo = DB::fetchAll("
@@ -377,12 +383,12 @@ if ($DBOPT_SQLITE) {
             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'
             ORDER BY (DATA_LENGTH + INDEX_LENGTH) DESC");
         foreach ($tablesInfo as $t) { $totalData += (int)$t['data_len']; $totalIndex += (int)$t['index_len']; }
-    } catch (Exception $e) {}
+    } catch (Exception $e) { $dboptErrors['tables']='خواندن فرادادهٔ MySQL کامل نشد.'; }
 }
 
 $missingIndexes = [];
 foreach ($recommendedIndexes as [$table, $idxName, $cols, $desc]) {
-    if (dbopt_table_exists($table) && !dbopt_index_exists($table, $idxName)) {
+    if (dbopt_table_exists($table) && dbopt_index_exists($table, $idxName)===false) {
         $colList = array_map(fn($c) => trim($c, ' `'), explode(',', $cols));
         $allCols = true;
         foreach ($colList as $col) { if (!dbopt_column_exists($table, $col)) { $allCols = false; break; } }
@@ -391,15 +397,21 @@ foreach ($recommendedIndexes as [$table, $idxName, $cols, $desc]) {
 }
 
 $orphanCounts = [];
-foreach (dbopt_orphan_defs() as $key => [$label, $countSql, $deleteSql]) {
+if ($detailedScan) foreach (dbopt_orphan_defs() as $key => [$label, $countSql, $deleteSql]) {
     $orphanCounts[$label] = dbopt_count($countSql);
 }
 
-$dupStudents = dbopt_count("SELECT COUNT(*) c FROM (SELECT national_id FROM students GROUP BY national_id, academic_year HAVING COUNT(*) > 1) x");
-$dupClasses  = dbopt_count("SELECT COUNT(*) c FROM (SELECT name FROM classes GROUP BY name, academic_year HAVING COUNT(*) > 1) x");
+$dupStudents = $detailedScan ? dbopt_count("SELECT COUNT(*) c FROM (SELECT national_id FROM students GROUP BY national_id, academic_year HAVING COUNT(*) > 1) x") : -1;
+$dupClasses  = $detailedScan ? dbopt_count("SELECT COUNT(*) c FROM (SELECT name FROM classes GROUP BY name, academic_year HAVING COUNT(*) > 1) x") : -1;
 
-$badEngine = array_values(array_filter($tablesInfo, fn($t) => strtolower((string)$t['engine']) !== 'innodb'));
-$badCollation = array_values(array_filter($tablesInfo, fn($t) => strpos((string)$t['collation'], 'utf8mb4') !== 0));
+$engineWarnings=dbh_engine_warnings($driver,$tablesInfo);
+$badEngine=$engineWarnings['engine']; $badCollation=$engineWarnings['collation'];
+if ($engineWarnings['unknown']) $dboptErrors['engine']='اطلاعات موتور/کلیشن برخی جدول‌ها نامشخص است.';
+$integrity=null;
+if ($DBOPT_SQLITE && $detailedScan) {
+    try { $integrity=$pdo->query('PRAGMA quick_check')->fetchAll(PDO::FETCH_COLUMN); }
+    catch (Throwable $e) { $dboptErrors['integrity']='بررسی یکپارچگی SQLite انجام نشد.'; }
+}
 
 function fmt_bytes($b) {
     $b = (float)$b;
@@ -414,21 +426,30 @@ foreach ($orphanCounts as $n) { if ($n > 0) $totalOrphans += $n; }
 
 require_once __DIR__ . '/includes/header.php';
 ?>
+<section class="card p-4 mb-4" aria-label="نوع پایگاه داده">
+<h2>سلامت پایگاه داده — <?php echo clean($DBOPT_SQLITE?'SQLite':'MySQL / MariaDB'); ?></h2>
+<?php if ($DBOPT_SQLITE): ?><p>این اتصال از SQLite استفاده می‌کند. InnoDB و کلیشن utf8mb4 مخصوص MySQL هستند و برای این پایگاه داده قابل اعمال نیستند؛ نیازی به تبدیل موتور یا کلیشن نیست.</p><?php endif; ?>
+<p>نمای اولیه فقط فراداده و ایندکس‌ها را بررسی می‌کند. اسکن کامل شامل شمارش رکوردها، بررسی تکراری‌ها و در SQLite بررسی یکپارچگی است؛ روی پایگاه بزرگ ممکن است زمان‌بر باشد. بازکردن صفحه هیچ بهینه‌سازی یا حذف خودکاری اجرا نمی‌کند.</p>
+<a class="btn btn-outline" href="db-optimizer.php?scan=1<?php echo !empty($_GET['embedded'])?'&amp;embedded=1':''; ?>">اجرای اسکن کامل (فقط خواندنی)</a>
+<p>پیش از عملیات نوشتاری پشتیبان بگیرید. ایجاد ایندکس و بازسازی فیزیکی را در زمان کم‌ترافیک انجام دهید؛ بهبود سرعت وابسته به کوئری و حجم داده است.</p>
+<?php if ($integrity!==null): ?><p role="status"><?php echo $integrity===['ok']?'بررسی یکپارچگی SQLite: سالم در این بررسی.':'بررسی یکپارچگی SQLite خطا گزارش کرد؛ نوشتن را متوقف و نسخهٔ پشتیبان را با متخصص بررسی کنید. تبدیل موتور راه‌حل این خطا نیست.'; ?></p><?php endif; ?>
+<?php foreach (array_unique($dboptErrors) as $error): ?><p role="alert"><?php echo clean($error); ?></p><?php endforeach; ?>
+</section>
 <div class="page-hero card p-4 mb-4 flex items-center justify-between flex-wrap gap-2">
     <div>
         <h2 class="text-xl font-bold"><svg data-ui-icon="health" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 21S-1 13 3 5c3-5 9 0 9 0s6-5 9 0c4 8-9 16-9 16Z"/><path d="M8 12h8m-4-4v8"/></svg> سلامت و بهینه‌سازی پایگاه داده</h2>
         <p class="text-muted text-xs mt-1">ممیزی ایندکس‌ها، رکوردهای یتیم/تکراری و بهینه‌سازی فیزیکی جداول — نگارش 4.31.0</p>
     </div>
     <div class="flex gap-2 flex-wrap">
-        <form method="POST" data-no-busy="0" onsubmit="return confirm('ایندکس‌های حیاتی به جداول اضافه شوند؟ (عملیات امن و بدون تغییر داده)');">
+        <form method="POST" data-no-busy="0" onsubmit="return confirm('ایندکس‌های حیاتی به جداول اضافه شوند؟ (بدون تغییر رکوردها؛ نیازمند زمان و فضای دیسک)');">
             <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
             <input type="hidden" name="do" value="apply_indexes">
-            <button type="submit" class="btn btn-primary btn-sm" <?php echo empty($missingIndexes) ? 'disabled' : ''; ?>><svg data-ui-icon="bolt" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m14 2-11 12h8l-1 8 11-12h-8Z"/></svg> اعمال ایندکس‌های حیاتی (<?php echo count($missingIndexes); ?>)</button>
+            <button type="submit" class="btn btn-primary btn-sm" <?php echo (empty($missingIndexes)||$dboptErrors) ? 'disabled' : ''; ?>><svg data-ui-icon="bolt" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m14 2-11 12h8l-1 8 11-12h-8Z"/></svg> اعمال ایندکس‌های حیاتی (<?php echo count($missingIndexes); ?>)</button>
         </form>
         <form method="POST" onsubmit="return confirm('رکوردهای یتیم و توکن‌های منقضی حذف شوند؟ این عملیات فقط داده‌های بلااستفاده را پاک می‌کند.');">
             <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
             <input type="hidden" name="do" value="cleanup_orphans">
-            <button type="submit" class="btn btn-warning btn-sm" <?php echo $totalOrphans <= 0 ? 'disabled' : ''; ?>><svg data-ui-icon="delete" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 16h12l1-16M10 10v8m4-8v8"/></svg> پاکسازی رکوردهای یتیم (<?php echo max(0, $totalOrphans); ?>)</button>
+            <button type="submit" class="btn btn-warning btn-sm" <?php echo $totalOrphans <= 0 ? 'disabled' : ''; ?>><svg data-ui-icon="delete" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 16h12l1-16M10 10v8m4-8v8"/></svg> پاکسازی رکوردهای یتیم (<?php echo $detailedScan?max(0,$totalOrphans):'اسکن نشده'; ?>)</button>
         </form>
         <form method="POST" onsubmit="return confirm('دانش‌آموزان و کلاس‌های تکراری (فقط موارد بدون سابقه) حذف شوند؟');">
             <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
@@ -438,17 +459,17 @@ require_once __DIR__ . '/includes/header.php';
         <form method="POST" onsubmit="return confirm(<?php echo $DBOPT_SQLITE ? "'ANALYZE و VACUUM روی کل دیتابیس اجرا شود؟ (ممکن است چند لحظه طول بکشد)'" : "'ANALYZE و OPTIMIZE روی همه جداول اجرا شود؟ (ممکن است چند لحظه طول بکشد)'"; ?>);">
             <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
             <input type="hidden" name="do" value="optimize_tables">
-            <button type="submit" class="btn btn-success btn-sm"><?php echo $DBOPT_SQLITE ? '🚀 ANALYZE + VACUUM' : '🚀 ANALYZE + OPTIMIZE جداول'; ?></button>
+            <button type="submit" class="btn btn-success btn-sm"><?php echo $DBOPT_SQLITE ? 'ANALYZE + VACUUM' : 'ANALYZE + OPTIMIZE جداول'; ?></button>
         </form>
     </div>
 </div>
 
 <div class="grid gap-4 mb-4" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
     <div class="card p-4"><div class="text-muted text-xs mb-1">حجم داده‌ها</div><div class="text-xl font-bold" style="color:var(--primary)"><?php echo fmt_bytes($totalData); ?></div></div>
-    <div class="card p-4"><div class="text-muted text-xs mb-1">حجم ایندکس‌ها</div><div class="text-xl font-bold" style="color:#0ea5e9"><?php echo fmt_bytes($totalIndex); ?></div></div>
+    <div class="card p-4"><div class="text-muted text-xs mb-1">حجم ایندکس‌ها</div><div class="text-xl font-bold" style="color:#0ea5e9"><?php echo $DBOPT_SQLITE?'جداگانه در دسترس نیست':fmt_bytes($totalIndex); ?></div></div>
     <div class="card p-4"><div class="text-muted text-xs mb-1">ایندکس حیاتی غایب</div><div class="text-xl font-bold" style="color:<?php echo empty($missingIndexes) ? '#10b981' : '#ef4444'; ?>"><?php echo count($missingIndexes); ?></div></div>
-    <div class="card p-4"><div class="text-muted text-xs mb-1">رکورد یتیم / منقضی</div><div class="text-xl font-bold" style="color:<?php echo $totalOrphans > 0 ? '#f59e0b' : '#10b981'; ?>"><?php echo max(0, $totalOrphans); ?></div></div>
-    <div class="card p-4"><div class="text-muted text-xs mb-1">گروه تکراری (دانش‌آموز/کلاس)</div><div class="text-xl font-bold" style="color:<?php echo ($dupStudents > 0 || $dupClasses > 0) ? '#ef4444' : '#10b981'; ?>"><?php echo max(0,$dupStudents); ?> / <?php echo max(0,$dupClasses); ?></div></div>
+    <div class="card p-4"><div class="text-muted text-xs mb-1">رکورد یتیم / منقضی</div><div class="text-xl font-bold" style="color:<?php echo $totalOrphans > 0 ? '#f59e0b' : '#10b981'; ?>"><?php echo $detailedScan?max(0,$totalOrphans):'اسکن نشده'; ?></div></div>
+    <div class="card p-4"><div class="text-muted text-xs mb-1">گروه تکراری (دانش‌آموز/کلاس)</div><div class="text-xl font-bold" style="color:<?php echo ($dupStudents > 0 || $dupClasses > 0) ? '#ef4444' : '#10b981'; ?>"><?php echo $detailedScan?($dupStudents<0?'نامشخص':$dupStudents).' / '.($dupClasses<0?'نامشخص':$dupClasses):'اسکن نشده'; ?></div></div>
 </div>
 
 <?php if (!empty($missingIndexes)): ?>
@@ -464,9 +485,9 @@ require_once __DIR__ . '/includes/header.php';
             </tbody>
         </table>
     </div>
-    <p class="text-muted text-xs mt-2">با دکمهٔ «اعمال ایندکس‌های حیاتی» همهٔ موارد بالا به‌صورت امن (بدون تغییر داده) اضافه می‌شوند. با رشد داده‌ها این ایندکس‌ها سرعت ورود دانش‌آموز، لیست‌ها و کارنامه‌ها را چندین برابر می‌کنند.</p>
+    <p class="text-muted text-xs mt-2">با دکمهٔ «اعمال ایندکس‌های حیاتی» همهٔ موارد بالا بدون تغییر رکوردهای داده (با هزینهٔ ساخت ایندکس) اضافه می‌شوند. ایندکس هم‌ارز با نام دیگر نیز تشخیص داده می‌شود؛ افزایش سرعت تضمین‌شده نیست.</p>
 </div>
-<?php else: ?>
+<?php elseif (!$dboptErrors): ?>
 <div class="card p-4 mb-4" style="border-color:#abefc6;background:#f6fef9;">
     <span class="font-bold" style="color:#067647;"><svg data-ui-icon="check" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m7 12 3 3 7-7"/></svg> همهٔ ایندکس‌های حیاتی برقرار هستند.</span>
 </div>
@@ -482,7 +503,7 @@ require_once __DIR__ . '/includes/header.php';
                 <tr>
                     <td><?php echo clean($label); ?></td>
                     <td class="font-mono font-bold"><?php echo $n < 0 ? '—' : $n; ?></td>
-                    <td><?php if ($n > 0): ?><span class="badge badge-warning">نیاز به پاکسازی</span><?php elseif ($n === 0): ?><span class="badge badge-success">تمیز</span><?php else: ?><span class="badge badge-info">نامرتبط</span><?php endif; ?></td>
+                    <td><?php if ($n > 0): ?><span class="badge badge-warning">نیاز به پاکسازی</span><?php elseif ($n === 0): ?><span class="badge badge-success">تمیز</span><?php else: ?><span class="badge badge-info">بررسی ناموفق</span><?php endif; ?></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -509,7 +530,7 @@ require_once __DIR__ . '/includes/header.php';
                 <tr>
                     <td class="font-mono font-bold"><?php echo clean($t['name']); ?></td>
                     <td><?php echo clean($t['engine']); ?></td>
-                    <td class="font-mono"><?php echo number_format((int)$t['rows_est']); ?></td>
+                    <td class="font-mono"><?php echo $t['rows_est']===null?'اسکن نشده':number_format((int)$t['rows_est']); ?></td>
                     <td class="font-mono"><?php echo $t['data_len'] === null ? '—' : fmt_bytes($t['data_len']); ?></td>
                     <td class="font-mono"><?php echo $DBOPT_SQLITE ? number_format((int)$t['index_len']) : fmt_bytes($t['index_len']); ?></td>
                     <td class="font-mono"><?php echo $t['data_free'] === null ? '—' : ((int)$t['data_free'] > 1048576 ? '<span style="color:#b54708;font-weight:bold">' . fmt_bytes($t['data_free']) . '</span>' : fmt_bytes($t['data_free'])); ?></td>
@@ -519,11 +540,11 @@ require_once __DIR__ . '/includes/header.php';
         </table>
     </div>
     <p class="text-muted text-xs mt-2"><?php if ($DBOPT_SQLITE): ?>
-        SQLite آمار حجم به تفکیک جدول ندارد، پس ستون «حجم داده» خالی است و به‌جای آن تعداد ردیف دقیق شمرده می‌شود.
+        SQLite آمار حجم به تفکیک جدول ندارد، پس ستون «حجم داده» خالی است؛ تعداد دقیق ردیف‌ها فقط در اسکن کامل شمرده می‌شود.
         حجم کل فایل دیتابیس: <b><?php echo fmt_bytes($totalData); ?></b><?php if (!empty($sqliteFreeBytes)): ?> · فضای آزاد قابل بازپس‌گیری با VACUUM: <b><?php echo fmt_bytes($sqliteFreeBytes); ?></b><?php endif; ?>.
-        توصیه: این صفحه را ماهی یک بار اجرا کنید.
+        بازسازی فیزیکی را فقط در صورت نیاز، با پشتیبان و فضای دیسک کافی اجرا کنید.
     <?php else: ?>
-        اگر «فضای آزاد» جدولی بزرگ است، دکمهٔ OPTIMIZE آن را بازپس می‌گیرد. توصیه: این صفحه را ماهی یک بار اجرا کنید.
+        اگر «فضای آزاد» جدولی بزرگ است، دکمهٔ OPTIMIZE آن را بازپس می‌گیرد. بازسازی فیزیکی را فقط در صورت نیاز، با پشتیبان و فضای دیسک کافی اجرا کنید.
     <?php endif; ?></p>
 </div>
 

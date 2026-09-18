@@ -1,0 +1,7 @@
+[
+  "db-optimizer.php",
+  "includes/db_health.php",
+  "includes/header.php",
+  "includes/header_tiles.php",
+  "includes/management_hub.php"
+]

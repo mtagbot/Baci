@@ -1,0 +1,324 @@
+{
+  "checks": 77,
+  "results": [
+    {
+      "state": "health",
+      "width": 320,
+      "child": {
+        "width": 294,
+        "scroll": 294,
+        "height": 4591,
+        "forms": 0
+      },
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "height": 4594
+      }
+    },
+    {
+      "state": "health",
+      "width": 390,
+      "child": {
+        "width": 364,
+        "scroll": 364,
+        "height": 4448,
+        "forms": 0
+      },
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "height": 4450
+      }
+    },
+    {
+      "state": "health",
+      "width": 768,
+      "child": {
+        "width": 734,
+        "scroll": 734,
+        "height": 4240,
+        "forms": 0
+      },
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "height": 4242
+      }
+    },
+    {
+      "state": "health",
+      "width": 1024,
+      "child": {
+        "width": 778,
+        "scroll": 778,
+        "height": 4219,
+        "forms": 0
+      },
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "height": 640
+      }
+    },
+    {
+      "state": "health",
+      "width": 1440,
+      "child": {
+        "width": 1142,
+        "scroll": 1142,
+        "height": 1618,
+        "forms": 0
+      },
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "height": 640
+      }
+    },
+    {
+      "state": "health-detail",
+      "width": 320,
+      "child": {
+        "width": 294,
+        "scroll": 294,
+        "height": 5176,
+        "forms": 0
+      },
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "height": 5178
+      }
+    },
+    {
+      "state": "health-detail",
+      "width": 390,
+      "child": {
+        "width": 364,
+        "scroll": 364,
+        "height": 5032,
+        "forms": 0
+      },
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "height": 5035
+      }
+    },
+    {
+      "state": "health-detail",
+      "width": 768,
+      "child": {
+        "width": 734,
+        "scroll": 734,
+        "height": 4824,
+        "forms": 0
+      },
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "height": 4827
+      }
+    },
+    {
+      "state": "health-detail",
+      "width": 1024,
+      "child": {
+        "width": 778,
+        "scroll": 778,
+        "height": 4751,
+        "forms": 0
+      },
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "height": 640
+      }
+    },
+    {
+      "state": "health-detail",
+      "width": 1440,
+      "child": {
+        "width": 1142,
+        "scroll": 1142,
+        "height": 1979,
+        "forms": 0
+      },
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "height": 640
+      }
+    },
+    {
+      "state": "sync",
+      "width": 320,
+      "child": {
+        "width": 294,
+        "scroll": 294,
+        "height": 595,
+        "forms": 0
+      },
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "height": 597
+      }
+    },
+    {
+      "state": "sync",
+      "width": 390,
+      "child": {
+        "width": 364,
+        "scroll": 364,
+        "height": 510,
+        "forms": 0
+      },
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "height": 512
+      }
+    },
+    {
+      "state": "sync",
+      "width": 768,
+      "child": {
+        "width": 734,
+        "scroll": 734,
+        "height": 404,
+        "forms": 0
+      },
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "height": 406
+      }
+    },
+    {
+      "state": "sync",
+      "width": 1024,
+      "child": {
+        "width": 778,
+        "scroll": 778,
+        "height": 404,
+        "forms": 0
+      },
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "height": 640
+      }
+    },
+    {
+      "state": "sync",
+      "width": 1440,
+      "child": {
+        "width": 1142,
+        "scroll": 1142,
+        "height": 640,
+        "forms": 0
+      },
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "height": 640
+      }
+    },
+    {
+      "state": "admins",
+      "width": 320,
+      "child": {
+        "width": 294,
+        "scroll": 294,
+        "height": 322,
+        "forms": 0
+      },
+      "parent": {
+        "width": 320,
+        "scroll": 320,
+        "height": 324
+      }
+    },
+    {
+      "state": "admins",
+      "width": 390,
+      "child": {
+        "width": 364,
+        "scroll": 364,
+        "height": 322,
+        "forms": 0
+      },
+      "parent": {
+        "width": 390,
+        "scroll": 390,
+        "height": 324
+      }
+    },
+    {
+      "state": "admins",
+      "width": 768,
+      "child": {
+        "width": 734,
+        "scroll": 734,
+        "height": 322,
+        "forms": 0
+      },
+      "parent": {
+        "width": 768,
+        "scroll": 768,
+        "height": 324
+      }
+    },
+    {
+      "state": "admins",
+      "width": 1024,
+      "child": {
+        "width": 778,
+        "scroll": 778,
+        "height": 322,
+        "forms": 0
+      },
+      "parent": {
+        "width": 1024,
+        "scroll": 1024,
+        "height": 640
+      }
+    },
+    {
+      "state": "admins",
+      "width": 1440,
+      "child": {
+        "width": 1142,
+        "scroll": 1142,
+        "height": 640,
+        "forms": 0
+      },
+      "parent": {
+        "width": 1440,
+        "scroll": 1440,
+        "height": 640
+      }
+    }
+  ],
+  "errors": [],
+  "accessibility": [
+    {
+      "state": "health",
+      "violations": []
+    },
+    {
+      "state": "health-detail",
+      "violations": []
+    },
+    {
+      "state": "sync",
+      "violations": []
+    },
+    {
+      "state": "admins",
+      "violations": []
+    }
+  ]
+}

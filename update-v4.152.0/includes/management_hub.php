@@ -23,11 +23,26 @@ function school_management_hubs() {
             'logs'=>['لاگ فعالیت','activity-logs.php?embedded=1'],
             'migration'=>['مایگریشن','migration-updater.php?embedded=1'],
             'backups'=>['پشتیبان‌گیری','backups.php?embedded=1'],
-            'api'=>['مستندات API','api/docs.php?embedded=1']]]
+            'api'=>['مستندات API','api/docs.php?embedded=1'],
+            'sync'=>['همگام‌سازی با سایت','desk-sync.php?embedded=1'],
+            'health'=>['سلامت پایگاه داده','db-optimizer.php?embedded=1'],
+            'admins'=>['مدیریت مدیران','admins.php?embedded=1']]]
     ];
 }
 function render_management_hub($key) {
     $hub=school_management_hubs()[$key];$tabs=$hub['tabs'];
+    if ($key==='settings') {
+        // The child controllers remain the authority; do not expose unusable/privileged tabs.
+        foreach (['logs'=>'view_logs','migration'=>'system_settings','backups'=>'manage_backups','health'=>'system_settings'] as $id=>$permission) {
+            if (!has_permission($permission)) unset($tabs[$id]);
+        }
+        if (($_SESSION['admin_role']??'')!=='super_admin') unset($tabs['admins']);
+        $release=is_file(dirname(__DIR__).'/config/release.php')?require dirname(__DIR__).'/config/release.php':[];
+        if (($release['distribution']??'site')!=='desktop') {
+            $account=current_admin();
+            if (!$account || $account['role']!=='super_admin' || !(int)$account['status']) unset($tabs['sync']);
+        }
+    }
     $requested=$_GET['hub_tab']??'';
     $active=is_string($requested)&&isset($tabs[$requested])?$requested:array_key_first($tabs);
     $current=$tabs[$active];

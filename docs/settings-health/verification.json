@@ -1,0 +1,43 @@
+{
+  "php": {
+    "site_checks": 65,
+    "desktop_checks": 65,
+    "database": "isolated SQLite"
+  },
+  "sqlite_table_count_queries": {
+    "default_view": 0,
+    "explicit_full_scan": 57
+  },
+  "browser": {
+    "engine": "Chromium",
+    "site_checks": 77,
+    "desktop_web_checks": 77,
+    "layouts_per_distribution": 20,
+    "widths": [
+      320,
+      390,
+      768,
+      1024,
+      1440
+    ],
+    "axe_scope": "hub tab controls only"
+  },
+  "regression": {
+    "site_suites_passed": 31,
+    "desktop_suites_passed": 31,
+    "report_tools_site_checks": 128
+  },
+  "packaging": {
+    "runtime_paths": 5,
+    "new_tests_passed": 5,
+    "previous_packaging_tests_passed": 15,
+    "prior_archives_unchanged": true
+  },
+  "limitations": {
+    "live_school_database_accessed": false,
+    "mysql_server_tested": false,
+    "native_windows_tested": false,
+    "physical_phone_tested": false,
+    "live_sync_network_tested": false
+  }
+}

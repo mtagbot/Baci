@@ -148,7 +148,7 @@ ob_start(); render_header_tiles(); $h = ob_get_clean();
 DB::execute("DELETE FROM admins WHERE username='limitedadm'");
 echo json_encode([
   'has_students'=> strpos($h,'students.php')!==false ?1:0,
-  'has_settings'=> strpos($h,'settings.php')!==false ?1:0,
+  'has_settings'=> strpos($h,'href="settings.php"')!==false ?1:0,
   'has_admins'  => strpos($h,'admins.php')!==false ?1:0,
   'has_dash'    => strpos($h,'view=dashboard')!==false ?1:0,
 ]);`);

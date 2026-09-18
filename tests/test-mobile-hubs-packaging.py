@@ -11,7 +11,7 @@ class MobileHubs(unittest.TestCase):
   for name,prefix in ARCHIVES:
    with ZipFile(ROOT/name) as z:
     self.assertIsNone(z.testzip());self.assertEqual(set(z.namelist()),{prefix+p for p in FILES})
-    for p in FILES:self.assertEqual(z.read(prefix+p),(ROOT/'update-v4.152.0'/p).read_bytes())
+    for p in FILES:self.assertEqual(z.read(prefix+p),subprocess.check_output(['git','show','3ed3d70924a5615a2708578a6486d275967340e2:update-v4.152.0/'+p],cwd=ROOT))
  def test_hashes(self):
   for line in (ROOT/'MOBILE-HUBS-SHA256SUMS.txt').read_text().splitlines():
    digest,name=line.split();self.assertEqual(hashlib.sha256((ROOT/name).read_bytes()).hexdigest(),digest)

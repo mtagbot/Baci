@@ -200,11 +200,8 @@ function mtagToggleSidebar(){
             <a href="bot-accounts.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'bot-accounts.php' ? 'active' : ''; ?>">اکانت‌های متصل</a>
         <?php endif; ?>
         <div class="sidebar-section-title">سیستم</div>
-        <a href="other-settings.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['other-settings.php','backups.php','activity-logs.php','migration-updater.php']) ? 'active' : ''; ?>">تنظیمات دیگر</a>
-        <a href="desk-sync.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'desk-sync.php' ? 'active' : ''; ?>">همگام‌سازی با سایت</a>
-        <?php if (has_permission('system_settings')): ?><a href="db-optimizer.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'db-optimizer.php' ? 'active' : ''; ?>">سلامت پایگاه داده</a><?php endif; ?>
+        <a href="other-settings.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['other-settings.php','backups.php','activity-logs.php','migration-updater.php','desk-sync.php','db-optimizer.php','admins.php']) ? 'active' : ''; ?>">تنظیمات دیگر</a>
         <?php if (has_permission('system_settings')): ?><a href="settings.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'settings.php' ? 'active' : ''; ?>">سفارشی‌سازی</a><?php endif; ?>
-        <?php if (($_SESSION['admin_role'] ?? '') === 'super_admin'): ?><a href="admins.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'admins.php' ? 'active' : ''; ?>">مدیریت مدیران</a><?php endif; ?>
         </div>
     </aside>
     <?php elseif (is_student_logged_in()): ?>

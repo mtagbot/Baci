@@ -1,0 +1,2 @@
+0c39efb608f7f7b3e2ade480350ed3e9c2d6aa5c9fc67fe53ad7c5cdc5cb871b  SITE-FIX-v4.152.0-settings-health.zip
+ac557baae28dfff70a54ced4980a89df6057f0d8b6b38827d08a76f0d071f7e7  SchoolDeskPro-FIX-v2.83.0-settings-health.zip

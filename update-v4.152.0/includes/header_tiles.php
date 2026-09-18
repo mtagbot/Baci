@@ -42,10 +42,7 @@ if (!function_exists('header_tiles_catalog')) {
             'backups'     => ['t' => 'پشتیبان‌گیری',    'i' => '💾', 'ic' => 'backups', 'u' => 'backups.php',             'p' => null],
             'logs'        => ['t' => 'گزارش فعالیت',   'i' => '🕓', 'ic' => 'logs', 'u' => 'activity-logs.php',       'p' => null],
             'othersets'   => ['t' => 'تنظیمات دیگر',   'i' => '⚙️', 'ic' => 'othersets', 'u' => 'other-settings.php',      'p' => null],
-            'sync'        => ['t' => 'همگام‌سازی',      'i' => '🔄', 'ic' => 'sync', 'u' => 'desk-sync.php',           'p' => null],
-            'dbhealth'    => ['t' => 'سلامت پایگاه',   'i' => '🩺', 'ic' => 'dbhealth', 'u' => 'db-optimizer.php',        'p' => 'system_settings'],
             'settings'    => ['t' => 'سفارشی‌سازی',    'i' => '🎨', 'ic' => 'settings', 'u' => 'settings.php',            'p' => 'system_settings'],
-            'admins'      => ['t' => 'مدیران',         'i' => '👥', 'ic' => 'admins', 'u' => 'admins.php',              'p' => '__super__'],
         ];
     }
 }
@@ -88,6 +85,7 @@ if (!function_exists('header_tiles_selected')) {
 
         $out = [];
         foreach ($keys as $k) {
+            if (in_array($k,['sync','dbhealth','admins'],true)) $k='othersets';
             if (isset($cat[$k]) && !in_array($k, $out, true)) $out[] = $k;
             if (count($out) >= header_tiles_max()) break;
         }
@@ -102,7 +100,8 @@ if (!function_exists('header_tiles_sanitize_post')) {
         if (!is_array($posted)) $posted = [];
         $out = [];
         foreach ($posted as $k) {
-            $k = trim((string)$k);
+            $k = is_scalar($k) ? trim((string)$k) : '';
+            if (in_array($k,['sync','dbhealth','admins'],true)) $k='othersets';
             if (isset($cat[$k]) && !in_array($k, $out, true)) $out[] = $k;
             if (count($out) >= header_tiles_max()) break;
         }

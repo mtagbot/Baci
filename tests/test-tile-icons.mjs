@@ -30,14 +30,14 @@ const catKeys = [...tiles.matchAll(/'(\w+)'\s*=>\s*\['t'\s*=>/g)].map(m => m[1])
 const icRefs  = [...tiles.matchAll(/'ic'\s*=>\s*'([\w-]+)'/g)].map(m => m[1]);
 const symbols = [...sprite.matchAll(/<symbol id="t-([\w-]+)"/g)].map(m => m[1]);
 
-ok('کاتالوگ ۲۰ کاشی دارد', catKeys.length === 20, String(catKeys.length));
-ok('هر ۲۰ کاشی آیکون دارد', icRefs.length === 20, String(icRefs.length));
+ok('کاتالوگ ۱۷ کاشی دارد؛ سه ابزار زیر تنظیمات دیگر هستند', catKeys.length === 17, String(catKeys.length));
+ok('هر ۱۷ کاشی آیکون دارد', icRefs.length === 17, String(icRefs.length));
 ok('sprite ۲۰ آیکون دارد', symbols.length === 20, String(symbols.length));
 ok('هیچ آیکونی در sprite گم نیست',
    icRefs.every(r => symbols.includes(r)),
    JSON.stringify(icRefs.filter(r => !symbols.includes(r))));
-ok('هیچ آیکون بی‌استفاده‌ای در sprite نیست',
-   symbols.every(sy => icRefs.includes(sy)),
+ok('فقط سه آیکون منتقل‌شده برای سازگاری در sprite باقی‌اند',
+   JSON.stringify(symbols.filter(sy => !icRefs.includes(sy)).sort())===JSON.stringify(['admins','dbhealth','sync']),
    JSON.stringify(symbols.filter(sy => !icRefs.includes(sy))));
 ok('شناسهٔ آیکون‌ها تکراری نیست', new Set(symbols).size === symbols.length);
 
@@ -187,7 +187,7 @@ ok('دیگر از data-icon ایموجی استفاده نمی‌شود', !setts
 /* ═══ ۵) ایموجی به‌عنوان پشتیبان حفظ شده ═══ */
 console.log('\n══ پشتیبان ══');
 ok("کلید 'i' (ایموجی) برای پشتیبانی حذف نشده",
-   (tiles.match(/'i'\s*=>/g) || []).length === 20);
+   (tiles.match(/'i'\s*=>/g) || []).length === 17);
 ok('اگر آیکون نبود به ایموجی برمی‌گردد', /else\s*\{?\s*echo \$tile\['i'\]/.test(tiles));
 
 console.log(`\n  سوئیت آیکون کاشی‌ها: ${pass} PASS / ${fail} FAIL`);
