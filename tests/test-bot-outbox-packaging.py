@@ -12,8 +12,12 @@ def check(v,m):
 # optimized desk_sync.php ships in its own corrective) and must never
 # silently rewrite an already-published archive.
 BASELINE='d44626fafc69f67ef2e32bde70022d5bfb73b3ad'
+# The published packages' manifests are historical facts — pin them here
+# instead of the (evolved) staging list.
+HISTORICAL={'site':['attendance.php','includes/bot_helpers.php','includes/bot_outbox.php','includes/bot_admin_ui.php','class-exam-sync-api.php','cron/bot-outbox-worker.php'],
+            'desktop':['attendance.php','includes/bot_helpers.php','includes/bot_outbox.php','includes/bot_admin_ui.php','includes/desk_sync.php','desk-sync-daemon.php']}
 for name,prefix,desktop in release.PACKAGES:
- files=release.stage.DESKTOP if desktop else release.stage.SITE
+ files=HISTORICAL['desktop' if desktop else 'site']
  with ZipFile(ROOT/name)as z:
   check(z.testzip() is None,name+' CRC')
   check(sorted(z.namelist())==sorted(prefix+f for f in files),name+' minimal manifest')

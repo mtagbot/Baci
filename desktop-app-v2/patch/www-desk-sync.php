@@ -66,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_sync'])) {
     DeskSync::setCfg('desk_sync_url', $url);
     DeskSync::setCfg('desk_sync_key', trim($_POST['sync_key'] ?? ''));
     DeskSync::setCfg('desk_sync_enabled', isset($_POST['sync_enabled']) ? '1' : '0');
+    DeskSync::setCfg('desk_sync_mode', ($_POST['desk_sync_mode'] ?? 'full') === 'event' ? 'event' : 'full');
     if (isset($_POST['reset_state'])) {
         DeskSync::setCfg('desk_sync_snapshot_done', '0');
         DeskSync::setCfg('desk_sync_cursor', '0');
@@ -129,6 +130,21 @@ function fa_ago($ts) {
                     <input type="checkbox" name="reset_state" value="1">
                     <span class="text-sm text-muted">شروع مجدد از صفر (دریافت کامل دوباره از سرور)</span>
                 </label>
+            </div>
+            <div class="mb-4">
+                <label class="form-label">حالت ترافیک با سایت</label>
+                <div class="space-y-2">
+                    <label class="flex items-start gap-2">
+                        <input type="radio" name="desk_sync_mode" value="full" class="mt-1" <?php echo ($st['mode'] ?? 'full') === 'full' ? 'checked' : ''; ?>>
+                        <span><b>کامل (پیش‌فرض)</b>
+                            <span class="block text-xs text-muted mt-0.5">هر ~۳۰ ثانیه یک‌بار بررسی می‌کند سایت تغییری داشته باشد یا نه؛ تغییری که روی وب‌سایت زده شود تا ~۳۰ ثانیه بعد در دسکتاپ دیده می‌شود. درخواست‌های روزانه: صدها.</span></span>
+                    </label>
+                    <label class="flex items-start gap-2">
+                        <input type="radio" name="desk_sync_mode" value="event" class="mt-1" <?php echo ($st['mode'] ?? 'full') === 'event' ? 'checked' : ''; ?>>
+                        <span><b>فقط رویداد (کم‌ترافیک‌ترین)</b>
+                            <span class="block text-xs text-muted mt-0.5">بدون هیچ بررسی دوره‌ای؛ درخواست همگام‌سازی فقط با ثبت/ویرایش/حذف واقعی انجام می‌شود (فوری، همان‌همان). تغییری که روی وب‌سایت زده شود، در دسکتاپ تا ۱ ساعت بعد — یا بلافاصله با اولین ویرایش بعدی در دسکتاپ — اعمال می‌شود. یک چک آشتی هر ساعت کار می‌کند. درخواست‌های روزانه: ده‌ها.</span></span>
+                    </label>
+                </div>
             </div>
             <div class="flex gap-3">
                 <button type="submit" name="save_sync" value="1" class="btn btn-primary">ذخیره تنظیمات</button>

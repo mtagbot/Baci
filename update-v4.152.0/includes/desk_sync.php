@@ -58,6 +58,11 @@ class DeskSync {
     // removes ~80% of idle traffic. Desktop→site pushes stay immediate
     // (kick file + pending>0 below), unaffected by this constant.
     const PING_INTERVAL = 30;     // seconds between idle site probes
+    // "event" mode (desk_sync_mode='event', least-traffic option): no idle
+    // probes and no 5-minute safety cycle — this hourly mirror check is the
+    // only background work. Site-side edits still reach the desktop on the
+    // next local edit (full cycles are bidirectional) or by the hourly check.
+    const EVENT_SAFETY_INTERVAL = 3600;
 
     /* ---------------- settings helpers (raw, no cache) ---------------- */
 
@@ -94,6 +99,7 @@ class DeskSync {
     public static function status() {
         return [
             'enabled'   => self::enabled(),
+            'mode'      => self::getCfg('desk_sync_mode', 'full'),
             'url'       => self::getCfg('desk_sync_url'),
             'last_run'  => (int) self::getCfg('desk_sync_last', '0'),
             'last_ok'   => (int) self::getCfg('desk_sync_last_ok', '0'),
@@ -320,7 +326,9 @@ class DeskSync {
     public static function runIfDue() {
         if (!self::enabled()) return ['ok' => false, 'skipped' => 'disabled'];
         $last = (int) self::getCfg('desk_sync_last', '0');
-        if (time() - $last < self::MIN_INTERVAL) return ['ok' => true, 'skipped' => 'recent'];
+        $safety = self::getCfg('desk_sync_mode', 'full') === 'event'
+            ? self::EVENT_SAFETY_INTERVAL : self::MIN_INTERVAL;
+        if (time() - $last < $safety) return ['ok' => true, 'skipped' => 'recent'];
         return self::run();
     }
 
@@ -354,6 +362,10 @@ class DeskSync {
         if ($fails > 0 && $now < $nextTry) return ['ok' => true, 'skipped' => 'backoff'] + $base;
 
         $due = $pending > 0 || self::getCfg('desk_sync_snapshot_done') !== '1';
+        // "event" mode: no idle probes at all — the desktop talks to the
+        // site only when something changed, plus the hourly mirror check
+        // below. (Mode selector lives on the sync settings page.)
+        $event = self::getCfg('desk_sync_mode', 'full') === 'event';
 
         // nothing to push → ask the site (cheap) whether IT has news.
         // The probe is throttled to PING_INTERVAL (30s): the desktop→site
@@ -362,7 +374,7 @@ class DeskSync {
         // ON THE SITE is still noticed within one probe. The success
         // timestamp only advances on a GOOD probe, so the offline back-off
         // ladder still controls retry timing after an outage.
-        if (!$due) {
+        if (!$due && !$event) {
             $lastPing = (int) self::getCfg('desk_sync_ping_last', '0');
             if ($now - $lastPing >= self::PING_INTERVAL) {
                 try {
@@ -391,7 +403,9 @@ class DeskSync {
         if (!$base['server_verified'] && ($now - (int) self::getCfg('desk_sync_verified_at', '0')) < 60) $base['server_verified'] = true;
 
         // periodic safety cycle even when both sides look quiet
-        if (!$due && ($now - (int) self::getCfg('desk_sync_last', '0')) >= self::MIN_INTERVAL) $due = true;
+        // (event mode relaxes it to the hourly mirror check)
+        $safety = $event ? self::EVENT_SAFETY_INTERVAL : self::MIN_INTERVAL;
+        if (!$due && ($now - (int) self::getCfg('desk_sync_last', '0')) >= $safety) $due = true;
 
         if (!$due) return ['ok' => true, 'skipped' => 'idle'] + $base;
 

@@ -1,0 +1,15 @@
+{
+  "packages": [
+    {
+      "name": "SchoolDeskPro-FIX-v2.83.0-event-sync.zip",
+      "bytes": 18527,
+      "sha256": "11ea4aad7f7b2e64747fbde5e1db23f32505af81ba597223fd2b1b6e978d2f76",
+      "files": [
+        "includes/desk_sync.php",
+        "desk-sync.php"
+      ],
+      "baseline": "5336dcde3b91c5087ec178c931fa859b820b048c"
+    }
+  ],
+  "historical_archives_unchanged": 149
+}

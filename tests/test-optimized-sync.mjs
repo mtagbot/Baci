@@ -13,7 +13,7 @@
 // In PHP-WASM, cURL cannot reach any host, so "an HTTP attempt happened" is
 // observably deterministic: the call() offline error lands in the state.
 // "No HTTP" is observable as that error being absent. No live network.
-import {php,run,student} from './harness/lib.mjs';
+import {php,run,student,loginAdmin,req} from './harness/lib.mjs';
 let checks=0;
 const check=(v,m)=>{if(!v){console.error('❌ FAIL:',m);process.exit(1);}checks++;console.log('   · '+m);};
 
@@ -114,6 +114,53 @@ const fgate=+(await cfg('desk_bot_outbox_next'));
 check(fgate>Date.now()/1000+25&&fgate<Date.now()/1000+35,'failed handover re-checks in ~30s');
 check((await json(`$row=DB::fetch("SELECT state FROM bot_outbox WHERE job_id=?",[str_repeat('f',32)]);echo json_encode($row['state']);`))==='pending','unacknowledged job stays pending — no false delivery');
 await code(`bot_outbox_sql("DELETE FROM bot_outbox WHERE owner='relay'");`);
+
+/* ── event mode (desk_sync_mode='event') ───────────────────────────── */
+const setMode=m=>code(`DeskSync::setCfg('desk_sync_mode','${m}');`);
+
+// 9) No idle probes at all in event mode (fresh start would probe in full mode).
+await setMode('event');
+await reset({});
+r=await tick();
+check(r.skipped==='idle'&&await cfg('desk_sync_fails')==='0','event mode: zero idle probes even on a fresh start');
+
+// 10) A pending local change still triggers the immediate full cycle.
+await reset({pingLast:'now',verifiedAt:'now',pendingRow:student.id});
+r=await tick();
+check(r.ok===false&&r.skipped!=='idle'&&await cfg('desk_sync_last')>Date.now()/1000-15,'event mode: local edit still syncs immediately');
+check(r.pending===1,'event mode: unpushed change retained while offline');
+await reset({});
+
+// 11) Hourly mirror check runs at 3601s of quiet (not before).
+await reset({pingLast:'now',verifiedAt:'now',last:3601});
+r=await tick();
+check(r.ok===false&&r.skipped!=='idle'&&await cfg('desk_sync_fails')==='1','event mode: hourly mirror check runs after an hour of quiet');
+await reset({pingLast:'now',verifiedAt:'now',last:3599});
+const evLast=await cfg('desk_sync_last');
+r=await tick();
+check(r.skipped==='idle'&&await cfg('desk_sync_last')===evLast&&await cfg('desk_sync_fails')==='0','event mode: nothing runs before the hourly check (no probe, no 5-min cycle)');
+
+// 12) Default (no mode set) keeps the full-mode 300s cycle.
+await setMode('full');
+await reset({pingLast:'now',verifiedAt:'now',last:301});
+r=await tick();
+check(r.ok===false&&r.skipped!=='idle','full mode (default) still runs the 5-minute safety cycle');
+await reset({});
+
+// 13) Settings UI: renders both modes, saves the choice, ignores junk values.
+await loginAdmin('modeAdm');
+let page=await req('mode page',{file:'desk-sync.php',sid:'modeAdm'});
+check(page.res.page.includes('name="desk_sync_mode"')&&page.res.page.includes('value="event"'),'sync page offers the event-mode selector');
+const csrf=(page.res.page.match(/name="csrf_token" value="([^"]+)"/)||[])[1];
+check(!!csrf,'csrf token present for the save form');
+await req('save event mode',{file:'desk-sync.php',sid:'modeAdm',method:'POST',post:{save_sync:'1',sync_url:'https://school.test/reports',sync_key:'fixture-sync-key-not-production',sync_enabled:'1',desk_sync_mode:'event',csrf_token:csrf}});
+check(await cfg('desk_sync_mode')==='event','saving the form stores event mode');
+check((await json('echo json_encode(DeskSync::status());')).mode==='event','status() reports the active mode');
+page=await req('mode page after save',{file:'desk-sync.php',sid:'modeAdm'});
+check(/value="event" class="mt-1" checked/.test(page.res.page.replace(/\s+/g,' '))||page.res.page.includes('value="event" class="mt-1" checked'),'event radio is checked after saving');
+await req('save junk mode',{file:'desk-sync.php',sid:'modeAdm',method:'POST',post:{save_sync:'1',sync_url:'https://school.test/reports',sync_key:'fixture-sync-key-not-production',sync_enabled:'1',desk_sync_mode:'bogus',csrf_token:csrf}});
+check(await cfg('desk_sync_mode')==='full','unknown mode value falls back to full');
+await setMode('full');
 
 console.log(`PASS ${checks} optimized-sync checks (desktop, staged build, no live network)`);
 process.exit(0);

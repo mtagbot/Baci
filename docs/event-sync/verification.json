@@ -1,0 +1,12 @@
+{
+  "packaging_checks": 169,
+  "baseline_archives_unchanged": 149,
+  "regression_suites": {
+    "site": 31,
+    "desktop": 31
+  },
+  "limits": [
+    "PHP 8.3 WASM/SQLite; cURL cannot reach the network inside the harness",
+    "No live host or Windows daemon measurement"
+  ]
+}

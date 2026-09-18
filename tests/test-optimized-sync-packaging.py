@@ -8,6 +8,7 @@ NAME='SchoolDeskPro-FIX-v2.83.0-optimized-sync.zip'
 PREFIX='SchoolDeskPro/reports/'
 FILE='includes/desk_sync.php'
 BASELINE='d44626fafc69f67ef2e32bde70022d5bfb73b3ad'  # published bot-outbox commit
+PUBLISHED_IN='5336dcde3b91c5087ec178c931fa859b820b048c'  # commit that published THIS package
 checks=0
 def check(v,m):
  global checks
@@ -15,15 +16,17 @@ def check(v,m):
 z=ZipFile(ROOT/NAME)
 check(z.testzip() is None,'ZIP CRC')
 check(z.namelist()==[PREFIX+FILE],'exactly one file at the installed path')
-src=(ROOT/'update-v4.152.0'/FILE)
-staged=(ROOT/'.cache/bot-outbox/desktop/SchoolDeskPro/reports'/FILE)
-check(z.read(PREFIX+FILE)==src.read_bytes(),'ZIP bytes == source bytes')
-check(z.read(PREFIX+FILE)==staged.read_bytes(),'ZIP bytes == tested staged build bytes')
+# The package bytes are the PUBLISHED ones: compare against the git objects of
+# the publishing commit. The live source has since legitimately evolved (the
+# event-sync corrective ships a newer engine) and must never silently rewrite
+# an already-published archive.
+published=subprocess.check_output(['git','show',PUBLISHED_IN+':update-v4.152.0/includes/desk_sync.php'],cwd=ROOT)
+check(z.read(PREFIX+FILE)==published,'ZIP bytes == published bytes')
 for line in (ROOT/'OPTIMIZED-SYNC-SHA256SUMS.txt').read_text().splitlines():
  h,n=line.split();check(hashlib.sha256((ROOT/n).read_bytes()).hexdigest()==h,'checksum '+n)
-# Semantic invariants of the optimized engine (byte-level pins; behaviour is
+# Semantic invariants of the published engine (byte-level pins; behaviour is
 # exercised by tests/test-optimized-sync.mjs on the real staged PHP).
-sync=src.read_text()
+sync=published.decode('utf-8')
 check('const PING_INTERVAL = 30;' in sync,'idle probe throttled to 30s')
 check('const MIN_INTERVAL = 300;' in sync,'safety cycle stretched to 300s')
 check('if(!$jobs)return;' in sync,'empty relay queue performs no HTTP round-trip')
