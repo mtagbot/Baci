@@ -1,0 +1,31 @@
+{
+  "packages": [
+    {
+      "name": "SITE-FIX-v4.152.0-bot-outbox.zip",
+      "bytes": 49268,
+      "sha256": "696dd40ce9a3b612b038756797d67f80488c47cf17ba3983cbc1205bb8f8d4ac",
+      "files": [
+        "attendance.php",
+        "includes/bot_helpers.php",
+        "includes/bot_outbox.php",
+        "includes/bot_admin_ui.php",
+        "class-exam-sync-api.php",
+        "cron/bot-outbox-worker.php"
+      ]
+    },
+    {
+      "name": "SchoolDeskPro-FIX-v2.83.0-bot-outbox.zip",
+      "bytes": 56202,
+      "sha256": "8784f8e2a1122068c11dad1805f705e2bf482c9864802fdd80fa9f0065a82a7b",
+      "files": [
+        "attendance.php",
+        "includes/bot_helpers.php",
+        "includes/bot_outbox.php",
+        "includes/bot_admin_ui.php",
+        "includes/desk_sync.php",
+        "desk-sync-daemon.php"
+      ]
+    }
+  ],
+  "historical_archives_unchanged": 146
+}

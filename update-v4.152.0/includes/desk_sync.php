@@ -95,6 +95,25 @@ class DeskSync {
         ];
     }
 
+    /** Separate idempotent handoff. Never mirror outbox delivery state as ordinary rows. */
+    public static function relayBotNotifications() {
+        require_once __DIR__.'/bot_helpers.php';
+        if(!self::enabled())return;
+        $next=(int)self::getCfg('desk_bot_outbox_next','0');
+        if(time()<$next)return;
+        $jobs=bot_outbox_relay_jobs();
+        self::setCfg('desk_bot_outbox_next',(string)(time()+15));
+        try {
+            $res=self::call('bot_outbox',['jobs'=>$jobs]);
+            bot_outbox_apply_receipts($jobs,$res['receipts']??null);
+            self::setCfg('desk_bot_outbox_error','');
+        } catch(Throwable $e) {
+            // Don't use bot API fallback: the server might already have accepted this batch.
+            self::setCfg('desk_bot_outbox_next',(string)(time()+30));
+            self::setCfg('desk_bot_outbox_error','تحویل صف اعلان به سایت انجام نشد؛ اتصال و نصب اصلاحی صف ربات روی سایت را بررسی کنید.');
+        }
+    }
+
     /* ---------------- HTTP ---------------- */
 
     private static function call($action, $payload = [], $fast = false) {
@@ -107,6 +126,8 @@ class DeskSync {
         $url = self::getCfg('desk_sync_url');
         // Companion endpoint preserves the original server's custom key/config file.
         $url = preg_replace('~[^/?]+\.php(?=\?|$)~','class-exam-sync-api.php',$url);
+        $secureOutbox=$action==='bot_outbox';
+        if($secureOutbox && strtolower((string)parse_url($url,PHP_URL_SCHEME))!=='https')throw new RuntimeException('Notification relay requires HTTPS');
         $payload['action'] = $action;
         $payload['key']    = self::getCfg('desk_sync_key');
         $ch = curl_init($url);
@@ -117,9 +138,9 @@ class DeskSync {
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CONNECTTIMEOUT => $connectT,
             CURLOPT_TIMEOUT        => $totalT,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => 0,
-            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => $secureOutbox,
+            CURLOPT_SSL_VERIFYHOST => $secureOutbox?2:0,
+            CURLOPT_FOLLOWLOCATION => !$secureOutbox,
             CURLOPT_MAXREDIRS      => 3,
         ]);
         $body = curl_exec($ch);
@@ -129,7 +150,7 @@ class DeskSync {
         // https failed at connection level → retry once over plain http.
         // v2.11.0: skipped when DNS itself failed (device offline) — the
         // fallback could never succeed and only doubled the frozen time.
-        if ($body === false && stripos($url, 'https://') === 0 && stripos($err, 'resolve') === false) {
+        if (!$secureOutbox && $body === false && stripos($url, 'https://') === 0 && stripos($err, 'resolve') === false) {
             $ch = curl_init('http://' . substr($url, 8));
             curl_setopt_array($ch, [
                 CURLOPT_POST           => true,
@@ -138,7 +159,7 @@ class DeskSync {
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_CONNECTTIMEOUT => $connectT,
                 CURLOPT_TIMEOUT        => $totalT,
-                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_FOLLOWLOCATION => !$secureOutbox,
                 CURLOPT_MAXREDIRS      => 3,
             ]);
             $body = curl_exec($ch);

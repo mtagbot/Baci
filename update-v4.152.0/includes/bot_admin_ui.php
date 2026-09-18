@@ -39,6 +39,15 @@ if (!function_exists('bot_admin_handle_request')) {
                 redirect($page);
             }
 
+            if (isset($_POST['retry_bot_outbox'])) {
+                bot_outbox_schema();
+                bot_outbox_sql("UPDATE bot_outbox SET next_try=0 WHERE platform=? AND state IN ('pending','relayed')",[$platform]);
+                // Keep provider rate limits and live leases intact. Never retry a sent job.
+                set_setting('desk_bot_outbox_next','0');
+                set_flash_message('success','صف برای تلاش مجدد آماده شد؛ ارسال توسط worker انجام می‌شود.');
+                redirect($page);
+            }
+
             if (isset($_POST['save_bot_token'])) {
                 set_setting(bot_token_key($platform), trim($_POST['bot_token'] ?? ''));
                 /* v4.84.0: optional relay base URL for Telegram — for hosts that
@@ -113,7 +122,8 @@ if (!function_exists('bot_admin_handle_request')) {
                             $result = bot_send_targeted_text($platform, $scope, $value, $message);
                             log_activity($_SESSION['admin_id'] ?? null, 'ارسال هدفمند ربات ' . $title, "scope=$scope value=$value sent={$result['sent']} failed={$result['failed']}");
                         }
-                        set_flash_message($result['failed'] ? 'warning' : 'success', "ارسال انجام شد. کل گیرندگان: {$result['total']}، موفق: {$result['sent']}، ناموفق: {$result['failed']}.");
+                        $queued=(int)($result['queued']??0);
+                        set_flash_message($result['failed'] ? 'warning' : 'success', "کل گیرندگان: {$result['total']}، ارسال تأییدشده: {$result['sent']}، در صف: {$queued}، ناموفق: {$result['failed']}.");
                     } catch (Exception $e) {
                         set_flash_message('error', 'خطا در ارسال پیام: ' . $e->getMessage());
                     }
@@ -267,6 +277,26 @@ if (!function_exists('bot_admin_render_page')) {
             <a href="sms-panel.php" class="btn btn-outline text-xs">بازگشت</a>
         </div>
     </div>
+
+    <?php
+    bot_outbox_schema();
+    $queueCounts=bot_outbox_sql('SELECT state,COUNT(*) AS n FROM bot_outbox WHERE platform=? GROUP BY state',[$platform])->fetchAll(PDO::FETCH_ASSOC);
+    $queueRows=bot_outbox_sql("SELECT job_id,state,owner,attempts,created_at,last_error FROM bot_outbox WHERE platform=? AND state<>'sent' ORDER BY created_at DESC LIMIT 10",[$platform])->fetchAll(PDO::FETCH_ASSOC);
+    $stateNames=['pending'=>'در انتظار تلاش','sending'=>'در حال ارسال','relayed'=>'در صف سایت','sent'=>'ارسال تأییدشده'];
+    ?>
+    <section class="card space-y-3" aria-labelledby="bot-queue-heading">
+        <h3 id="bot-queue-heading" class="font-bold">صف ماندگار اعلان‌ها</h3>
+        <p class="text-xs text-muted">اعلان‌های متنی همهٔ نقش‌ها پس از قطعی حفظ می‌شوند. «در صف» به معنی تحویل به پیام‌رسان نیست. اتصال حساب کاربر به ربات و دسترسی سرور به API لازم است.</p>
+        <div class="flex gap-3 flex-wrap" role="status"><?php foreach($queueCounts as $q): ?><span><?php echo clean($stateNames[$q['state']]??$q['state']); ?>: <?php echo tr_num((int)$q['n'],'fa'); ?></span><?php endforeach; ?><?php if(!$queueCounts): ?>صف خالی است.<?php endif; ?></div>
+        <?php foreach($queueRows as $q): ?><div class="soft-panel text-xs" style="overflow-wrap:anywhere;word-break:break-word">
+            <b><?php echo clean($stateNames[$q['state']]??$q['state']); ?></b> — تلاش: <?php echo tr_num((int)$q['attempts'],'fa'); ?>
+            <?php if($q['owner']==='relay'): ?> · ارسال از سایت<?php endif; ?>
+            <?php if($q['last_error']!==''): ?><p><?php echo clean($q['last_error']); ?></p><?php endif; ?>
+        </div><?php endforeach; ?>
+        <?php if(bot_outbox_desktop() && get_setting('desk_bot_outbox_error','')!==''): ?><p class="text-xs"><?php echo clean(get_setting('desk_bot_outbox_error','')); ?></p><?php endif; ?>
+        <form method="POST"><input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>"><button class="btn btn-secondary text-xs" name="retry_bot_outbox" value="1">آماده‌سازی صف برای تلاش مجدد</button></form>
+        <p class="text-xs text-muted">برای ادامهٔ ارسال روی سایت حتی پس از بسته‌شدن نرم‌افزار، Cron هاست را هر دقیقه روی <code dir="ltr">php /absolute/path/reports/cron/bot-outbox-worker.php</code> تنظیم کنید. مسیر نمونه را با مسیر واقعی هاست عوض کنید. این worker جدا از دریافت پیام‌های ربات است.</p>
+    </section>
 
     <div class="grid grid-cols-3 gap-6 responsive-grid">
         <section class="card shadow-lg space-y-4">

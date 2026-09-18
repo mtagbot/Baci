@@ -1,0 +1,2 @@
+696dd40ce9a3b612b038756797d67f80488c47cf17ba3983cbc1205bb8f8d4ac  SITE-FIX-v4.152.0-bot-outbox.zip
+8784f8e2a1122068c11dad1805f705e2bf482c9864802fdd80fa9f0065a82a7b  SchoolDeskPro-FIX-v2.83.0-bot-outbox.zip

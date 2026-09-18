@@ -1,0 +1,15 @@
+{
+  "packaging_checks": 174,
+  "historical_archives_unchanged": 146,
+  "regression_suites": {
+    "site": 31,
+    "desktop": 31
+  },
+  "site": 34,
+  "desktop_and_authenticated_relay": 45,
+  "limitations": [
+    "PHP 8.3 WASM/SQLite; provider responses and network errors mocked",
+    "No live bot messages, production DB access, native MySQL or Windows worker tests",
+    "At-least-once delivery; provider acceptance with a lost response may duplicate a message"
+  ]
+}

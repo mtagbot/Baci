@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             DB::execute("UPDATE student_attendance SET notified_chats=? WHERE id=?", [$sentChats, $rid]);
         }
         log_activity($_SESSION['admin_id'] ?? null, 'ثبت ' . ($status === 'late' ? 'تأخیر' : 'غیبت'), 'دانش‌آموز #' . $sid . ' تاریخ ' . $date . ' اعلان به ' . $sentChats . ' چت');
-        $msgTail = $notify ? ($sentChats ? ' و به ' . tr_num($sentChats, 'fa') . ' حساب ربات ولی اطلاع‌رسانی شد.' : ' اما هیچ حساب ربات متصلی برای اطلاع‌رسانی یافت نشد.') : '.';
+        $msgTail = $notify ? ($sentChats ? ' و به ' . tr_num($sentChats, 'fa') . ' حساب ربات ولی، اعلان ارسال یا در صف پایدار ثبت شد.' : ' اما هیچ حساب ربات متصلی برای اطلاع‌رسانی یافت نشد.') : '.';
         set_flash_message($notify && !$sentChats ? 'warning' : 'success', ($status === 'late' ? 'تأخیر' : 'غیبت') . ' ثبت شد' . $msgTail);
         redirect('attendance.php?date=' . urlencode($date));
     }
@@ -118,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $label = $target === 'late' ? 'تأخیر' : 'غیبت';
             if ($filed) {
-                $msg = tr_num($filed, 'fa') . ' مورد ' . $label . ' در پرونده انضباطی ثبت و به اولیا اطلاع‌رسانی شد.';
+                $msg = tr_num($filed, 'fa') . ' مورد ' . $label . ' در پرونده انضباطی ثبت شد؛ اعلان حساب‌های متصل ارسال یا در صف قرار گرفت.';
                 if ($skipped) $msg .= ' (' . tr_num($skipped, 'fa') . ' مورد قبلاً ثبت شده بود.)';
                 set_flash_message('success', $msg);
             } elseif ($skipped) {
@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($rec) {
             $sentChats = notify_student_attendance_bots((int)$rec['student_id'], $rec['status'], $rec['date_jalali'], (int)$rec['minutes_late'], (string)$rec['note'], $rid, (string)($rec['scan_time'] ?? ''));
             DB::execute("UPDATE student_attendance SET notified_chats=? WHERE id=?", [$sentChats, $rid]);
-            set_flash_message($sentChats ? 'success' : 'warning', $sentChats ? 'اعلان مجدد به ' . tr_num($sentChats, 'fa') . ' حساب ربات ارسال شد.' : 'حساب ربات متصلی برای این دانش‌آموز یافت نشد.');
+            set_flash_message($sentChats ? 'success' : 'warning', $sentChats ? 'اعلان مجدد به ' . tr_num($sentChats, 'fa') . ' حساب ربات ارسال یا در صف پایدار ثبت شد.' : 'حساب ربات متصلی برای این دانش‌آموز یافت نشد.');
         }
         redirect('attendance.php?date=' . urlencode($_POST['back_date'] ?? ''));
     }
@@ -406,7 +406,7 @@ $scannerUrl = $attProto . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $attBase . '/
                             </td>
                             <td class="text-xs dir-ltr"><?php echo !empty($r['scan_time']) ? tr_num($r['scan_time'], 'fa') : '---'; ?></td>
                             <td class="text-xs"><?php echo ($r['source'] ?? 'manual') === 'qr' ? 'اسکن QR' : (($r['source'] ?? '') === 'auto' ? 'خودکار' : 'دستی'); ?></td>
-                            <td class="text-xs"><?php echo (int)$r['notified_chats'] > 0 ? ('ارسال به ' . tr_num((int)$r['notified_chats'], 'fa') . ' چت') : '<span class="text-muted">ارسال نشده</span>'; ?></td>
+                            <td class="text-xs"><?php echo (int)$r['notified_chats'] > 0 ? ('ارسال/صف برای ' . tr_num((int)$r['notified_chats'], 'fa') . ' چت') : '<span class="text-muted">ارسال نشده</span>'; ?></td>
                             <td class="text-xs"><?php echo $r['review_status'] === 'acknowledged' ? '<span class="badge badge-success">اطلاع یافت</span>' : '<span class="text-muted">در انتظار</span>'; ?></td>
                             <td>
                                 <div class="flex gap-1">

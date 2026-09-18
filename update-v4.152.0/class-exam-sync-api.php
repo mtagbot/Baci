@@ -15,6 +15,13 @@
 
 // Reuse the installation's existing key; no key/configuration is shipped or overwritten.
 function ceg_existing_sync_key() {
+    // Release_V1.0 installs use this private key file. An invalid existing key fails closed.
+    $private=__DIR__.'/config/desk-sync-key.php';
+    if(is_file($private)) {
+        $key=require $private;
+        return is_string($key) && preg_match('/^[a-f0-9]{64}$/D',$key) ? $key : '';
+    }
+    // Compatibility only for pre-release installations without a private key file.
     $path=__DIR__.'/desk-sync-api.php';
     if(!is_file($path))return '';
     $tokens=array_values(array_filter(token_get_all(file_get_contents($path)),function($t){return !is_array($t)||!in_array($t[0],[T_WHITESPACE,T_COMMENT,T_DOC_COMMENT],true);}));
@@ -63,6 +70,17 @@ if (!hash_equals(DESK_SYNC_KEY, (string)($in['key'] ?? ''))) { http_response_cod
 $pdo = DB::getInstance()->getPdo();
 if (!$pdo) jfail('database unavailable');
 $action = $in['action'] ?? '';
+if ($action === 'bot_outbox') {
+    // Authentication above is mandatory; no tokens, arbitrary methods or URLs from clients.
+    require_once __DIR__.'/includes/bot_helpers.php';
+    if(session_status()===PHP_SESSION_ACTIVE)session_write_close();
+    try {
+        $ids=bot_outbox_accept($in['jobs']??[]);
+        bot_outbox_drain(1,8); // bounded; cron handles backlogs even after desktop closure
+        jout(['ok'=>true,'receipts'=>bot_outbox_receipts($ids)]);
+    } catch(Throwable $e) { jfail('notification queue rejected request or storage unavailable'); }
+}
+
 require_once __DIR__.'/includes/class_exam_groups.php';
 ensure_exams_schema();ceg_schema();
 

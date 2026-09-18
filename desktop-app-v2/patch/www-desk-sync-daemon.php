@@ -52,6 +52,14 @@ while (true) {
                 'pending' => DeskSync::pendingCount(), 'fails' => 0, 'alert' => false];
     }
     if (!is_array($res)) $res = ['ok' => false];
+    try {
+        require_once __DIR__.'/includes/bot_helpers.php';
+        // Local-owner jobs are safe to retry independently of school-data sync.
+        bot_outbox_drain(2,8);
+        // Alert links/record IDs must already exist on the server before handoff.
+        if(!empty($res['ok']) && !empty($res['server_verified']) && DeskSync::pendingCount()===0) DeskSync::relayBotNotifications();
+    } catch(Throwable $e) { error_log('Notification worker: queue processing failed; retained for retry.'); }
+
     $res['ts']     = time();
     $res['daemon'] = 1;
     $res['phase']='settled';
