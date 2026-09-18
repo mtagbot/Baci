@@ -1,0 +1,14 @@
+{
+  "packages": [
+    {
+      "name": "SchoolDeskPro-FIX-v2.83.0-optimized-sync.zip",
+      "bytes": 13984,
+      "sha256": "6f42bb13e9cf887229a255de24b58b5790185f690c9f8bc6acae15873c64cc3c",
+      "files": [
+        "includes/desk_sync.php"
+      ],
+      "baseline": "d44626fafc69f67ef2e32bde70022d5bfb73b3ad"
+    }
+  ],
+  "historical_archives_unchanged": 148
+}

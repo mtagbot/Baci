@@ -81,20 +81,39 @@ const engine=readFileSync(resolveSite()+'/includes/desk_sync.php','utf8');
 const tick=engine.slice(engine.indexOf('    public static function tick()'),engine.indexOf('    private static function isOffline'));
 php.writeFile('/harness/tick-probe.php',`<?php class TickProbe {
 const MIN_INTERVAL=60;
+const PING_INTERVAL=30;
 ${tick}
 static function enabled(){return true;}
 static function pendingCount(){return 0;}
 static function getCfg($k,$default=''){return $GLOBALS['cfg'][$k]??$default;}
 static function setCfg($k,$v){$GLOBALS['cfg'][$k]=$v;}
-static function call($a,$b,$c){if(!empty($GLOBALS['badPing']))throw new Exception('rejected ping');return !empty($GLOBALS['emptyPing'])?['ok'=>true]:['log_max'=>0];}
+static function call($a,$b,$c){$GLOBALS['calls']=($GLOBALS['calls']??0)+1;if(!empty($GLOBALS['badPing']))throw new Exception('rejected ping');return !empty($GLOBALS['emptyPing'])?['ok'=>true]:['log_max'=>0];}
 static function isOffline($e){return false;}
 static function run(){return $GLOBALS['runResult'];}
 }`);
 for(const [badPing,oldLast,runResult,verified,emptyPing=false] of [[false,false,{},false,true],[false,false,{},true],[true,false,{},false],[true,true,{ok:true,skipped:'locked'},false],[true,true,{ok:true,pushed:0,pulled:0},true]]){
  const encoded=Buffer.from(JSON.stringify(runResult)).toString('base64');
- const r=JSON.parse(await code(`<?php require '/harness/tick-probe.php';$GLOBALS['cfg']=['desk_sync_snapshot_done'=>'1','desk_sync_last'=>${oldLast?'0':'time()'}];$GLOBALS['badPing']=${badPing};$GLOBALS['emptyPing']=${emptyPing};$GLOBALS['runResult']=json_decode(base64_decode('${encoded}'),true);echo json_encode(TickProbe::tick());`));
+ const out=JSON.parse(await code(`<?php require '/harness/tick-probe.php';$GLOBALS['cfg']=['desk_sync_snapshot_done'=>'1','desk_sync_last'=>${oldLast?'0':'time()'}];$GLOBALS['badPing']=${badPing};$GLOBALS['emptyPing']=${emptyPing};$GLOBALS['runResult']=json_decode(base64_decode('${encoded}'),true);$GLOBALS['calls']=0;echo json_encode(['r'=>TickProbe::tick(),'calls'=>$GLOBALS['calls']]);`));
+ const r=out.r;
  check(r.server_verified===verified,'Production tick proof flag');
  if((badPing||emptyPing)&&!oldLast)check(r.probe_failed===true,'Rejected ping cannot masquerade as successful idle');
+}
+// Throttle contract on the SAME production tick body: a probe within the
+// last 30s must not touch the site at all; a recently verified mirror
+// (≤60s) still counts as verified without a fresh probe. (The site build
+// ships the pre-optimization engine and is exempt — the desktop build pins
+// the new contract.)
+const hasThrottle=engine.includes('const PING_INTERVAL');
+if(hasThrottle){
+ const probe=async (cfg,extra='')=>JSON.parse(await code(`<?php require '/harness/tick-probe.php';$GLOBALS['cfg']=${cfg};$GLOBALS['calls']=0;${extra}echo json_encode(['r'=>TickProbe::tick(),'calls'=>$GLOBALS['calls']]);`));
+ let p=await probe(`['desk_sync_snapshot_done'=>'1','desk_sync_last'=>time(),'desk_sync_ping_last'=>time()]`);
+ check(p.r.skipped==='idle'&&p.r.server_verified===false&&p.calls===0,'Fresh probe timestamp: zero site requests in throttled window');
+ p=await probe(`['desk_sync_snapshot_done'=>'1','desk_sync_last'=>time(),'desk_sync_ping_last'=>time()-31]`);
+ check(p.r.server_verified===true&&p.calls===1,'After the 30s window the production probe fires again');
+ p=await probe(`['desk_sync_snapshot_done'=>'1','desk_sync_last'=>time(),'desk_sync_ping_last'=>time(),'desk_sync_verified_at'=>time()-30]`);
+ check(p.r.skipped==='idle'&&p.r.server_verified===true&&p.calls===0,'≤60s-old verified mirror keeps handoff cadence without re-probing');
+ p=await probe(`['desk_sync_snapshot_done'=>'1','desk_sync_last'=>time(),'desk_sync_ping_last'=>time(),'desk_sync_verified_at'=>time()-120]`);
+ check(p.r.skipped==='idle'&&p.r.server_verified===false&&p.calls===0,'Stale verification (>60s) does not count as verified');
 }
 // Endpoint access and sanitization: local file only, admin counts, no guest data.
 php.writeFile('/www/config/release.php',"<?php return ['distribution'=>'desktop'];");

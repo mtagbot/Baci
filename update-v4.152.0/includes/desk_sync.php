@@ -45,9 +45,19 @@ class DeskSync {
 
     const ID_BASE = 5000000;      // desktop-created rows start here
     const BATCH   = 400;
-    const MIN_INTERVAL = 120;     // seconds between automatic runs
+    // Safety cycle for when BOTH sides are quiet. The daemon loops every few
+    // seconds, so with a 120s cycle each system ran ~150 full cycles/day
+    // (handshake + pull + file checks) even on an empty school day. 300s
+    // keeps a 5-minute mirror guarantee while cutting those cycles 60%.
+    const MIN_INTERVAL = 300;     // seconds between automatic safety runs
     const LOCK_TTL     = 180;     // stale-lock takeover
     const RECON_INTERVAL = 3600;  // v2.11.0: mirror-reconcile at most once per hour
+    // Idle "any news on the site?" probe. One probe per daemon loop (≈5s) was
+    // ~2,900 empty requests/day per system carrying only a change counter;
+    // stretching it to 30s costs at most 25s of site→desktop visibility and
+    // removes ~80% of idle traffic. Desktop→site pushes stay immediate
+    // (kick file + pending>0 below), unaffected by this constant.
+    const PING_INTERVAL = 30;     // seconds between idle site probes
 
     /* ---------------- settings helpers (raw, no cache) ---------------- */
 
@@ -103,6 +113,10 @@ class DeskSync {
         if(time()<$next)return;
         $jobs=bot_outbox_relay_jobs();
         self::setCfg('desk_bot_outbox_next',(string)(time()+15));
+        // Empty queue is the NORMAL state. Handing an empty batch to the site
+        // was ~1,200 HTTP round-trips/day per system with nothing behind
+        // them. New jobs are picked up on the next 15s cycle; nothing lost.
+        if(!$jobs)return;
         try {
             $res=self::call('bot_outbox',['jobs'=>$jobs]);
             bot_outbox_apply_receipts($jobs,$res['receipts']??null);
@@ -319,10 +333,11 @@ class DeskSync {
     }
 
     /**
-     * Real-time heartbeat (called every few seconds by the UI):
+     * Real-time heartbeat (called every few seconds by the daemon/UI):
      *  - pushes local changes IMMEDIATELY after any edit,
-     *  - pulls site changes within seconds (cheap `ping` checks the site's
-     *    change counter, a full cycle runs only when something is new),
+     *  - pulls site changes within ~30s (a throttled `ping` checks the site's
+     *    change counter; a full cycle runs only when something is new or the
+     *    5-minute safety interval has passed),
      *  - when offline, retries on the 10s/20s/60s ladder and keeps every
      *    change safely in the local change-log until the connection is back.
      */
@@ -340,23 +355,40 @@ class DeskSync {
 
         $due = $pending > 0 || self::getCfg('desk_sync_snapshot_done') !== '1';
 
-        // nothing to push → ask the site (cheap) whether IT has news
+        // nothing to push → ask the site (cheap) whether IT has news.
+        // The probe is throttled to PING_INTERVAL (30s): the desktop→site
+        // direction is unaffected (pending>0 below runs a full cycle
+        // immediately, kicked within a second of any edit), and a change made
+        // ON THE SITE is still noticed within one probe. The success
+        // timestamp only advances on a GOOD probe, so the offline back-off
+        // ladder still controls retry timing after an outage.
         if (!$due) {
-            try {
-                $res = self::call('ping', [], true);
-                if (!isset($res['log_max']) || !is_numeric($res['log_max']) || $res['log_max'] < 0) throw new Exception('پاسخ بررسی سرور معتبر نیست');
-                $base['server_verified'] = true;
-                $base['fails'] = 0; $base['alert'] = false; $base['retry_in'] = 0;
-                if ((int)($res['log_max'] ?? 0) > (int) self::getCfg('desk_sync_cursor', '0')) $due = true;
-                if ($fails > 0) { self::setCfg('desk_sync_fails', '0'); self::setCfg('desk_sync_next_try', '0'); $fails = 0; }
-            } catch (Throwable $e) {
-                if (self::isOffline($e)) return self::noteFailure($now) + ['ok' => true, 'skipped' => 'offline', 'pending' => $pending];
-                // A rejected/unsupported ping is not proof of a healthy connection.
-                $base['probe_failed'] = true;
-                // old server file (no ping action) → fall back to the periodic cycle
-                $due = ($now - (int) self::getCfg('desk_sync_last', '0')) >= self::MIN_INTERVAL;
+            $lastPing = (int) self::getCfg('desk_sync_ping_last', '0');
+            if ($now - $lastPing >= self::PING_INTERVAL) {
+                try {
+                    $res = self::call('ping', [], true);
+                    if (!isset($res['log_max']) || !is_numeric($res['log_max']) || $res['log_max'] < 0) throw new Exception('پاسخ بررسی سرور معتبر نیست');
+                    self::setCfg('desk_sync_ping_last', (string)$now);
+                    $base['server_verified'] = true;
+                    $base['fails'] = 0; $base['alert'] = false; $base['retry_in'] = 0;
+                    if ((int)($res['log_max'] ?? 0) > (int) self::getCfg('desk_sync_cursor', '0')) $due = true;
+                    if ($fails > 0) { self::setCfg('desk_sync_fails', '0'); self::setCfg('desk_sync_next_try', '0'); $fails = 0; }
+                } catch (Throwable $e) {
+                    if (self::isOffline($e)) return self::noteFailure($now) + ['ok' => true, 'skipped' => 'offline', 'pending' => $pending];
+                    // A rejected/unsupported ping is not proof of a healthy connection.
+                    $base['probe_failed'] = true;
+                    // old server file (no ping action) → fall back to the periodic cycle
+                    $due = ($now - (int) self::getCfg('desk_sync_last', '0')) >= self::MIN_INTERVAL;
+                }
             }
         }
+
+        // A probe or full cycle that verified the site within the last minute
+        // still counts as verified, so the 15s notification-handoff cadence
+        // does not have to wait for the next 30s probe. The guard remains:
+        // nothing is handed off without a recently verified mirror and zero
+        // unpushed local changes.
+        if (!$base['server_verified'] && ($now - (int) self::getCfg('desk_sync_verified_at', '0')) < 60) $base['server_verified'] = true;
 
         // periodic safety cycle even when both sides look quiet
         if (!$due && ($now - (int) self::getCfg('desk_sync_last', '0')) >= self::MIN_INTERVAL) $due = true;
@@ -368,6 +400,7 @@ class DeskSync {
         if (!empty($res['ok'])) {
             self::setCfg('desk_sync_fails', '0');
             self::setCfg('desk_sync_next_try', '0');
+            if (!isset($res['skipped'])) self::setCfg('desk_sync_verified_at', (string)$now);
             return $res + ['pending' => $pending, 'fails' => 0, 'alert' => false, 'retry_in' => 0, 'server_verified' => !isset($res['skipped'])];
         }
         if (isset($res['error']) && mb_strpos((string)$res['error'], 'اتصال به سرور برقرار نشد') !== false) {

@@ -7,16 +7,21 @@ checks=0
 def check(v,m):
  global checks
  assert v,m;checks+=1
+# The package bytes ARE the published ones: compare against the git objects of
+# the baseline commit. The live sources have since legitimately evolved (the
+# optimized desk_sync.php ships in its own corrective) and must never
+# silently rewrite an already-published archive.
+BASELINE='d44626fafc69f67ef2e32bde70022d5bfb73b3ad'
 for name,prefix,desktop in release.PACKAGES:
  files=release.stage.DESKTOP if desktop else release.stage.SITE
- tested=ROOT/'.cache/bot-outbox'/('desktop/SchoolDeskPro/reports' if desktop else 'site')
  with ZipFile(ROOT/name)as z:
   check(z.testzip() is None,name+' CRC')
   check(sorted(z.namelist())==sorted(prefix+f for f in files),name+' minimal manifest')
   check(len(z.namelist())==6,name+' six files')
   for f in files:
    source=ROOT/'desktop-app-v2/patch/www-desk-sync-daemon.php' if f=='desk-sync-daemon.php' else ROOT/'update-v4.152.0'/f
-   check(z.read(prefix+f)==source.read_bytes()==(tested/f).read_bytes(),name+' exact tested source '+f)
+   base=subprocess.check_output(['git','show',BASELINE+':'+str(source.relative_to(ROOT))],cwd=ROOT)
+   check(z.read(prefix+f)==base,name+' published bytes '+f)
   check(not any('/www/' in f or '/config/' in f or f.endswith(('.sqlite','.exe')) for f in z.namelist()),'no legacy root/secrets/database/launcher')
 for line in (ROOT/'BOT-OUTBOX-SHA256SUMS.txt').read_text().splitlines():
  h,n=line.split();check(hashlib.sha256((ROOT/n).read_bytes()).hexdigest()==h,'checksum '+n)

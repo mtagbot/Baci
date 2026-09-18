@@ -1,0 +1,12 @@
+{
+  "packaging_checks": 162,
+  "baseline_archives_unchanged": 148,
+  "regression_suites": {
+    "site": 31,
+    "desktop": 31
+  },
+  "limits": [
+    "PHP 8.3 WASM/SQLite; cURL cannot reach the network inside the harness \u2014 HTTP attempts are asserted via deterministic offline state transitions",
+    "No live bot traffic, production DB, native MySQL or Windows daemon measurement"
+  ]
+}
