@@ -1,3 +1,5 @@
+> **اصلاحی reports (پس از settings-health):** سورس فعلی launcher از `reports/` و نشانی `/reports/` استفاده می‌کند. برای بستهٔ کوچک جدید، `python3 scripts/release-reports-layout.py` و راهنمای `CORRECTIONS-REPORTS-LAYOUT-FA.md` را ببینید. router به‌صورت مرحله‌ای در `reports-layout-update/router.php` قرار می‌گیرد؛ launcher تغییر نام امن `www` را انجام می‌دهد. دستورهای تاریخی زیر برای چیدمان قدیمی‌اند؛ launcher جدید را بدون router/payload جدید در بستهٔ قدیمی قرار ندهید. ZIPهای کامل در این اصلاحی بازسازی نشده‌اند.
+
 # SchoolDesk Pro — build notes
 
 ## Current corrective launcher (2026-09-17)

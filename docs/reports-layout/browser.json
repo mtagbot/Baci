@@ -1,0 +1,27 @@
+{
+  "runtime": "PHP 8.3 WASM, Playwright intercepted transport, actual renamed app; no native cli-server/Windows claim",
+  "checks": 12,
+  "results": [
+    {
+      "role": "guest",
+      "url": "http://reports.test/reports/",
+      "logo": {
+        "src": "http://reports.test/reports/assets/logo/logo.png",
+        "width": 16,
+        "height": 16
+      },
+      "assets": 12
+    },
+    {
+      "role": "admin",
+      "url": "http://reports.test/reports/",
+      "logo": {
+        "src": "http://reports.test/reports/assets/logo/logo.png",
+        "width": 16,
+        "height": 16
+      },
+      "assets": 11
+    }
+  ],
+  "errors": []
+}

@@ -5,7 +5,7 @@
  * PHP codebase as the website) locally:
  *
  *   SchoolDeskPro.exe
- *     |- php\php.exe -S 127.0.0.1:<port> -t www   (hidden child process)
+ *     |- php\php.exe -S 127.0.0.1:<port> -t SchoolDeskPro reports/router.php (hidden child process)
  *     |- app window: Microsoft Edge / Google Chrome in --app mode
  *        (modern engine; the old embedded-IE/MSHTML approach rendered the
  *         site broken and its JS never ran — v2.2 bug)
@@ -24,6 +24,7 @@
 #include <string.h>
 #include <shellapi.h>
 #include "window-policy.h"
+#include "reports-layout.h"
 
 static char g_dir[MAX_PATH];
 
@@ -248,7 +249,7 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hp, LPSTR cmd, int show) {
     int port = 0;
     if (f) { if (fscanf(f, "%d", &port) != 1) port = 0; fclose(f); }
     if (port > 0 && port_in_use(port)) {
-      snprintf(url, sizeof(url), "http://127.0.0.1:%d/", port);
+      snprintf(url, sizeof(url), "http://127.0.0.1:%d/reports/", port);
       if (find_browser(browser, sizeof(browser))) {
         HANDLE b = launch_app_window(browser, url);
         if (b) CloseHandle(b);
@@ -257,6 +258,16 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hp, LPSTR cmd, int show) {
       }
     }
     return 0;
+  }
+
+  int layout=sdp_prepare_reports(g_dir);
+  if(layout){
+    const wchar_t *message = layout==1 ? L"هر دو پوشهٔ www و reports وجود دارند. برای حفظ اطلاعات، ادغام خودکار انجام نشد. اصلاحی‌های قدیمی را داخل reports نصب کنید؛ پوشه‌ها را بدون بررسی حذف نکنید."
+      : layout==3 ? L"سرویس همگام‌سازی قبلی هنوز مشغول است. توقف امن درخواست شد؛ کمی صبر کنید و برنامه را دوباره اجرا کنید. پوشه‌ها تغییر نکردند."
+      : layout==2 ? L"فایل‌های نصب یا اصلاحی reports کامل نیستند. ابتدا اصلاحی را کنار SchoolDeskPro.exe استخراج کنید. پوشهٔ وب باید شامل کل برنامه باشد."
+      : L"تغییر مسیر reports انجام نشد. دسترسی نوشتن و بسته‌بودن برنامه را بررسی کنید؛ داده‌های مدرسه حذف نشده‌اند.";
+    MessageBoxW(NULL,message,L"SchoolDesk Pro — reports",MB_ICONERROR|MB_RTLREADING|MB_RIGHT);
+    WSACleanup();return 1;
   }
 
   /* data dirs */
@@ -273,8 +284,8 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hp, LPSTR cmd, int show) {
   if (pf) { fprintf(pf, "%d", port); fclose(pf); }
 
   /* start hidden PHP built-in server */
-  char cmdline[MAX_PATH * 4];
-  snprintf(cmdline, sizeof(cmdline),
+  char cmdline[MAX_PATH * 16];
+  int cmdlen=snprintf(cmdline, sizeof(cmdline),
            "\"%s\\php\\php.exe\" -c \"%s\\php\\php.ini\" "
            "-d extension_dir=\"%s\\php\\ext\" "
            "-d error_log=\"%s\\data\\php-error.log\" "
@@ -282,8 +293,13 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hp, LPSTR cmd, int show) {
            "-d upload_tmp_dir=\"%s\\data\\uploads\" "
            "-d curl.cainfo=\"%s\\php\\cacert.pem\" "
            "-d openssl.cafile=\"%s\\php\\cacert.pem\" "
-           "-S 127.0.0.1:%d -t \"%s\\www\" \"%s\\www\\router.php\"",
+           "-S 127.0.0.1:%d -t \"%s\" \"%s\\reports\\router.php\"",
            g_dir, g_dir, g_dir, g_dir, g_dir, g_dir, g_dir, g_dir, port, g_dir, g_dir);
+  // Parent docroot is safe ONLY with the complete mandatory router argument.
+  if(cmdlen<0 || (size_t)cmdlen>=sizeof(cmdline)){
+    MessageBoxW(NULL,L"مسیر نصب بیش از حد طولانی است. برنامه را در مسیری کوتاه‌تر نصب کنید.",L"SchoolDesk Pro",MB_ICONERROR|MB_RTLREADING|MB_RIGHT);
+    WSACleanup();return 1;
+  }
 
   STARTUPINFOA si;
   PROCESS_INFORMATION pi;
@@ -323,7 +339,7 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hp, LPSTR cmd, int show) {
   }
 
   char url[128];
-  snprintf(url, sizeof(url), "http://127.0.0.1:%d/", port);
+  snprintf(url, sizeof(url), "http://127.0.0.1:%d/reports/", port);
 
   char browser[MAX_PATH];
   int fallback = 1;

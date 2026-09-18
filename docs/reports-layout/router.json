@@ -1,0 +1,254 @@
+{
+  "runtime": "PHP 8.3 WASM; native dispatch emulated; no native PHP/Windows claim",
+  "checks": 131,
+  "results": [
+    {
+      "path": "/SchoolDeskPro.exe",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/data/school.sqlite",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/php/php.ini",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/config/database.php",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/config/secret.txt",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/includes/private.txt",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/vendor/tcpdf.php",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/backups/a.zip",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/report.json",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/router.php",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/desk-prepend.php",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/desk-sync-daemon.php",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/.env",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/%2e%2e/data/school.sqlite",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/%252e%252e/data/school.sqlite",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/config./database.php",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/config%20/database.php",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/a%3Ab",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/a%5cb",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/uploads/bad.php",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports//uploads/bad.php",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/assets/bad.php",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/uploads/bad.php/x",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/outside/school.sqlite",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/alias/secret.txt",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/up-alias/bad.php",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/worker-alias.php",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/source.png",
+      "method": "GET",
+      "status": 403
+    },
+    {
+      "path": "/reports/uploads/sub/",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/reports/up-alias/sub/",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/reports/no.css",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/not-a-real-page.php",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/",
+      "method": "GET",
+      "status": 307,
+      "location": "/reports/"
+    },
+    {
+      "path": "/reports",
+      "method": "GET",
+      "status": 307,
+      "location": "/reports/"
+    },
+    {
+      "path": "/assets/logo/logo.png?v=7",
+      "method": "GET",
+      "status": 307,
+      "location": "/reports/assets/logo/logo.png?v=7"
+    },
+    {
+      "path": "/uploads/old.png",
+      "method": "GET",
+      "status": 307,
+      "location": "/reports/uploads/old.png"
+    },
+    {
+      "path": "/probe.php?a=1",
+      "method": "GET",
+      "status": 307,
+      "location": "/reports/probe.php?a=1"
+    },
+    {
+      "path": "/reports/sub",
+      "method": "GET",
+      "status": 307,
+      "location": "/reports/sub/"
+    },
+    {
+      "path": "/reports/assets/logo/logo.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/reports/uploads/old.png",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/reports/",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/reports/sub/",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/probe.php?q=a",
+      "method": "POST",
+      "status": 307,
+      "location": "/reports/probe.php?q=a"
+    },
+    {
+      "path": "/reports/probe.php?q=a",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/reports/",
+      "method": "GET",
+      "status": 302,
+      "location": "/reports/installer.php"
+    },
+    {
+      "path": "/reports/installer.php",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/reports/missing.css",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/reports/assets/logo/logo.png",
+      "method": "GET",
+      "status": 200
+    }
+  ]
+}

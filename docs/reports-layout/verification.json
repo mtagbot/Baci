@@ -1,0 +1,18 @@
+{
+  "package": "SchoolDeskPro-FIX-v2.83.0-reports-layout.zip",
+  "bytes": 48315,
+  "sha256": "93c70d0e1ed83c8930fdeab48b53b225a3749a80962da329a6764a4b8da3657a",
+  "packaging_checks": 161,
+  "historical_archives_unchanged": 145,
+  "migration_checks": 44,
+  "router_checks": 131,
+  "browser_and_pdf_checks": 12,
+  "window_policy_mock_checks": 8,
+  "compiler": "ziglang 0.16.0 x86_64-windows-gnu",
+  "limitations": [
+    "No native Windows GUI or native PHP cli-server execution",
+    "Win32 migration APIs mocked; Windows PHP flock interoperability not exercised",
+    "PHP 8.3 WASM actual application with browser transport/native dispatch emulation",
+    "No customer database accessed"
+  ]
+}
