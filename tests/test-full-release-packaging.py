@@ -51,6 +51,8 @@ class FullRelease(unittest.TestCase):
                 if f.is_file() and f.suffix.lower() not in ['.txt','.md','.zip','.csv']:
                     latest[str(f.relative_to(patch))]=f
         transformed={'.htaccess','includes/functions.php','includes/footer.php','class-exam-sync-api.php','sql/database.sql','sql/schema-sqlite.sql'}
+        # Published corrective packages are overlaid after the numeric patches, so they win.
+        correctives={platform:BUILDER.corrective_payload(platform)[1] for platform in ['site','desktop']}
         for platform,(z,p,w) in self.bundles.items():
             for rel,source in latest.items():
                 if rel in transformed:continue
@@ -63,7 +65,25 @@ class FullRelease(unittest.TestCase):
                     # Preserve documented desktop adaptations already present in the full 4.124 baseline.
                     with zipfile.ZipFile(ROOT/'SchoolDeskPro-v2.55.0-win64.zip') as baseline:
                         if 'SchoolDeskPro/www/'+rel in baseline.namelist():expected=baseline.read('SchoolDeskPro/www/'+rel)
+                expected=correctives[platform].get(rel,expected)
                 self.assertEqual(z.read(p+w+rel),expected,(platform,rel))
+    def test_11_published_correctives_are_inside(self):
+        """A fresh install must not need the corrective chain afterwards."""
+        transformed={'.htaccess','includes/functions.php','includes/footer.php','class-exam-sync-api.php','sql/database.sql','sql/schema-sqlite.sql'}
+        for platform,(z,p,w) in self.bundles.items():
+            packages,payload,staged,provenance=BUILDER.corrective_payload(platform)
+            self.assertTrue(packages)
+            for rel,data in payload.items():
+                self.assertIn(p+w+rel,z.namelist(),(platform,rel))
+                if rel in transformed:continue
+                self.assertEqual(z.read(p+w+rel),data,(platform,rel))
+            for rel in staged:
+                self.assertIn(p+rel,z.namelist(),(platform,rel))
+        z,p,w=self.bundles['desktop']
+        self.assertIn(b'SDP_REPORTS_ROOT_V1',z.read(p+'reports-layout-update/router.php'))
+        self.assertNotIn(b'SDP_REPORTS_ROOT_V1',z.read(p+'www/router.php'))
+        for rel in [x for x in z.namelist() if x.startswith(p+'www/')]:
+            self.assertNotEqual(rel,p+'www/reports-layout-update/router.php')
     def test_06_no_historical_shared_sync_key(self):
         old=(ROOT/'desktop-app-v2/server/desk-sync-api.php').read_text()
         old_key=re.search(r"define\('DESK_SYNC_KEY',\s*'([^']+)'",old).group(1).encode()

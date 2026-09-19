@@ -7,12 +7,24 @@ os.chdir(ROOT)
 CACHE = ROOT/'.cache/release-v1'
 STAGE = CACHE/'package'
 SOURCE = ROOT/'release-v1.0'
-STAMP = (2026, 9, 17, 0, 0, 0)
+STAMP = (2026, 9, 19, 0, 0, 0)
+# Corrective packages published AFTER the previous full rebuild. They are immutable
+# inputs like the numeric patches, but they only ever ship as ZIPs, so the full
+# release has to overlay them explicitly — otherwise a fresh install would still
+# need the whole corrective chain afterwards. Order is the documented installation
+# order (dependencies: svg → student-workflow → preview-navigation → fast-ui →
+# mobile-hubs → report-tools → settings-health → reports-layout → bot-outbox →
+# optimized-sync → event-sync → recovery-ui).
+SITE_CORRECTIVES = ['svg-responsive','student-workflow','preview-navigation','fast-ui','mobile-hubs','report-tools','settings-health','bot-outbox','recovery-ui']
+DESKTOP_CORRECTIVES = ['svg-responsive','student-workflow','preview-navigation','fast-ui','mobile-hubs','report-tools','settings-health','reports-layout','bot-outbox','optimized-sync','event-sync','recovery-ui']
+SITE_CORRECTIVE_PREFIX = 'site-update-v4.152.0/'
 def sha(b): return hashlib.sha256(b).hexdigest()
 def run(*args): return subprocess.check_output(args, text=True)
 def version(p): return tuple(map(int,p.name.split('v',1)[1].split('.')))
 def copy(src, dest):
     dest.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(src,dest)
+def put_bytes(data, dest):
+    dest.parent.mkdir(parents=True, exist_ok=True); dest.write_bytes(data)
 def clean_sql(path):
     # sqlite3.complete_statement is a lexical SQL splitter, not regex: it keeps
     # semicolons inside strings and entire BEGIN ... END trigger bodies together.
@@ -63,6 +75,51 @@ def launcher():
     subprocess.run([zig,'cc','-target','x86_64-windows-gnu','-O2','-s','desktop-app-v2/launcher/launcher.c',str(res),'-lws2_32','-ladvapi32','-lshell32','-luser32','-lgdi32','-Wl,--subsystem,windows','-o',str(exe)],check=True)
     return exe
 
+def corrective_payload(platform):
+    """Return (packages, {web-relative path: bytes}, {package-relative path: bytes}, {web-relative path: package}).
+
+    Site packages carry their payload under ``site-update-v4.152.0/``. Desktop
+    packages were published against both web-root names (``www/`` before the
+    reports migration, ``reports/`` after it): both mean the desktop web root,
+    which stays ``www/`` here so the launcher's one-time migration — with its
+    lock, validation and rollback — performs the rename on real machines.
+    The rebuilt launcher binary always comes from source; the staged router of
+    the reports-layout package is kept as the migration input.
+    """
+    packages=[];payload={};staged={};provenance={}
+    for slug in (SITE_CORRECTIVES if platform=='site' else DESKTOP_CORRECTIVES):
+        name=(f'SITE-FIX-v4.152.0-{slug}.zip' if platform=='site' else f'SchoolDeskPro-FIX-v2.83.0-{slug}.zip')
+        path=ROOT/name
+        if not path.is_file():raise SystemExit('Missing corrective package: '+name)
+        with zipfile.ZipFile(path) as z:
+            entries=[n for n in z.namelist() if not n.endswith('/')]
+            if not entries:raise SystemExit('Empty corrective package: '+name)
+            for n in entries:
+                rel=n
+                if platform=='site':
+                    if not rel.startswith(SITE_CORRECTIVE_PREFIX):raise ValueError(f'{name}: unexpected entry {n}')
+                    rel=rel[len(SITE_CORRECTIVE_PREFIX):]
+                else:
+                    parts=rel.split('/')
+                    if parts[0]!='SchoolDeskPro':raise ValueError(f'{name}: unexpected entry {n}')
+                    rel='/'.join(parts[1:])
+                    if rel=='SchoolDeskPro.exe':continue  # rebuilt from desktop-app-v2/launcher/launcher.c
+                    if rel.startswith('reports-layout-update/'):staged[rel]=z.read(n);provenance[rel]=name;continue
+                    if rel.startswith('www/'):rel=rel[4:]
+                    elif rel.startswith('reports/'):rel=rel[8:]
+                payload[rel]=z.read(n);provenance[rel]=name
+        packages.append(name)
+    return packages,payload,staged,provenance
+
+def apply_correctives(web, platform, package_root, origins):
+    """Overlay the published corrective packages in installation order."""
+    packages,payload,staged,provenance=corrective_payload(platform)
+    for rel,data in payload.items():
+        put_bytes(data, web/rel); origins[platform][rel]=provenance[rel]
+    for rel,data in staged.items():put_bytes(data, package_root/rel)
+    return packages
+
+
 def assemble():
     tcpdf,chart=vendors();exe=launcher()
     if STAGE.exists():shutil.rmtree(STAGE)
@@ -88,6 +145,8 @@ def assemble():
             put(f,site,f.relative_to(patch),'site')
             # The full desktop baseline already includes site 4.124 with platform adjustments.
             if version(patch)>=(4,125,0) or str(f.relative_to(patch)) not in desktop_baseline:put(f,dw,f.relative_to(patch),'desktop')
+    site_correctives=apply_correctives(site,'site',STAGE,origins)
+    desktop_correctives=apply_correctives(dw,'desktop',desktop,origins)
     sync_source=(site/'desk-sync-api.php').read_text()
     for platform,web in [('site',site),('desktop',dw)]:
         for d in ['config','sql','backups']:
@@ -149,6 +208,7 @@ def assemble():
             'release':'Release_V1.0','platform':platform,'site_version':'4.152.0','desktop_version':'2.83.0',
             'base_commit':run('git','rev-parse','HEAD').strip(),
             'patches':[p.name for p in patches],
+            'correctives':site_correctives if platform=='site' else desktop_correctives,
             'baseline_sha256':sha((ROOT/'SchoolDeskPro-v2.55.0-win64.zip').read_bytes()),
             'files':{str(f.relative_to(folder)):{'sha256':sha(f.read_bytes()),'bytes':f.stat().st_size,'source':origins[platform].get(str(f.relative_to(web)) if f.is_relative_to(web) else '', 'release integration / bundled dependency')} for f in sorted(folder.rglob('*')) if f.is_file()}
         }
