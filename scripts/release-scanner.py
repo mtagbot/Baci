@@ -11,7 +11,9 @@ PATCH = ROOT / 'update-v4.152.0'
 FILES = ('attendance-scanner.php', 'attendance-scanner-legacy.php',
          'assets/js/attendance-scanner-light.js', 'assets/js/attendance-decoder-worker.js')
 ARCHIVES = {'SITE-FIX-v4.152.0-scanner.zip': 'site-update-v4.152.0/',
-            'SchoolDeskPro-FIX-v2.83.0-scanner.zip': 'SchoolDeskPro/www/'}
+            # The desktop web root was renamed www -> reports; the desktop updater
+            # accepts both, reports/ is what a migrated machine expects.
+            'SchoolDeskPro-FIX-v2.83.0-scanner.zip': 'SchoolDeskPro/reports/'}
 # Same payload, in the shape the desktop app can install ONLINE from the school
 # site (see docs/DESKTOP-ONLINE-UPDATE-FA.md). Same four files, no launcher.
 ONLINE_ARCHIVE = 'SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip'
@@ -46,10 +48,10 @@ def build():
                 assert z.read(prefix + name) == payload[name]
         print(archive, target.stat().st_size, hashlib.sha256(target.read_bytes()).hexdigest())
 
-    online = {'SchoolDeskPro/www/' + name: data for name, data in payload.items()}
+    online = {'SchoolDeskPro/reports/' + name: data for name, data in payload.items()}
     online['SchoolDeskPro/DESKTOP-UPDATE.json'] = manifest(
         '2.83.0-scanner-focus', payload,
-        'اصلاح اسکنر: فوکوس روی بی‌نهایت قفل می‌شود و بین اسکن‌های متوالی دوباره فوکوس نمی‌کند.')
+        'اسکنر سریع‌تر: فوکوس روی فاصلهٔ ۵ تا ۲۰ سانتی‌متر قفل می‌شود، شاتر کوتاه و نرخ فریم بالا می‌رود و بین اسکن‌های متوالی هیچ فوکوس مجددی رخ نمی‌دهد.')
     target = ROOT / ONLINE_ARCHIVE
     with ZipFile(target, 'w', compression=ZIP_DEFLATED, compresslevel=9) as z:
         for name, content in sorted(online.items()):
@@ -63,7 +65,7 @@ def build():
         meta = json.loads(z.read('SchoolDeskPro/DESKTOP-UPDATE.json'))
         for name in FILES:
             assert meta['files'][name]['sha256'] == hashlib.sha256(payload[name]).hexdigest()
-            assert z.read('SchoolDeskPro/www/' + name) == payload[name]
+            assert z.read('SchoolDeskPro/reports/' + name) == payload[name]
     print(ONLINE_ARCHIVE, target.stat().st_size, hashlib.sha256(target.read_bytes()).hexdigest())
 
 if __name__ == '__main__':

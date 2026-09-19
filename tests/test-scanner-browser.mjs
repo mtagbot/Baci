@@ -106,7 +106,7 @@ try {
    assert(Number.isFinite(timing.detectMs)&&Number.isFinite(timing.totalMs));
    measurements.push({mode,fixture:f.name,...timing});
    if(process.env.OPTICS_TEST&&i===0){
-    await page.waitForFunction(()=>document.getElementById('opticsDetails').textContent.includes('بی‌نهایت'));
+    await page.waitForFunction(()=>document.getElementById('opticsStatus').textContent.includes('قفل'));
     const settings=await page.evaluate(()=>window.fixtureStreams.find(s=>s.stream.getVideoTracks()[0].readyState==='live').stream.getVideoTracks()[0].getSettings());
     assert.equal(settings.focusDistance,8);assert.equal(settings.frameRate,60);assert.equal(settings.exposureTime,100);assert.equal(settings.iso,400);
     console.log('PASS',mode,'optical controls verified against simulated driver settings (not physical lens/shutter)');

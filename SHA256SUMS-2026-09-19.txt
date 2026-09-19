@@ -1,12 +1,13 @@
 # SchoolDesk Pro — اصلاح‌های 2026-09-19 (نسخه سایت 4.152.0 / دسکتاپ 2.83.0)
+# اسکنر camera5: فوکوس قفل‌شده روی ۵ تا ۲۰ سانتی‌متر، شاتر کوتاه، تحلیل بدون مکث، صفحهٔ خلاصه
 # بستهٔ تجمیعی هر پلتفرم: SITE-FIX-v4.152.0-cumulative.zip و SchoolDeskPro-FIX-v2.83.0-cumulative.zip
-# به‌همراه بسته‌های تک‌موضوعی، بستهٔ آنلاین اسکنر و Release_V1.0 بازسازی‌شده
-cd6cb34d4676056f27f5e3dd299d475c86192a42a8db89c4ed6b8ae02db80a76  SITE-FIX-v4.152.0-scanner.zip
-ec348bb7599002fdccea728e65029a532c6848c350b5f1766756e2a366013dc3  SchoolDeskPro-FIX-v2.83.0-scanner.zip
-2d86384b79e4b77505f934b752299a3f312aef75997328e56ffb85c940db15da  SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip
+# وب نرم‌افزار دسکتاپ در بسته‌ها زیر SchoolDeskPro/reports/ است (نام تازهٔ پوشهٔ www)
+db788c31e32c2199a310a52e2b269cdfa351ca11908c4cb17b91eba85260c226  SITE-FIX-v4.152.0-scanner.zip
+6b071a95cf98522e8f4f48eb7e5687182ba2630891aa31073a4dc094fdd5b867  SchoolDeskPro-FIX-v2.83.0-scanner.zip
+fe2b2027e944d4050f64c3a58e11c1f4d06e78e03c60e62a912a7c9bed1dfad5  SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip
 99366e9daeb0278b323ae1d696a435702c87bc0b57807d0d82f228e4b88e4fae  SITE-FIX-v4.152.0-desk-update.zip
-70a242367befe5e4d67f1141f9bbc2d54adb868bd6f3c66b5e6691df3b871708  SchoolDeskPro-FIX-v2.83.0-desk-update.zip
-d2e287178e3247b2aa22cb7bd0b6e126001c2ed24fee736e6f17329fce80a903  Release_V1.0-Site.zip
-18bc74f4c6ded4b6fa06c8465e05a59e67b30494c3885546e11dd3349877ae8c  Release_V1.0-Desktop.zip
-62ce92acf9b0414a39b9623df259d772637c1e2f89a5f86952078686fecf0103  SITE-FIX-v4.152.0-cumulative.zip
-905357a9366c7080009fac9965f3fa16cd9f1acdfeb1ac9ac29a92447048d49f  SchoolDeskPro-FIX-v2.83.0-cumulative.zip
+ed13682712eda1553640629ca15e5204d1e96b152b5b8d275af58025da35f0c9  SchoolDeskPro-FIX-v2.83.0-desk-update.zip
+5d5fbdcff1bf3415cd9ecadc87fc46980db5d9cec511336de4d99d3002ded5fd  Release_V1.0-Site.zip
+1f8bfacf4fe0c1be52e17d4b2f5cab016fc1987a77b47e749468f8d6721a54ac  Release_V1.0-Desktop.zip
+031bd7eccb68a8afe8409b52e7c91dc20ade9aa510c2dcc317bf69cfda3c1dc1  SITE-FIX-v4.152.0-cumulative.zip
+62494a4214c4faecde38efe990953240799ceabd3c0d6510be0ee3f9ea3e3fdb  SchoolDeskPro-FIX-v2.83.0-cumulative.zip

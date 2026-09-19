@@ -5,7 +5,7 @@
   SchoolDeskPro-FIX-v2.83.0-cumulative.zip    whole desktop correction
 
 Contents are exactly the union of the two published correctives
-(`*-scanner.zip` = infinity focus lock, `*-desk-update.zip` = online desktop
+(`*-scanner.zip` = fast near-band scanner, `*-desk-update.zip` = online desktop
 updates); nothing else is added, so a machine that installs this pair gets the
 same bytes as one that installs the four individual packages. The desktop ZIP
 also carries the freshly compiled SchoolDeskPro.exe, because the online-update
@@ -23,6 +23,8 @@ import sys
 ROOT = Path(__file__).resolve().parent.parent
 SITE_PREFIX = 'site-update-v4.152.0/'
 DESKTOP_PREFIX = 'SchoolDeskPro/'
+# The desktop web root is called reports/ since the reports migration.
+DESKTOP_WEB = 'reports/'
 SITE_ARCHIVE = 'SITE-FIX-v4.152.0-cumulative.zip'
 DESKTOP_ARCHIVE = 'SchoolDeskPro-FIX-v2.83.0-cumulative.zip'
 PARTS = {
@@ -72,8 +74,8 @@ def main():
         scripts = {
             'site': [(SITE_PREFIX + rel, (scanner.PATCH / rel).read_bytes()) for rel in scanner.FILES]
                     + [(SITE_PREFIX + rel, (desk_update.PATCH / rel).read_bytes()) for rel in desk_update.SITE_FILES],
-            'desktop': [(DESKTOP_PREFIX + 'www/' + rel, (scanner.PATCH / rel).read_bytes()) for rel in scanner.FILES]
-                       + [(DESKTOP_PREFIX + 'www/' + rel, desk_update.DESKTOP_SOURCES.get(rel, desk_update.PATCH / rel).read_bytes())
+            'desktop': [(DESKTOP_PREFIX + DESKTOP_WEB + rel, (scanner.PATCH / rel).read_bytes()) for rel in scanner.FILES]
+                       + [(DESKTOP_PREFIX + DESKTOP_WEB + rel, desk_update.DESKTOP_SOURCES.get(rel, desk_update.PATCH / rel).read_bytes())
                           for rel in desk_update.DESKTOP_FILES],
         }[platform]
         for name, data in scripts:

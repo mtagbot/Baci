@@ -82,7 +82,7 @@
 بستهٔ آنلاین یک ZIP با این ساختار است (نمونهٔ آماده: `SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip`):
 
 ```
-SchoolDeskPro/www/<همان فایل‌هایی که باید عوض شوند>     (یا reports/ — هر دو یکی است)
+SchoolDeskPro/reports/<همان فایل‌هایی که باید عوض شوند>  (نام تازهٔ پوشهٔ وب؛ www/ هم پذیرفته می‌شود)
 SchoolDeskPro/DESKTOP-UPDATE.json                        (اختیاری: نسخه، توضیح، چک‌سام هر فایل)
 SchoolDeskPro/SchoolDeskPro.exe                          (اختیاری: فقط برای به‌روزرسانی فایل اجرایی)
 SchoolDeskPro/reports-layout-update/router.php           (اختیاری)

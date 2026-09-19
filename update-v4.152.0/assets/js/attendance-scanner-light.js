@@ -164,8 +164,8 @@
     busy = true;
     // Immediate, neutral acknowledgement is NOT attendance confirmation.
     resBox.className = 'result'; resIcon.textContent = '⏳';
-    resName.textContent = 'کد خوانده شد'; resStat.textContent = 'در حال ثبت حضور…';
-    resSub.textContent = 'منتظر تأیید سرور باشید';
+    resName.textContent = 'کد خوانده شد'; resStat.textContent = 'در حال ثبت…';
+    resSub.textContent = '';
     forget(payload); recentTags.push({ value: payload, time: now() });
     if (recentTags.length > 32) recentTags.shift();
     function send(attempt) {
@@ -180,67 +180,35 @@
         }
         // Cooldown starts at confirmation, not before a possibly slow request.
         forget(payload); recentTags.push({ value: payload, time: now() });
-        if (j.ok && j.code === 'present') showResult('ok', '✅', j.student, 'حضور ثبت شد — ' + j.time, j['class'] + ' — ' + j.message);
-        else if (j.ok && j.code === 'late') showResult('warn', '⏰', j.student, j.status + ' — ' + j.time, j['class'] + ' — ' + j.message);
-        else if (j.code === 'duplicate') showResult('warn', '🔁', j.student || 'تکراری', 'قبلاً ثبت شده: ' + (j.status || ''), j.message);
+        /* Only the name and whether the student made it on time — nothing else
+           competes with the camera for attention. */
+        if (j.ok && j.code === 'present') showResult('ok', '✅', j.student, 'ورود به موقع — ' + j.time, j['class'] || '');
+        else if (j.ok && j.code === 'late') showResult('warn', '⏰', j.student, 'تأخیر — ' + j.time, j['class'] || '');
+        else if (j.code === 'duplicate') showResult('warn', '🔁', j.student || 'تکراری', 'قبلاً ثبت شده: ' + (j.status || ''), j['class'] || '');
         else { forget(payload); sendAfter = now() + 1500; showResult('err', '❌', 'ناموفق', j.message || 'کد نامعتبر', ''); }
-        refreshStatus(true);
       });
     }
     send(0); return true;
   }
-  window.manualSubmit = function () {
-    var input = el('manualInp'), value = input.value.replace(/^\s+|\s+$/g, '');
-    if (value && sendScan(value, true)) input.value = '';
-    // Busy input is intentionally retained, not silently discarded.
-  };
-  el('manualInp').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.keyCode === 13) window.manualSubmit(); });
-
-  /* Coalesce status updates; a scan occurring during a status request gets
-   * exactly one follow-up. A stale poll cannot overwrite that follow-up. */
-  var statusBusy = false, statusDirty = false, statusTimer = null, statusCancel = null;
-  var lastStatusAt = -10000, statusSnapshot = '';
-  function refreshStatus(force) {
-    if (force === true) statusDirty = true;
-    if (document.hidden || statusBusy || statusTimer) return;
-    var delay = Math.max(0, 1500 - (now() - lastStatusAt));
-    statusTimer = setTimeout(function () {
-      statusTimer = null;
-      if (document.hidden) return;
-      statusBusy = true; statusDirty = false; lastStatusAt = now();
-      statusCancel = request('GET', API + '?action=status&key=' + encodeURIComponent(KEY) + '&_=' + now(), null, 10000, function (error, j) {
-        statusBusy = false; statusCancel = null;
-        if (!error && j.ok && !document.hidden) renderStatus(j);
-        if (statusDirty && !document.hidden) refreshStatus();
-      });
-    }, delay);
-  }
-  function renderStatus(j) {
-    var snapshot = JSON.stringify([j.present, j.late, j.absent, j.recent || []]);
-    if (snapshot === statusSnapshot) return;
-    statusSnapshot = snapshot;
-    el('stP').textContent = faDigits(j.present); el('stL').textContent = faDigits(j.late); el('stA').textContent = faDigits(j.absent);
-    var list = el('recentList'); list.innerHTML = '';
-    if (!j.recent || !j.recent.length) { list.textContent = 'هنوز ترددی ثبت نشده است.'; return; }
-    j.recent.forEach(function (r) {
-      var row = document.createElement('div'); row.className = 'row';
-      var who = document.createElement('div'); who.className = 'who';
-      var b = document.createElement('b'); b.textContent = r.name;
-      var s = document.createElement('span'); s.textContent = r['class'] + ' — ' + r.time;
-      who.appendChild(b); who.appendChild(s);
-      var tag = document.createElement('span'); tag.className = 'tagstat ' + (r.late ? 'l' : 'p'); tag.textContent = r.status;
-      row.appendChild(who); row.appendChild(tag); list.appendChild(row);
-    });
-  }
-
-  /* Preserve the original full / center / full / overlapping corner pyramid
-   * and attemptBoth inversion. Speed-first cadence; no lower-resolution guess
-   * solely because an older browser hides its hardware information.
-   * Adapt rest time, not away the pixels needed to read small/distant tags. */
+  /* ── Fast decode path ────────────────────────────────────────────────
+   * One frame in flight, zero artificial pause: the instant a decode finishes,
+   * the next camera frame is analysed. The pause that used to be added after
+   * every pass was pure added latency for the next student.
+   *
+   * Most passes read a tight centre crop (that is where the operator holds the
+   * tag, per the one-line hint under the camera) at 480–640 px, which is a much
+   * cheaper jsQR job than a full 1080p frame. Every fifth pass reads the whole
+   * frame with inversion attempts enabled, so an off-centre or inverted tag is
+   * still found — without paying that cost on every frame.
+   *
+   * `imageSmoothingEnabled` is set explicitly on every pass: it must be true
+   * when down-scaling (aliased QR modules stop decoding), false when the crop
+   * is already small enough. */
   var mem = navigator.deviceMemory || 0, cores = navigator.hardwareConcurrency || 0;
   var LOW_END = (mem && mem <= 3) || (cores && cores <= 4);
-  var FULL_DIM = LOW_END ? 560 : 900, BASE_REST = LOW_END ? 25 : 12;
-  var scanTimer = null, frameCallback = null, scanning = false, decodeBusy = false;
+  var FAST_DIM = LOW_END ? 480 : 640, CROP_RATIO = 0.72, FULL_EVERY = 5;
+  var DECODE_TIMEOUT_MS = 1500, MAX_REST_MS = 40, FRAME_POLL_MS = 10;
+  var scanTimer = null, scanning = false, decodeBusy = false;
   var scanEpoch = 0, passCounter = 0, lastFrameTime = -1, decodeJob = 0;
   var worker = null, workerBroken = false, workerDone = null;
   var nativeDetector = null, nativeBroken = false;
@@ -265,7 +233,8 @@
     script.src = config.decoder || 'assets/js/jsqr.min.js';
     document.head.appendChild(script);
   }
-  // Detection is optional and never blocks boot or the jsQR fallback.
+  // Native detection (hardware accelerated) is the fast path when the browser
+  // has it; jsQR in a Worker is the fallback and the default on most browsers.
   try {
     if (window.BarcodeDetector && typeof window.BarcodeDetector.getSupportedFormats === 'function') {
       observe(window.BarcodeDetector.getSupportedFormats(), function (formats) {
@@ -303,13 +272,13 @@
     }
     if (!decoderLoading && typeof window.jsQR !== 'function' && now() >= decoderRetryAt) loadDecoder(noop);
   }
-  function jsDecode(image, callback) {
+  function jsDecode(image, invert, callback) {
     prepareDecoder();
     if (worker) {
       try {
         var id = ++decodeJob;
         workerDone = { id: id, callback: callback };
-        worker.postMessage({ id: id, pixels: image.data.buffer, width: image.width, height: image.height }, [image.data.buffer]);
+        worker.postMessage({ id: id, pixels: image.data.buffer, width: image.width, height: image.height, invert: !!invert }, [image.data.buffer]);
         return;
       } catch (e) {
         workerBroken = true; discardWorker();
@@ -318,69 +287,66 @@
       }
     }
     var code = null;
-    try { code = window.jsQR(image.data, image.width, image.height, { inversionAttempts: 'attemptBoth' }); } catch (e) {}
+    try { code = window.jsQR(image.data, image.width, image.height, { inversionAttempts: invert ? 'attemptBoth' : 'dontInvert' }); } catch (e) {}
     callback(code && code.data);
   }
 
   function frameImage(p) {
-    var w = video.videoWidth, h = video.videoHeight, sx = 0, sy = 0, sw = w, sh = h;
-    if (p % 4 === 1) {
-      sw = Math.round(w * 0.55); sh = Math.round(h * 0.55);
+    var w = video.videoWidth, h = video.videoHeight, full = (p % FULL_EVERY) === 0;
+    var sw = w, sh = h, sx = 0, sy = 0;
+    if (!full) {
+      sw = Math.round(w * CROP_RATIO); sh = Math.round(h * CROP_RATIO);
       sx = Math.round((w - sw) / 2); sy = Math.round((h - sh) / 2);
-    } else if (p % 4 === 3) {
-      sw = Math.round(w * 0.62); sh = Math.round(h * 0.62);
-      var quadrant = (p >> 2) % 4;
-      sx = (quadrant % 2) ? w - sw : 0; sy = quadrant > 1 ? h - sh : 0;
     }
-    var ratio = sw / sh, cw = FULL_DIM, ch = Math.round(FULL_DIM / ratio);
-    if (ch > FULL_DIM) { ch = FULL_DIM; cw = Math.round(FULL_DIM * ratio); }
+    var ratio = sw / sh, cw = FAST_DIM, ch = Math.round(FAST_DIM / ratio);
+    if (ch > FAST_DIM) { ch = FAST_DIM; cw = Math.round(FAST_DIM * ratio); }
     if (canvas.width !== cw) canvas.width = cw;
     if (canvas.height !== ch) canvas.height = ch;
     ctx.imageSmoothingEnabled = sw > cw;
     ctx.drawImage(video, sx, sy, sw, sh, 0, 0, cw, ch);
-    return { width: cw, height: ch };
+    return { width: cw, height: ch, full: full };
   }
   function scheduleScan(rest) {
-    if (!scanning || scanTimer || frameCallback !== null || decodeBusy || document.hidden) return;
-    scanTimer = setTimeout(function () {
-      scanTimer = null;
-      if (!scanning || document.hidden) return;
-      // A fresh frame may already have arrived during decode/rest. Use it now
-      // instead of unconditionally waiting for yet ANOTHER camera frame.
-      if (video.readyState >= 2 && video.currentTime !== lastFrameTime) { scanTick(); return; }
-      if (typeof video.requestVideoFrameCallback === 'function' && typeof video.cancelVideoFrameCallback === 'function') {
-        frameCallback = video.requestVideoFrameCallback(function () { frameCallback = null; scanTick(); });
-      } else scanTick();
-    }, rest);
+    if (!scanning || scanTimer || decodeBusy || document.hidden) return;
+    if (rest > 0) {
+      scanTimer = setTimeout(function () { scanTimer = null; scanTick(); }, rest);
+      return;
+    }
+    // No rest: a frame that is already newer than the last decoded one is used
+    // immediately. Otherwise a short poll (about twice per frame at 60 fps)
+    // picks up the next presented frame. Deliberately no
+    // requestVideoFrameCallback: a browser that never fires it would silently
+    // stop scanning, and the poll costs nothing measurable.
+    if (video.readyState >= 2 && video.currentTime !== lastFrameTime) { scanTick(); return; }
+    scheduleScan(FRAME_POLL_MS);
   }
   function scanTick() {
     if (!scanning || document.hidden || camState !== 'ready') return;
-    if (!ctx) { scanning = false; camMsg.textContent = 'پردازش تصویر در این مرورگر ممکن نیست؛ ورود دستی یا اسکنر قبلی را امتحان کنید.'; return; }
+    if (!ctx) { scanning = false; camMsg.textContent = 'پردازش تصویر در این مرورگر ممکن نیست.'; return; }
     if (busy || decodeBusy || video.readyState < 2 || !video.videoWidth || !video.videoHeight || video.currentTime === lastFrameTime) {
-      scheduleScan(BASE_REST); return;
+      scheduleScan(FRAME_POLL_MS); return;
     }
-    if ((workerBroken || !window.Worker) && typeof window.jsQR !== 'function') {
+    if ((workerBroken || !window.Worker) && typeof window.jsQR !== 'function' && !nativeDetector) {
       if (now() < decoderRetryAt) { scheduleScan(1000); return; }
       var loadingEpoch = scanEpoch;
       decodeBusy = true;
       loadDecoder(function (ok) {
         if (loadingEpoch !== scanEpoch) return;
         decodeBusy = false;
-        if (!ok) camMsg.textContent = 'بارگذاری تشخیص QR ناموفق بود؛ ورود دستی یا اسکنر قبلی را امتحان کنید.';
-        scheduleScan(ok ? BASE_REST : 1000);
+        if (!ok) camMsg.textContent = 'بارگذاری تشخیص QR ناموفق بود.';
+        scheduleScan(ok ? 0 : 1000);
       });
       return;
     }
     lastFrameTime = video.currentTime;
     var epoch = scanEpoch, generation = cameraGeneration, started = now(), finished = false;
-    var capturedOptics = opticsFrameSettings();
-    var useNative = nativeDetector && !nativeBroken && passCounter % 4 === 0;
+    var useNative = !!(nativeDetector && !nativeBroken);
     decodeBusy = true;
     var timer = setTimeout(function () {
       if (useNative) { nativeBroken = true; nativeDetector = null; }
       else { workerBroken = true; discardWorker(); }
       complete(null);
-    }, 8000);
+    }, DECODE_TIMEOUT_MS);
     activeDecodeCancel = function () {
       if (finished) return;
       finished = true; clearTimeout(timer);
@@ -391,8 +357,11 @@
       if (finished) return; finished = true; clearTimeout(timer);
       if (epoch !== scanEpoch) return;
       activeDecodeCancel = null; decodeBusy = false;
-      if (generation === cameraGeneration && camState === 'ready' && !document.hidden && data) { opticsDecoded(data, capturedOptics); sendScan(data, false); }
-      scheduleScan(Math.max(BASE_REST, Math.min(2000, Math.round((now() - started) * 0.35))));
+      if (generation === cameraGeneration && camState === 'ready' && !document.hidden && data) sendScan(data, false);
+      // Tiny adaptive rest only when decoding itself is slower than the camera:
+      // keeps a weak phone cool without adding a fixed pause to every student.
+      var spent = now() - started;
+      scheduleScan(spent > 25 ? Math.min(MAX_REST_MS, Math.round(spent * 0.1)) : 0);
     }
     try {
       var size = frameImage(passCounter++);
@@ -400,7 +369,7 @@
         observe(nativeDetector.detect(canvas), function (codes) {
           complete(codes && codes.length ? codes[0].rawValue : null);
         }, function () { nativeBroken = true; nativeDetector = null; complete(null); });
-      } else jsDecode(ctx.getImageData(0, 0, size.width, size.height), complete);
+      } else jsDecode(ctx.getImageData(0, 0, size.width, size.height), size.full, complete);
     } catch (e) { complete(null); }
   }
   function startScanLoop() { scanning = true; scheduleScan(0); }
@@ -408,94 +377,117 @@
     scanning = false; scanEpoch++; decodeBusy = false;
     if (activeDecodeCancel) { activeDecodeCancel(); activeDecodeCancel = null; }
     clearTimeout(scanTimer); scanTimer = null;
-    if (frameCallback !== null) { try { video.cancelVideoFrameCallback(frameCallback); } catch (e) {} frameCallback = null; }
     // Do not retain work/frame buffers from the old camera or a hidden page.
     discardWorker(); lastFrameTime = -1; passCounter = 0;
   }
 
-  /* Focus is pinned to INFINITY for the whole session: it is applied the moment
-   * the camera becomes ready — before any tag — and it is never derived from a
-   * scan. The lens therefore cannot hunt between students: moving the tag
-   * closer or farther no longer triggers a new autofocus sweep (that sweep was
-   * what blurred the tag right after the first read). applyConstraints is only
-   * re-issued when the device itself drops the lock (watchdog / camera
-   * reopen), never per scan. Exposure shortening stays a separate step. */
-  var opticsEnabled = true, optics = null, meterCanvas = null, optMode = el('opticsMode'), optFocus = el('opticsFocus'), optTorch = el('opticsTorch');
-  /* focusDistance is reported in meters, so the LARGEST supported value is the
-   * farthest focus (Android infinity is 0 diopters, reported as an unbounded
-   * range). When that range has no upper bound we request a finite distance
-   * beyond any phone hyperfocal distance; the camera maps it to infinity. */
-  var INFINITY_METERS = 1000, FOCUS_WATCHDOG_MS = 5000;
+  /* ── Optics: the lens is parked inside the 5–20 cm band and stays there ──
+   *
+   * What used to cost the time: autofocus. Every time a student moved the tag
+   * closer or farther the lens swept, and each sweep is tens to hundreds of
+   * milliseconds during which nothing can be decoded. So the lens is set once —
+   * as soon as the camera is ready, before any tag — to a fixed distance inside
+   * the band the operator scans at, and it is never moved again by a scan.
+   *
+   * The band is 5–20 cm; 12 cm is requested (the middle of the band, so both a
+   * 5–10 cm and a 15–20 cm tag stay inside the depth of field). A device whose
+   * range does not reach the band is parked at its closest reachable point and
+   * the label says so honestly instead of pretending.
+   *
+   * Exposure is the second half of speed: a long shutter smears the tag while
+   * the student walks past. The shortest shutter the device accepts is requested
+   * with compensating gain, once, right after the focus lock — not after the
+   * first tag, and never on the scan path. */
+  var opticsEnabled = true, optics = null, meterCanvas = null, optTorch = el('opticsTorch'), optStatus = el('opticsStatus');
+  var NEAR_METERS = 0.12, BAND_MIN = 0.05, BAND_MAX = 0.20, FOCUS_WATCHDOG_MS = 5000;
+  var SHUTTER_FACTOR = 8, ISO_CEILING = 1600, SHUTTER_MIN_BRIGHTNESS = 45, DARK_BRIGHTNESS = 22;
   function finiteNumber(n) { return typeof n === 'number' && isFinite(n); }
   function cameraSettings(track) { try { return track.getSettings ? track.getSettings() : {}; } catch (e) { return {}; } }
   function hasMode(caps, key, value) { return caps[key] && caps[key].indexOf(value) >= 0; }
   function validRange(r) { return r && finiteNumber(r.min) && finiteNumber(r.max) && r.max > r.min; }
   function inRange(n, r) { return finiteNumber(n) && validRange(r) && n >= r.min && n <= r.max; }
+  /* Quantise away float noise (0.1 + 2*0.01 must be 0.12, not 0.1200000001)
+   * so the value sent to the device and the value shown to the operator agree. */
+  function tidy(n) { return finiteNumber(n) ? Math.round(n * 1e6) / 1e6 : n; }
+  /* Nearest legal step of the device grid, never outside its own range. */
+  function snapToRange(n, r) {
+    n = Math.max(r.min, Math.min(r.max, n));
+    var step = finiteNumber(r.step) && r.step > 0 ? r.step : 0;
+    if (!step) return tidy(n);
+    return tidy(Math.max(r.min, Math.min(r.max, r.min + Math.round((n - r.min) / step) * step)));
+  }
   function roundUpRange(n, r) {
     var step = finiteNumber(r.step) && r.step > 0 ? r.step : 0;
     n = Math.max(r.min, Math.min(r.max, n));
-    return Math.min(r.max, step ? r.min + Math.ceil((n - r.min) / step - 0.000001) * step : n);
+    return tidy(Math.min(r.max, step ? r.min + Math.ceil((n - r.min) / step - 0.000001) * step : n));
   }
   function closeSetting(actual, expected, range) {
-    // Requests for exposure/ISO are already rounded to the device grid. A
-    // whole-step tolerance could wrongly accept a very different near focus.
-    var tolerance = Math.max(0.000001, Math.abs(expected) * 0.015);
+    var tolerance = Math.max(0.000001, Math.abs(expected) * 0.15);
     return finiteNumber(actual) && Math.abs(actual - expected) <= tolerance;
   }
-  /* Fixed infinity position for this camera, or null when the device offers no
-   * way to take focus away from continuous autofocus. Layers, in order:
-   * manual + farthest reported distance → manual without distance control
-   * (freezes the current position) → single-shot (one sweep, then hold). */
-  function infinityFocusTarget(o) {
+  /* focusDistance is reported in metres; the tag is read at 5–20 cm. */
+  function inBand(d) { return finiteNumber(d) && d >= BAND_MIN * 0.8 && d <= BAND_MAX * 1.3; }
+  function nearFocusTarget(o) {
     var caps = o.caps, range = caps.focusDistance;
     if (hasMode(caps, 'focusMode', 'manual')) {
-      if (validRange(range)) return { focusMode: 'manual', focusDistance: range.max };
-      if (range && finiteNumber(range.min) && !finiteNumber(range.max)) return { focusMode: 'manual', focusDistance: Math.max(INFINITY_METERS, range.min) };
+      if (validRange(range)) {
+        var lo = Math.max(range.min, BAND_MIN), hi = Math.min(range.max, BAND_MAX);
+        if (lo <= hi) {
+          o.bandExact = true;
+          return { focusMode: 'manual', focusDistance: snapToRange(Math.max(lo, Math.min(hi, NEAR_METERS)), range) };
+        }
+        // A lens that cannot reach the band: park at its closest reachable point.
+        o.bandExact = false;
+        return { focusMode: 'manual', focusDistance: range.min > BAND_MAX ? range.min : range.max };
+      }
+      if (range && finiteNumber(range.min) && !finiteNumber(range.max)) {
+        o.bandExact = false;
+        return { focusMode: 'manual', focusDistance: Math.max(NEAR_METERS, range.min) };
+      }
+      o.bandExact = null;   // the device never reports a distance: freeze in place
       return { focusMode: 'manual' };
     }
-    if (hasMode(caps, 'focusMode', 'single-shot')) return { focusMode: 'single-shot' };
+    if (hasMode(caps, 'focusMode', 'single-shot')) { o.bandExact = null; return { focusMode: 'single-shot' }; }
     return null;
   }
-  /* The lock counts only when the device reported the requested mode AND a
-   * position at least as far as requested. A non-finite readback IS the device
-   * reporting infinity; a nearer readback is never claimed as infinity. */
+  /* The lock counts when the device reported manual mode AND a position that is
+   * either inside the requested band or the best the lens can physically reach.
+   * A readback that contradicts the request is never called locked. */
   function focusLockSatisfied(o, expected, s) {
     if (!expected || s.focusMode !== expected.focusMode) return false;
     if (expected.focusMode !== 'manual' || expected.focusDistance === undefined) return true;
     var d = s.focusDistance;
-    if (!finiteNumber(d)) return true;
-    return d >= expected.focusDistance * 0.9;
+    if (inBand(d)) return true;
+    if (o.bandExact === false) return true;
+    return closeSetting(d, expected.focusDistance, o.caps.focusDistance);
   }
   function focusReading(o) {
     var s = cameraSettings(o.track), d = s.focusDistance;
-    if (!o.focusTarget) return 'خودکار (قفل نشده)';
-    if (o.focusTarget.focusMode === 'single-shot') return s.focusMode === 'single-shot' ? 'تک‌مرحله‌ای (قفل‌شده)' : 'خودکار (قفل نشده)';
+    if (!o.focusTarget) return 'کنترل فوکوس در دسترس نیست (خودکار)';
+    if (o.focusTarget.focusMode === 'single-shot') return s.focusMode === 'single-shot' ? 'قفل‌شده (تک‌مرحله‌ای)' : 'خودکار (قفل نشده)';
     if (s.focusMode !== 'manual') return 'خودکار (قفل نشده)';
     if (!o.confirmedFocus) return 'در حال بررسی';
     if (o.focusTarget.focusDistance === undefined) return 'قفل‌شده روی فاصلهٔ فعلی';
-    if (!finiteNumber(d) || d >= 100) return 'بی‌نهایت (قفل‌شده)';
-    if (d >= 2) return 'دور (قفل‌شده) — ' + faDigits(d.toFixed(1)) + ' متر';
-    return 'قفل‌شده در ' + faDigits(d.toFixed(2)) + ' متر';
+    if (!finiteNumber(d)) return 'فاصله گزارش نشد (نامعلوم)';
+    if (o.bandExact === false && !inBand(d)) return 'نزدیک‌ترین فاصلهٔ ممکن — ' + faDigits(Math.round(d * 100)) + ' سانتی‌متر';
+    return 'قفل روی ' + faDigits(Math.round(d * 100)) + ' سانتی‌متر';
   }
   function currentOptics(o) { return optics === o && o.generation === cameraGeneration && currentStream && currentStream.getVideoTracks()[0] === o.track && !document.hidden; }
   function stopOptics() {
     if (optics) { clearTimeout(optics.timer); clearTimeout(optics.verifyTimer); clearTimeout(optics.lightTimer); }
     optics = null;
-    if (optMode) { optMode.disabled = true; optFocus.disabled = true; optTorch.disabled = true; }
+    if (optTorch) optTorch.disabled = true;
   }
   function renderOptics(o) {
-    if (!currentOptics(o) || !optMode) return;
+    if (!currentOptics(o)) return;
     var s = cameraSettings(o.track);
-    var text = 'گزارش دوربین: فوکوس: ' + focusReading(o) + ' | تصویر: ' + (finiteNumber(s.frameRate) ? faDigits(Math.round(s.frameRate)) + ' فریم' : 'نرخ گزارش نشده');
-    if (o.confirmedExposure && finiteNumber(s.exposureTime)) text += ' | نوردهی کوتاه‌تر';
-    else text += ' | نوردهی: ' + (s.exposureMode === 'continuous' ? 'خودکار' : 'کنترل سریع تأیید نشده');
-    el('opticsStatus').textContent = o.message;
-    el('opticsDetails').textContent = text;
-    optMode.checked = o.enabled;
-    optMode.disabled = !o.supported || (!!o.pending && !o.stalled);
-    optFocus.disabled = !o.enabled || !o.focusTarget || !!o.pending;
-    optTorch.disabled = !o.torchAvailable || !!o.pending;
-    optTorch.textContent = s.torch === true ? 'خاموش‌کردن چراغ' : 'روشن‌کردن چراغ';
+    // The verbose line is diagnostics only (hidden); the operator sees one short
+    // status sentence under the camera.
+    if (optStatus) optStatus.textContent = 'focus=' + focusReading(o) + ' sys=' + String(s.focusMode) + ' d=' + String(s.focusDistance) + ' fps=' + String(s.frameRate) + ' shutter=' + String(s.exposureTime) + ' iso=' + String(s.iso) + ' state=' + o.state;
+    if (optTorch) {
+      optTorch.disabled = !o.torchAvailable || !!o.pending;
+      optTorch.textContent = s.torch === true ? 'چراغ روشن' : 'چراغ';
+    }
   }
   function normalOptics(o) {
     var f = {};
@@ -513,11 +505,14 @@
     return f;
   }
   function opticConstraints(o) {
-    var base = JSON.parse(JSON.stringify(o.base)), fields = normalOptics(o), key;
+    var base = JSON.parse(JSON.stringify(o.base)), fields = {}, key;
     if (o.enabled) {
       if (o.focusTarget) for (key in o.focusTarget) if (Object.prototype.hasOwnProperty.call(o.focusTarget, key)) fields[key] = o.focusTarget[key];
       if (o.exposureTarget) for (key in o.exposureTarget) if (Object.prototype.hasOwnProperty.call(o.exposureTarget, key)) fields[key] = o.exposureTarget[key];
-      if (o.caps.frameRate && o.caps.frameRate.max >= 60) base.frameRate = { ideal: 60, max: 60 };
+      if (o.caps.frameRate && validRange(o.caps.frameRate)) {
+        var want = o.caps.frameRate.max >= 60 ? 60 : o.caps.frameRate.max;
+        base.frameRate = { ideal: want, max: o.caps.frameRate.max };
+      }
     }
     if (fields.focusMode !== 'manual') delete fields.focusDistance;
     if (o.torchAvailable) fields.torch = o.torchWanted;
@@ -533,23 +528,33 @@
     base.advanced.push(fields);
     return base;
   }
-  function restoreOptics(o, message) {
-    o.enabled = false; o.focusTarget = null; o.exposureTarget = null;
-    o.confirmedFocus = false; o.confirmedExposure = false;
-    o.torchWanted = o.original.torch === true;
-    o.restoreReason = message; o.message = message + '؛ بازگشت به حالت عادی درخواست شد.';
-    o.revision++; renderOptics(o);
+  /* If the device refuses to hold the near lock, never fall back to continuous
+   * autofocus (that reintroduces the sweep we removed). One-shot hold is the
+   * fallback; if even that is unavailable the camera stays untouched and the
+   * short status line says the lock was not confirmed. */
+  function fallbackFocus(o, reason) {
+    o.exposureTarget = null; o.confirmedExposure = false;
+    if (o.focusTarget && o.focusTarget.focusMode === 'manual' && hasMode(o.caps, 'focusMode', 'single-shot')) {
+      o.focusTarget = { focusMode: 'single-shot' }; o.bandExact = null;
+      o.confirmedFocus = false; o.state = 'single-shot';
+      o.shortMessage = reason + ' — فوکوس تک‌مرحله‌ای (بدون فوکوس مجدد)';
+      o.revision++; return true;
+    }
+    o.enabled = false; o.state = 'unconfirmed';
+    o.shortMessage = reason + ' — فوکوس دست‌نخورده می‌ماند';
+    setControls();
+    return false;
   }
   function flushOptics(o) {
     if (!currentOptics(o) || !o.supported || o.pending || o.appliedRevision === o.revision) return;
-    var revision = o.revision, wasEnabled = o.enabled, expectedFocus = o.enabled && o.focusTarget, expectedExposure = o.enabled && o.exposureTarget;
-    var expectedTorch = o.torchWanted, request = {}, constraints = opticConstraints(o), normal = normalOptics(o);
+    var revision = o.revision, expectedFocus = o.enabled && o.focusTarget, expectedExposure = o.enabled && o.exposureTarget;
+    var expectedTorch = o.torchWanted, request = {}, constraints = opticConstraints(o);
     o.pending = request; renderOptics(o);
     o.timer = setTimeout(function () {
       if (!currentOptics(o) || o.pending !== request) return;
-      o.stalled = true; o.message = 'پاسخ تنظیم دوربین طولانی شد؛ می‌توانید همین دوربین را دوباره باز کنید';
+      o.stalled = true;
       // applyConstraints cannot be cancelled: retain the slot until it settles.
-      renderOptics(o); setControls();
+      renderOptics(o);
     }, 2500);
     function complete(error) {
       if (!currentOptics(o) || o.pending !== request) return;
@@ -558,98 +563,116 @@
       if (revision === o.revision && !failed) {
         if (expectedFocus) {
           o.confirmedFocus = focusLockSatisfied(o, expectedFocus, s);
-          if (!o.confirmedFocus) {
-            failed = true;
-            // Never claim a far lock the camera did not confirm.
-            o.lockRejected = finiteNumber(s.focusDistance) ? 'فاصلهٔ گزارش‌شده نزدیک‌تر از درخواست بود' : 'حالت فوکوس تأیید نشد';
-          }
+          if (!o.confirmedFocus) failed = true;
         }
         if (expectedExposure) {
           o.confirmedExposure = s.exposureMode === 'manual' && closeSetting(s.exposureTime, expectedExposure.exposureTime, o.caps.exposureTime) && closeSetting(s.iso, expectedExposure.iso, o.caps.iso);
           if (!o.confirmedExposure) failed = true;
         }
-        if (!wasEnabled) {
-          if (normal.focusMode && s.focusMode !== normal.focusMode) failed = true;
-          if (normal.focusMode === 'manual' && finiteNumber(normal.focusDistance) && !closeSetting(s.focusDistance, normal.focusDistance, o.caps.focusDistance)) failed = true;
-          if (normal.exposureMode && s.exposureMode !== normal.exposureMode) failed = true;
-          if (normal.exposureMode === 'manual' && (!closeSetting(s.exposureTime, normal.exposureTime, o.caps.exposureTime) || !closeSetting(s.iso, normal.iso, o.caps.iso))) failed = true;
-        }
         if (o.torchAvailable && s.torch !== expectedTorch) failed = true;
       }
       o.stalled = false;
-      if (failed && wasEnabled && revision === o.revision) restoreOptics(o, 'قفل فوکوس بین‌هایت توسط دوربین تأیید نشد' + (o.lockRejected ? ' (' + o.lockRejected + ')' : ''));
-      else if (failed && revision === o.revision) { o.restoreFailed = true; o.message = 'بازگشت تنظیم دوربین تأیید نشد؛ برای بازنشانی، همین دوربین یا اسکنر قبلی را دوباره باز کنید'; }
-      else if (revision === o.revision && o.enabled && o.confirmedFocus && !o.exposureWarning) o.message = 'فوکوس روی بین‌هایت قفل شد؛ با نزدیک یا دور شدن تگ، دوربین دیگر فوکوس نمی‌کند و اسکن ادامه دارد';
-      else if (revision === o.revision && !o.enabled) { o.restoreFailed = false; o.message = (o.restoreReason ? o.restoreReason + '؛ ' : '') + 'حالت عادی؛ قفل فوکوس خودکار غیرفعال است و اسکن ادامه دارد'; }
+      if (failed && revision === o.revision && o.enabled) {
+        var reason = o.exposureTarget && !expectedFocus ? 'نوردهی سریع تأیید نشد' : 'قفل فوکوس ' + faDigits(Math.round(NEAR_METERS * 100)) + ' سانتی‌متر تأیید نشد';
+        fallbackFocus(o, reason);
+      }
+      if (revision === o.revision && !failed && o.confirmedFocus) startFastExposure(o);
+      if (revision === o.revision) {
+        if (o.confirmedFocus) o.shortMessage = 'فوکوس ثابت روی ' + faDigits(Math.round((finiteNumber(s.focusDistance) ? s.focusDistance : NEAR_METERS) * 100)) + ' سانتی‌متر'
+          + (o.confirmedExposure ? ' — شاتر سریع' : '')
+          + (o.notice ? ' — ' + o.notice : '')
+          + ' — تگ را وسط تصویر بگیرید';
+        // Unsupported hardware keeps the plain operating hint; a failed lock
+        // must say so instead of pretending.
+        if (o.shortMessage && (o.enabled || o.state === 'unconfirmed')) camMsg.textContent = o.shortMessage;
+      }
+      renderOptics(o);
+      // One brightness sample decides whether the shorter shutter is safe.
       if (!failed && revision === o.revision && o.confirmedExposure && !o.lightChecked) {
         o.lightChecked = true;
         o.lightTimer = setTimeout(function () {
           if (!currentOptics(o) || !o.confirmedExposure || !o.enabled) return;
           var brightness = opticsBrightness();
-          if (brightness !== null && ((brightness < 22 && o.referenceBrightness > 45 && brightness < o.referenceBrightness * 0.35) || (brightness > 250 && o.referenceBrightness !== null && o.referenceBrightness < 200))) {
-            o.exposureTarget = null; o.confirmedExposure = false; o.exposureWarning = true;
-            o.message = 'تصویر پس از تنظیم نوردهی تاریک یا بیش‌ازحد روشن شد؛ نوردهی خودکار برمی‌گردد. نور محیط و بازتاب چراغ را بررسی کنید';
+          if (brightness !== null && ((brightness < DARK_BRIGHTNESS && o.referenceBrightness > SHUTTER_MIN_BRIGHTNESS && brightness < o.referenceBrightness * 0.35) || (brightness > 250 && o.referenceBrightness !== null && o.referenceBrightness < 200))) {
+            o.exposureTarget = null; o.confirmedExposure = false;
+            o.notice = 'تصویر تاریک/بیش‌ازحد روشن شد — نوردهی خودکار برگشت (فوکوس ثابت ماند)';
             o.revision++; flushOptics(o);
           }
         }, 500);
       }
-      renderOptics(o); setControls(); flushOptics(o);
+      flushOptics(o);
     }
     try {
       observe(o.track.applyConstraints(constraints), function () {
         if (!currentOptics(o) || o.pending !== request) return;
         // Give settings a short opportunity to reflect the acknowledged request.
-        o.verifyTimer = setTimeout(function () { complete(null); }, 100);
+        o.verifyTimer = setTimeout(function () { complete(null); }, 60);
       }, complete);
     } catch (error) { complete(error); }
   }
   function configureOptics(track, generation) {
     stopOptics();
-    if (!optMode) return;
     var caps = {}, base = {};
     try { caps = track.getCapabilities ? track.getCapabilities() : {}; } catch (e) {}
     try { base = track.getConstraints ? track.getConstraints() : {}; } catch (e) {}
     var o = { track: track, generation: generation, caps: caps, base: base, original: cameraSettings(track),
-      enabled: opticsEnabled, focusTarget: null, exposureTarget: null, exposureAttempted: false,
-      confirmedFocus: false, confirmedExposure: false, pending: null, revision: 1, appliedRevision: 0, stalled: false,
-      lockAttempts: 0, lockRejected: '', message: 'تنظیم اولیه دوربین…' };
-    if (!o.base.frameRate) o.base.frameRate = { ideal: 30, max: 30 };
-    o.focusAvailable = hasMode(caps, 'focusMode', 'manual') || hasMode(caps, 'focusMode', 'single-shot');
-    o.torchAvailable = caps.torch === true || (caps.torch && typeof caps.torch.indexOf === 'function' && caps.torch.indexOf(true) >= 0 && caps.torch.indexOf(false) >= 0);
+      enabled: opticsEnabled, focusTarget: null, exposureTarget: null, bandExact: null,
+      confirmedFocus: false, confirmedExposure: false, exposureAttempted: false, notice: '', pending: null, revision: 1, appliedRevision: 0, stalled: false,
+      state: 'starting', shortMessage: 'در حال تنظیم فوکوس ۵ تا ۲۰ سانتی‌متر…' };
+    o.torchAvailable = hasMode(caps, 'torch', true) && typeof caps.torch !== 'string';
+    o.torchAvailable = !!(caps.torch === true || (caps.torch && typeof caps.torch.indexOf === 'function' && caps.torch.indexOf(true) >= 0 && caps.torch.indexOf(false) >= 0));
     o.torchWanted = o.original.torch === true;
-    o.focusTarget = o.enabled ? infinityFocusTarget(o) : null;
-    o.supported = !!track.applyConstraints && !!(o.focusAvailable || o.torchAvailable || (caps.frameRate && caps.frameRate.max >= 60) || hasMode(caps, 'exposureMode', 'manual'));
-    if (!opticsEnabled) { o.enabled = false; o.message = 'حالت قفل فوکوس انتخاب نشده است؛ فوکوس خودکار و نوردهی خودکار فعال‌اند'; }
-    else if (!o.supported) { o.enabled = false; o.message = 'این مرورگر کنترل فوکوس/شاتر را ارائه نمی‌کند؛ اسکن عادی ادامه دارد.'; }
-    else if (!o.focusTarget) { o.enabled = false; o.supported = false; o.message = 'قفل فوکوس در این مرورگر قابل کنترل نیست؛ دوربین دست‌نخورده می‌ماند و اسکن عادی ادامه دارد.'; }
-    else if (o.focusTarget.focusMode === 'single-shot') o.message = 'قفل فوکوس تک‌مرحله‌ای پیش از اولین اسکن؛ پس از آن دوربین دوباره فوکوس نمی‌کند';
-    else if (o.focusTarget.focusDistance === undefined) o.message = 'قفل فوکوس روی فاصلهٔ فعلی (این دوربین فاصله را گزارش نمی‌کند); پس از آن دوربین دوباره فوکوس نمی‌کند';
-    else if (o.focusTarget.focusDistance >= 100) o.message = 'قفل فوکوس روی بین‌هایت پیش از اولین اسکن؛ پس از آن دوربین دوباره فوکوس نمی‌کند';
-    else o.message = 'قفل فوکوس روی دورترین فاصلهٔ ممکن (بین‌هایت) پیش از اولین اسکن؛ پس از آن دوربین دوباره فوکوس نمی‌کند';
+    o.focusTarget = o.enabled ? nearFocusTarget(o) : null;
+    o.supported = !!track.applyConstraints && !!(o.focusTarget || o.torchAvailable || (caps.frameRate && caps.frameRate.max >= 60) || hasMode(caps, 'exposureMode', 'manual'));
+    if (!o.focusTarget) {
+      o.enabled = false; o.state = 'unavailable';
+      o.shortMessage = 'این مرورگر کنترل فوکوس ندارد — دوربین دست‌نخورده می‌ماند';
+    } else if (!o.supported) {
+      o.enabled = false; o.state = 'unavailable';
+      o.shortMessage = 'تنظیم دوربین در این مرورگر در دسترس نیست';
+    } else if (o.focusTarget.focusMode === 'single-shot') {
+      o.state = 'single-shot';
+      o.shortMessage = 'فوکوس یک‌بار تنظیم می‌شود و دیگر جابه‌جا نمی‌شود';
+    } else if (o.focusTarget.focusDistance === undefined) {
+      o.state = 'frozen';
+      o.shortMessage = 'فوکوس روی فاصلهٔ فعلی ثابت می‌شود';
+    } else {
+      o.state = 'near';
+      o.shortMessage = 'در حال قفل فوکوس روی ' + faDigits(Math.round(o.focusTarget.focusDistance * 100)) + ' سانتی‌متر…';
+    }
     optics = o; renderOptics(o); flushOptics(o);
   }
-  /* The lock must survive the whole session on every phone. Devices can drop it
-   * after a driver reset, an app switch or a rotation; this watchdog restores
-   * the exact same fixed position. It never runs on the scan path. */
+  /* Shortest usable shutter: the biggest single speed win after the focus lock.
+   * Applied once, right after the lock — never per scan, never after a tag. */
+  function startFastExposure(o) {
+    if (!o.confirmedFocus || o.exposureAttempted || !o.enabled) return;
+    o.exposureAttempted = true;
+    var c = o.caps, s = o.original, time = s.exposureTime, iso = s.iso;
+    if (!hasMode(c, 'exposureMode', 'manual')) return;
+    if (!finiteNumber(time) || !finiteNumber(iso) || !(time > 0) || !(iso > 0)) return;
+    if (!inRange(time, c.exposureTime) || !inRange(iso, c.iso)) return;
+    var brightness = opticsBrightness();
+    if (brightness !== null && brightness < SHUTTER_MIN_BRIGHTNESS) return;   // already dark: keep AE
+    var gainLimit = Math.min(c.iso.max, Math.max(iso, ISO_CEILING)), factor = Math.min(SHUTTER_FACTOR, gainLimit / iso);
+    var targetTime = roundUpRange(time / factor, c.exposureTime);
+    var targetISO = roundUpRange(iso * time / targetTime, c.iso);
+    if (!(targetTime < time * 0.8) || targetISO > gainLimit) return;
+    o.exposureTarget = { exposureMode: 'manual', exposureTime: targetTime, iso: targetISO };
+    o.referenceBrightness = brightness; o.lightChecked = false;
+    o.revision++; flushOptics(o);
+  }
   function focusWatchdog() {
     var o = optics;
     if (!o || !currentOptics(o) || !o.enabled || !o.focusTarget || o.pending || document.hidden) return;
     var s = cameraSettings(o.track);
     if (focusLockSatisfied(o, o.focusTarget, s)) {
-      // Keep the reported focus position truthful while the lock holds.
-      o.confirmedFocus = true; renderOptics(o);
-      return;
+      o.confirmedFocus = true; renderOptics(o); startFastExposure(o); return;
     }
-    o.lockAttempts++;
-    o.confirmedFocus = false;
-    o.message = 'قفل فوکوس حفظ نشده بود؛ دوباره روی همان حالت قفل می‌شود';
-    o.revision++; flushOptics(o);
+    o.confirmedFocus = false; o.revision++; flushOptics(o);
   }
-  if (optMode) setInterval(focusWatchdog, FOCUS_WATCHDOG_MS);
-  function opticsFrameSettings() {
-    var o = optics;
-    return o && currentOptics(o) && o.enabled && !o.exposureAttempted ? cameraSettings(o.track) : null;
-  }
+  // Registered unconditionally: a page that ships an older #opticsStatus (or
+  // none) must still get the drift watchdog, not only the diagnostics.
+  setInterval(focusWatchdog, FOCUS_WATCHDOG_MS);
   function opticsBrightness() {
     try {
       if (!meterCanvas) { meterCanvas = document.createElement('canvas'); meterCanvas.width = 16; meterCanvas.height = 12; }
@@ -660,53 +683,13 @@
       return sum / (pixels.length / 4);
     } catch (e) { return null; }
   }
-  /* A decoded tag NEVER moves the lens again: only exposure is calibrated, and
-   * only on the very first read of this camera session. */
-  function opticsDecoded(data, captured) {
-    var o = optics;
-    if (!o || !currentOptics(o) || !o.enabled || !captured || o.exposureAttempted || !/^MTAG-ATT:\d+:[a-f0-9]{16,64}$/i.test(data)) return;
-    o.exposureAttempted = true;
-    var c = o.caps, time = captured.exposureTime, iso = captured.iso, changed = false;
-    // At most 4x shorter with compensating gain. Do not underexpose blindly,
-    // or push a previously clean image above ISO 1600 just to shorten shutter.
-    if (hasMode(c, 'exposureMode', 'manual') && (hasMode(c, 'exposureMode', 'continuous') || o.original.exposureMode === 'manual') && time > 0 && iso > 0 && inRange(time, c.exposureTime) && inRange(iso, c.iso)) {
-      var gainLimit = Math.min(c.iso.max, Math.max(iso, 1600)), factor = Math.min(4, gainLimit / iso);
-      var targetTime = roundUpRange(time / factor, c.exposureTime);
-      var targetISO = roundUpRange(iso * time / targetTime, c.iso);
-      if (targetTime < time * 0.8 && targetISO <= gainLimit) {
-        o.exposureTarget = { exposureMode: 'manual', exposureTime: targetTime, iso: targetISO };
-        o.referenceBrightness = opticsBrightness(); o.lightChecked = false; changed = true;
-      }
-    }
-    if (changed) { o.message = 'در حال درخواست نوردهی سریع‌تر؛ قفل فوکوس بین‌هایت دست‌نخورده است'; o.revision++; flushOptics(o); }
-    else renderOptics(o);
-  }
-  if (optMode) {
-    optMode.addEventListener('change', function () {
-      var o = optics; if (!o || !currentOptics(o) || (o.pending && !o.stalled)) return;
-      opticsEnabled = optMode.checked;
-      if (o.stalled) { openCamera(0, false); return; }
-      o.restoreReason = ''; o.restoreFailed = false; o.lockRejected = '';
-      o.enabled = opticsEnabled; o.exposureWarning = false; o.focusTarget = o.enabled ? infinityFocusTarget(o) : null;
-      o.exposureTarget = null; o.exposureAttempted = false; o.confirmedFocus = false; o.confirmedExposure = false;
-      o.message = o.enabled ? 'در حال قفل‌کردن فوکوس روی بین‌هایت…' : 'در حال بازگرداندن حالت عادی';
-      o.revision++; flushOptics(o);
-    });
-    optFocus.addEventListener('click', function () {
-      var o = optics; if (!o || !currentOptics(o) || !o.enabled || o.pending) return;
-      o.exposureWarning = false; o.lockRejected = ''; o.restoreFailed = false;
-      o.exposureTarget = null; o.exposureAttempted = false; o.confirmedExposure = false;
-      o.focusTarget = infinityFocusTarget(o);
-      if (!o.focusTarget) { o.enabled = false; o.message = 'قفل فوکوس در این مرورگر قابل کنترل نیست؛ فوکوس خودکار می‌ماند'; renderOptics(o); return; }
-      o.confirmedFocus = false; o.message = 'قفل دوبارهٔ فوکوس روی بین‌هایت درخواست شد';
-      o.revision++; flushOptics(o);
-    });
+  if (optTorch) {
     optTorch.addEventListener('click', function () {
       var o = optics; if (!o || !currentOptics(o) || !o.torchAvailable || o.pending) return;
-      o.torchWanted = !o.torchWanted; o.exposureWarning = false;
-      // Lighting changed: let AE settle and recalibrate shutter after a read.
+      o.torchWanted = !o.torchWanted;
+      // Lighting changed: let AE settle, then measure the shutter again.
       o.exposureTarget = null; o.exposureAttempted = false; o.confirmedExposure = false;
-      o.message = 'در حال تغییر چراغ؛ مراقب بازتاب نور روی تگ براق باشید'; o.revision++; flushOptics(o);
+      o.revision++; flushOptics(o);
     });
   }
   /* Camera lifecycle. A getUserMedia request cannot be cancelled by JS.
@@ -735,7 +718,7 @@
   function setControls() {
     camBtn.disabled = !!pendingOpen || camState === 'opening' || camState === 'warming';
     camBtn.style.display = camList.length > 1 || (camList.length === 1 && camList[0].deviceId !== desiredId) ? 'block' : 'none';
-    camRetry.style.display = camState === 'error' || (optics && (optics.stalled || optics.restoreFailed)) ? 'block' : 'none';
+    camRetry.style.display = camState === 'error' || (optics && (optics.stalled || optics.state === 'unconfirmed')) ? 'block' : 'none';
     camRetry.textContent = pendingOpen ? 'بازکردن دوباره صفحه' : 'تلاش مجدد همین دوربین';
     for (var i = 0; i < camList.length; i++) {
       if (camList[i].deviceId === desiredId) {
@@ -808,7 +791,7 @@
       var message = 'بازکردن دوربین ناموفق بود (' + name + ')';
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError') message = 'اجازهٔ دوربین داده نشده؛ مجوز مرورگر و اتصال امن را بررسی کنید';
       if (name === 'NotFoundError' || name === 'OverconstrainedError') message = 'دوربین انتخابی در دسترس نیست؛ دوباره تلاش کنید یا دوربین دیگری انتخاب کنید';
-      if (name === 'CameraAPIUnavailable') message = 'دوربین در این مرورگر یا آدرس قابل دسترسی نیست؛ HTTPS، اسکنر قبلی یا ورود دستی را امتحان کنید';
+      if (name === 'CameraAPIUnavailable') message = 'دوربین در این مرورگر یا آدرس قابل دسترسی نیست؛ HTTPS یا اسکنر قبلی را امتحان کنید';
       cameraError(message); listCams(cameraGeneration);
     }
     function opened(stream) {
@@ -828,7 +811,7 @@
           camState = 'ready'; readyCheck = null;
           if (!desiredId && settings.deviceId) desiredId = settings.deviceId;
           if (desiredId) { try { localStorage.setItem('mtag_scanner_cam', desiredId); } catch (e) {} }
-          camMsg.textContent = 'تگ را هر جای تصویر بگیرید — لازم نیست داخل کادر باشد';
+          camMsg.textContent = 'تگ را وسط تصویر، در فاصلهٔ حدود ۵ تا ۲۰ سانتی‌متر بگیرید';
           setControls(); listCams(generation); configureOptics(track, generation); startScanLoop(); return;
         }
         if (now() >= deadline) { cameraError('تصویر دوربین آماده نشد؛ تلاش مجدد را بزنید'); return; }
@@ -847,15 +830,18 @@
           if (generation === cameraGeneration) cameraError('پخش تصویر شروع نشد؛ دکمهٔ تلاش مجدد را لمس کنید');
         });
         checkReady();
-      } catch (e) { if (generation === cameraGeneration) cameraError('نمایش تصویر در این مرورگر ممکن نشد؛ اسکنر قبلی یا ورود دستی را امتحان کنید'); }
+      } catch (e) { if (generation === cameraGeneration) cameraError('نمایش تصویر در این مرورگر ممکن نشد؛ اسکنر قبلی را امتحان کنید'); }
     }
     try {
       var media = navigator.mediaDevices;
       var videoConstraints = req.id ? { deviceId: { exact: req.id } } : { facingMode: 'environment' };
       if (!basic) {
-        videoConstraints.width = { ideal: LOW_END ? 1280 : 1920 };
-        videoConstraints.height = { ideal: LOW_END ? 720 : 1080 };
-        videoConstraints.frameRate = { ideal: 30, max: 30 };
+        // 720p is the sweet spot here: the sensor can actually deliver a high
+        // frame rate at this size, and a high frame rate is what makes a tag
+        // that is moving land in the very next frame.
+        videoConstraints.width = { ideal: LOW_END ? 960 : 1280 };
+        videoConstraints.height = { ideal: LOW_END ? 540 : 720 };
+        videoConstraints.frameRate = { ideal: 60, max: 60 };
       }
       if (media && typeof media.getUserMedia === 'function') observe(media.getUserMedia({ video: videoConstraints, audio: false }), opened, failed);
       else {
@@ -890,13 +876,11 @@
     cameraGeneration++; clearRecovery(); clearTimeout(readyTimer); readyTimer = null;
     if (pendingOpen) { clearTimeout(pendingOpen.timer); pendingOpen.timer = null; }
     readyCheck = null; stopScanLoop(); stopStream(); camState = 'suspended';
-    clearTimeout(statusTimer); statusTimer = null;
-    if (statusCancel) statusCancel();
     setControls();
   }
   function resume() {
     if (document.hidden) return;
-    clock(); refreshStatus();
+    clock();
     if (camState === 'opening' || camState === 'warming' || camState === 'error') return;
     if (camState === 'suspended' || camState === 'idle') { openCamera(0, false); return; }
     if (!trackLive()) { scheduleRecovery(); return; }
@@ -909,7 +893,7 @@
   window.addEventListener('pageshow', resume);
   window.addEventListener('focus', resume);
   window.addEventListener('orientationchange', resume);
-  window.addEventListener('online', function () { refreshStatus(true); });
+  window.addEventListener('online', function () {});
   try { if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', function () { listCams(cameraGeneration); }); } catch (e) {}
   setInterval(function () {
     if (document.hidden || camState !== 'ready' || pendingOpen || recoveryTimer || (optics && optics.pending && !optics.stalled)) return;
@@ -918,6 +902,5 @@
     lastVideoTime = video.currentTime;
     if (frozenCount >= 2) { frozenCount = 0; scheduleRecovery(); }
   }, 4000);
-  setInterval(function () { if (!document.hidden) refreshStatus(); }, 30000);
-  openCamera(0, false); refreshStatus();
+  openCamera(0, false);
 })();

@@ -2,7 +2,7 @@
 
 Contract (see docs/DESKTOP-ONLINE-UPDATE-FA.md):
   SITE-FIX-v4.152.0-desk-update.zip        prefix site-update-v4.152.0/
-  SchoolDeskPro-FIX-v2.83.0-desk-update.zip prefix SchoolDeskPro/
+  SchoolDeskPro-FIX-v2.83.0-desk-update.zip prefix SchoolDeskPro/reports/
 
 The site package must never publish school data, the desktop package must
 never carry config/, data/ or the php runtime, the two shared ZIP readers must
@@ -15,6 +15,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / 'update-v4.152.0'
+WEB = 'reports/'   # desktop web root since the reports migration
 DESKTOP_SOURCES = {
     'desk-update.php': ROOT / 'desktop-app-v2/patch/www-desk-update.php',
     'includes/desk_update.php': ROOT / 'desktop-app-v2/patch/includes-desk_update.php',
@@ -67,10 +68,10 @@ class DeskUpdatePackages(unittest.TestCase):
     def test_desktop_package_exact_payload(self):
         with self.archive('SchoolDeskPro-FIX-v2.83.0-desk-update.zip') as z:
             self.assertIsNone(z.testzip())
-            expected = {'SchoolDeskPro/www/' + rel for rel in DESKTOP_FILES} | {'SchoolDeskPro/SchoolDeskPro.exe'}
+            expected = {'SchoolDeskPro/' + WEB + rel for rel in DESKTOP_FILES} | {'SchoolDeskPro/SchoolDeskPro.exe'}
             self.assertEqual(set(z.namelist()), expected)
             for rel, source in DESKTOP_FILES.items():
-                self.assertEqual(z.read('SchoolDeskPro/www/' + rel), source.read_bytes(), rel)
+                self.assertEqual(z.read('SchoolDeskPro/' + WEB + rel), source.read_bytes(), rel)
             binary = z.read('SchoolDeskPro/SchoolDeskPro.exe')
             self.assertGreater(len(binary), 20000)
             self.assertNotIn(b'libgcc_s', binary, 'statically linked launcher expected')
@@ -94,7 +95,7 @@ class DeskUpdatePackages(unittest.TestCase):
         for name in ('SITE-FIX-v4.152.0-desk-update.zip', 'SchoolDeskPro-FIX-v2.83.0-desk-update.zip'):
             with self.archive(name) as z:
                 for entry in z.namelist():
-                    rel = entry.split('SchoolDeskPro/www/')[-1].split('site-update-v4.152.0/')[-1]
+                    rel = entry.split('SchoolDeskPro/' + WEB)[-1].split('site-update-v4.152.0/')[-1]
                     self.assertFalse(any(rel.startswith(prefix) for prefix in FORBIDDEN), entry)
                     if entry == 'SchoolDeskPro/SchoolDeskPro.exe':
                         continue
@@ -109,7 +110,7 @@ class DeskUpdatePackages(unittest.TestCase):
         self.assertEqual(digest, hashlib.sha256(
             self.archive_bytes('SITE-FIX-v4.152.0-desk-update.zip', 'site-update-v4.152.0/includes/desk_update_zip.php')).hexdigest())
         self.assertEqual(digest, hashlib.sha256(
-            self.archive_bytes('SchoolDeskPro-FIX-v2.83.0-desk-update.zip', 'SchoolDeskPro/www/includes/desk_update_zip.php')).hexdigest())
+            self.archive_bytes('SchoolDeskPro-FIX-v2.83.0-desk-update.zip', 'SchoolDeskPro/' + WEB + 'includes/desk_update_zip.php')).hexdigest())
 
     def archive_bytes(self, archive, entry):
         with self.archive(archive) as z:

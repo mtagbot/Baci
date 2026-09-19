@@ -11,7 +11,7 @@ uses the same pinned Zig 0.14.1 toolchain as scripts/build-full-release.py.
 
 Online packages (the ones a school publishes from the site) are built by
 scripts/release-scanner.py for the scanner correction; the same shape applies
-to any other correction: SchoolDeskPro/www/<files> + DESKTOP-UPDATE.json.
+to any other correction: SchoolDeskPro/reports/<files> + DESKTOP-UPDATE.json.
 """
 from pathlib import Path
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
@@ -109,7 +109,7 @@ def build() -> None:
     for rel in DESKTOP_FILES:
         source = DESKTOP_SOURCES.get(rel, PATCH / rel)
         assert source.is_file(), source
-        desktop_entries['SchoolDeskPro/www/' + rel] = source.read_bytes()
+        desktop_entries['SchoolDeskPro/reports/' + rel] = source.read_bytes()
     exe = compile_launcher()
     binary = exe.read_bytes()
     assert binary[:2] == b'MZ', 'compiled launcher is not a PE file'
