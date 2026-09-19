@@ -119,6 +119,7 @@ class DeskUpdatePackages(unittest.TestCase):
         source = (SITE / 'desk-updates.php').read_text(encoding='utf-8')
         self.assertIn("$admin['role'] !== 'super_admin'", source)
         self.assertIn('verify_csrf', source)
+        self.assertIn("'desktop'", source, 'publishing must stay a site-only page')
         self.assertIn("desk_updates_report", source)
 
     def test_api_authorizes_with_the_per_install_key_file(self):

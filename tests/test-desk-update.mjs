@@ -364,6 +364,9 @@ php.writeFile(releaseFile, "<?php return ['distribution' => 'desktop'];");
 const hubDesk = await req(null, { method: 'GET', file: 'other-settings.php', query: 'embedded=1', sid: 'harnessAdm0001' });
 ok('در نسخهٔ دسکتاپ، تب به‌روزرسانی نرم‌افزار دیده می‌شود و تب انتشار پنهان است',
   hubDesk.res.page.includes('desk-update.php?embedded=1') && !hubDesk.res.page.includes('desk-updates.php?embedded=1'));
+const publishPageDesktop = await req(null, { method: 'GET', file: 'desk-updates.php', sid: 'harnessAdm0001' });
+ok('صفحهٔ انتشار روی نسخهٔ دسکتاپ وجود ندارد (فقط سایت مدرسه منتشر می\u200cکند)',
+  publishPageDesktop.res.output_len < 200 && publishPageDesktop.res.output_len > 0, String(publishPageDesktop.res.output_len));
 php.writeFile(releaseFile, releaseBackup);
 const studentPage = await req(null, { method: 'GET', file: 'desk-update.php', sid: 'harnessStu0001' });
 console.log('   DBG studentPage:', studentPage.res.output_len, '| csrf:', studentPage.res.page.includes('csrf_token'), '|', (studentPage.res.raw_head || '').replace(/\n/g, ' ').slice(0, 160));

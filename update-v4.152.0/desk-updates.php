@@ -10,6 +10,8 @@ require_once __DIR__.'/includes/auth.php';
 require_once __DIR__.'/includes/functions.php';
 require_once __DIR__.'/includes/desk_updates_store.php';
 
+$release = is_file(__DIR__.'/config/release.php') ? require __DIR__.'/config/release.php' : [];
+if (($release['distribution'] ?? 'site') === 'desktop') { http_response_code(404); exit('انتشار بسته فقط روی سایت مدرسه انجام می‌شود.'); }
 $admin = is_admin_logged_in() ? DB::fetch('SELECT role,status FROM admins WHERE id=?', [(int)$_SESSION['admin_id']]) : null;
 if (!$admin || $admin['role'] !== 'super_admin' || !(int)$admin['status']) { http_response_code(403); exit('فقط مدیر کل به انتشار به‌روزرسانی دسکتاپ دسترسی دارد.'); }
 

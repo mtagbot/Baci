@@ -95,8 +95,8 @@ SchoolDeskPro/reports-layout-update/router.php           (اختیاری)
 
 | آزمون | نتیجه |
 |---|---|
-| `PATCH=update-v4.152.0 node tests/test-desk-update.mjs` | ۵۸ بررسی رفتاری با PHP واقعی: ساخت بستهٔ واقعی، رد مسیر/نوع/بستهٔ خراب، بررسی PE، چک‌سام نادرست و درست، نصب و پشتیبان‌گیری، وضعیت، ساخت نشانی API، فروشگاه سمت سایت، و API سایت (کلید درست/نادرست/خالی، GET، دانلود، شناسهٔ ناایمن) |
-| `python3 tests/test-desk-update-packaging.py` | ۸ آزمون بسته‌بندی: فایل‌های دقیق، نبود مسیر خصوصی/اجرایی، یکسانی بایت‌به‌بایت دو نسخهٔ خوانندهٔ ZIP، PE بودن فایل اجرایی |
+| `PATCH=update-v4.152.0 node tests/test-desk-update.mjs` | ۵۹ بررسی رفتاری با PHP واقعی: ساخت بستهٔ واقعی، رد مسیر/نوع/بستهٔ خراب، بررسی PE، چک‌سام نادرست و درست، نصب و پشتیبان‌گیری، وضعیت، ساخت نشانی API، فروشگاه سمت سایت، و API سایت (کلید درست/نادرست/خالی، GET، دانلود، شناسهٔ ناایمن) |
+| `python3 tests/test-desk-update-packaging.py` | ۹ آزمون بسته‌بندی: فایل‌های دقیق، نبود مسیر خصوصی/اجرایی، یکسانی بایت‌به‌بایت دو نسخهٔ خوانندهٔ ZIP، PE بودن فایل اجرایی |
 | `python3 tests/test-scanner-packaging.py` | ۵ آزمون، شامل بستهٔ آنلاین اسکنر و فهرست چک‌سام آن |
 | `PATCH=update-v4.152.0 bash scripts/run-tests.sh` | ۳۲ سوئیت سبز (سوئیت تازه «به‌روزرسانی آنلاین دسکتاپ» اضافه شده) |
 
@@ -116,5 +116,5 @@ PATCH=update-v4.152.0 bash scripts/run-tests.sh
 
 | بسته | بایت | SHA256 |
 |---|---:|---|
-| `SITE-FIX-v4.152.0-desk-update.zip` | 12585 | `856c7c78c5490b401062637a23749ba42787547c4297ed26b4851508c179fdc3` |
+| `SITE-FIX-v4.152.0-desk-update.zip` | 12664 | `99366e9daeb0278b323ae1d696a435702c87bc0b57807d0d82f228e4b88e4fae` |
 | `SchoolDeskPro-FIX-v2.83.0-desk-update.zip` | 34077 | `70a242367befe5e4d67f1141f9bbc2d54adb868bd6f3c66b5e6691df3b871708` |
