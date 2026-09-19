@@ -26,6 +26,8 @@ function school_management_hubs() {
             'api'=>['مستندات API','api/docs.php?embedded=1'],
             'sync'=>['همگام‌سازی با سایت','desk-sync.php?embedded=1'],
             'health'=>['سلامت پایگاه داده','db-optimizer.php?embedded=1'],
+            'software-update'=>['به‌روزرسانی نرم‌افزار','desk-update.php?embedded=1'],
+            'desktop-updates'=>['انتشار به‌روزرسانی دسکتاپ','desk-updates.php?embedded=1'],
             'admins'=>['مدیریت مدیران','admins.php?embedded=1']]]
     ];
 }
@@ -39,9 +41,11 @@ function render_management_hub($key) {
         if (($_SESSION['admin_role']??'')!=='super_admin') unset($tabs['admins']);
         $release=is_file(dirname(__DIR__).'/config/release.php')?require dirname(__DIR__).'/config/release.php':[];
         if (($release['distribution']??'site')!=='desktop') {
+            // Desktop online update exists only in the desktop distribution.
+            unset($tabs['software-update']);
             $account=current_admin();
-            if (!$account || $account['role']!=='super_admin' || !(int)$account['status']) unset($tabs['sync']);
-        }
+            if (!$account || $account['role']!=='super_admin' || !(int)$account['status']) { unset($tabs['sync']); unset($tabs['desktop-updates']); }
+        } else unset($tabs['desktop-updates']);
     }
     $requested=$_GET['hub_tab']??'';
     $active=is_string($requested)&&isset($tabs[$requested])?$requested:array_key_first($tabs);

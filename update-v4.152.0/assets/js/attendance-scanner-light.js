@@ -413,11 +413,19 @@
     discardWorker(); lastFrameTime = -1; passCounter = 0;
   }
 
-  /* Near-tag calibration, not infinity. Units of focus/exposure are not
-   * guessed: keep the reported focus of a decoded frame and shorten exposure
-   * by a ratio, compensating with ISO only when both are reported/supported.
-   * Optical constraints are serialized independently of decoding/registration. */
+  /* Focus is pinned to INFINITY for the whole session: it is applied the moment
+   * the camera becomes ready — before any tag — and it is never derived from a
+   * scan. The lens therefore cannot hunt between students: moving the tag
+   * closer or farther no longer triggers a new autofocus sweep (that sweep was
+   * what blurred the tag right after the first read). applyConstraints is only
+   * re-issued when the device itself drops the lock (watchdog / camera
+   * reopen), never per scan. Exposure shortening stays a separate step. */
   var opticsEnabled = true, optics = null, meterCanvas = null, optMode = el('opticsMode'), optFocus = el('opticsFocus'), optTorch = el('opticsTorch');
+  /* focusDistance is reported in meters, so the LARGEST supported value is the
+   * farthest focus (Android infinity is 0 diopters, reported as an unbounded
+   * range). When that range has no upper bound we request a finite distance
+   * beyond any phone hyperfocal distance; the camera maps it to infinity. */
+  var INFINITY_METERS = 1000, FOCUS_WATCHDOG_MS = 5000;
   function finiteNumber(n) { return typeof n === 'number' && isFinite(n); }
   function cameraSettings(track) { try { return track.getSettings ? track.getSettings() : {}; } catch (e) { return {}; } }
   function hasMode(caps, key, value) { return caps[key] && caps[key].indexOf(value) >= 0; }
@@ -434,6 +442,41 @@
     var tolerance = Math.max(0.000001, Math.abs(expected) * 0.015);
     return finiteNumber(actual) && Math.abs(actual - expected) <= tolerance;
   }
+  /* Fixed infinity position for this camera, or null when the device offers no
+   * way to take focus away from continuous autofocus. Layers, in order:
+   * manual + farthest reported distance → manual without distance control
+   * (freezes the current position) → single-shot (one sweep, then hold). */
+  function infinityFocusTarget(o) {
+    var caps = o.caps, range = caps.focusDistance;
+    if (hasMode(caps, 'focusMode', 'manual')) {
+      if (validRange(range)) return { focusMode: 'manual', focusDistance: range.max };
+      if (range && finiteNumber(range.min) && !finiteNumber(range.max)) return { focusMode: 'manual', focusDistance: Math.max(INFINITY_METERS, range.min) };
+      return { focusMode: 'manual' };
+    }
+    if (hasMode(caps, 'focusMode', 'single-shot')) return { focusMode: 'single-shot' };
+    return null;
+  }
+  /* The lock counts only when the device reported the requested mode AND a
+   * position at least as far as requested. A non-finite readback IS the device
+   * reporting infinity; a nearer readback is never claimed as infinity. */
+  function focusLockSatisfied(o, expected, s) {
+    if (!expected || s.focusMode !== expected.focusMode) return false;
+    if (expected.focusMode !== 'manual' || expected.focusDistance === undefined) return true;
+    var d = s.focusDistance;
+    if (!finiteNumber(d)) return true;
+    return d >= expected.focusDistance * 0.9;
+  }
+  function focusReading(o) {
+    var s = cameraSettings(o.track), d = s.focusDistance;
+    if (!o.focusTarget) return 'خودکار (قفل نشده)';
+    if (o.focusTarget.focusMode === 'single-shot') return s.focusMode === 'single-shot' ? 'تک‌مرحله‌ای (قفل‌شده)' : 'خودکار (قفل نشده)';
+    if (s.focusMode !== 'manual') return 'خودکار (قفل نشده)';
+    if (!o.confirmedFocus) return 'در حال بررسی';
+    if (o.focusTarget.focusDistance === undefined) return 'قفل‌شده روی فاصلهٔ فعلی';
+    if (!finiteNumber(d) || d >= 100) return 'بی‌نهایت (قفل‌شده)';
+    if (d >= 2) return 'دور (قفل‌شده) — ' + faDigits(d.toFixed(1)) + ' متر';
+    return 'قفل‌شده در ' + faDigits(d.toFixed(2)) + ' متر';
+  }
   function currentOptics(o) { return optics === o && o.generation === cameraGeneration && currentStream && currentStream.getVideoTracks()[0] === o.track && !document.hidden; }
   function stopOptics() {
     if (optics) { clearTimeout(optics.timer); clearTimeout(optics.verifyTimer); clearTimeout(optics.lightTimer); }
@@ -442,18 +485,15 @@
   }
   function renderOptics(o) {
     if (!currentOptics(o) || !optMode) return;
-    var s = cameraSettings(o.track), focus = 'فوکوس: کنترل‌نشده';
-    if (s.focusMode === 'continuous') focus = 'فوکوس خودکار';
-    else if (s.focusMode === 'manual' && o.confirmedFocus) focus = 'فوکوس ثابت (گزارش دوربین)';
-    else if (s.focusMode === 'single-shot' && o.confirmedFocus) focus = 'فوکوس تک‌مرحله‌ای (گزارش دوربین)';
-    var text = 'گزارش دوربین: ' + focus + ' | تصویر: ' + (finiteNumber(s.frameRate) ? faDigits(Math.round(s.frameRate)) + ' فریم' : 'نرخ گزارش نشده');
+    var s = cameraSettings(o.track);
+    var text = 'گزارش دوربین: فوکوس: ' + focusReading(o) + ' | تصویر: ' + (finiteNumber(s.frameRate) ? faDigits(Math.round(s.frameRate)) + ' فریم' : 'نرخ گزارش نشده');
     if (o.confirmedExposure && finiteNumber(s.exposureTime)) text += ' | نوردهی کوتاه‌تر';
     else text += ' | نوردهی: ' + (s.exposureMode === 'continuous' ? 'خودکار' : 'کنترل سریع تأیید نشده');
     el('opticsStatus').textContent = o.message;
     el('opticsDetails').textContent = text;
     optMode.checked = o.enabled;
     optMode.disabled = !o.supported || (!!o.pending && !o.stalled);
-    optFocus.disabled = !o.enabled || !o.focusAvailable || !!o.pending;
+    optFocus.disabled = !o.enabled || !o.focusTarget || !!o.pending;
     optTorch.disabled = !o.torchAvailable || !!o.pending;
     optTorch.textContent = s.torch === true ? 'خاموش‌کردن چراغ' : 'روشن‌کردن چراغ';
   }
@@ -517,8 +557,12 @@
       var s = cameraSettings(o.track), failed = !!error || o.stalled;
       if (revision === o.revision && !failed) {
         if (expectedFocus) {
-          o.confirmedFocus = s.focusMode === expectedFocus.focusMode && (expectedFocus.focusMode !== 'manual' || closeSetting(s.focusDistance, expectedFocus.focusDistance, o.caps.focusDistance));
-          if (!o.confirmedFocus) failed = true;
+          o.confirmedFocus = focusLockSatisfied(o, expectedFocus, s);
+          if (!o.confirmedFocus) {
+            failed = true;
+            // Never claim a far lock the camera did not confirm.
+            o.lockRejected = finiteNumber(s.focusDistance) ? 'فاصلهٔ گزارش‌شده نزدیک‌تر از درخواست بود' : 'حالت فوکوس تأیید نشد';
+          }
         }
         if (expectedExposure) {
           o.confirmedExposure = s.exposureMode === 'manual' && closeSetting(s.exposureTime, expectedExposure.exposureTime, o.caps.exposureTime) && closeSetting(s.iso, expectedExposure.iso, o.caps.iso);
@@ -533,10 +577,10 @@
         if (o.torchAvailable && s.torch !== expectedTorch) failed = true;
       }
       o.stalled = false;
-      if (failed && wasEnabled && revision === o.revision) restoreOptics(o, 'تنظیم ثابت/سریع توسط دوربین تأیید نشد');
+      if (failed && wasEnabled && revision === o.revision) restoreOptics(o, 'قفل فوکوس بین‌هایت توسط دوربین تأیید نشد' + (o.lockRejected ? ' (' + o.lockRejected + ')' : ''));
       else if (failed && revision === o.revision) { o.restoreFailed = true; o.message = 'بازگشت تنظیم دوربین تأیید نشد؛ برای بازنشانی، همین دوربین یا اسکنر قبلی را دوباره باز کنید'; }
-      else if (revision === o.revision && o.enabled && o.confirmedFocus && !o.exposureWarning) o.message = 'تنظیم فوکوس ثابت/تک‌مرحله‌ای تأیید شد؛ فاصله تگ را تقریباً ثابت نگه دارید';
-      else if (revision === o.revision && !o.enabled) { o.restoreFailed = false; o.message = (o.restoreReason ? o.restoreReason + '؛ ' : '') + 'حالت عادی؛ قفل خودکار پس از خواندن غیرفعال است'; }
+      else if (revision === o.revision && o.enabled && o.confirmedFocus && !o.exposureWarning) o.message = 'فوکوس روی بین‌هایت قفل شد؛ با نزدیک یا دور شدن تگ، دوربین دیگر فوکوس نمی‌کند و اسکن ادامه دارد';
+      else if (revision === o.revision && !o.enabled) { o.restoreFailed = false; o.message = (o.restoreReason ? o.restoreReason + '؛ ' : '') + 'حالت عادی؛ قفل فوکوس خودکار غیرفعال است و اسکن ادامه دارد'; }
       if (!failed && revision === o.revision && o.confirmedExposure && !o.lightChecked) {
         o.lightChecked = true;
         o.lightTimer = setTimeout(function () {
@@ -566,22 +610,45 @@
     try { caps = track.getCapabilities ? track.getCapabilities() : {}; } catch (e) {}
     try { base = track.getConstraints ? track.getConstraints() : {}; } catch (e) {}
     var o = { track: track, generation: generation, caps: caps, base: base, original: cameraSettings(track),
-      enabled: opticsEnabled, focusTarget: null, exposureTarget: null, focusAttempted: false, exposureAttempted: false,
+      enabled: opticsEnabled, focusTarget: null, exposureTarget: null, exposureAttempted: false,
       confirmedFocus: false, confirmedExposure: false, pending: null, revision: 1, appliedRevision: 0, stalled: false,
-      message: 'تنظیم اولیه: تگ را وسط تصویر، در فاصله معمول ۱۰ تا ۱۵ سانتی‌متر لحظه‌ای ثابت بگیرید؛ پس از اولین خواندن، قفل فوکوس امتحان می‌شود.' };
+      lockAttempts: 0, lockRejected: '', message: 'تنظیم اولیه دوربین…' };
     if (!o.base.frameRate) o.base.frameRate = { ideal: 30, max: 30 };
-    o.focusAvailable = hasMode(caps, 'focusMode', 'single-shot') || (hasMode(caps, 'focusMode', 'manual') && validRange(caps.focusDistance));
+    o.focusAvailable = hasMode(caps, 'focusMode', 'manual') || hasMode(caps, 'focusMode', 'single-shot');
     o.torchAvailable = caps.torch === true || (caps.torch && typeof caps.torch.indexOf === 'function' && caps.torch.indexOf(true) >= 0 && caps.torch.indexOf(false) >= 0);
     o.torchWanted = o.original.torch === true;
-    o.supported = !!track.applyConstraints && !!(o.focusAvailable || hasMode(caps, 'focusMode', 'continuous') || o.torchAvailable || (caps.frameRate && caps.frameRate.max >= 60) || hasMode(caps, 'exposureMode', 'manual'));
-    if (!o.supported) { o.enabled = false; o.message = 'این مرورگر کنترل فوکوس/شاتر را ارائه نمی‌کند؛ اسکن عادی ادامه دارد.'; }
-    else if (!o.focusAvailable) o.message = 'قفل فوکوس در این مرورگر قابل کنترل نیست؛ اسکن و تنظیمات حرکتِ پشتیبانی‌شده ادامه دارند.';
-    if (!opticsEnabled) o.message = 'حالت عادی انتخاب شده است؛ قفل و نوردهی سریع غیرفعال‌اند';
+    o.focusTarget = o.enabled ? infinityFocusTarget(o) : null;
+    o.supported = !!track.applyConstraints && !!(o.focusAvailable || o.torchAvailable || (caps.frameRate && caps.frameRate.max >= 60) || hasMode(caps, 'exposureMode', 'manual'));
+    if (!opticsEnabled) { o.enabled = false; o.message = 'حالت قفل فوکوس انتخاب نشده است؛ فوکوس خودکار و نوردهی خودکار فعال‌اند'; }
+    else if (!o.supported) { o.enabled = false; o.message = 'این مرورگر کنترل فوکوس/شاتر را ارائه نمی‌کند؛ اسکن عادی ادامه دارد.'; }
+    else if (!o.focusTarget) { o.enabled = false; o.supported = false; o.message = 'قفل فوکوس در این مرورگر قابل کنترل نیست؛ دوربین دست‌نخورده می‌ماند و اسکن عادی ادامه دارد.'; }
+    else if (o.focusTarget.focusMode === 'single-shot') o.message = 'قفل فوکوس تک‌مرحله‌ای پیش از اولین اسکن؛ پس از آن دوربین دوباره فوکوس نمی‌کند';
+    else if (o.focusTarget.focusDistance === undefined) o.message = 'قفل فوکوس روی فاصلهٔ فعلی (این دوربین فاصله را گزارش نمی‌کند); پس از آن دوربین دوباره فوکوس نمی‌کند';
+    else if (o.focusTarget.focusDistance >= 100) o.message = 'قفل فوکوس روی بین‌هایت پیش از اولین اسکن؛ پس از آن دوربین دوباره فوکوس نمی‌کند';
+    else o.message = 'قفل فوکوس روی دورترین فاصلهٔ ممکن (بین‌هایت) پیش از اولین اسکن؛ پس از آن دوربین دوباره فوکوس نمی‌کند';
     optics = o; renderOptics(o); flushOptics(o);
   }
+  /* The lock must survive the whole session on every phone. Devices can drop it
+   * after a driver reset, an app switch or a rotation; this watchdog restores
+   * the exact same fixed position. It never runs on the scan path. */
+  function focusWatchdog() {
+    var o = optics;
+    if (!o || !currentOptics(o) || !o.enabled || !o.focusTarget || o.pending || document.hidden) return;
+    var s = cameraSettings(o.track);
+    if (focusLockSatisfied(o, o.focusTarget, s)) {
+      // Keep the reported focus position truthful while the lock holds.
+      o.confirmedFocus = true; renderOptics(o);
+      return;
+    }
+    o.lockAttempts++;
+    o.confirmedFocus = false;
+    o.message = 'قفل فوکوس حفظ نشده بود؛ دوباره روی همان حالت قفل می‌شود';
+    o.revision++; flushOptics(o);
+  }
+  if (optMode) setInterval(focusWatchdog, FOCUS_WATCHDOG_MS);
   function opticsFrameSettings() {
     var o = optics;
-    return o && currentOptics(o) && o.enabled && (!o.focusAttempted || !o.exposureAttempted) ? cameraSettings(o.track) : null;
+    return o && currentOptics(o) && o.enabled && !o.exposureAttempted ? cameraSettings(o.track) : null;
   }
   function opticsBrightness() {
     try {
@@ -593,34 +660,25 @@
       return sum / (pixels.length / 4);
     } catch (e) { return null; }
   }
+  /* A decoded tag NEVER moves the lens again: only exposure is calibrated, and
+   * only on the very first read of this camera session. */
   function opticsDecoded(data, captured) {
     var o = optics;
-    if (!o || !currentOptics(o) || !o.enabled || !captured || !/^MTAG-ATT:\d+:[a-f0-9]{16,64}$/i.test(data)) return;
-    var changed = false;
-    if (!o.focusAttempted) {
-      o.focusAttempted = true;
-      // Never invent a 0/infinity or 0.125m preset: device units may differ.
-      if (hasMode(o.caps, 'focusMode', 'manual') && captured.focusDistance > 0 && inRange(captured.focusDistance, o.caps.focusDistance)) o.focusTarget = { focusMode: 'manual', focusDistance: captured.focusDistance };
-      else if (hasMode(o.caps, 'focusMode', 'single-shot')) o.focusTarget = { focusMode: 'single-shot' };
-      else o.message = 'فاصله فوکوس قابل تثبیت/گزارش نیست؛ فوکوس خودکار حفظ شد.';
-      if (o.focusTarget) changed = true;
-    }
-    if (!o.exposureAttempted) {
-      o.exposureAttempted = true;
-      var c = o.caps, time = captured.exposureTime, iso = captured.iso;
-      // At most 4x shorter with compensating gain. Do not underexpose blindly,
-      // or push a previously clean image above ISO 1600 just to shorten shutter.
-      if (hasMode(c, 'exposureMode', 'manual') && (hasMode(c, 'exposureMode', 'continuous') || o.original.exposureMode === 'manual') && time > 0 && iso > 0 && inRange(time, c.exposureTime) && inRange(iso, c.iso)) {
-        var gainLimit = Math.min(c.iso.max, Math.max(iso, 1600)), factor = Math.min(4, gainLimit / iso);
-        var targetTime = roundUpRange(time / factor, c.exposureTime);
-        var targetISO = roundUpRange(iso * time / targetTime, c.iso);
-        if (targetTime < time * 0.8 && targetISO <= gainLimit) {
-          o.exposureTarget = { exposureMode: 'manual', exposureTime: targetTime, iso: targetISO };
-          o.referenceBrightness = opticsBrightness(); o.lightChecked = false; changed = true;
-        }
+    if (!o || !currentOptics(o) || !o.enabled || !captured || o.exposureAttempted || !/^MTAG-ATT:\d+:[a-f0-9]{16,64}$/i.test(data)) return;
+    o.exposureAttempted = true;
+    var c = o.caps, time = captured.exposureTime, iso = captured.iso, changed = false;
+    // At most 4x shorter with compensating gain. Do not underexpose blindly,
+    // or push a previously clean image above ISO 1600 just to shorten shutter.
+    if (hasMode(c, 'exposureMode', 'manual') && (hasMode(c, 'exposureMode', 'continuous') || o.original.exposureMode === 'manual') && time > 0 && iso > 0 && inRange(time, c.exposureTime) && inRange(iso, c.iso)) {
+      var gainLimit = Math.min(c.iso.max, Math.max(iso, 1600)), factor = Math.min(4, gainLimit / iso);
+      var targetTime = roundUpRange(time / factor, c.exposureTime);
+      var targetISO = roundUpRange(iso * time / targetTime, c.iso);
+      if (targetTime < time * 0.8 && targetISO <= gainLimit) {
+        o.exposureTarget = { exposureMode: 'manual', exposureTime: targetTime, iso: targetISO };
+        o.referenceBrightness = opticsBrightness(); o.lightChecked = false; changed = true;
       }
     }
-    if (changed) { o.message = 'در حال درخواست فوکوس ثابت/نوردهی سریع؛ اسکن متوقف نشده است'; o.revision++; flushOptics(o); }
+    if (changed) { o.message = 'در حال درخواست نوردهی سریع‌تر؛ قفل فوکوس بین‌هایت دست‌نخورده است'; o.revision++; flushOptics(o); }
     else renderOptics(o);
   }
   if (optMode) {
@@ -628,16 +686,19 @@
       var o = optics; if (!o || !currentOptics(o) || (o.pending && !o.stalled)) return;
       opticsEnabled = optMode.checked;
       if (o.stalled) { openCamera(0, false); return; }
-      o.restoreReason = ''; o.restoreFailed = false;
-      o.enabled = opticsEnabled; o.exposureWarning = false; o.focusTarget = null; o.exposureTarget = null;
-      o.focusAttempted = false; o.exposureAttempted = false; o.confirmedFocus = false; o.confirmedExposure = false;
-      o.message = o.enabled ? 'تگ را وسط تصویر و در فاصله معمول نگه دارید؛ قفل پس از اولین خواندن امتحان می‌شود' : 'در حال بازگرداندن حالت عادی';
+      o.restoreReason = ''; o.restoreFailed = false; o.lockRejected = '';
+      o.enabled = opticsEnabled; o.exposureWarning = false; o.focusTarget = o.enabled ? infinityFocusTarget(o) : null;
+      o.exposureTarget = null; o.exposureAttempted = false; o.confirmedFocus = false; o.confirmedExposure = false;
+      o.message = o.enabled ? 'در حال قفل‌کردن فوکوس روی بین‌هایت…' : 'در حال بازگرداندن حالت عادی';
       o.revision++; flushOptics(o);
     });
     optFocus.addEventListener('click', function () {
       var o = optics; if (!o || !currentOptics(o) || !o.enabled || o.pending) return;
-      o.exposureWarning = false; o.focusTarget = null; o.exposureTarget = null; o.focusAttempted = false; o.exposureAttempted = false;
-      o.confirmedFocus = false; o.confirmedExposure = false; o.message = 'تگ را وسط تصویر و ثابت در فاصله دلخواه بگیرید؛ فوکوس با خواندن بعدی تنظیم می‌شود';
+      o.exposureWarning = false; o.lockRejected = ''; o.restoreFailed = false;
+      o.exposureTarget = null; o.exposureAttempted = false; o.confirmedExposure = false;
+      o.focusTarget = infinityFocusTarget(o);
+      if (!o.focusTarget) { o.enabled = false; o.message = 'قفل فوکوس در این مرورگر قابل کنترل نیست؛ فوکوس خودکار می‌ماند'; renderOptics(o); return; }
+      o.confirmedFocus = false; o.message = 'قفل دوبارهٔ فوکوس روی بین‌هایت درخواست شد';
       o.revision++; flushOptics(o);
     });
     optTorch.addEventListener('click', function () {
@@ -648,7 +709,6 @@
       o.message = 'در حال تغییر چراغ؛ مراقب بازتاب نور روی تگ براق باشید'; o.revision++; flushOptics(o);
     });
   }
-
   /* Camera lifecycle. A getUserMedia request cannot be cancelled by JS.
    * Keep its slot until it settles, even after our UI timeout. A retry while
    * the browser is still stuck offers a page reload, never an overlapping open.

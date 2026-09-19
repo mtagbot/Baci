@@ -65,6 +65,15 @@ while (true) {
     $res['phase']='settled';
     desk_write_heartbeat($hbFile,$res);
 
+    /* Desktop online update: ask the school site (same key as sync) whether a
+       newer package is published. Throttled inside the engine (6h by default),
+       so this is a local file read on most loops and never blocks school-data
+       sync — a failed check is simply retried on a later loop. */
+    try {
+        require_once __DIR__.'/includes/desk_update.php';
+        if (DeskSync::enabled()) desk_update_check(false, 21600);
+    } catch (Throwable $e) { /* never let update checking disturb data sync */ }
+
     // app closed? (no page request refreshed app-alive for 15 minutes) → stop
     if (!is_file($aliveFile) || time() - (int)@filemtime($aliveFile) > 900) break;
 

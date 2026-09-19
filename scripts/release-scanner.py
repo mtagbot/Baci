@@ -5,12 +5,25 @@ The backup must be byte-for-byte the accepted v4.94 scanner. Run from any cwd.
 from pathlib import Path
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 import hashlib
+import json
 ROOT = Path(__file__).resolve().parent.parent
 PATCH = ROOT / 'update-v4.152.0'
 FILES = ('attendance-scanner.php', 'attendance-scanner-legacy.php',
          'assets/js/attendance-scanner-light.js', 'assets/js/attendance-decoder-worker.js')
 ARCHIVES = {'SITE-FIX-v4.152.0-scanner.zip': 'site-update-v4.152.0/',
             'SchoolDeskPro-FIX-v2.83.0-scanner.zip': 'SchoolDeskPro/www/'}
+# Same payload, in the shape the desktop app can install ONLINE from the school
+# site (see docs/DESKTOP-ONLINE-UPDATE-FA.md). Same four files, no launcher.
+ONLINE_ARCHIVE = 'SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip'
+
+def manifest(version, payload, notes):
+    return (json.dumps({
+        'version': version,
+        'notes': notes,
+        'files': {name: {'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)}
+                  for name, data in sorted(payload.items())},
+    }, ensure_ascii=False, indent=2, sort_keys=True) + '\n').encode()
+
 
 def build():
     payload = {name: (PATCH / name).read_bytes() for name in FILES}
@@ -32,6 +45,26 @@ def build():
             for name in FILES:
                 assert z.read(prefix + name) == payload[name]
         print(archive, target.stat().st_size, hashlib.sha256(target.read_bytes()).hexdigest())
+
+    online = {'SchoolDeskPro/www/' + name: data for name, data in payload.items()}
+    online['SchoolDeskPro/DESKTOP-UPDATE.json'] = manifest(
+        '2.83.0-scanner-focus', payload,
+        'اصلاح اسکنر: فوکوس روی بی‌نهایت قفل می‌شود و بین اسکن‌های متوالی دوباره فوکوس نمی‌کند.')
+    target = ROOT / ONLINE_ARCHIVE
+    with ZipFile(target, 'w', compression=ZIP_DEFLATED, compresslevel=9) as z:
+        for name, content in sorted(online.items()):
+            info = ZipInfo(name, (2026, 9, 19, 0, 0, 0))
+            info.compress_type = ZIP_DEFLATED
+            info.external_attr = 0o100644 << 16
+            z.writestr(info, content)
+    with ZipFile(target) as z:
+        assert z.testzip() is None
+        assert set(z.namelist()) == set(online)
+        meta = json.loads(z.read('SchoolDeskPro/DESKTOP-UPDATE.json'))
+        for name in FILES:
+            assert meta['files'][name]['sha256'] == hashlib.sha256(payload[name]).hexdigest()
+            assert z.read('SchoolDeskPro/www/' + name) == payload[name]
+    print(ONLINE_ARCHIVE, target.stat().st_size, hashlib.sha256(target.read_bytes()).hexdigest())
 
 if __name__ == '__main__':
     build()

@@ -25,6 +25,7 @@
 #include <shellapi.h>
 #include "window-policy.h"
 #include "reports-layout.h"
+#include "desk-update.h"
 
 static char g_dir[MAX_PATH];
 
@@ -234,6 +235,10 @@ static HANDLE launch_app_window(const char *browser, const char *url) {
 int WINAPI WinMain(HINSTANCE hi, HINSTANCE hp, LPSTR cmd, int show) {
   (void) hi; (void) hp; (void) cmd; (void) show;
   exe_dir();
+
+  /* A staged self-update is applied before anything else: hand off to the
+     detached helper and exit, so it can replace this image file safely. */
+  if (sdp_staged_update_ready(g_dir) && sdp_handoff_update(g_dir)) return 0;
 
   WSADATA wd;
   WSAStartup(MAKEWORD(2, 2), &wd);

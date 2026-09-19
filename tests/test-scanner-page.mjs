@@ -10,7 +10,7 @@ for(const [name,query,old] of [['new','',false],['rollback','scanner=legacy',tru
  assert(!res.fatal,res.fatal);assert(!stderr,stderr);assert(res.page.includes('id="cam"'));
  assert.equal(res.page.includes('attendance-scanner-light.js'),!old);
  assert.equal(res.page.includes('function startCam(deviceId)'),old);count++;
- if(!old){assert(res.page.includes('id="opticsMode"'));assert(res.page.includes('camera3'));assert(res.page.includes('attendance-scanner.php?scanner=legacy'));assert(!res.page.includes('<script src="assets/js/jsqr.min.js">'));mkdirSync(REPO+'/.cache/scanner-tests',{recursive:true});writeFileSync(REPO+'/.cache/scanner-tests/page.html',res.page)}
+ if(!old){assert(res.page.includes('id="opticsMode"'));assert(res.page.includes('camera4'));assert(res.page.includes('attendance-scanner.php?scanner=legacy'));assert(!res.page.includes('<script src="assets/js/jsqr.min.js">'));mkdirSync(REPO+'/.cache/scanner-tests',{recursive:true});writeFileSync(REPO+'/.cache/scanner-tests/page.html',res.page)}
 }
 await run(`<?php require '/www/includes/functions.php'; set_setting('attendance_scanner_key','DEMO-only-safe-key');`);
 for(const query of ['key=DEMO-only-safe-key','key=DEMO-only-safe-key&scanner=legacy']) {
