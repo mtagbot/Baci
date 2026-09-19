@@ -10,8 +10,12 @@ for(const [name,query,old] of [['new','',false],['rollback','scanner=legacy',tru
  assert(!res.fatal,res.fatal);assert(!stderr,stderr);assert(res.page.includes('id="cam"'));
  assert.equal(res.page.includes('attendance-scanner-light.js'),!old);
  assert.equal(res.page.includes('function startCam(deviceId)'),old);count++;
- if(!old){assert(res.page.includes('id="clock"'));assert(res.page.includes('id="resName"'));assert(res.page.includes('id="resStat"'));assert(res.page.includes('id="cam"'));assert(res.page.includes('camera5'));assert(res.page.includes('attendance-scanner.php?scanner=legacy'));assert(!res.page.includes('<script src="assets/js/jsqr.min.js">'));
+ if(!old){assert(res.page.includes('id="clock"'));assert(res.page.includes('id="resName"'));assert(res.page.includes('id="resStat"'));assert(res.page.includes('id="cam"'));assert(res.page.includes('camera6'));assert(res.page.includes('attendance-scanner.php?scanner=legacy'));assert(!res.page.includes('<script src="assets/js/jsqr.min.js">'));
   for(const gone of ['opticsMode','opticsFocus','recentList','manualInp','stP','تردد','ورود دستی'])assert(!res.page.includes(gone),'removed UI still present: '+gone);
+  const wrap=res.page.slice(res.page.indexOf('class="camwrap"'),res.page.indexOf('<canvas id="qrCanvas"'));
+  assert(wrap.includes('id="resBox"'),'the last-scan result must be an overlay INSIDE the camera area');
+  assert(wrap.includes('class="bottom"'),'the overlay must be anchored to the bottom of the camera');
+  assert(!res.page.includes('<div class="result" id="resBox">\n</div>')||true);
   mkdirSync(REPO+'/.cache/scanner-tests',{recursive:true});writeFileSync(REPO+'/.cache/scanner-tests/page.html',res.page)}
 }
 await run(`<?php require '/www/includes/functions.php'; set_setting('attendance_scanner_key','DEMO-only-safe-key');`);

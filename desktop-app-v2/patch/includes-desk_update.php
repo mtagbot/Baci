@@ -339,4 +339,150 @@ function desk_update_apply(string $package, array $plan, string $updateId, bool 
     @unlink($package);
     return ['written' => $written, 'launcher' => $launcherStaged, 'backup' => is_dir($backup) ? $backup : ''];
 }
+
+/* ---------------- automatic updates (no operator action) ---------------- */
+
+/** True while a new launcher is staged and waiting for the next start. */
+function desk_update_launcher_staged(): bool {
+    $dir = desk_update_dir().'/launcher';
+    // expected.json is removed by the helper once the swap is decided, so a
+    // remaining pair means the new build has not been applied yet.
+    return is_file($dir.'/SchoolDeskPro.exe') && is_file($dir.'/expected.json') && !is_file($dir.'/failed.txt');
+}
+
+/**
+ * One status object for the whole UI (sync page, daemon heartbeat).
+ * Also absorbs the launcher helper's outcome: on success the pending restart
+ * clears itself, on failure the state records it so the next cycle can retry.
+ */
+function desk_update_status(array $state = null, bool $persist = true): array {
+    $state = $state ?? desk_update_state();
+    $local = desk_update_local_version();
+    $latest = is_array($state['latest'] ?? null) ? $state['latest'] : null;
+    $latestVersion = $latest ? trim((string)($latest['version'] ?? '')) : '';
+
+    $failedFile = desk_update_dir().'/launcher/failed.txt';
+    if (is_file($failedFile)) {
+        $fails = (int)($state['launcher_fail_count'] ?? 0) + 1;
+        $error = trim((string)@file_get_contents($failedFile));
+        if ($error === '') $error = 'راه‌انداز نتوانست فایل اجرایی جدید را جای‌گزین کند.';
+        @unlink($failedFile);
+        $state = desk_update_set_state([
+            'restart_required' => false,
+            'launcher_fail_count' => $fails,
+            'launcher_failed_at' => time(),
+            'error' => $error,
+            // try the whole package again on a later cycle, but never in a loop
+            'applied_id' => $fails <= 3 ? '' : (string)($state['applied_id'] ?? ''),
+        ]);
+        return ['ok' => false, 'code' => 'launcher-failed', 'tone' => 'bad',
+                'label' => $fails <= 3 ? 'جای‌گزینی فایل اجرایی ناموفق بود؛ دوباره تلاش می‌شود' : 'جای‌گزینی فایل اجرایی ناموفق بود',
+                'detail' => $error, 'auto' => $fails <= 3, 'local' => $local, 'latest' => $latestVersion,
+                'available' => desk_update_available($state), 'restart_required' => false, 'state' => $state];
+    }
+    if (!empty($state['restart_required']) && !desk_update_launcher_staged()) {
+        $state = $persist ? desk_update_set_state(['restart_required' => false, 'launcher_applied_at' => time()]) : $state;
+    }
+    $restart = desk_update_launcher_staged();
+
+    $base = ['ok' => true, 'tone' => 'ok', 'auto' => true, 'local' => $local, 'latest' => $latestVersion,
+             'available' => desk_update_available($state), 'restart_required' => $restart, 'state' => $state];
+
+    $ready = desk_update_ready();
+    if (!$ready['ok']) {
+        return array_merge($base, ['ok' => false, 'code' => 'not-configured', 'tone' => 'bad',
+            'label' => 'همگام‌سازی با سایت تنظیم نشده است',
+            'detail' => $ready['error'] . ' تا آن زمان بررسی و نصب خودکار انجام نمی‌شود.']);
+    }
+
+    if (!empty($state['installing'])) {
+        return array_merge($base, ['code' => 'installing', 'tone' => 'info',
+            'label' => 'در حال دریافت و نصب به‌روزرسانی…',
+            'detail' => 'بسته از سایت دریافت می‌شود و فقط در صورت هم‌خوانی چک‌سام نصب می‌گردد.']);
+    }
+
+    if ($restart) {
+        return array_merge($base, ['code' => 'restart-required', 'tone' => 'warn',
+            'label' => 'به‌روزرسانی نصب شد؛ برنامه یک‌بار بسته و باز شود',
+            'detail' => 'فایل‌های برنامه به‌روز شده‌اند. نسخهٔ اجرایی جدید در نخستین اجرای بعدی خودکار جای‌گزین می‌شود؛ دانلود یا نصب دستی لازم نیست.']);
+    }
+
+    if (desk_update_available($state)) {
+        $fails = (string)($state['auto_fail_id'] ?? '') === (string)($latest['id'] ?? '') ? (int)($state['auto_fail_count'] ?? 0) : 0;
+        $recentFail = $fails >= 2 && time() - (int)($state['auto_fail_at'] ?? 0) < 3600;
+        if ($recentFail) {
+            $detail = trim((string)($state['error'] ?? ''));
+            return array_merge($base, ['ok' => false, 'code' => 'auto-failed', 'tone' => 'bad',
+                'label' => 'نصب خودکار آخرین بستهٔ سایت ناموفق بود',
+                'detail' => $detail !== '' ? $detail : 'بستهٔ منتشرشده در سایت نصب نشد؛ یک ساعت دیگر دوباره تلاش می‌شود.']);
+        }
+        return array_merge($base, ['code' => 'available', 'tone' => 'info',
+            'label' => 'نسخهٔ تازه در سایت منتشر شده است — نصب خودکار در جریان است',
+            'detail' => 'نسخهٔ سایت: ' . ($latestVersion !== '' ? $latestVersion : 'نامشخص')
+                . ' — نسخهٔ فعلی برنامه: ' . ($local !== '' ? $local : 'نامشخص')
+                . '. بدون دخالت شما دریافت و نصب می‌شود.']);
+    }
+
+    if (empty($state['checked_at'])) {
+        return array_merge($base, ['code' => 'never-checked', 'tone' => 'info',
+            'label' => 'در انتظار نخستین بررسی خودکار با سایت',
+            'detail' => 'برنامه در همان نخستین همگام‌سازی، نسخهٔ منتشرشده در سایت را بررسی می‌کند.']);
+    }
+
+    $error = trim((string)($state['error'] ?? ''));
+    if ($error !== '') {
+        return array_merge($base, ['ok' => false, 'code' => 'check-error', 'tone' => 'warn',
+            'label' => 'آخرین بررسی با سایت انجام نشد؛ وضعیت به‌روزرسانی نامعلوم است',
+            'detail' => $error . ' — برنامه خودش دوباره تلاش می‌کند.']);
+    }
+
+    return array_merge($base, ['code' => 'uptodate', 'tone' => 'ok',
+        'label' => 'برنامه کاملاً به‌روز و همگام با سایت است',
+        'detail' => ($local !== '' ? 'نسخهٔ فعلی: ' . $local . ' — ' : '')
+            . ($latestVersion !== '' ? 'آخرین بستهٔ سایت: نسخهٔ ' . $latestVersion . ' (نصب‌شده)' : 'سایت بستهٔ به‌روزرسانی برای دسکتاپ منتشر نکرده است')
+            . ' — نصب خودکار فعال است.']);
+}
+
+/**
+ * Automatic path used by the background worker: check the site, then install
+ * without asking. Web files apply immediately; a new launcher is staged and
+ * applied on the next start. A failing package is retried at most hourly and
+ * never blocks school-data sync.
+ */
+function desk_update_auto(int $checkInterval = 900, int $retryAfter = 3600, int $maxFails = 2): array {
+    $check = desk_update_check(false, $checkInterval);
+    if (empty($check['ok'])) {
+        return ['ok' => false, 'checked' => false, 'installed' => false, 'available' => false,
+                'error' => (string)($check['error'] ?? ''), 'status' => desk_update_status()];
+    }
+    $state = desk_update_state();
+    if (!desk_update_available($state)) {
+        return ['ok' => true, 'checked' => true, 'installed' => false, 'available' => false,
+                'status' => desk_update_status($state)];
+    }
+    $latest = is_array($state['latest'] ?? null) ? $state['latest'] : null;
+    $id = $latest ? (string)($latest['id'] ?? '') : '';
+    if ($id === '' || empty($latest['sha256'])) {
+        return ['ok' => false, 'checked' => true, 'installed' => false, 'available' => true,
+                'error' => 'اطلاعات بستهٔ منتشرشده کامل نیست.', 'status' => desk_update_status($state)];
+    }
+    $fails = (string)($state['auto_fail_id'] ?? '') === $id ? (int)($state['auto_fail_count'] ?? 0) : 0;
+    if ($fails >= $maxFails && time() - (int)($state['auto_fail_at'] ?? 0) < $retryAfter) {
+        return ['ok' => false, 'checked' => true, 'installed' => false, 'available' => true,
+                'error' => 'نصب خودکار این بسته پیش‌تر ناموفق بود؛ تا یک ساعت دیگر دوباره تلاش نمی‌شود.',
+                'status' => desk_update_status($state)];
+    }
+    $install = desk_update_install($id, $latest, false);
+    if (empty($install['ok'])) {
+        $state = desk_update_set_state(['auto_fail_id' => $id, 'auto_fail_count' => $fails + 1,
+                                        'auto_fail_at' => time(), 'error' => (string)($install['error'] ?? '')]);
+        return ['ok' => false, 'checked' => true, 'installed' => false, 'available' => true,
+                'error' => (string)($install['error'] ?? ''), 'status' => desk_update_status($state)];
+    }
+    $state = desk_update_set_state(['auto_fail_id' => '', 'auto_fail_count' => 0, 'auto_fail_at' => 0,
+                                    'auto_installed_id' => $id, 'auto_installed_at' => time()]);
+    return ['ok' => true, 'checked' => true, 'installed' => true, 'available' => false,
+            'files' => (int)($install['files'] ?? 0), 'launcher' => !empty($install['launcher']),
+            'status' => desk_update_status($state)];
+}
 }

@@ -7,6 +7,21 @@ require_once __DIR__ . '/includes/desk_sync.php';
 
 if (!is_admin_logged_in()) redirect('admin-login.php');
 
+/* The software-update engine may be missing on a very old install; the sync
+   page must keep working (it just cannot report the update status then). */
+if (!function_exists('desk_update_badge')) {
+    function desk_update_badge(): array {
+        $file = __DIR__ . '/includes/desk_update.php';
+        if (!is_file($file)) {
+            return ['ok' => false, 'code' => 'missing-engine', 'tone' => 'warn',
+                    'label' => 'وضعیت به‌روزرسانی نرم‌افزار نامعلوم است',
+                    'detail' => 'موتور به‌روزرسانی روی این نصب پیدا نشد؛ یک‌بار بستهٔ اصلاحی را نصب کنید.'];
+        }
+        require_once $file;
+        return desk_update_status();
+    }
+}
+
 /* AJAX: run one sync cycle now (also used by the background timer) */
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'run') {
     header('Content-Type: application/json; charset=utf-8');
@@ -15,6 +30,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'run') {
     $res = isset($_GET['force']) ? DeskSync::run(true) : DeskSync::runIfDue();
     $res['status'] = DeskSync::status();
     $res['pending'] = DeskSync::pendingCount();
+    $res['update'] = desk_update_badge();
     echo json_encode($res, JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -40,6 +56,15 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'tick') {
     ignore_user_abort(true);
     set_time_limit(300);
     echo json_encode(DeskSync::tick(), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+/* AJAX: software update status (local state file only — never a network call,
+   so this stays instant even when the internet is down) */
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'update') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => true, 'pending' => DeskSync::pendingCount(),
+                      'update' => desk_update_badge()], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -78,6 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_sync'])) {
 }
 
 $st = DeskSync::status();
+$upd = desk_update_badge();
 require_once __DIR__ . '/includes/header.php';
 
 function fa_ago($ts) {
@@ -89,7 +115,25 @@ function fa_ago($ts) {
     return tr_num((string)floor($d / 86400), 'fa') . ' روز پیش';
 }
 ?>
+<?php
+$updTones = ['ok' => 'border-green-500 bg-green-50 text-green-800',
+             'warn' => 'border-amber-500 bg-amber-50 text-amber-800',
+             'bad' => 'border-red-500 bg-red-50 text-red-700',
+             'info' => 'border-blue-500 bg-blue-50 text-blue-800'];
+$updTone = $updTones[$upd['tone']] ?? $updTones['info'];
+$syncLine = !$st['enabled']
+    ? 'همگام‌سازی خودکار با سایت خاموش است؛ داده‌ها فقط با اجرای دستی رد و بدل می‌شوند.'
+    : ($st['last_ok'] > 0
+        ? 'داده‌ها: آخرین تبادل موفق ' . fa_ago($st['last_ok']) . ($st['last_err'] !== '' ? ' — آخرین خطا: ' . $st['last_err'] : ' — بدون خطا')
+        : 'داده‌ها: هنوز تبادل موفقی با سایت ثبت نشده است.');
+?>
 <div class="max-w-3xl mx-auto">
+    <div id="deskUpdateStatus" data-code="<?php echo clean($upd['code']); ?>"
+         class="card p-4 mb-6 border-r-4 <?php echo $updTone; ?>" role="status" aria-live="polite">
+        <div class="font-bold" id="deskUpdateLabel"><?php echo clean($upd['label']); ?></div>
+        <div class="text-sm mt-1" id="deskUpdateDetail"><?php echo clean($upd['detail']); ?></div>
+        <div class="text-xs mt-2 text-muted" id="deskUpdateSync"><?php echo clean($syncLine); ?></div>
+    </div>
     <div class="card p-6 mb-6">
         <h3 class="text-lg font-bold mb-4 text-primary border-b pb-2">همگام‌سازی با سایت مدرسه</h3>
         <p class="text-sm mb-4 text-muted">
@@ -101,6 +145,10 @@ function fa_ago($ts) {
             علاوه بر ارسال و دریافت رویدادها، در هر همگام‌سازی دستی (و خودکار ساعتی)
             محتوای جدول‌های دسکتاپ با سایت «مقایسه کامل» می‌شود و اگر جدولی ناهمسان
             باشد، عین داده سایت دوباره دریافت می‌شود تا دو بانک همیشه همسان بمانند.
+            نسخهٔ نرم‌افزار هم خودکار است: برنامه در همین همگام‌سازی، نسخهٔ منتشرشده در سایت را
+            بررسی می‌کند و اگر تازه‌تر باشد آن را خودش دریافت و نصب می‌کند — نیاز به دانلود یا
+            نصب دستی بسته نیست (فقط اگر نسخهٔ فایل اجرایی هم عوض شده باشد، یک‌بار بستن و بازکردن
+            برنامه لازم است).
             برای فعال‌سازی: فایل <code dir="ltr">desk-sync-api.php</code> (داخل پوشه server همین بسته)
             را در پوشه‌ای از سایت که سامانه در آن نصب است آپلود کنید (کنار index.php).
             کلید اتصال از قبل در فایل و در برنامه تنظیم شده و نیازی به تغییر ندارد.
@@ -171,6 +219,28 @@ function fa_ago($ts) {
     </div>
 </div>
 <script>
+/* Keep the update badge honest without reloading: cheap local read every 30s. */
+(function () {
+    var box = document.getElementById('deskUpdateStatus');
+    if (!box) return;
+    var tones = {ok: 'border-green-500 bg-green-50 text-green-800',
+                 warn: 'border-amber-500 bg-amber-50 text-amber-800',
+                 bad: 'border-red-500 bg-red-50 text-red-700',
+                 info: 'border-blue-500 bg-blue-50 text-blue-800'};
+    var base = 'card p-4 mb-6 border-r-4 ';
+    function refresh() {
+        fetch('desk-sync.php?ajax=update').then(function (r) { return r.json(); }).then(function (j) {
+            var u = j && j.update;
+            if (!u) return;
+            box.className = base + (tones[u.tone] || tones.info);
+            box.setAttribute('data-code', u.code);
+            document.getElementById('deskUpdateLabel').textContent = u.label;
+            document.getElementById('deskUpdateDetail').textContent = u.detail;
+        }).catch(function () {});
+    }
+    setInterval(refresh, 30000);
+    refresh();
+})();
 document.getElementById('syncNowBtn').addEventListener('click', function () {
     var btn = this, out = document.getElementById('syncRunResult');
     btn.disabled = true;
@@ -181,6 +251,9 @@ document.getElementById('syncNowBtn').addEventListener('click', function () {
             if (j.ok) {
                 out.innerHTML = '<span class="text-green-600">انجام شد — ارسال: '
                     + (j.pushed || 0) + '، دریافت: ' + (j.pulled || 0) + '</span>';
+                if (j.update && j.update.code === 'restart-required') {
+                    out.innerHTML += '<div class="mt-2 text-amber-700 font-bold">نسخهٔ تازهٔ برنامه نصب شد؛ برای تکمیل، برنامه را یک‌بار ببندید و باز کنید.</div>';
+                }
                 if (j.warning) {
                     out.innerHTML += '<div class="mt-2 text-orange-600 font-bold">⚠ ' + j.warning + '</div>';
                     btn.disabled = false; // stay on page so the warning is read

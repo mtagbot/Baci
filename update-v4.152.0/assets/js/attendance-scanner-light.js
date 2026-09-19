@@ -53,11 +53,21 @@
     }
     var hint = document.getElementById('sndHint');
     if (hint) hint.style.display = 'none';
-    document.removeEventListener('touchstart', unlockAudio);
-    document.removeEventListener('click', unlockAudio);
   }
-  document.addEventListener('touchstart', unlockAudio, false);
-  document.addEventListener('click', unlockAudio, false);
+  /* A tap is a safe moment to repair a camera that never opened (blocked
+     autoplay, a permission prompt dismissed early, a browser that needs the
+     interaction). The listeners stay attached, rate-limited, because a scanning
+     page must never be one dead tap away from doing nothing. */
+  var lastGestureRepair = 0;
+  function onGesture() {
+    unlockAudio();
+    if (camState !== 'idle' && camState !== 'error') return;
+    if (now() - lastGestureRepair < 10000) return;
+    lastGestureRepair = now(); recoveryAttempts = 0;
+    openCamera(0, false);
+  }
+  document.addEventListener('touchstart', onGesture, false);
+  document.addEventListener('click', onGesture, false);
 
   /* one tone with attack/decay envelope */
   function tone(freq, startAt, dur, type, vol, slideTo){
@@ -161,7 +171,7 @@
   }
   function sendScan(payload, manual) {
     if (busy || (!manual && (now() < sendAfter || seen(payload)))) return false;
-    busy = true;
+    busy = true; lastTagAt = now();
     // Immediate, neutral acknowledgement is NOT attendance confirmation.
     resBox.className = 'result'; resIcon.textContent = '⏳';
     resName.textContent = 'کد خوانده شد'; resStat.textContent = 'در حال ثبت…';
@@ -207,9 +217,17 @@
   var mem = navigator.deviceMemory || 0, cores = navigator.hardwareConcurrency || 0;
   var LOW_END = (mem && mem <= 3) || (cores && cores <= 4);
   var FAST_DIM = LOW_END ? 480 : 640, CROP_RATIO = 0.72, FULL_EVERY = 5;
-  var DECODE_TIMEOUT_MS = 1500, MAX_REST_MS = 40, FRAME_POLL_MS = 10;
+  var DECODE_TIMEOUT_MS = 1500, MAX_REST_MS = 40, FRAME_POLL_MS = 10, FORCE_DECODE_MS = 120;
+  /* A stream can stop delivering frames without any error event: some browsers
+   * keep video.currentTime at 0 for a live MediaStream, applyConstraints may
+   * freeze the capture session, or the decoder may simply never be asked again.
+   * Scanning must never depend on a signal that may never come, so the loop has
+   * three independent frame signals and two self-healing steps. */
+  var STALL_CHECK_MS = 1000, STALL_REATTACH_MS = 3000, STALL_REOPEN_MS = 9000;
   var scanTimer = null, scanning = false, decodeBusy = false;
   var scanEpoch = 0, passCounter = 0, lastFrameTime = -1, decodeJob = 0;
+  var frameToken = 0, frameCallback = null, lastFrameToken = -1, lastDecodeAt = 0, lastTagAt = 0;
+  var stallTicks = 0, sigCanvas = null, lastSignature = '';
   var worker = null, workerBroken = false, workerDone = null;
   var nativeDetector = null, nativeBroken = false;
   var decoderLoading = false, decoderWaiters = [], decoderRetryAt = 0, activeDecodeCancel = null;
@@ -306,6 +324,76 @@
     ctx.drawImage(video, sx, sy, sw, sh, 0, 0, cw, ch);
     return { width: cw, height: ch, full: full };
   }
+  /* Signal 1 (exact, when the browser has it): one token per presented frame. */
+  function armFrameCallback() {
+    if (!scanning || document.hidden || frameCallback !== null) return;
+    if (typeof video.requestVideoFrameCallback !== 'function') return;
+    try {
+      frameCallback = video.requestVideoFrameCallback(function () {
+        frameCallback = null;
+        if (!scanning || document.hidden) return;
+        frameToken++;
+        scheduleScan(0);
+        armFrameCallback();
+      });
+    } catch (e) { frameCallback = null; }
+  }
+  /* Signal 2: video.currentTime. Signal 3: bounded re-decode of the standing
+   * frame, so a browser that never advances a signal cannot stop scanning. */
+  function frameFresh() {
+    if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) return false;
+    if (video.currentTime !== lastFrameTime) return true;
+    if (frameToken !== lastFrameToken) return true;
+    return now() - lastDecodeAt >= FORCE_DECODE_MS;
+  }
+  /* A cheap 16x12 fingerprint: if the pixels keep changing, frames are arriving
+   * even when no time signal moves. */
+  function frameSignature() {
+    try {
+      if (!sigCanvas) { sigCanvas = document.createElement('canvas'); sigCanvas.width = 16; sigCanvas.height = 12; }
+      var sctx = sigCanvas.getContext('2d');
+      sctx.drawImage(video, 0, 0, 16, 12);
+      var data = sctx.getImageData(0, 0, 16, 12).data, sum = 0, sig = '';
+      for (var i = 0; i < data.length; i += 4) sum += data[i] + data[i + 1] + data[i + 2];
+      sig = String(Math.round(sum / 48));
+      for (var k = 0; k < data.length; k += 68) sig += ':' + data[k];
+      return sig;
+    } catch (e) { return ''; }
+  }
+  function reattachStream() {
+    if (!currentStream || document.hidden || camState !== 'ready') return;
+    camMsg.textContent = 'تصویر دوربین ثابت ماند؛ در حال بازیابی…';
+    try {
+      if ('srcObject' in video) { video.srcObject = null; video.srcObject = currentStream; }
+      else if ('mozSrcObject' in video) video.mozSrcObject = currentStream;
+    } catch (e) {}
+    lastFrameTime = -1; lastFrameToken = -1; lastVideoTime = -1; lastDecodeAt = 0;
+    try { observe(video.play(), function () { if (scanning) scheduleScan(0); }, noop); } catch (e) { scheduleScan(0); }
+  }
+  /* Last resort: the stream itself is dead. Reopen the same camera, and never
+   * let the lens tuning freeze the scanner again for this session. */
+  function recoverStalledCamera() {
+    if (!currentStream || document.hidden || camState !== 'ready') return;
+    if (recoveryAttempts >= 3) return;
+    stallTicks = 0; recoveryAttempts++; opticsSafeMode = true;
+    camMsg.textContent = 'دوربین پاسخ نمی‌دهد؛ بازکردن دوبارهٔ همان دوربین…';
+    openCamera(0, false);
+  }
+  function stallCheck() {
+    if (!scanning || document.hidden || camState !== 'ready' || pendingOpen || busy || decodeBusy) return;
+    if (!trackLive()) return;
+    if (lastTagAt && now() - lastTagAt < 3000) { stallTicks = 0; return; }        // it just worked
+    var sig = frameSignature();
+    if (sig === '') return;                                                      // canvas unavailable: cannot judge
+    if (sig !== lastSignature) { lastSignature = sig; stallTicks = 0; return; }  // pixels are moving
+    if (video.currentTime !== lastFrameTime || frameToken !== lastFrameToken) { stallTicks = 0; lastSignature = sig; return; }
+    stallTicks++;
+    var stalledFor = stallTicks * STALL_CHECK_MS;
+    if (stalledFor >= STALL_REOPEN_MS) { recoverStalledCamera(); return; }
+    // Re-attach the live stream every few seconds first; only a stream that
+    // stays frozen for the whole window justifies touching the camera itself.
+    if (stalledFor % STALL_REATTACH_MS === 0) reattachStream();
+  }
   function scheduleScan(rest) {
     if (!scanning || scanTimer || decodeBusy || document.hidden) return;
     if (rest > 0) {
@@ -313,19 +401,14 @@
       return;
     }
     // No rest: a frame that is already newer than the last decoded one is used
-    // immediately. Otherwise a short poll (about twice per frame at 60 fps)
-    // picks up the next presented frame. Deliberately no
-    // requestVideoFrameCallback: a browser that never fires it would silently
-    // stop scanning, and the poll costs nothing measurable.
-    if (video.readyState >= 2 && video.currentTime !== lastFrameTime) { scanTick(); return; }
+    // immediately. Otherwise a short poll picks up the next presented frame.
+    if (frameFresh()) { scanTick(); return; }
     scheduleScan(FRAME_POLL_MS);
   }
   function scanTick() {
     if (!scanning || document.hidden || camState !== 'ready') return;
     if (!ctx) { scanning = false; camMsg.textContent = 'پردازش تصویر در این مرورگر ممکن نیست.'; return; }
-    if (busy || decodeBusy || video.readyState < 2 || !video.videoWidth || !video.videoHeight || video.currentTime === lastFrameTime) {
-      scheduleScan(FRAME_POLL_MS); return;
-    }
+    if (busy || decodeBusy || !frameFresh()) { scheduleScan(FRAME_POLL_MS); return; }
     if ((workerBroken || !window.Worker) && typeof window.jsQR !== 'function' && !nativeDetector) {
       if (now() < decoderRetryAt) { scheduleScan(1000); return; }
       var loadingEpoch = scanEpoch;
@@ -338,7 +421,7 @@
       });
       return;
     }
-    lastFrameTime = video.currentTime;
+    lastFrameTime = video.currentTime; lastFrameToken = frameToken; lastDecodeAt = now();
     var epoch = scanEpoch, generation = cameraGeneration, started = now(), finished = false;
     var useNative = !!(nativeDetector && !nativeBroken);
     decodeBusy = true;
@@ -372,11 +455,16 @@
       } else jsDecode(ctx.getImageData(0, 0, size.width, size.height), size.full, complete);
     } catch (e) { complete(null); }
   }
-  function startScanLoop() { scanning = true; scheduleScan(0); }
+  function startScanLoop() {
+    scanning = true; stallTicks = 0; lastSignature = ''; lastDecodeAt = 0;
+    lastFrameTime = video.currentTime; lastFrameToken = frameToken;
+    armFrameCallback(); scheduleScan(0);
+  }
   function stopScanLoop() {
     scanning = false; scanEpoch++; decodeBusy = false;
     if (activeDecodeCancel) { activeDecodeCancel(); activeDecodeCancel = null; }
     clearTimeout(scanTimer); scanTimer = null;
+    if (frameCallback !== null) { try { video.cancelVideoFrameCallback(frameCallback); } catch (e) {} frameCallback = null; }
     // Do not retain work/frame buffers from the old camera or a hidden page.
     discardWorker(); lastFrameTime = -1; passCounter = 0;
   }
@@ -398,7 +486,7 @@
    * the student walks past. The shortest shutter the device accepts is requested
    * with compensating gain, once, right after the focus lock — not after the
    * first tag, and never on the scan path. */
-  var opticsEnabled = true, optics = null, meterCanvas = null, optTorch = el('opticsTorch'), optStatus = el('opticsStatus');
+  var opticsEnabled = true, opticsSafeMode = false, optics = null, meterCanvas = null, optTorch = el('opticsTorch'), optStatus = el('opticsStatus');
   var NEAR_METERS = 0.12, BAND_MIN = 0.05, BAND_MAX = 0.20, FOCUS_WATCHDOG_MS = 5000;
   var SHUTTER_FACTOR = 8, ISO_CEILING = 1600, SHUTTER_MIN_BRIGHTNESS = 45, DARK_BRIGHTNESS = 22;
   function finiteNumber(n) { return typeof n === 'number' && isFinite(n); }
@@ -546,7 +634,7 @@
     return false;
   }
   function flushOptics(o) {
-    if (!currentOptics(o) || !o.supported || o.pending || o.appliedRevision === o.revision) return;
+    if (!currentOptics(o) || !o.supported || o.pending || o.appliedRevision === o.revision || o.state === 'safe' || o.state === 'unconfirmed') return;
     var revision = o.revision, expectedFocus = o.enabled && o.focusTarget, expectedExposure = o.enabled && o.exposureTarget;
     var expectedTorch = o.torchWanted, request = {}, constraints = opticConstraints(o);
     o.pending = request; renderOptics(o);
@@ -616,15 +704,17 @@
     try { caps = track.getCapabilities ? track.getCapabilities() : {}; } catch (e) {}
     try { base = track.getConstraints ? track.getConstraints() : {}; } catch (e) {}
     var o = { track: track, generation: generation, caps: caps, base: base, original: cameraSettings(track),
-      enabled: opticsEnabled, focusTarget: null, exposureTarget: null, bandExact: null,
+      enabled: opticsEnabled && !opticsSafeMode, focusTarget: null, exposureTarget: null, bandExact: null,
       confirmedFocus: false, confirmedExposure: false, exposureAttempted: false, notice: '', pending: null, revision: 1, appliedRevision: 0, stalled: false,
       state: 'starting', shortMessage: 'در حال تنظیم فوکوس ۵ تا ۲۰ سانتی‌متر…' };
-    o.torchAvailable = hasMode(caps, 'torch', true) && typeof caps.torch !== 'string';
     o.torchAvailable = !!(caps.torch === true || (caps.torch && typeof caps.torch.indexOf === 'function' && caps.torch.indexOf(true) >= 0 && caps.torch.indexOf(false) >= 0));
     o.torchWanted = o.original.torch === true;
     o.focusTarget = o.enabled ? nearFocusTarget(o) : null;
     o.supported = !!track.applyConstraints && !!(o.focusTarget || o.torchAvailable || (caps.frameRate && caps.frameRate.max >= 60) || hasMode(caps, 'exposureMode', 'manual'));
-    if (!o.focusTarget) {
+    if (opticsSafeMode) {
+      o.state = 'safe';
+      o.shortMessage = 'تنظیم لنز برای این نشست کنار گذاشته شد تا اسکن قطع نشود';
+    } else if (!o.focusTarget) {
       o.enabled = false; o.state = 'unavailable';
       o.shortMessage = 'این مرورگر کنترل فوکوس ندارد — دوربین دست‌نخورده می‌ماند';
     } else if (!o.supported) {
@@ -700,7 +790,7 @@
   var desiredId = null, camList = [], readyTimer = null, recoveryTimer = null, objectURL = null, readyCheck = null;
   video.addEventListener('loadeddata', function () { if (readyCheck) readyCheck(); });
   video.addEventListener('playing', function () { if (readyCheck) readyCheck(); });
-  var recoveryAttempts = 0, stableTicks = 0, frozenCount = 0, lastVideoTime = -1;
+  var recoveryAttempts = 0, stableTicks = 0, deadTicks = 0, lastVideoTime = -1, wasSuspended = false;
   try { desiredId = localStorage.getItem('mtag_scanner_cam') || null; } catch (e) {}
   function stopTracks(stream) {
     if (!stream) return;
@@ -765,7 +855,7 @@
     clearRecovery(); clearTimeout(readyTimer); readyCheck = null; stopScanLoop(); stopStream();
     prepareDecoder();
     var generation = ++cameraGeneration;
-    camState = 'opening'; frozenCount = 0; stableTicks = 0; lastVideoTime = -1;
+    camState = 'opening'; stableTicks = 0; lastVideoTime = -1;
     camMsg.textContent = 'در حال راه‌اندازی دوربین انتخابی...';
     var req = { generation: generation, id: desiredId, expired: false, timer: null };
     pendingOpen = req; setControls(); armOpenTimeout(req);
@@ -876,12 +966,19 @@
     cameraGeneration++; clearRecovery(); clearTimeout(readyTimer); readyTimer = null;
     if (pendingOpen) { clearTimeout(pendingOpen.timer); pendingOpen.timer = null; }
     readyCheck = null; stopScanLoop(); stopStream(); camState = 'suspended';
+    wasSuspended = true;
     setControls();
   }
   function resume() {
     if (document.hidden) return;
     clock();
-    if (camState === 'opening' || camState === 'warming' || camState === 'error') return;
+    /* Coming back to a page that failed (error, suspended, stalled) must end in
+     * a working scanner without the operator touching anything. A plain window
+     * focus must not re-ask for a camera that was never granted, so the automatic
+     * retry only happens after the page was really away (hidden/minimised). */
+    var returning = wasSuspended; wasSuspended = false;
+    if (camState === 'error') { if (returning) { recoveryAttempts = 0; openCamera(0, false); } return; }
+    if (camState === 'opening' || camState === 'warming') return;
     if (camState === 'suspended' || camState === 'idle') { openCamera(0, false); return; }
     if (!trackLive()) { scheduleRecovery(); return; }
     if (video.paused) {
@@ -895,12 +992,19 @@
   window.addEventListener('orientationchange', resume);
   window.addEventListener('online', function () {});
   try { if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', function () { listCams(cameraGeneration); }); } catch (e) {}
+  setInterval(stallCheck, STALL_CHECK_MS);
   setInterval(function () {
     if (document.hidden || camState !== 'ready' || pendingOpen || recoveryTimer || (optics && optics.pending && !optics.stalled)) return;
-    if (!trackLive() || video.readyState < 2 || video.currentTime === lastVideoTime) { frozenCount++; stableTicks = 0; }
-    else { frozenCount = 0; if (++stableTicks >= 3) recoveryAttempts = 0; }
+    if (!trackLive() || video.readyState < 2) {
+      // Muted/ended track or a video that stopped delivering data: the stream
+      // itself is dead, so recover the SAME selected camera.
+      deadTicks++;
+      if (deadTicks >= 2) { deadTicks = 0; scheduleRecovery(); }
+      return;
+    }
+    deadTicks = 0;
+    if (video.currentTime !== lastVideoTime) { stableTicks++; recoveryAttempts = 0; }
     lastVideoTime = video.currentTime;
-    if (frozenCount >= 2) { frozenCount = 0; scheduleRecovery(); }
   }, 4000);
   openCamera(0, false);
 })();

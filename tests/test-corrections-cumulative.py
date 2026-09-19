@@ -102,6 +102,7 @@ class CumulativeCorrective(unittest.TestCase):
             'desk-update.php': ROOT / 'desktop-app-v2/patch/www-desk-update.php',
             'includes/desk_update.php': ROOT / 'desktop-app-v2/patch/includes-desk_update.php',
             'desk-sync-daemon.php': ROOT / 'desktop-app-v2/patch/www-desk-sync-daemon.php',
+            'desk-sync.php': ROOT / 'desktop-app-v2/patch/www-desk-sync.php',
         }
         with ZipFile(SITE_ARCHIVE) as z:
             for rel, source in site_sources.items():
@@ -111,6 +112,23 @@ class CumulativeCorrective(unittest.TestCase):
         with ZipFile(DESKTOP_ARCHIVE) as z:
             for rel, source in {**shared, **desktop_extra}.items():
                 self.assertEqual(z.read(DESKTOP_PREFIX + WEB + rel), source.read_bytes(), rel)
+
+    def test_automatic_update_is_in_the_cumulative_payload(self):
+        """Installing the cumulative pair must be enough to switch a school to
+        automatic updates: the sync page, the daemon hook and the engine travel
+        together, and the site page keeps the API + publisher."""
+        with ZipFile(DESKTOP_ARCHIVE) as z:
+            desktop = set(z.namelist())
+            names = {n[len(DESKTOP_PREFIX + WEB):] for n in desktop if n.startswith(DESKTOP_PREFIX + WEB)}
+        self.assertIn('desk-sync.php', names)
+        self.assertIn('desk-sync-daemon.php', names)
+        self.assertIn('includes/desk_update.php', names)
+        self.assertIn('attendance-scanner.php', names)
+        with ZipFile(SITE_ARCHIVE) as z:
+            site = set(z.namelist())
+        for rel in ('desk-update-api.php', 'desk-updates.php', 'includes/desk_updates_store.php', 'attendance-scanner.php'):
+            self.assertIn(SITE_PREFIX + rel, site)
+        self.assertIn('desk_update_auto(', (ROOT / 'desktop-app-v2/patch/includes-desk_update.php').read_text(encoding='utf-8'))
 
     def test_shared_reader_copy_is_identical_across_the_pair(self):
         with ZipFile(SITE_ARCHIVE) as site, ZipFile(DESKTOP_ARCHIVE) as desktop:

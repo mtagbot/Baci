@@ -42,6 +42,8 @@ DESKTOP_FILES = (
     'includes/desk_update_zip.php',
     'includes/management_hub.php',
     'desk-sync-daemon.php',
+    # the sync page shows whether the app is up to date with the site
+    'desk-sync.php',
 )
 SITE_ARCHIVE = 'SITE-FIX-v4.152.0-desk-update.zip'
 DESKTOP_ARCHIVE = 'SchoolDeskPro-FIX-v2.83.0-desk-update.zip'
@@ -51,6 +53,7 @@ DESKTOP_SOURCES = {
     'includes/desk_update.php': ROOT / 'desktop-app-v2/patch/includes-desk_update.php',
     'includes/desk_update_zip.php': ROOT / 'desktop-app-v2/patch/includes-desk_update_zip.php',
     'desk-sync-daemon.php': ROOT / 'desktop-app-v2/patch/www-desk-sync-daemon.php',
+    'desk-sync.php': ROOT / 'desktop-app-v2/patch/www-desk-sync.php',
 }
 
 

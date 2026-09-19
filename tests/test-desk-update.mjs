@@ -25,6 +25,7 @@ const desktopFiles = {
   '/www/includes/desk_update.php': read('desktop-app-v2/patch/includes-desk_update.php'),
   '/www/desk-update.php': read('desktop-app-v2/patch/www-desk-update.php'),
   '/www/desk-sync-daemon.php': read('desktop-app-v2/patch/www-desk-sync-daemon.php'),
+  '/www/desk-sync.php': read('desktop-app-v2/patch/www-desk-sync.php'),
 };
 for (const [path, text] of Object.entries(desktopFiles)) php.writeFile(path, text);
 console.log('>>> فایل‌های دسکتاپ داخل /www نوشته شد');
@@ -374,13 +375,122 @@ ok('دانش‌آموز/کاربر عادی به صفحهٔ به‌روزرسا�
   !studentPage.res.page.includes('csrf_token') && studentPage.res.page.length < 2000,
   String(studentPage.res.output_len));
 
-/* ═══ ۶) قلاب دیمن و پاک‌سازی ═══ */
+/* ═══ ۶) وضعیت و به‌روزرسانی خودکار ═══ */
+const auto = await run(String.raw`<?php
+ini_set('display_errors', '1'); error_reporting(E_ALL);
+require_once '/www/includes/functions.php';
+require_once '/www/includes/db.php';
+require_once '/www/includes/desk_sync.php';
+require_once '/www/includes/desk_update.php';
+$out = [];
+@unlink('/data/update/state.json');
+@unlink('/data/update/launcher/expected.json');
+@unlink('/data/update/launcher/failed.txt');
+@unlink('/data/update/launcher/SchoolDeskPro.exe');
+DB::execute("DELETE FROM settings WHERE key_name IN ('desk_sync_url','desk_sync_key')");
+$out['status_unconfigured'] = desk_update_status();
+DeskSync::setCfg('desk_sync_url', 'https://school.example.ir/desk-sync-api.php');
+DeskSync::setCfg('desk_sync_key', str_repeat('k', 40));
+$out['status_never'] = desk_update_status();
+$pkg = ['id' => 'pkg-2.84.0-abcdef', 'version' => '2.84.0', 'sha256' => str_repeat('a', 64), 'bytes' => 1234, 'created' => '2026-09-19 00:00'];
+desk_update_set_state(['checked_at' => time(), 'latest' => $pkg, 'error' => '', 'applied_id' => '', 'restart_required' => false, 'auto_fail_id' => '', 'auto_fail_count' => 0, 'auto_fail_at' => 0]);
+$out['status_available'] = desk_update_status();
+desk_update_set_state(['auto_fail_id' => $pkg['id'], 'auto_fail_count' => 2, 'auto_fail_at' => time()]);
+$out['auto_throttled'] = desk_update_auto(900);
+$out['status_auto_failed'] = desk_update_status();
+desk_update_set_state(['auto_fail_id' => '', 'auto_fail_count' => 0, 'auto_fail_at' => 0, 'checked_at' => time()]);
+$out['auto_attempt'] = desk_update_auto(900);
+$after = desk_update_state();
+$out['auto_attempt_state'] = ['fail_id' => (string)($after['auto_fail_id'] ?? ''), 'fail_count' => (int)($after['auto_fail_count'] ?? 0), 'error' => (string)($after['error'] ?? ''), 'installing' => (string)($after['installing'] ?? '')];
+$out['auto_attempt_2'] = desk_update_auto(900);
+$after2 = desk_update_state();
+$out['auto_attempt_2_state'] = ['fail_count' => (int)($after2['auto_fail_count'] ?? 0)];
+$out['auto_throttled_after_fail'] = desk_update_auto(900);
+desk_update_set_state(['applied_id' => $pkg['id'], 'applied_at' => time(), 'error' => '', 'auto_fail_id' => '', 'auto_fail_count' => 0, 'auto_fail_at' => 0, 'restart_required' => false]);
+$out['status_uptodate'] = desk_update_status();
+@mkdir('/data/update/launcher', 0777, true);
+file_put_contents('/data/update/launcher/SchoolDeskPro.exe', 'MZ' . str_repeat("\x00", 40000));
+file_put_contents('/data/update/launcher/expected.json', '{"sha256":"x"}');
+$out['status_restart'] = desk_update_status();
+@unlink('/data/update/launcher/expected.json');
+$out['status_after_swap'] = desk_update_status();
+file_put_contents('/data/update/launcher/failed.txt', 'new build did not start; previous build restored');
+$out['status_launcher_failed'] = desk_update_status();
+$out['failed_marker_removed'] = !file_exists('/data/update/launcher/failed.txt');
+$final = desk_update_state();
+$out['state_after_failure'] = ['applied_id' => (string)($final['applied_id'] ?? ''), 'error' => (string)($final['error'] ?? '')];
+echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);`);
+let A = {};
+try { A = JSON.parse(auto.out); } catch (e) {
+  console.log('   === خروجی PHP (خودکار) ===\n' + (auto.out || '').slice(-1200) + '\n   === stderr ===\n' + (auto.err || '').slice(-400));
+  ok('اجرای موتور به‌روزرسانی خودکار', false, (auto.err || auto.out).slice(-300));
+}
+console.log('\n══ وضعیت به‌روزرسانی و نصب خودکار (بدون دخالت اپراتور) ══');
+ok('بدون تنظیم همگام‌سازی، وضعیت صریح «تنظیم نشده» است',
+  A.status_unconfigured?.code === 'not-configured' && A.status_unconfigured?.tone === 'bad', JSON.stringify(A.status_unconfigured));
+ok('پیش از نخستین بررسی: «در انتظار نخستین بررسی خودکار»',
+  A.status_never?.code === 'never-checked', JSON.stringify(A.status_never));
+ok('بستهٔ تازهٔ سایت: «نصب خودکار در جریان است» با هر دو نسخه',
+  A.status_available?.code === 'available' && A.status_available?.detail.includes('2.84.0')
+  && A.status_available?.detail.includes('نسخهٔ فعلی'), JSON.stringify(A.status_available));
+ok('پایان کار: «برنامه کاملاً به‌روز و همگام با سایت است»',
+  A.status_uptodate?.code === 'uptodate' && A.status_uptodate?.tone === 'ok'
+  && A.status_uptodate?.label.includes('کاملاً به‌روز'), JSON.stringify(A.status_uptodate));
+ok('فایل اجرایی مرحله‌بندی‌شده: «یک‌بار بسته و باز شود» بدون نصب دستی',
+  A.status_restart?.code === 'restart-required' && A.status_restart?.tone === 'warn'
+  && A.status_restart?.detail.includes('دانلود یا نصب دستی لازم نیست'), JSON.stringify(A.status_restart));
+ok('پس از جایگزینی فایل اجرایی، وضعیت خودش به «به‌روز» برمی‌گردد',
+  A.status_after_swap?.code === 'uptodate', JSON.stringify(A.status_after_swap).slice(0, 160));
+ok('شکست راه‌انداز: هشدار صریح، نشانه پاک می‌شود و بسته دوباره قابل تلاش است',
+  A.status_launcher_failed?.code === 'launcher-failed' && A.status_launcher_failed?.tone === 'bad'
+  && A.failed_marker_removed === true && A.state_after_failure?.applied_id === '',
+  JSON.stringify(A.status_launcher_failed).slice(0, 200));
+ok('پس از دو شکست، نصب خودکار تا یک ساعت پشت سر هم تکرار نمی‌شود',
+  A.auto_throttled?.ok === false && A.auto_throttled?.installed === false
+  && String(A.auto_throttled?.error).includes('یک ساعت'), JSON.stringify(A.auto_throttled).slice(0, 160));
+ok('وضعیت پس از شکست خودکار علت را نشان می‌دهد (نه «به‌روز» دروغین)',
+  A.status_auto_failed?.code === 'auto-failed' && A.status_auto_failed?.tone === 'bad',
+  JSON.stringify(A.status_auto_failed).slice(0, 160));
+ok('تلاش خودکار بدون شبکه تمیز شکست می‌خورد و شمارندهٔ شکست را ثبت می‌کند',
+  A.auto_attempt?.ok === false && A.auto_attempt_state?.fail_count === 1
+  && A.auto_attempt_state?.fail_id === 'pkg-2.84.0-abcdef' && A.auto_attempt_state?.installing === '',
+  JSON.stringify(A.auto_attempt_state).slice(0, 200));
+ok('دو تلاش ناموفق پیاپی مجاز است، تلاش سوم یک ساعت به تعویق می‌افتد',
+  A.auto_attempt_2?.ok === false && A.auto_attempt_2_state?.fail_count === 2
+  && String(A.auto_throttled_after_fail?.error).includes('یک ساعت'),
+  JSON.stringify(A.auto_attempt_2_state) + ' | ' + String(A.auto_throttled_after_fail?.error));
+
+/* صفحهٔ همگام‌سازی: نشان وضعیت به‌روزرسانی */
+const syncPage = await req(null, { method: 'GET', file: 'desk-sync.php', sid: 'harnessAdm0001' });
+ok('صفحهٔ همگام‌سازی، نشان وضعیت «به‌روز/همگام با سایت» را نشان می‌دهد',
+  syncPage.res.page.includes('id="deskUpdateStatus"') && /data-code="[a-z-]+"/.test(syncPage.res.page)
+  && syncPage.res.page.includes('id="syncStatusTable"') && !syncPage.res.fatal,
+  (syncPage.res.fatal || syncPage.res.raw_head || '').slice(0, 200));
+const syncAjax = await req(null, { method: 'GET', file: 'desk-sync.php', query: 'ajax=update', sid: 'harnessAdm0001' });
+ok('وضعیت به‌روزرسانی با پرس‌وجوی سبک و بدون شبکه خوانده می‌شود',
+  syncAjax.res.raw_head.includes('"update"') && syncAjax.res.raw_head.includes('"code"')
+  && syncAjax.res.raw_head.includes('"pending"'), (syncAjax.res.raw_head || '').slice(0, 160));
+php.writeFile('/www/config/release.php', "<?php return ['distribution' => 'desktop', 'desktop_version' => '2.83.0'];");
+const updPage = await req(null, { method: 'GET', file: 'desk-update.php', sid: 'harnessAdm0001' });
+ok('صفحهٔ به‌روزرسانی می‌گوید کار خودکار است و وضعیت زنده را نشان می‌دهد',
+  updPage.res.page.includes('خودکار</b>')
+  && updPage.res.page.includes('نصب دستی بسته نیست')
+  && updPage.res.page.includes('وضعیت و نصب دستی')
+  && !updPage.res.fatal,
+  String(updPage.res.output_len));
+php.writeFile('/www/config/release.php', releaseBackup);
+
+/* ═══ ۷) قلاب دیمن و پاک‌سازی ═══ */
 console.log('\n══ چرخهٔ پس‌زمینه ══');
 const daemon = desktopFiles['/www/desk-sync-daemon.php'];
-ok('دیمن همگام‌سازی، بررسی به‌روزرسانی را در چرخهٔ خود دارد',
-  daemon.includes('desk_update_check(false, 21600)') && daemon.includes('DeskSync::enabled()'));
-ok('خطای بررسی به‌روزرسانی هرگز همگام‌سازی داده را متوقف نمی‌کند',
-  /try \{\s*require_once __DIR__\.'\/includes\/desk_update\.php';\s*if \(DeskSync::enabled\(\)\) desk_update_check/.test(daemon));
+ok('دیمن همگام‌سازی، نصب خودکار به‌روزرسانی را در چرخهٔ خود دارد (بدون اپراتور)',
+  daemon.includes('desk_update_auto(900)') && daemon.includes('DeskSync::enabled()'));
+ok('خطای به‌روزرسانی هرگز همگام‌سازی داده را متوقف نمی‌کند',
+  /try \{\s*require_once __DIR__\.'\/includes\/desk_update\.php';[\s\S]{0,500}desk_update_auto/.test(daemon));
+ok('دیمن وضعیت به‌روزرسانی را در فایل ضربان می‌نویسد (صفحه و نشانگر از آن می‌خوانند)',
+  daemon.includes("$res['update'] = $auto['status'] ?? null;")
+  && desktopFiles['/www/desk-sync.php'].includes('deskUpdateStatus')
+  && desktopFiles['/www/desk-sync.php'].includes("$_GET['ajax'] === 'update'"));
 ok('دیمن باید کد قدیمی هم با فایل‌های جدید کار کند (require_once محافظت‌شده)',
   daemon.includes("require_once __DIR__.'/includes/desk_update.php'"));
 

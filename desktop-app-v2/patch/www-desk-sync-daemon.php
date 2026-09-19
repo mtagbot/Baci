@@ -60,19 +60,27 @@ while (true) {
         if(!empty($res['ok']) && !empty($res['server_verified']) && DeskSync::pendingCount()===0) DeskSync::relayBotNotifications();
     } catch(Throwable $e) { error_log('Notification worker: queue processing failed; retained for retry.'); }
 
+    /* Desktop online update — fully automatic. Ask the school site (same key as
+       sync) whether a newer package is published and install it without any
+       operator action: web files are replaced immediately, a new
+       SchoolDeskPro.exe is staged and applied by the launcher on the next start.
+       The check is throttled inside the engine (15 minutes), so most loops are a
+       local file read, and a failure never disturbs school-data sync. */
+    $res['update'] = null;
+    try {
+        require_once __DIR__.'/includes/desk_update.php';
+        if (DeskSync::enabled()) {
+            $auto = desk_update_auto(900);
+            $res['update'] = $auto['status'] ?? null;
+            $res['update_installed'] = !empty($auto['installed']);
+            $res['update_error'] = (string)($auto['error'] ?? '');
+        }
+    } catch (Throwable $e) { /* never let update checking disturb data sync */ }
+
     $res['ts']     = time();
     $res['daemon'] = 1;
     $res['phase']='settled';
     desk_write_heartbeat($hbFile,$res);
-
-    /* Desktop online update: ask the school site (same key as sync) whether a
-       newer package is published. Throttled inside the engine (6h by default),
-       so this is a local file read on most loops and never blocks school-data
-       sync — a failed check is simply retried on a later loop. */
-    try {
-        require_once __DIR__.'/includes/desk_update.php';
-        if (DeskSync::enabled()) desk_update_check(false, 21600);
-    } catch (Throwable $e) { /* never let update checking disturb data sync */ }
 
     // app closed? (no page request refreshed app-alive for 15 minutes) → stop
     if (!is_file($aliveFile) || time() - (int)@filemtime($aliveFile) > 900) break;

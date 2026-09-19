@@ -36,6 +36,7 @@ DESKTOP_FILES = {
     'includes/desk_update_zip.php': DESKTOP_SOURCES['includes/desk_update_zip.php'],
     'includes/management_hub.php': SITE / 'includes/management_hub.php',
     'desk-sync-daemon.php': DESKTOP_SOURCES['desk-sync-daemon.php'],
+    'desk-sync.php': ROOT / 'desktop-app-v2/patch/www-desk-sync.php',
 }
 FORBIDDEN = ('config/', 'data/', 'php/', 'backups/', 'profile/', 'server/')
 EXECUTABLE = ('.bat', '.cmd', '.ps1', '.vbs', '.sh', '.py', '.dll', '.so')
@@ -128,6 +129,25 @@ class DeskUpdatePackages(unittest.TestCase):
         self.assertIn("config/desk-sync-key.php", source)
         self.assertIn('hash_equals', source)
         self.assertIn("strlen($stored) < 32", source)
+
+    def test_automatic_update_ships_in_the_package(self):
+        """The daemon installs published packages by itself: the engine, the daemon
+        hook and the sync page that reports the status must all be in the payload."""
+        engine = (ROOT / 'desktop-app-v2/patch/includes-desk_update.php').read_text(encoding='utf-8')
+        self.assertIn('function desk_update_auto(', engine)
+        self.assertIn('function desk_update_status(', engine)
+        self.assertIn('auto_fail_count', engine)
+        daemon = (ROOT / 'desktop-app-v2/patch/www-desk-sync-daemon.php').read_text(encoding='utf-8')
+        self.assertIn('desk_update_auto(900)', daemon)
+        sync = (ROOT / 'desktop-app-v2/patch/www-desk-sync.php').read_text(encoding='utf-8')
+        self.assertIn('deskUpdateStatus', sync)
+        self.assertIn("'ajax'] === 'update'", sync)
+        # and they really travel inside the corrective archive
+        with self.archive('SchoolDeskPro-FIX-v2.83.0-desk-update.zip') as z:
+            names = set(z.namelist())
+        self.assertIn('SchoolDeskPro/' + WEB + 'desk-sync.php', names)
+        self.assertIn('SchoolDeskPro/' + WEB + 'desk-sync-daemon.php', names)
+        self.assertIn('SchoolDeskPro/' + WEB + 'includes/desk_update.php', names)
 
     def test_engine_never_touches_config_data_or_runtime(self):
         source = (ROOT / 'desktop-app-v2/patch/includes-desk_update.php').read_text(encoding='utf-8')

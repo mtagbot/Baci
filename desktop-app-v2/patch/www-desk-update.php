@@ -2,6 +2,10 @@
 /**
  * File: desk-update.php — به‌روزرسانی آنلاین نرم‌افزار دسکتاپ از روی سایت مدرسه.
  *
+ * به‌روزرسانی به‌صورت پیش‌فرض خودکار است: پردازهٔ پس‌زمینهٔ همگام‌سازی
+ * (desk-sync-daemon.php) بستهٔ منتشرشده در سایت را خودش بررسی، دانلود و نصب
+ * می‌کند و این صفحه فقط برای دیدن وضعیت و نصب دستی به‌عنوان راهِ پشتیبان است.
+ *
  * فقط در نسخهٔ دسکتاپ معنا دارد. بستهٔ منتشرشده در سایت، با همان کلید
  * همگام‌سازی همین مدرسه دانلود، چک‌سام و از نظر مسیر/نوع فایل اعتبارسنجی
  * می‌شود؛ سپس فایل‌های برنامه به‌صورت اتمیک جای‌گزین و نسخهٔ قبلی در
@@ -50,12 +54,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 $state = desk_update_state();
 $latest = is_array($state['latest'] ?? null) ? $state['latest'] : null;
 $ready = desk_update_ready();
+$auto = desk_update_status($state);
+$autoTone = ['ok' => 'text-green-700', 'warn' => 'text-amber-700', 'bad' => 'text-red-600', 'info' => 'text-blue-700'][$auto['tone']] ?? '';
 $pageTitle = 'به‌روزرسانی نرم‌افزار';
 require_once __DIR__ . '/includes/header.php';
 ?>
 <section class="card p-6">
     <h1>به‌روزرسانی آنلاین نرم‌افزار</h1>
-    <p>پس از هر همگام‌سازی، نسخهٔ منتشرشده در سایت مدرسه بررسی می‌شود. بستهٔ دانلودی فقط وقتی نصب می‌شود که چک‌سام آن با سایت یکی باشد و همهٔ مسیرهایش مجاز باشند. تنظیمات نصب، پایگاه داده و پشتیبان‌ها هرگز تغییر نمی‌کنند.</p>
+    <p>این کار <b>خودکار</b> انجام می‌شود: در هر همگام‌سازی، پردازهٔ پس‌زمینه نسخهٔ منتشرشده در سایت مدرسه را بررسی می‌کند و اگر تازه‌تر باشد آن را خودش دریافت و نصب می‌کند؛ نیازی به دانلود یا نصب دستی بسته نیست. بستهٔ دانلودی فقط وقتی نصب می‌شود که چک‌سام آن با سایت یکی باشد و همهٔ مسیرهایش مجاز باشند. تنظیمات نصب، پایگاه داده و پشتیبان‌ها هرگز تغییر نمی‌کنند. این صفحه برای دیدن وضعیت و نصب دستی (راهِ پشتیبان) است.</p>
+    <p class="p-3 mb-3 <?php echo $autoTone; ?> font-bold" role="status"><?php echo clean($auto['label']); ?><span class="block text-sm font-normal mt-1"><?php echo clean($auto['detail']); ?></span></p>
     <?php if ($message): ?><p class="p-3 mb-3 text-green-700 font-bold" role="status"><?php echo clean($message); ?></p><?php endif; ?>
     <?php if ($error): ?><p class="p-3 mb-3 text-red-600 font-bold" role="alert"><?php echo clean($error); ?></p><?php endif; ?>
 
