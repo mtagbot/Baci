@@ -34,7 +34,6 @@ SITE_FILES = (
     'includes/desk_update_zip.php',
     'includes/desk_updates_store.php',
     'includes/management_hub.php',
-    'uploads/desktop-updates/.htaccess',
 )
 # web-relative source path → path inside the desktop corrective (under SchoolDeskPro/)
 DESKTOP_FILES = (

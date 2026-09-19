@@ -70,6 +70,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 }
 $updates = desk_updates_index();
 $latest = desk_updates_latest($updates);
+/* The release build never ships uploads/; the guard is created with the folder. */
+desk_updates_ensure_dir();
 $pageTitle = 'به‌روزرسانی دسکتاپ';
 require_once __DIR__.'/includes/header.php';
 ?>

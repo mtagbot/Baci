@@ -13,6 +13,7 @@
 | فایل‌های برنامه: `.php`, `.css`, `.js`, `assets/`, `vendor/`, `sql/`, `.htaccess`, فونت‌های `uploads/` | به‌روزرسانی می‌شود |
 | `SchoolDeskPro.exe` (فایل اجرایی) | مرحله‌بندی و در اجرای بعدی جای‌گزین می‌شود |
 | `reports-layout-update/router.php` | فقط اگر بسته همراه داشته باشد و نشانهٔ `SDP_REPORTS_ROOT_V1` داشته باشد |
+| `uploads/` | بستهٔ آنلاین فقط فونت می‌تواند همراه داشته باشد؛ ساختار انتشار، پوشهٔ `uploads` را نمی‌برد |
 | `config/` (تنظیمات نصب، کلید همگام‌سازی، رمز پایگاه داده) | **هرگز** |
 | `data/` (پایگاه دادهٔ مدرسه، نشست‌ها، پشتیبان‌ها، فایل‌های همگام‌سازی) | **هرگز** |
 | `php/` (زمان اجرای PHP ویندوز) و `licenses/` | **هرگز** |
@@ -62,7 +63,7 @@
 
 ### ۱) روی سایت (یک بار)
 
-محتوای `SITE-FIX-v4.152.0-desk-update.zip` را (پوشهٔ `site-update-v4.152.0/` روی ریشهٔ سایت) کپی کنید: فایل‌های `desk-updates.php`، `desk-update-api.php`، `includes/desk_update_zip.php`، `includes/desk_updates_store.php`، `includes/management_hub.php` و پوشهٔ `uploads/desktop-updates/.htaccess`.
+محتوای `SITE-FIX-v4.152.0-desk-update.zip` را (پوشهٔ `site-update-v4.152.0/` روی ریشهٔ سایت) کپی کنید: فایل‌های `desk-updates.php`، `desk-update-api.php`، `includes/desk_update_zip.php`، `includes/desk_updates_store.php`، `includes/management_hub.php`. پوشهٔ `uploads/desktop-updates/` و محافظ `.htaccess` آن خودکار و همان لحظهٔ بازکردن صفحهٔ انتشار ساخته می‌شوند (ساختار انتشار، پوشهٔ `uploads` را هرگز همراه نمی‌برد).
 
 ### ۲) روی هر دستگاه دسکتاپ (یک بار)
 
@@ -115,5 +116,5 @@ PATCH=update-v4.152.0 bash scripts/run-tests.sh
 
 | بسته | بایت | SHA256 |
 |---|---:|---|
-| `SITE-FIX-v4.152.0-desk-update.zip` | 12773 | `b1d84fee08c424133a7415105df5f2187d025b2c0f2f3ce94117d07ed0ef132e` |
+| `SITE-FIX-v4.152.0-desk-update.zip` | 12585 | `856c7c78c5490b401062637a23749ba42787547c4297ed26b4851508c179fdc3` |
 | `SchoolDeskPro-FIX-v2.83.0-desk-update.zip` | 34077 | `70a242367befe5e4d67f1141f9bbc2d54adb868bd6f3c66b5e6691df3b871708` |

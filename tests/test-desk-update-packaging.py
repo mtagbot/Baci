@@ -28,7 +28,6 @@ SITE_FILES = {
     'includes/desk_update_zip.php': SITE / 'includes/desk_update_zip.php',
     'includes/desk_updates_store.php': SITE / 'includes/desk_updates_store.php',
     'includes/management_hub.php': SITE / 'includes/management_hub.php',
-    'uploads/desktop-updates/.htaccess': SITE / 'uploads/desktop-updates/.htaccess',
 }
 DESKTOP_FILES = {
     'desk-update.php': DESKTOP_SOURCES['desk-update.php'],
@@ -78,6 +77,18 @@ class DeskUpdatePackages(unittest.TestCase):
 
     def test_launcher_binary_is_a_windows_gui_build(self):
         self.assertTrue(pe_binary(ROOT / '.cache/release-v1/SchoolDeskPro.exe'))
+
+    def test_upload_folder_guard_is_created_at_runtime_not_shipped(self):
+        # the release build wipes uploads/ (student files must never ship), so the
+        # publisher page creates uploads/desktop-updates/.htaccess on first use.
+        store = (SITE / 'includes/desk_updates_store.php').read_text(encoding='utf-8')
+        self.assertIn('uploads/desktop-updates', store)
+        self.assertIn("'/.htaccess'", store)
+        page = (SITE / 'desk-updates.php').read_text(encoding='utf-8')
+        self.assertIn('desk_updates_ensure_dir()', page)
+        for name in ('SITE-FIX-v4.152.0-desk-update.zip', 'SchoolDeskPro-FIX-v2.83.0-desk-update.zip'):
+            with self.archive(name) as z:
+                self.assertFalse([n for n in z.namelist() if 'uploads/' in n], name)
 
     def test_no_private_or_executable_payload_anywhere(self):
         for name in ('SITE-FIX-v4.152.0-desk-update.zip', 'SchoolDeskPro-FIX-v2.83.0-desk-update.zip'):
