@@ -61,6 +61,7 @@
   var lastGestureRepair = 0;
   function onGesture() {
     unlockAudio();
+    if (camState === 'warming') { if (gesturePlay) gesturePlay(); return; }
     if (camState !== 'idle' && camState !== 'error') return;
     if (now() - lastGestureRepair < 10000) return;
     lastGestureRepair = now(); recoveryAttempts = 0;
@@ -227,7 +228,7 @@
   var scanTimer = null, scanning = false, decodeBusy = false;
   var scanEpoch = 0, passCounter = 0, lastFrameTime = -1, decodeJob = 0;
   var frameToken = 0, frameCallback = null, lastFrameToken = -1, lastDecodeAt = 0, lastTagAt = 0;
-  var stallTicks = 0, sigCanvas = null, lastSignature = '';
+  var stallTicks = 0, sigCanvas = null, lastSignature = '', scanPasses = 0, scanStartedAt = 0;
   var worker = null, workerBroken = false, workerDone = null;
   var nativeDetector = null, nativeBroken = false;
   var decoderLoading = false, decoderWaiters = [], decoderRetryAt = 0, activeDecodeCancel = null;
@@ -341,7 +342,10 @@
   /* Signal 2: video.currentTime. Signal 3: bounded re-decode of the standing
    * frame, so a browser that never advances a signal cannot stop scanning. */
   function frameFresh() {
-    if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) return false;
+    // Only the negotiated frame size is required. Several Android WebViews keep
+    // readyState at 1 for a live MediaStream, and that single signal used to be
+    // enough to leave the scanner idle until the camera was switched by hand.
+    if (!video.videoWidth || !video.videoHeight) return false;
     if (video.currentTime !== lastFrameTime) return true;
     if (frameToken !== lastFrameToken) return true;
     return now() - lastDecodeAt >= FORCE_DECODE_MS;
@@ -376,12 +380,18 @@
     if (!currentStream || document.hidden || camState !== 'ready') return;
     if (recoveryAttempts >= 3) return;
     stallTicks = 0; recoveryAttempts++; opticsSafeMode = true;
-    camMsg.textContent = 'دوربین پاسخ نمی‌دهد؛ بازکردن دوبارهٔ همان دوربین…';
     openCamera(0, false);
+    // After openCamera: it resets the status line to "starting camera".
+    camMsg.textContent = 'دوربین پاسخ نمی‌دهد؛ بازکردن دوبارهٔ همان دوربین…';
   }
   function stallCheck() {
     if (!scanning || document.hidden || camState !== 'ready' || pendingOpen || busy || decodeBusy) return;
     if (!trackLive()) return;
+    // A camera that has not produced a single analysed frame (black first frame,
+    // a capture session that only really starts after a fresh getUserMedia, a
+    // canvas that cannot read the video yet) is exactly the "switch the camera
+    // once" workaround: do it automatically instead of waiting for the operator.
+    if (scanPasses === 0 && now() - scanStartedAt >= 6000) { recoverStalledCamera(); return; }
     if (lastTagAt && now() - lastTagAt < 3000) { stallTicks = 0; return; }        // it just worked
     var sig = frameSignature();
     if (sig === '') return;                                                      // canvas unavailable: cannot judge
@@ -448,6 +458,7 @@
     }
     try {
       var size = frameImage(passCounter++);
+      scanPasses++;
       if (useNative) {
         observe(nativeDetector.detect(canvas), function (codes) {
           complete(codes && codes.length ? codes[0].rawValue : null);
@@ -457,6 +468,7 @@
   }
   function startScanLoop() {
     scanning = true; stallTicks = 0; lastSignature = ''; lastDecodeAt = 0;
+    scanPasses = 0; scanStartedAt = now();
     lastFrameTime = video.currentTime; lastFrameToken = frameToken;
     armFrameCallback(); scheduleScan(0);
   }
@@ -487,7 +499,7 @@
    * with compensating gain, once, right after the focus lock — not after the
    * first tag, and never on the scan path. */
   var opticsEnabled = true, opticsSafeMode = false, optics = null, meterCanvas = null, optTorch = el('opticsTorch'), optStatus = el('opticsStatus');
-  var NEAR_METERS = 0.12, BAND_MIN = 0.05, BAND_MAX = 0.20, FOCUS_WATCHDOG_MS = 5000;
+  var NEAR_METERS = 0.20, BAND_MIN = 0.10, BAND_MAX = 0.30, FOCUS_WATCHDOG_MS = 5000;
   var SHUTTER_FACTOR = 8, ISO_CEILING = 1600, SHUTTER_MIN_BRIGHTNESS = 45, DARK_BRIGHTNESS = 22;
   function finiteNumber(n) { return typeof n === 'number' && isFinite(n); }
   function cameraSettings(track) { try { return track.getSettings ? track.getSettings() : {}; } catch (e) { return {}; } }
@@ -513,7 +525,7 @@
     var tolerance = Math.max(0.000001, Math.abs(expected) * 0.15);
     return finiteNumber(actual) && Math.abs(actual - expected) <= tolerance;
   }
-  /* focusDistance is reported in metres; the tag is read at 5–20 cm. */
+  /* focusDistance is reported in metres; the tag is read at 10–30 cm. */
   function inBand(d) { return finiteNumber(d) && d >= BAND_MIN * 0.8 && d <= BAND_MAX * 1.3; }
   function nearFocusTarget(o) {
     var caps = o.caps, range = caps.focusDistance;
@@ -706,7 +718,7 @@
     var o = { track: track, generation: generation, caps: caps, base: base, original: cameraSettings(track),
       enabled: opticsEnabled && !opticsSafeMode, focusTarget: null, exposureTarget: null, bandExact: null,
       confirmedFocus: false, confirmedExposure: false, exposureAttempted: false, notice: '', pending: null, revision: 1, appliedRevision: 0, stalled: false,
-      state: 'starting', shortMessage: 'در حال تنظیم فوکوس ۵ تا ۲۰ سانتی‌متر…' };
+      state: 'starting', shortMessage: 'در حال تنظیم فوکوس ۱۰ تا ۳۰ سانتی‌متر…' };
     o.torchAvailable = !!(caps.torch === true || (caps.torch && typeof caps.torch.indexOf === 'function' && caps.torch.indexOf(true) >= 0 && caps.torch.indexOf(false) >= 0));
     o.torchWanted = o.original.torch === true;
     o.focusTarget = o.enabled ? nearFocusTarget(o) : null;
@@ -791,13 +803,14 @@
   video.addEventListener('loadeddata', function () { if (readyCheck) readyCheck(); });
   video.addEventListener('playing', function () { if (readyCheck) readyCheck(); });
   var recoveryAttempts = 0, stableTicks = 0, deadTicks = 0, lastVideoTime = -1, wasSuspended = false;
+  var warmupRepairs = 0, gesturePlay = null, needsGesture = false;
   try { desiredId = localStorage.getItem('mtag_scanner_cam') || null; } catch (e) {}
   function stopTracks(stream) {
     if (!stream) return;
     stream.getTracks().forEach(function (track) { track.onended = null; try { track.stop(); } catch (e) {} });
   }
   function stopStream() {
-    stopOptics();
+    stopOptics(); gesturePlay = null; needsGesture = false;
     stopTracks(currentStream); currentStream = null;
     try { video.pause(); } catch (e) {}
     try { if ('srcObject' in video) video.srcObject = null; } catch (e) {}
@@ -832,7 +845,7 @@
   }
   function cameraError(message) {
     cameraGeneration++; clearRecovery(); clearTimeout(readyTimer); readyTimer = null;
-    readyCheck = null; stopScanLoop(); stopStream(); camState = 'error';
+    readyCheck = null; stopScanLoop(); stopStream(); camState = 'error'; warmupRepairs = 0;
     camMsg.textContent = message + ' — دوربین انتخابی خودکار عوض نمی‌شود.'; setControls();
   }
   function openTimeout(req) {
@@ -893,20 +906,69 @@
       if (req.id && settings.deviceId && settings.deviceId !== req.id) {
         cameraError('مرورگر دوربین دیگری برگرداند؛ انتخاب شما حفظ شد'); return;
       }
-      var playing = false, deadline = now() + 15000;
+      var playing = false, playAttempts = 0, nextPlayAt = 0, deadline = now() + 7000;
+      /* Warm-up is decided by what decoding actually needs: a live track and a
+       * negotiated frame size. video.paused and a play() promise are not used as
+       * gates - several Android browsers keep `paused` true while frames are on
+       * screen and never settle the first play() promise, which left the scanner
+       * idle until the camera was switched by hand. If frames still do not show
+       * up, the same camera is reopened automatically (three times at most),
+       * which is the manual workaround, done without the operator. */
+      function trackUsable() { return !!track && track.readyState !== 'ended' && !track.muted; }
+      function framesReady() {
+        // While the browser has explicitly blocked playback there is no picture
+        // to analyse, so readiness waits for the tap instead of pretending.
+        return !!(video.videoWidth && video.videoHeight) && video.readyState >= 1
+          && trackUsable() && !document.hidden && !needsGesture;
+      }
+      function attemptPlay() {
+        try {
+          observe(video.play(), function () { playing = true; needsGesture = false; checkReady(); }, function (error) {
+            if (generation !== cameraGeneration || currentStream !== stream) return;
+            var name = error && error.name || '';
+            if (name === 'NotAllowedError' || name === 'SecurityError') {
+              // Blocked autoplay is fixed by one tap, not by a dead scanner.
+              needsGesture = true; nextPlayAt = 0;
+              camMsg.textContent = 'برای شروع تصویر، یک بار صفحه را لمس کنید';
+              return;
+            }
+            if (name === 'AbortError' || name === 'NotSupportedError' || !name) {
+              // Replacing srcObject aborts an in-flight play() on several
+              // browsers: retry quietly, the warm-up repair is the backstop.
+              if (playAttempts++ < 4) nextPlayAt = now() + 300;
+              return;
+            }
+            cameraError('پخش تصویر شروع نشد؛ دکمهٔ تلاش مجدد را لمس کنید');
+          });
+        } catch (e) { cameraError('نمایش تصویر در این مرورگر ممکن نشد؛ اسکنر قبلی را امتحان کنید'); }
+      }
+      function becomeReady() {
+        camState = 'ready'; readyCheck = null; warmupRepairs = 0; gesturePlay = null;
+        if (!desiredId && settings.deviceId) desiredId = settings.deviceId;
+        if (desiredId) { try { localStorage.setItem('mtag_scanner_cam', desiredId); } catch (e) {} }
+        camMsg.textContent = 'تگ را وسط تصویر، در فاصلهٔ حدود ۱۰ تا ۳۰ سانتی‌متر بگیرید';
+        setControls(); listCams(generation); configureOptics(track, generation); startScanLoop();
+      }
       function checkReady() {
         if (generation !== cameraGeneration || currentStream !== stream || document.hidden || camState !== 'warming') return;
         clearTimeout(readyTimer); readyTimer = null;
-        if (playing && video.readyState >= 2 && video.videoWidth && video.videoHeight && !video.paused && trackLive()) {
-          camState = 'ready'; readyCheck = null;
-          if (!desiredId && settings.deviceId) desiredId = settings.deviceId;
-          if (desiredId) { try { localStorage.setItem('mtag_scanner_cam', desiredId); } catch (e) {} }
-          camMsg.textContent = 'تگ را وسط تصویر، در فاصلهٔ حدود ۵ تا ۲۰ سانتی‌متر بگیرید';
-          setControls(); listCams(generation); configureOptics(track, generation); startScanLoop(); return;
+        if (framesReady()) { becomeReady(); return; }
+        // A blocked autoplay is not a broken camera: wait for the tap.
+        if (now() >= deadline && !needsGesture) {
+          if (warmupRepairs < 3) {
+            warmupRepairs++;
+            openCamera(0, false);
+            camMsg.textContent = 'تصویر دوربین آماده نشد؛ دوربین دوباره باز می‌شود…';
+            return;
+          }
+          cameraError('تصویر دوربین آماده نشد؛ تلاش مجدد را بزنید'); return;
         }
-        if (now() >= deadline) { cameraError('تصویر دوربین آماده نشد؛ تلاش مجدد را بزنید'); return; }
+        // Keep trying to start playback while waiting: a rejected or aborted
+        // play() must not leave a live camera showing nothing.
+        if (!playing && !needsGesture && now() >= nextPlayAt) { nextPlayAt = now() + 2000; attemptPlay(); }
         readyTimer = setTimeout(checkReady, 25);
       }
+      gesturePlay = attemptPlay;
       readyCheck = checkReady;
       try {
         video.muted = true;
@@ -916,10 +978,7 @@
         tracks.forEach(function (t) {
           t.onended = function () { if (generation === cameraGeneration && currentStream === stream) scheduleRecovery(); };
         });
-        observe(video.play(), function () { playing = true; checkReady(); }, function () {
-          if (generation === cameraGeneration) cameraError('پخش تصویر شروع نشد؛ دکمهٔ تلاش مجدد را لمس کنید');
-        });
-        checkReady();
+        attemptPlay(); checkReady();
       } catch (e) { if (generation === cameraGeneration) cameraError('نمایش تصویر در این مرورگر ممکن نشد؛ اسکنر قبلی را امتحان کنید'); }
     }
     try {
@@ -948,11 +1007,11 @@
     var index = -1;
     for (var i = 0; i < camList.length; i++) if (camList[i].deviceId === desiredId) index = i;
     desiredId = camList[(index + 1) % camList.length].deviceId;
-    recoveryAttempts = 0; setControls(); openCamera(0, false);
+    recoveryAttempts = 0; warmupRepairs = 0; setControls(); openCamera(0, false);
   });
   camRetry.addEventListener('click', function () {
     if (pendingOpen) { window.location.reload(); return; }
-    recoveryAttempts = 0; openCamera(0, false);
+    recoveryAttempts = 0; warmupRepairs = 0; openCamera(0, false);
   });
   function scheduleRecovery() {
     if (document.hidden || pendingOpen || recoveryTimer || camState !== 'ready') return;
@@ -977,7 +1036,7 @@
      * focus must not re-ask for a camera that was never granted, so the automatic
      * retry only happens after the page was really away (hidden/minimised). */
     var returning = wasSuspended; wasSuspended = false;
-    if (camState === 'error') { if (returning) { recoveryAttempts = 0; openCamera(0, false); } return; }
+    if (camState === 'error') { if (returning) { recoveryAttempts = 0; warmupRepairs = 0; openCamera(0, false); } return; }
     if (camState === 'opening' || camState === 'warming') return;
     if (camState === 'suspended' || camState === 'idle') { openCamera(0, false); return; }
     if (!trackLive()) { scheduleRecovery(); return; }
@@ -995,7 +1054,7 @@
   setInterval(stallCheck, STALL_CHECK_MS);
   setInterval(function () {
     if (document.hidden || camState !== 'ready' || pendingOpen || recoveryTimer || (optics && optics.pending && !optics.stalled)) return;
-    if (!trackLive() || video.readyState < 2) {
+    if (!trackLive() || !video.videoWidth) {
       // Muted/ended track or a video that stopped delivering data: the stream
       // itself is dead, so recover the SAME selected camera.
       deadTicks++;

@@ -10,11 +10,18 @@ for(const [name,query,old] of [['new','',false],['rollback','scanner=legacy',tru
  assert(!res.fatal,res.fatal);assert(!stderr,stderr);assert(res.page.includes('id="cam"'));
  assert.equal(res.page.includes('attendance-scanner-light.js'),!old);
  assert.equal(res.page.includes('function startCam(deviceId)'),old);count++;
- if(!old){assert(res.page.includes('id="clock"'));assert(res.page.includes('id="resName"'));assert(res.page.includes('id="resStat"'));assert(res.page.includes('id="cam"'));assert(res.page.includes('camera6'));assert(res.page.includes('attendance-scanner.php?scanner=legacy'));assert(!res.page.includes('<script src="assets/js/jsqr.min.js">'));
+ if(!old){assert(res.page.includes('id="clock"'));assert(res.page.includes('id="resName"'));assert(res.page.includes('id="resStat"'));assert(res.page.includes('id="cam"'));assert(res.page.includes('camera7'));assert(res.page.includes('attendance-scanner.php?scanner=legacy'));assert(!res.page.includes('<script src="assets/js/jsqr.min.js">'));
   for(const gone of ['opticsMode','opticsFocus','recentList','manualInp','stP','تردد','ورود دستی'])assert(!res.page.includes(gone),'removed UI still present: '+gone);
   const wrap=res.page.slice(res.page.indexOf('class="camwrap"'),res.page.indexOf('<canvas id="qrCanvas"'));
   assert(wrap.includes('id="resBox"'),'the last-scan result must be an overlay INSIDE the camera area');
   assert(wrap.includes('class="bottom"'),'the overlay must be anchored to the bottom of the camera');
+  /* The operator asked twice for the name/status box to sit higher: it must be
+     lifted off the very bottom edge and the page must not use 100vh alone, which
+     is what pushed it off screen on phones with a collapsing address bar. */
+  assert(/\.bottom\{[^}]*bottom:38px/.test(res.page),'the overlay must be lifted above the bottom edge');
+  assert(/\.bottom\{[^}]*env\(safe-area-inset-bottom/.test(res.page),'the overlay must respect the phone gesture bar');
+  assert(res.page.includes('height:100dvh'),'the page height must follow the dynamic viewport on mobile');
+  assert(res.page.includes('۱۰ تا ۳۰ سانتی‌متر'),'the hint must state the 10-30 cm band');
   assert(!res.page.includes('<div class="result" id="resBox">\n</div>')||true);
   mkdirSync(REPO+'/.cache/scanner-tests',{recursive:true});writeFileSync(REPO+'/.cache/scanner-tests/page.html',res.page)}
 }

@@ -26,7 +26,7 @@ $schoolName = get_setting('school_name', 'آموزشگاه');
 /* حداقل استایل: بدون انیمیشن، سایه، گرادیان یا فیلتر (هیچ بار اضافه‌ای روی CPU/GPU).
    صفحه فقط سه چیز دارد: ساعت بالا، تصویر دوربین، و نتیجهٔ آخرین اسکن زیر دوربین. */
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Tahoma,sans-serif;background:#111;color:#eee;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body{font-family:Tahoma,sans-serif;background:#111;color:#eee;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 .hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 12px;background:#1c1c1c;border-bottom:1px solid #333}
 .hdr .sch{font-size:.85rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hdr a{color:#64748b;font-size:.62rem;text-decoration:none;white-space:nowrap}
@@ -43,8 +43,8 @@ video{width:100%;height:100%;object-fit:cover;display:block}
 .camlabel{position:absolute;top:46px;right:8px;z-index:4;background:rgba(0,0,0,.55);padding:4px 8px;font-size:.6rem;color:#94a3b8;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:none}
 /* لایهٔ پایین دوربین: وضعیت دوربین + نتیجهٔ آخرین اسکن، به‌صورت شفاف روی
    پایین تصویر. هیچ بخشی از نام/وضعیت دیگر بیرون از کادر دوربین نمی‌افتد. */
-.bottom{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;flex-direction:column}
-.result{background:rgba(12,12,12,.78);padding:6px 12px;text-align:center;border-top:3px solid #333;display:flex;align-items:center;justify-content:center;gap:12px;max-height:34%}
+.bottom{position:absolute;left:0;right:0;bottom:38px;bottom:calc(38px + env(safe-area-inset-bottom,0px));z-index:3;display:flex;flex-direction:column}
+.result{background:rgba(12,12,12,.78);padding:6px 12px;text-align:center;border-top:3px solid #333;display:flex;align-items:center;justify-content:center;gap:12px;max-height:32%}
 .result.ok{border-top-color:#10b981;background:rgba(13,42,31,.86)}
 .result.warn{border-top-color:#f59e0b;background:rgba(42,35,13,.86)}
 .result.err{border-top-color:#ef4444;background:rgba(42,13,13,.86)}
@@ -81,7 +81,7 @@ video{width:100%;height:100%;object-fit:cover;display:block}
                 <div class="icon" id="resIcon"><svg data-ui-icon="camera" class="school-icon" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6 9 3h6l1 3h5v15H3V6Z"/><circle cx="12" cy="13" r="4"/></svg></div>
                 <div class="rtext">
                     <div class="rname" id="resName">آمادهٔ اسکن</div>
-                    <div class="rstat" id="resStat">تگ را وسط تصویر، حدود ۵ تا ۲۰ سانتی‌متر بگیرید</div>
+                    <div class="rstat" id="resStat">تگ را وسط تصویر، حدود ۱۰ تا ۳۰ سانتی‌متر بگیرید</div>
                     <div class="rsub" id="resSub"></div>
                 </div>
             </div>
@@ -92,10 +92,10 @@ video{width:100%;height:100%;object-fit:cover;display:block}
 window.ATT_SCANNER_CONFIG = {
   key: <?php echo json_encode($byKey ? $key : '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
   api: 'attendance-scan-api.php',
-  worker: 'assets/js/attendance-decoder-worker.js?v=4.152.0-camera6',
+  worker: 'assets/js/attendance-decoder-worker.js?v=4.152.0-camera7',
   decoder: 'assets/js/jsqr.min.js'
 };
 </script>
-<script src="assets/js/attendance-scanner-light.js?v=4.152.0-camera6"></script>
+<script src="assets/js/attendance-scanner-light.js?v=4.152.0-camera7"></script>
 </body>
 </html>
