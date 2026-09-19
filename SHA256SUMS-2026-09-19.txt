@@ -1,0 +1,9 @@
+# SchoolDesk Pro — اصلاح‌های 2026-09-19 (نسخه سایت 4.152.0 / دسکتاپ 2.83.0)
+# فایل‌های اصلاحی سایت + دسکتاپ و بستهٔ آنلاین اسکنر؛ بازسازی Release_V1.0
+cd6cb34d4676056f27f5e3dd299d475c86192a42a8db89c4ed6b8ae02db80a76  SITE-FIX-v4.152.0-scanner.zip
+ec348bb7599002fdccea728e65029a532c6848c350b5f1766756e2a366013dc3  SchoolDeskPro-FIX-v2.83.0-scanner.zip
+2d86384b79e4b77505f934b752299a3f312aef75997328e56ffb85c940db15da  SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip
+99366e9daeb0278b323ae1d696a435702c87bc0b57807d0d82f228e4b88e4fae  SITE-FIX-v4.152.0-desk-update.zip
+70a242367befe5e4d67f1141f9bbc2d54adb868bd6f3c66b5e6691df3b871708  SchoolDeskPro-FIX-v2.83.0-desk-update.zip
+d2e287178e3247b2aa22cb7bd0b6e126001c2ed24fee736e6f17329fce80a903  Release_V1.0-Site.zip
+18bc74f4c6ded4b6fa06c8465e05a59e67b30494c3885546e11dd3349877ae8c  Release_V1.0-Desktop.zip
