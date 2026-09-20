@@ -28,8 +28,10 @@ DESKTOP_WEB = 'reports/'
 SITE_ARCHIVE = 'SITE-FIX-v4.152.0-cumulative.zip'
 DESKTOP_ARCHIVE = 'SchoolDeskPro-FIX-v2.83.0-cumulative.zip'
 PARTS = {
-    'site': ['SITE-FIX-v4.152.0-scanner.zip', 'SITE-FIX-v4.152.0-desk-update.zip'],
-    'desktop': ['SchoolDeskPro-FIX-v2.83.0-scanner.zip', 'SchoolDeskPro-FIX-v2.83.0-desk-update.zip'],
+    'site': ['SITE-FIX-v4.152.0-scanner.zip', 'SITE-FIX-v4.152.0-desk-update.zip',
+             'SITE-FIX-v4.152.0-attendance-test-tag.zip'],
+    'desktop': ['SchoolDeskPro-FIX-v2.83.0-scanner.zip', 'SchoolDeskPro-FIX-v2.83.0-desk-update.zip',
+                'SchoolDeskPro-FIX-v2.83.0-attendance-test-tag.zip'],
 }
 
 

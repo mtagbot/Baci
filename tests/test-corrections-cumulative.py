@@ -2,8 +2,9 @@
 
 `SITE-FIX-v4.152.0-cumulative.zip` and `SchoolDeskPro-FIX-v2.83.0-cumulative.zip`
 are what a school installs when it wants all corrections at once: the scanner
-near-band fast-scanner fix plus the desktop online-update feature. This test rebuilds
-the union from the four individual published packages and from the working tree,
+near-band fast-scanner fix, the desktop online-update feature and the «تگ آزمایشی»
+test sheet with its management test message. This test rebuilds the union from the
+individual published packages and from the working tree,
 then compares bytes — a missing or extra file, or a stale copy inside the ZIP,
 fails here and nowhere else.
 """
@@ -19,8 +20,10 @@ WEB = 'reports/'   # desktop web root since the reports migration
 SITE_ARCHIVE = ROOT / 'SITE-FIX-v4.152.0-cumulative.zip'
 DESKTOP_ARCHIVE = ROOT / 'SchoolDeskPro-FIX-v2.83.0-cumulative.zip'
 PARTS = {
-    'site': ['SITE-FIX-v4.152.0-scanner.zip', 'SITE-FIX-v4.152.0-desk-update.zip'],
-    'desktop': ['SchoolDeskPro-FIX-v2.83.0-scanner.zip', 'SchoolDeskPro-FIX-v2.83.0-desk-update.zip'],
+    'site': ['SITE-FIX-v4.152.0-scanner.zip', 'SITE-FIX-v4.152.0-desk-update.zip',
+             'SITE-FIX-v4.152.0-attendance-test-tag.zip'],
+    'desktop': ['SchoolDeskPro-FIX-v2.83.0-scanner.zip', 'SchoolDeskPro-FIX-v2.83.0-desk-update.zip',
+                'SchoolDeskPro-FIX-v2.83.0-attendance-test-tag.zip'],
 }
 PRIVATE = ('config/', 'data/', 'php/', 'backups/', 'profile/', 'server/', 'licenses/')
 EXECUTABLE = ('.bat', '.cmd', '.ps1', '.vbs', '.sh', '.py', '.dll', '.so')
@@ -45,7 +48,7 @@ class CumulativeCorrective(unittest.TestCase):
             self.assertEqual(set(z.namelist()), set(expected))
             for name, data in expected.items():
                 self.assertEqual(z.read(name), data, name)
-            self.assertEqual(len(z.namelist()), 9)
+            self.assertEqual(len(z.namelist()), 11)
 
     def test_desktop_archive_is_the_union_plus_the_launcher(self):
         expected = {k: v for k, v in parts_union('desktop').items() if k != DESKTOP_PREFIX + 'SchoolDeskPro.exe'}
@@ -97,6 +100,8 @@ class CumulativeCorrective(unittest.TestCase):
             'includes/desk_update_zip.php': ROOT / 'update-v4.152.0/includes/desk_update_zip.php',
             'includes/desk_updates_store.php': ROOT / 'update-v4.152.0/includes/desk_updates_store.php',
             'includes/management_hub.php': ROOT / 'update-v4.152.0/includes/management_hub.php',
+            'attendance-tags.php': ROOT / 'update-v4.152.0/attendance-tags.php',
+            'includes/attendance_helpers.php': ROOT / 'update-v4.152.0/includes/attendance_helpers.php',
         }
         desktop_extra = {
             'desk-update.php': ROOT / 'desktop-app-v2/patch/www-desk-update.php',

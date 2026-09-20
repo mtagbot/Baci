@@ -6,6 +6,9 @@
  * v4.55.0: free size + live customization of all tag elements:
  *          size (20-100mm), gap, page margin, cut frame, center school plate
  *          (custom text + scale), optional student name / class / national id.
+ * v4.152.0: «تگ آزمایشی» — one printable test sheet with the two simulated
+ *          statuses («حضور به موقع» / «تأخیر») that exercises the real scanner
+ *          and notification chain without recording any attendance.
  * QR codes are rendered client-side with the bundled qrcode-generator lib.
  */
 require_once __DIR__ . '/includes/auth.php';
@@ -108,6 +111,11 @@ $schoolLabel = get_setting('school_name_short', '') !== '' ? get_setting('school
  * Plain block-flow HTML => all pages paginate naturally.
  * ============================================================ */
 if (isset($_GET['print'])) {
+    /* v4.152.0: برگهٔ «تگ آزمایشی» — فقط دو تگ «حضور به موقع» و «تأخیر».
+       هیچ دانش‌آموزی خوانده نمی‌شود و هیچ توکنی ساخته نمی‌شود؛ دو بارکد
+       آزمایشی چاپ می‌شوند تا مسیر اسکن و اطلاع‌رسانی آزموده شود. */
+    $testSheet = (($_GET['test'] ?? '') === '1');
+    if ($testSheet) $students = att_test_tag_print_rows();
     $D = [
         'size'   => min(100, max(20, (float)($_GET['size'] ?? 40))),
         'gap'    => min(20, max(0, (float)($_GET['gap'] ?? 4))),
@@ -121,6 +129,11 @@ if (isset($_GET['print'])) {
         'snid'   => ($_GET['snid'] ?? '0') === '1',
     ];
     if ($D['ptext'] === '') $D['ptext'] = $schoolLabel;
+    if ($testSheet) {
+        /* نام تگ و توضیح «بدون ثبت حضور و غیاب» باید همیشه روی کاغذ باشد،
+           حتی اگر طراح تگ آن خطوط را خاموش کرده باشد. */
+        $D['sname'] = true; $D['scls'] = true; $D['snid'] = true;
+    }
     $fsName = max(2.4, $D['size'] * 0.085);
     $fsSub  = max(2.1, $D['size'] * 0.068);
 
@@ -164,7 +177,7 @@ if (isset($_GET['print'])) {
 <html lang="fa" dir="rtl">
 <head><meta name=viewport content="width=device-width, initial-scale=1">
 <meta charset="UTF-8">
-<title>چاپ تگ‌های QR</title>
+<title><?php echo $testSheet ? 'چاپ تگ آزمایشی' : 'چاپ تگ‌های QR'; ?></title>
 <style>
 <?php echo $fontFaces; ?>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -189,13 +202,13 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
 <body data-school-return="preview">
 <div class="toolbar no-print">
     <button onclick="appPrint()">چاپ</button>
-    <span>تعداد تگ: <?php echo tr_num(count($students) * $copies, 'fa'); ?> — <?php echo tr_num($copies, 'fa'); ?> نسخه برای هر دانش‌آموز — اندازه: <?php echo tr_num($D['size'], 'fa'); ?> میلی‌متر</span>
+    <span><?php if ($testSheet): ?>برگهٔ آزمایشی (حضور به موقع و تأخیر) — <?php endif; ?>تعداد تگ: <?php echo tr_num(count($students) * $copies, 'fa'); ?> — <?php echo tr_num($copies, 'fa'); ?> نسخه برای هر تگ — اندازه: <?php echo tr_num($D['size'], 'fa'); ?> میلی‌متر</span>
 </div>
 <div class="sheet">
 <?php foreach ($students as $s): for ($copyNo = 0; $copyNo < $copies; $copyNo++): ?>
     <div class="tag">
         <canvas class="qr-tag" data-qr="<?php echo clean($s['qr']); ?>"></canvas>
-        <?php if ($D['sname']): ?><div class="t-name"><?php echo clean($s['first_name'] . ' ' . $s['last_name']); ?></div><?php endif; ?>
+        <?php if ($D['sname']): ?><div class="t-name"><?php echo clean(trim($s['first_name'] . ' ' . $s['last_name'])); ?></div><?php endif; ?>
         <?php if ($D['scls']): ?><div class="t-sub"><?php echo clean($s['class_name'] ?: '---'); ?></div><?php endif; ?>
         <?php if ($D['snid']): ?><div class="t-sub"><?php echo clean(tr_num($s['national_id'], 'fa')); ?></div><?php endif; ?>
     </div>
@@ -281,6 +294,30 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
     exit;
 }
 
+/* ---- v4.152.0: وضعیت آزمون آزمایشی برای همین صفحه ----------------
+   پیش از چاپ برگهٔ «تگ آزمایشی» خوب است بدانیم کدام پیام‌رسان حساب
+   مدیریت متصل دارد؛ وگرنه تگ چاپ می‌شود ولی پیامی به کسی نمی‌رسد. */
+$testMgState = [];
+foreach (['bale' => 'بله', 'telegram' => 'تلگرام'] as $pfKey => $pfFa) {
+    try {
+        $foundMg = att_management_chats($pfKey);
+        $cntMg = count($foundMg['chats']);
+        $testMgState[] = $pfFa . ': ' . ($cntMg > 0
+            ? (tr_num($cntMg, 'fa') . ' حساب متصل' . (!empty($foundMg['fallback']) ? ' (کارکنان)' : ''))
+            : 'بدون حساب متصل');
+    } catch (Exception $e) { $testMgState[] = $pfFa . ': نامشخص'; }
+}
+$lastTest = json_decode((string)get_setting('att_test_last_result', ''), true);
+$lastTestLine = '';
+if (is_array($lastTest)) {
+    $testParts = [];
+    foreach (['بله' => 'bale', 'تلگرام' => 'telegram'] as $pfFa => $pfKey) {
+        $nMg = (int)($lastTest[$pfKey] ?? 0);
+        $testParts[] = $pfFa . ': ' . ($nMg > 0 ? (tr_num($nMg, 'fa') . ' پیام') : 'ارسال نشد');
+    }
+    $lastTestLine = 'آخرین آزمون ' . trim((string)($lastTest['at'] ?? '')) . ' — ' . implode(' | ', $testParts);
+}
+
 require_once __DIR__ . '/includes/header.php';
 ?>
 <div class="space-y-6">
@@ -292,7 +329,25 @@ require_once __DIR__ . '/includes/header.php';
         <div class="flex gap-2">
             <a href="entry-cards.php" class="btn btn-accent text-xs">کارت ورود دانش‌آموزان</a>
             <a href="attendance.php" class="btn btn-outline text-xs">بازگشت به حضور و غیاب</a>
+            <button type="button" onclick="openTestPrint()" class="btn btn-outline text-xs">تگ آزمایشی</button>
             <button type="button" onclick="openPrintView()" class="btn btn-primary text-xs">چاپ تگ‌ها</button>
+        </div>
+    </div>
+
+    <!-- ======== v4.152.0: برگهٔ «تگ آزمایشی» ======== -->
+    <div class="card no-print" id="testTagCard">
+        <div class="flex justify-between items-center" style="margin-bottom:10px">
+            <h3 class="font-bold text-sm">تگ آزمایشی (بررسی سامانه)</h3>
+            <button type="button" class="btn btn-accent text-xs" onclick="openTestPrint()">چاپ برگهٔ آزمایشی</button>
+        </div>
+        <div class="text-xs text-muted" style="line-height:2">
+            با این گزینه یک برگهٔ کوچک با دو تگ «حضور به موقع» و «تأخیر» چاپ می‌شود. با اسکن هر تگ، همان مسیر واقعی اسکنر طی می‌شود
+            (خواندن QR → سامانه → اطلاع‌رسانی) و پیام آزمایشی مربوط به همان وضعیت برای حساب مدیریت متصل به ربات — هم در بله و هم در تلگرام — فرستاده می‌شود.
+            هیچ حضور یا غیابی برای دانش‌آموزان ثبت نمی‌شود و پیامی هم برای والدین نمی‌رود.
+        </div>
+        <div class="text-xs" style="margin-top:8px">
+            اتصال حساب‌ها: <?php echo clean(implode(' | ', $testMgState)); ?>
+            <?php if ($lastTestLine !== ''): ?><br><?php echo clean(tr_num($lastTestLine, 'fa')); ?><?php endif; ?>
         </div>
     </div>
 
@@ -600,12 +655,16 @@ function drawTag(cv, plate, pscale, label){
 /* v4.135.0: چاپ فقط همین دانش‌آموز — طراحی فعلی حفظ می‌شود */
 function printOne(id){ openPrintView(id); }
 
-function openPrintView(oneId){
+/* v4.152.0: برگهٔ آزمایشی — دو تگ «حضور به موقع» و «تأخیر» با همان طراحی فعلی */
+function openTestPrint(){ openPrintView(null, true); }
+
+function openPrintView(oneId, testTag){
   var d = getDesign();
   var params = new URLSearchParams(window.location.search);
   params.set('print', '1');
   params.set('copies', d.copies);
   if (oneId) params.set('student_id', String(oneId));
+  if (testTag) params.set('test', '1');
   params.set('size', d.size); params.set('gap', d.gap); params.set('margin', d.margin);
   params.set('frame', d.frame); params.set('plate', d.plate ? '1' : '0');
   params.set('ptext', d.ptext); params.set('pscale', d.pscale);

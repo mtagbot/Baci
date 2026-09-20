@@ -1,0 +1,12 @@
+57c0d29b9d9cf4b060111d8c219b709ad59bb4a00b03c7b923b1087f29eaf3e7  SITE-FIX-v4.152.0-attendance-test-tag.zip
+6542be1f4fc75ccc1aaac760da908f26c6450526e482ec3ee85cdd27a337f446  SchoolDeskPro-FIX-v2.83.0-attendance-test-tag.zip
+34c5ddde1540f54540781a5e25b4312821ab10e8cb5d7894a6201b17dd1ce701  SchoolDeskPro-UPDATE-2.83.0-attendance-test-tag.zip
+492c71148e6b7be0e4f33bf550867dc9e83174b99f3401f1bfb5f9dc1c9bee13  SITE-FIX-v4.152.0-cumulative.zip
+cc6f270ce2063fa22a565b9dabe3607ca6457f14228073f1266a444ba808b7c3  SchoolDeskPro-FIX-v2.83.0-cumulative.zip
+bc47c78025c609cded2573aaf880880b7928f5d21a1d780002769f0c74aa7794  Release_V1.0-Site.zip
+16c1da262f677090ff9e7a01481d288967dd921b7c6612d677a3ec2a44c46993  Release_V1.0-Desktop.zip
+87e68f0e5b2b60cad5eb0888a30ffc7d8f280838a421ac6c77b17de0516357b5  SITE-FIX-v4.152.0-scanner.zip
+69c8744718a425444eec82f6cec28d44e08227bc83065ce2fbda5b79da76b7f5  SchoolDeskPro-FIX-v2.83.0-scanner.zip
+14ae783f7456b073f0df9b969e736548b5e7c3c2a0b4bbdfd43e9a8b6b491a6e  SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip
+99366e9daeb0278b323ae1d696a435702c87bc0b57807d0d82f228e4b88e4fae  SITE-FIX-v4.152.0-desk-update.zip
+06a6de4284d0ba22cdb3197cfbb82b0aebc39da4057e4c51e6b2c274f7fcbcaf  SchoolDeskPro-FIX-v2.83.0-desk-update.zip
