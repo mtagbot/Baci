@@ -219,30 +219,78 @@
   var LOW_END = (mem && mem <= 3) || (cores && cores <= 4);
   var FAST_DIM = LOW_END ? 480 : 640, CROP_RATIO = 0.72, FULL_EVERY = 5;
   var DECODE_TIMEOUT_MS = 1500, MAX_REST_MS = 40, FRAME_POLL_MS = 10, FORCE_DECODE_MS = 120;
-  /* A stream can stop delivering frames without any error event: some browsers
-   * keep video.currentTime at 0 for a live MediaStream, applyConstraints may
-   * freeze the capture session, or the decoder may simply never be asked again.
-   * Scanning must never depend on a signal that may never come, so the loop has
-   * three independent frame signals and two self-healing steps. */
-  var STALL_CHECK_MS = 1000, STALL_REATTACH_MS = 3000, STALL_REOPEN_MS = 9000;
-  /* Before the first tag of a session the scanner has no proof that the whole
-   * path camera -> canvas -> decoder works. On several phones the very first
-   * getUserMedia of a page delivers a preview that never decodes, and the only
-   * known cure was switching the camera by hand. Those are the windows of the
-   * automatic cure: nudge the live stream, reopen the same camera with the lens
-   * tuning skipped, then reopen it with the simplest constraints. */
-  var PIPELINE_GRACE_MS = 1200, FIRST_REATTACH_MS = 1000, FIRST_REOPEN_MS = 3500, FIRST_BASIC_MS = 7000;
+  /* ── Self-healing scan path ──────────────────────────────────────────
+   * The scanner must read tags on the very first open of the page, on any
+   * phone, with no manual step. The state that keeps breaking it is a live
+   * picture with a ready-looking page where not one tag is decoded until the
+   * camera is switched by hand. So the scanner now watches its own output -
+   * decoded tags - and while none arrives it walks a ladder of repairs that
+   * ends with exactly what the operator did by hand: switch to the other
+   * camera and come back. Nothing here ever runs once this page session has
+   * read a tag, every rung is spaced in time, and the ladder repeats with
+   * backoff instead of giving up. */
+  var STALL_CHECK_MS = 1000;
+  var PIPELINE_GRACE_MS = 900;          // a fresh loop is never judged before this
+  var CURE_FIRST_MS = 2500;             // first rung while the session has no read yet
+  var CURE_STEP_MS = 2600;              // spacing between the rungs of one cycle
+  var CURE_CYCLE_MS = 9000, CURE_CYCLE_CAP = 3;   // every repeated cycle is calmer
+  var CURE_BROKEN_GRACE_MS = 900;       // a provably broken picture: act sooner
+  var CURE_STEP_BROKEN_MS = 1500;
+  var CURE_READ_BROKEN_GRACE_MS = 3000; // after a good read, a brief black frame is not a fault
+  var CURE_STEP_READ_BROKEN_MS = 4000;
+  var CURE_WARMING_GRACE_MS = 4000;     // a slow camera gets time to negotiate frames
+  var MIN_CAMERA_GAP_MS = 2500;         // two camera opens are never closer than this
+  var SWAP_HOLD_MS = 1600;              // how long the other camera stays live in the swap rung
+  var PASS_STALL_MS = 4000;             // the loop must keep analysing frames
   var BLACK_LUMA = 2, DECODE_ERROR_LIMIT = 8, FROZEN_DEAD_MS = 2500;
-  /* While the picture looks alive but not a single tag has been read, the very
-   * first capture session of the page is re-negotiated once - the cure the
-   * operator found by hand (switch the camera away and back). The lens lock is
-   * re-applied on the fresh session, so the 10-30 cm band is kept. */
-  var FIRST_RENEGOTIATE_MS = 5000;
   var scanTimer = null, scanning = false, decodeBusy = false;
   var scanEpoch = 0, passCounter = 0, lastFrameTime = -1, decodeJob = 0;
   var frameToken = 0, frameCallback = null, lastFrameToken = -1, lastDecodeAt = 0, lastTagAt = 0;
-  var sigCanvas = null, lastSignature = '', lastSignatureAt = 0, scanPasses = 0, scanStartedAt = 0;
-  var decodeErrors = 0, brokenSince = 0, pipelineStage = 0, firstCodeAt = 0;
+  var sigCanvas = null, lastSignature = '', lastSignatureAt = 0, scanPasses = 0, scanStartedAt = 0, lastPassAt = 0;
+  var decodeErrors = 0, decodeStartedAt = 0, firstCodeAt = 0, lastReadAt = 0, phaseSince = 0;
+  var cureRung = 0, cureCycle = 0, cureNextAt = 0, cureActions = 0, lastOpenAt = 0, opticsEverEnabled = false;
+  /* A session that had to be repaired keeps the 10-30 cm focus lock but never
+     gets the forced shutter: shortening it is the only lens step that can
+     darken a picture enough to stop decoding, so it stays off after a repair. */
+  var opticsLightMode = false;
+  var temporarySwap = false, returnId = null, returnTimer = null, returnTries = 0;
+  /* Debug trace: the operator can open the page with ?debug=1 and read the last
+   * events on the screen, so a report about a phone that still does not scan
+   * names the failing step instead of needing another guess. */
+  var debugLines = [], debugBox = null;
+  function stamp() {
+    var d = new Date();
+    return faDigits(('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2));
+  }
+  function note(text) {
+    if (debugLines.length > 200) debugLines.shift();
+    debugLines.push(stamp() + ' ' + text);
+  }
+  function resetCure() { cureRung = 0; cureCycle = 0; cureNextAt = 0; }
+  function cancelSwap() { temporarySwap = false; returnId = null; clearTimeout(returnTimer); returnTimer = null; }
+  /* The result box must never claim "ready to scan" while the camera is still
+     opening: the operator read that static line as "the scanner is broken"
+     while the real state was hidden in a one-line hint under the camera. */
+  function showState(name, stat) {
+    if (busy || resBox.className !== 'result' || !name) return;
+    resName.textContent = name;
+    resStat.textContent = stat || '';
+  }
+  function debugDraw() {
+    if (!debugBox) return;
+    try {
+      debugBox.textContent = 'cam=' + camState + ' scanning=' + scanning + ' gen=' + cameraGeneration + ' id=' + (desiredId || '-')
+        + ' pending=' + !!pendingOpen + ' busy=' + busy
+        + '\nvideo=' + video.videoWidth + 'x' + video.videoHeight + ' rs=' + video.readyState
+        + ' t=' + (typeof video.currentTime === 'number' ? Math.round(video.currentTime * 100) / 100 : '-')
+        + ' passes=' + scanPasses + ' err=' + decodeErrors
+        + ' read=' + (lastReadAt ? Math.round((now() - lastReadAt) / 1000) + 's' : '-')
+        + ' tag=' + (lastTagAt ? Math.round((now() - lastTagAt) / 1000) + 's' : '-')
+        + '\ncure rung=' + cureRung + ' cycle=' + cureCycle + ' actions=' + cureActions + ' swap=' + temporarySwap
+        + ' optics=' + (optics ? optics.state : (opticsSafeMode ? 'released' : '-'))
+        + '\n' + debugLines.slice(-14).join('\n');
+    } catch (e) {}
+  }
   var worker = null, workerBroken = false, workerDone = null;
   var nativeDetector = null, nativeBroken = false;
   var decoderLoading = false, decoderWaiters = [], decoderRetryAt = 0, activeDecodeCancel = null;
@@ -380,99 +428,145 @@
     } catch (e) { return null; }
   }
   function reattachStream() {
-    if (!currentStream || document.hidden || camState !== 'ready') return;
-    camMsg.textContent = 'تصویر دوربین ثابت ماند؛ در حال بازیابی…';
+    if (!currentStream || document.hidden || camState !== 'ready') return false;
+    camMsg.textContent = 'ترمیم خودکار: تصویر ثابت ماند؛ پیوند دوبارهٔ جریان…';
+    note('rung reattach');
     try {
       if ('srcObject' in video) { video.srcObject = null; video.srcObject = currentStream; }
       else if ('mozSrcObject' in video) video.mozSrcObject = currentStream;
     } catch (e) {}
     lastFrameTime = -1; lastFrameToken = -1; lastVideoTime = -1; lastDecodeAt = 0;
     try { observe(video.play(), function () { if (scanning) scheduleScan(0); }, noop); } catch (e) { scheduleScan(0); }
+    return true;
   }
-  /* Last resort: the stream itself is dead. Reopen the same camera, and never
-   * let the lens tuning freeze the scanner again for this session. */
-  /* Re-negotiate the SAME camera by its exact device id, keeping the lens
-   * tuning: the capture session is what the operator's manual camera switch
-   * replaces, and that switch was the only cure they had. */
-  function warmRenegotiate(message) {
-    if (!currentStream || document.hidden || camState !== 'ready' || warmReopenDone) return;
-    warmReopenDone = true; warmReopenPending = true;
+  /* The camera is opened again - by its exact device id when there is one, the
+   * way the operator's manual camera switch did it - and, on the last rungs,
+   * with the simplest constraints the device can be asked for. */
+  function reopenRung(basic, message) {
+    if (document.hidden) return false;
+    recoveryAttempts = 0; warmupRepairs = 0; opticsLightMode = true;
+    if (desiredId) warmReopenPending = true;     // a failed exact-id open falls back to facingMode
+    openCamera(0, !!basic);
+    camMsg.textContent = message;
+    note(basic ? 'rung basic constraints' : 'rung reopen same camera');
+    return true;
+  }
+  /* Switch to the other camera and come straight back. This is literally what
+   * the operator did by hand, and it is the cure that was reported to work on
+   * the phone whose first capture session never decodes. */
+  function swapRung() {
+    if (camList.length < 2 || document.hidden || pendingOpen) return false;
+    var original = desiredId || (camList[0] && camList[0].deviceId), other = null, i;
+    for (i = 0; i < camList.length; i++) {
+      if (camList[i].deviceId !== original) { other = camList[i].deviceId; break; }
+    }
+    if (!other || !original) return false;
+    temporarySwap = true; returnId = original; returnTries = 0;
+    desiredId = other; recoveryAttempts = 0; warmupRepairs = 0; setControls();
     openCamera(0, false);
-    camMsg.textContent = message || 'دوربین یک‌بار دوباره تنظیم می‌شود…';
+    camMsg.textContent = 'ترمیم خودکار: دوربین موقتاً تعویض می‌شود و برمی‌گردد…';
+    note('rung swap to ' + other);
+    clearTimeout(returnTimer);
+    returnTimer = setTimeout(returnToOriginal, SWAP_HOLD_MS + 2600);
+    return true;
   }
-  function recoverStalledCamera(message, basic) {
-    if (!currentStream || document.hidden || camState !== 'ready') return;
-    if (recoveryAttempts >= 3) return;
-    recoveryAttempts++; opticsSafeMode = true;
-    openCamera(basic ? 1 : 0, !!basic);
-    // After openCamera: it resets the status line to "starting camera".
-    camMsg.textContent = message || 'دوربین پاسخ نمی‌دهد؛ بازکردن دوبارهٔ همان دوربین…';
+  function returnToOriginal() {
+    clearTimeout(returnTimer); returnTimer = null;
+    if (!returnId || document.hidden) return;
+    // A getUserMedia request cannot be cancelled: wait for the slot to settle.
+    if (pendingOpen) { if (returnTries++ < 12) returnTimer = setTimeout(returnToOriginal, 400); return; }
+    var id = returnId; returnId = null; temporarySwap = false;
+    desiredId = id; recoveryAttempts = 0; warmupRepairs = 0; setControls();
+    openCamera(0, false);
+    camMsg.textContent = 'دوربین به انتخاب قبلی برگشت؛ تگ را وسط تصویر بگیرید';
+    note('return to ' + id);
   }
-  /* Is the pipeline that turns the camera into decoded frames usable? A still
-   * scene is not enough to condemn it (a phone lying on a desk shows a frozen
-   * picture for seconds), but nothing here is ever called before the streak has
-   * lasted FROZEN_DEAD_MS. */
+  /* Release the lens lock and the forced shutter. The lock is a speed feature;
+   * if the decoder is what it fights, reading tags matters more. Once released
+   * it is never re-applied for this session. */
+  function releaseOpticsRung() {
+    var o = optics;
+    if (!opticsEverEnabled && !o) return false;
+    opticsSafeMode = true;
+    stopOptics();
+    if (o && o.track && currentStream && currentStream.getVideoTracks()[0] === o.track) {
+      var want = {};
+      if (hasMode(o.caps, 'focusMode', 'continuous')) want.focusMode = 'continuous';
+      if (hasMode(o.caps, 'exposureMode', 'continuous')) want.exposureMode = 'continuous';
+      try { observe(o.track.applyConstraints({ advanced: [want] }), noop, noop); } catch (e) {}
+    }
+    camMsg.textContent = 'ترمیم خودکار: قفل لنز آزاد شد تا خواندن تگ در اولویت باشد…';
+    note('rung release optics');
+    return true;
+  }
+  function cureSequence(broken, cycle) {
+    if (broken) return ['reattach', 'reopen', 'basic', 'swap', 'optics'];
+    return cycle === 0 ? ['reattach', 'reopen', 'swap', 'basic', 'optics'] : ['reopen', 'swap', 'basic', 'optics'];
+  }
+  function runCureRung(rung, broken) {
+    if (rung === 'reattach') return reattachStream();
+    if (rung === 'reopen') return reopenRung(false, broken
+      ? 'ترمیم خودکار: تصویر خوانده نمی‌شود؛ همان دوربین دوباره باز می‌شود…'
+      : 'ترمیم خودکار: دوربین یک‌بار دوباره تنظیم می‌شود…');
+    if (rung === 'basic') return reopenRung(true, 'ترمیم خودکار: تنظیمات سادهٔ دوربین امتحان می‌شود…');
+    if (rung === 'swap') return swapRung();
+    if (rung === 'optics') return releaseOpticsRung();
+    return false;
+  }
+  /* Is the path camera -> canvas -> decoder still doing its job? A still scene
+   * is not enough to condemn it (a phone on a desk shows a frozen picture for
+   * seconds), but nothing here is called before the streak has lasted
+   * FROZEN_DEAD_MS, and a session that already read a tag is left alone while
+   * its picture is healthy. */
   function pipelineBroken(probe, frozenFor) {
-    if (!video.videoWidth || !video.videoHeight) return true;                    // no frame size at all
-    if (!trackLive()) return true;                                              // the track itself ended
-    if (decodeErrors >= DECODE_ERROR_LIMIT) return true;                        // canvas cannot be read
-    if (!probe) return true;                                                    // the probe canvas cannot be read
-    if (probe.luma <= BLACK_LUMA) return true;                                  // a black picture reads nothing
-    if (scanPasses === 0 && now() - scanStartedAt >= 4000) return true;         // nothing ever reached the decoder
-    return frozenFor >= FROZEN_DEAD_MS;                                         // the picture never changes
+    if (!video.videoWidth || !video.videoHeight) return true;    // no frame size at all
+    if (!trackLive()) return true;                               // the track itself ended
+    if (decodeErrors >= DECODE_ERROR_LIMIT) return true;         // the canvas cannot be read
+    if (!probe) return true;                                     // the probe canvas cannot be read
+    if (probe.luma <= BLACK_LUMA) return true;                   // a black picture reads nothing
+    if (scanPasses === 0 && now() - scanStartedAt >= PASS_STALL_MS) return true;
+    if (lastPassAt && now() - lastPassAt >= PASS_STALL_MS + 2000) return true;   // the loop stopped analysing
+    return frozenFor >= FROZEN_DEAD_MS;                          // the picture never changes
   }
-  /* The repair ladder. It only escalates while the pipeline looks broken, and
-   * the streak is measured in time so a repair that did not help continues the
-   * ladder instead of restarting it. */
-  function pipelineWatch() {
-    if (now() - scanStartedAt < PIPELINE_GRACE_MS) return;                       // fresh loop: no verdict yet
+  function cureTick() {
+    if (document.hidden || busy) return;
+    var ready = camState === 'ready', warming = camState === 'warming';
+    if (!ready && !warming) return;                    // a failed open has its own explicit retry
+    if (ready && !scanning) {                          // a ready page that is not analysing: re-arm it
+      note('loop was idle; re-armed');
+      startScanLoop();
+      return;
+    }
+    if (decodeBusy && now() - decodeStartedAt > 6000) {   // a decode that never came back
+      note('decode stuck; released');
+      if (activeDecodeCancel) { activeDecodeCancel(); activeDecodeCancel = null; }
+      decodeBusy = false;
+    }
     var probe = frameProbe();
     if (probe && probe.sig !== lastSignature) { lastSignature = probe.sig; lastSignatureAt = now(); }
     var frozenFor = probe && lastSignatureAt ? now() - lastSignatureAt : 0;
     var broken = pipelineBroken(probe, frozenFor);
-    var frozen = frozenFor >= FROZEN_DEAD_MS;
-    if (firstCodeAt && frozen && !pipelineBroken(probe, 0)
-        && (video.currentTime !== lastFrameTime || frameToken !== lastFrameToken)) {
-      // After a successful read a still scene is normal; the browser's own clock
-      // decides. Before the first read, frozen pixels mean the path is dead.
-      lastFrameTime = video.currentTime; lastFrameToken = frameToken;
-      broken = false;
+    if (lastTagAt && now() - lastTagAt < 4000) broken = false;   // it just worked
+    if (ready && lastReadAt && !broken) return;                  // this session reads tags: never disturb it
+    var quiet = now() - Math.max(phaseSince, lastReadAt);
+    var grace = warming ? CURE_WARMING_GRACE_MS
+      : broken ? (lastReadAt ? CURE_READ_BROKEN_GRACE_MS : CURE_BROKEN_GRACE_MS)
+      : CURE_FIRST_MS;
+    if (quiet < grace) return;
+    if (now() < cureNextAt) return;
+    if (now() - lastOpenAt < MIN_CAMERA_GAP_MS) { cureNextAt = lastOpenAt + MIN_CAMERA_GAP_MS; return; }
+    if (pendingOpen) return;
+    var guard = 0;
+    var step = (broken ? (lastReadAt ? CURE_STEP_READ_BROKEN_MS : CURE_STEP_BROKEN_MS) : CURE_STEP_MS)
+      + Math.min(cureCycle, CURE_CYCLE_CAP) * CURE_CYCLE_MS;
+    while (guard++ < 14) {
+      var sequence = cureSequence(broken, cureCycle);
+      if (cureRung >= sequence.length) { cureRung = 0; cureCycle++; continue; }
+      if (runCureRung(sequence[cureRung++], broken)) { cureActions++; setControls(); cureNextAt = now() + step; return; }
     }
-    if (lastTagAt && now() - lastTagAt < 3000) broken = false;                   // it just worked
-    if (!broken) {
-      brokenSince = 0;
-      if (!firstCodeAt && !warmReopenDone && now() - scanStartedAt >= FIRST_RENEGOTIATE_MS) {
-        // A live picture that has not read a single tag: the first capture
-        // session may be a session that never really starts decoding. Re-open
-        // the same camera once, exactly like the manual camera switch did.
-        warmRenegotiate('برای شروع مطمئن، دوربین یک‌بار دوباره تنظیم می‌شود…');
-      }
-      return;
-    }
-    if (!brokenSince) brokenSince = now();
-    var brokenFor = Math.max(now() - brokenSince, frozenFor);
-    if (!firstCodeAt) {
-      if (brokenFor >= FIRST_BASIC_MS && pipelineStage < 3) {
-        pipelineStage = 3;
-        recoverStalledCamera('تنظیمات ساده‌تر دوربین امتحان می‌شود…', true);
-        return;
-      }
-      if (brokenFor >= FIRST_REOPEN_MS && pipelineStage < 2) {
-        pipelineStage = 2;
-        recoverStalledCamera('تصویر خوانده نمی‌شود؛ همان دوربین دوباره باز می‌شود…');
-        return;
-      }
-      if (brokenFor >= FIRST_REATTACH_MS && pipelineStage < 1) {
-        pipelineStage = 1; reattachStream(); return;
-      }
-      return;
-    }
-    if (brokenFor >= STALL_REOPEN_MS) { recoverStalledCamera(); return; }
-    if (brokenFor >= STALL_REATTACH_MS) reattachStream();
   }
   function stallCheck() {
-    if (!scanning || document.hidden || camState !== 'ready' || pendingOpen || busy || decodeBusy) return;
-    pipelineWatch();
+    try { cureTick(); } catch (e) { note('cure error: ' + ((e && e.message) || e)); }
   }
   function scheduleScan(rest) {
     if (!scanning || scanTimer || decodeBusy || document.hidden) return;
@@ -504,7 +598,7 @@
     lastFrameTime = video.currentTime; lastFrameToken = frameToken; lastDecodeAt = now();
     var epoch = scanEpoch, generation = cameraGeneration, started = now(), finished = false;
     var useNative = !!(nativeDetector && !nativeBroken);
-    decodeBusy = true;
+    decodeBusy = true; decodeStartedAt = now();
     var timer = setTimeout(function () {
       if (useNative) { nativeBroken = true; nativeDetector = null; }
       else { workerBroken = true; discardWorker(); }
@@ -520,7 +614,12 @@
       if (finished) return; finished = true; clearTimeout(timer);
       if (epoch !== scanEpoch) return;
       activeDecodeCancel = null; decodeBusy = false;
-      if (data) { firstCodeAt = firstCodeAt || now(); pipelineStage = 0; brokenSince = 0; decodeErrors = 0; }
+      if (data) {
+        // A decoded tag is the proof this session works: from here the ladder
+        // stands down and only a broken picture may disturb the camera.
+        firstCodeAt = firstCodeAt || now(); lastReadAt = now(); decodeErrors = 0; resetCure();
+        note('tag decoded (' + String(data).length + ' chars)');
+      }
       if (generation === cameraGeneration && camState === 'ready' && !document.hidden && data) sendScan(data, false);
       // Tiny adaptive rest only when decoding itself is slower than the camera:
       // keeps a weak phone cool without adding a fixed pause to every student.
@@ -529,7 +628,7 @@
     }
     try {
       var size = frameImage(passCounter++);
-      scanPasses++; decodeErrors = 0;
+      scanPasses++; lastPassAt = now(); decodeErrors = 0;
       if (useNative) {
         observe(nativeDetector.detect(canvas), function (codes) {
           complete(codes && codes.length ? codes[0].rawValue : null);
@@ -539,7 +638,7 @@
   }
   function startScanLoop() {
     scanning = true; lastSignature = ''; lastSignatureAt = 0; lastDecodeAt = 0;
-    scanPasses = 0; scanStartedAt = now();
+    scanPasses = 0; scanStartedAt = now(); phaseSince = now(); lastPassAt = now();
     lastFrameTime = video.currentTime; lastFrameToken = frameToken;
     armFrameCallback(); scheduleScan(0);
   }
@@ -813,12 +912,13 @@
       o.state = 'near';
       o.shortMessage = 'در حال قفل فوکوس روی ' + faDigits(Math.round(o.focusTarget.focusDistance * 100)) + ' سانتی‌متر…';
     }
+    if (o.enabled) opticsEverEnabled = true;
     optics = o; renderOptics(o); flushOptics(o);
   }
   /* Shortest usable shutter: the biggest single speed win after the focus lock.
    * Applied once, right after the lock — never per scan, never after a tag. */
   function startFastExposure(o) {
-    if (!o.confirmedFocus || o.exposureAttempted || !o.enabled) return;
+    if (!o.confirmedFocus || o.exposureAttempted || !o.enabled || opticsLightMode) return;
     o.exposureAttempted = true;
     var c = o.caps, s = o.original, time = s.exposureTime, iso = s.iso;
     if (!hasMode(c, 'exposureMode', 'manual')) return;
@@ -875,7 +975,7 @@
   video.addEventListener('playing', function () { if (readyCheck) readyCheck(); });
   var recoveryAttempts = 0, stableTicks = 0, deadTicks = 0, lastVideoTime = -1, wasSuspended = false;
   var warmupRepairs = 0, gesturePlay = null, needsGesture = false;
-  var warmReopenDone = false, warmReopenPending = false, warmReopenFailed = false;
+  var warmReopenPending = false, warmReopenFailed = false;
   try { desiredId = localStorage.getItem('mtag_scanner_cam') || null; } catch (e) {}
   function stopTracks(stream) {
     if (!stream) return;
@@ -893,7 +993,7 @@
   function setControls() {
     camBtn.disabled = !!pendingOpen || camState === 'opening' || camState === 'warming';
     camBtn.style.display = camList.length > 1 || (camList.length === 1 && camList[0].deviceId !== desiredId) ? 'block' : 'none';
-    camRetry.style.display = camState === 'error' || (optics && (optics.stalled || optics.state === 'unconfirmed')) ? 'block' : 'none';
+    camRetry.style.display = camState === 'error' || (camState === 'warming' && cureActions >= 2) || (optics && (optics.stalled || optics.state === 'unconfirmed')) ? 'block' : 'none';
     camRetry.textContent = pendingOpen ? 'بازکردن دوباره صفحه' : 'تلاش مجدد همین دوربین';
     for (var i = 0; i < camList.length; i++) {
       if (camList[i].deviceId === desiredId) {
@@ -944,7 +1044,9 @@
     prepareDecoder();
     var generation = ++cameraGeneration;
     camState = 'opening'; stableTicks = 0; lastVideoTime = -1;
+    phaseSince = now(); lastOpenAt = now();
     camMsg.textContent = 'در حال راه‌اندازی دوربین انتخابی...';
+    showState('در حال باز کردن دوربین…', '');
     var req = { generation: generation, id: desiredId, expired: false, timer: null };
     pendingOpen = req; setControls(); armOpenTimeout(req);
     function settled() {
@@ -1028,10 +1130,20 @@
       }
       function becomeReady() {
         camState = 'ready'; readyCheck = null; warmupRepairs = 0; gesturePlay = null;
-        if (!desiredId && settings.deviceId) desiredId = settings.deviceId;
-        if (desiredId) { try { localStorage.setItem('mtag_scanner_cam', desiredId); } catch (e) {} }
+        // The temporary camera of the swap repair must never become the choice
+        // that is remembered for the next visit.
+        if (!temporarySwap) {
+          if (!desiredId && settings.deviceId) desiredId = settings.deviceId;
+          if (desiredId) { try { localStorage.setItem('mtag_scanner_cam', desiredId); } catch (e) {} }
+        }
         camMsg.textContent = 'تگ را وسط تصویر، در فاصلهٔ حدود ۱۰ تا ۳۰ سانتی‌متر بگیرید';
-        setControls(); listCams(generation); configureOptics(track, generation); startScanLoop();
+        // Analysing frames starts FIRST: no repair or lens step may ever leave a
+        // ready-looking page that is not scanning.
+        startScanLoop();
+        showState('آمادهٔ اسکن', 'تگ را وسط تصویر، حدود ۱۰ تا ۳۰ سانتی‌متر بگیرید');
+        try { setControls(); listCams(generation); } catch (e) { note('camera list failed'); }
+        try { configureOptics(track, generation); } catch (e) { opticsSafeMode = true; stopOptics(); note('lens setup failed'); }
+        if (temporarySwap) { clearTimeout(returnTimer); returnTimer = setTimeout(returnToOriginal, SWAP_HOLD_MS); }
       }
       function checkReady() {
         if (generation !== cameraGeneration || currentStream !== stream || document.hidden || camState !== 'warming') return;
@@ -1039,13 +1151,9 @@
         if (framesReady()) { becomeReady(); return; }
         // A blocked autoplay is not a broken camera: wait for the tap.
         if (now() >= deadline && !needsGesture) {
-          if (warmupRepairs < 3) {
-            warmupRepairs++;
-            openCamera(0, false);
-            camMsg.textContent = 'تصویر دوربین آماده نشد؛ دوربین دوباره باز می‌شود…';
-            return;
-          }
-          cameraError('تصویر دوربین آماده نشد؛ تلاش مجدد را بزنید'); return;
+          // The self-healing ladder (cureTick) owns camera repairs from here;
+          // this loop only keeps trying to start playback.
+          deadline = now() + 7000;
         }
         // Keep trying to start playback while waiting: a rejected or aborted
         // play() must not leave a live camera showing nothing.
@@ -1091,13 +1199,14 @@
     var index = -1;
     for (var i = 0; i < camList.length; i++) if (camList[i].deviceId === desiredId) index = i;
     desiredId = camList[(index + 1) % camList.length].deviceId;
-    recoveryAttempts = 0; warmupRepairs = 0; pipelineStage = 0; brokenSince = 0; decodeErrors = 0;
-    warmReopenDone = true;                 // the operator asked for a camera; do not second-guess it
+    recoveryAttempts = 0; warmupRepairs = 0; decodeErrors = 0;
+    cancelSwap(); resetCure();             // the operator asked for a camera; follow that choice
     setControls(); openCamera(0, false);
   });
   camRetry.addEventListener('click', function () {
     if (pendingOpen) { window.location.reload(); return; }
-    recoveryAttempts = 0; warmupRepairs = 0; pipelineStage = 0; brokenSince = 0; decodeErrors = 0;
+    recoveryAttempts = 0; warmupRepairs = 0; decodeErrors = 0;
+    cancelSwap(); resetCure(); cureActions = 0;
     openCamera(0, false);
   });
   function scheduleRecovery() {
@@ -1112,7 +1221,7 @@
     cameraGeneration++; clearRecovery(); clearTimeout(readyTimer); readyTimer = null;
     if (pendingOpen) { clearTimeout(pendingOpen.timer); pendingOpen.timer = null; }
     readyCheck = null; stopScanLoop(); stopStream(); camState = 'suspended';
-    wasSuspended = true; brokenSince = 0;
+    wasSuspended = true;
     setControls();
   }
   function resume() {
@@ -1122,7 +1231,9 @@
      * a working scanner without the operator touching anything. A plain window
      * focus must not re-ask for a camera that was never granted, so the automatic
      * retry only happens after the page was really away (hidden/minimised). */
-    var returning = wasSuspended; wasSuspended = false; brokenSince = 0;
+    var returning = wasSuspended; wasSuspended = false;
+    resetCure(); cureActions = 0;
+    if (returnId) { returnToOriginal(); return; }
     if (camState === 'error') { if (returning) { recoveryAttempts = 0; warmupRepairs = 0; openCamera(0, false); } return; }
     if (camState === 'opening' || camState === 'warming') return;
     if (camState === 'suspended' || camState === 'idle') { openCamera(0, false); return; }
@@ -1152,5 +1263,18 @@
     if (video.currentTime !== lastVideoTime) { stableTicks++; recoveryAttempts = 0; }
     lastVideoTime = video.currentTime;
   }, 4000);
+  /* ?debug=1 : live state on the screen, for a phone we cannot hold. */
+  try {
+    var debugOn = /(^|[?&])debug=1(&|$)/.test(String((window.location && window.location.search) || ''));
+    if (debugOn && document.body) {
+      debugBox = document.createElement('pre');
+      debugBox.setAttribute('id', 'scanDebug');
+      debugBox.style.cssText = 'position:fixed;left:0;right:0;bottom:0;max-height:46%;overflow:auto;margin:0;padding:6px 8px;'
+        + 'background:rgba(0,0,0,.82);color:#9fe8ff;font:11px/1.45 monospace;direction:ltr;text-align:left;z-index:99;white-space:pre-wrap';
+      document.body.appendChild(debugBox);
+      setInterval(debugDraw, 500);
+      note('debug overlay on');
+    }
+  } catch (e) { debugBox = null; }
   openCamera(0, false);
 })();
