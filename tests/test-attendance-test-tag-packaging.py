@@ -118,6 +118,34 @@ class TestTagPackages(unittest.TestCase):
         test_scan = helpers[helpers.index('function att_process_test_scan'):helpers.index('function att_process_scan')]
         self.assertNotIn('INSERT INTO student_attendance', test_scan)
 
+    def test_08_manager_only_audience_is_in_the_shipped_bytes(self):
+        """The manager's own account is the only recipient — no second role, no fallback.
+
+        The audience rule lives in ``att_management_chats``: it must select the active
+        ``role_type = 'admin'`` sessions of the platform and nothing else. A teacher,
+        deputy, executive, counsellor or parent chat must never be reachable from the
+        test-message path, and there must be no staff-chat substitute at all.
+        """
+        payload = self.payload()
+        helpers = payload['includes/attendance_helpers.php'].decode('utf-8')
+        tags = payload['attendance-tags.php'].decode('utf-8')
+        audience = helpers[helpers.index('function att_management_chats'):
+                           helpers.index('function att_test_scan_message')]
+        self.assertIn("bs.role_type = 'admin'", audience)
+        self.assertIn('att_unique_chats', audience)
+        code = audience[audience.index('function att_management_chats'):]   # without the doc block
+        for leaked in ('fallback', 'is_deputy', 'is_executive', 'teacher_id', "'teacher'",
+                       'کارکنان', 'معاون'):
+            self.assertNotIn(leaked, code, leaked)
+        notify = helpers[helpers.index('function att_test_notify_management'):
+                         helpers.index('function att_process_scan')]
+        for leaked in ('fallback', 'کارکنان'):
+            self.assertNotIn(leaked, notify, leaked)
+        # and the tester sees the audience rule on the page itself
+        self.assertIn('فقط برای حساب مدیریتی', tags)
+        self.assertIn('حساب مدیریت:', tags)
+        self.assertIn('بدون حساب مدیریت متصل', tags)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

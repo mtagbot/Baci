@@ -265,38 +265,33 @@ if (!function_exists('att_unique_chats')) {
 
 if (!function_exists('att_management_chats')) {
     /**
-     * چت‌های فعال «مدیریت» روی یک پیام‌رسان: حساب‌هایی که مدرسه انتظار دارد
-     * صحت سامانه را ببینند — مدیر متصل‌شده به ربات (role_type=admin) و
-     * کارکنان دارای نقش مدیریتی (معاون/ناظم یا معاون اجرایی). اگر روی آن
-     * پیام‌رسان هیچ حساب مدیریتی متصل نباشد، برای اینکه آزمون بی‌اثر نماند
-     * چت‌های فعال کارکنان برمی‌گردد و fallback=true گزارش می‌شود.
+     * چت حساب‌های «مدیریت» روی یک پیام‌رسان.
+     *
+     * فقط حسابی که خودِ مدیر از طریق ربات و با نام کاربری و رمز پنل، حسابش را
+     * به ربات اضافه کرده است (`bot_admin_sessions.role_type = 'admin'`) پیام
+     * می‌گیرد. هیچ نقش دیگری — دبیر، معاون/ناظم، معاون اجرایی، مشاور — پیام
+     * آزمایشی نمی‌گیرد، حتی اگر به ربات متصل باشد. اگر روی یک پیام‌رسان هیچ
+     * حساب مدیریتی متصل نباشد، فهرست خالی برمی‌گردد و چیزی فرستاده نمی‌شود؛
+     * هیچ جانشین و هیچ نقش دومی وجود ندارد.
      */
     function att_management_chats($platform) {
         $platform = bot_valid_platform($platform);
         ensure_bot_schema($platform);
         if (!function_exists('ensure_school_roles_schema')) require_once __DIR__ . '/school_roles.php';
         ensure_school_roles_schema();
-        $rows = DB::fetchAll("SELECT bs.chat_id, bs.role_type, t.full_name AS teacher_name, a.name AS admin_name,
-                                     t.is_deputy, t.is_executive, t.status AS teacher_status, a.status AS admin_status
+        /* بدون DISTINCT و بدون مرتب‌سازی روی ستون بیرون از SELECT: این شکل روی
+           هم SQLite و هم MySQL معتبر است؛ تکراری‌ها با att_unique_chats حذف می‌شوند. */
+        $rows = DB::fetchAll("SELECT bs.chat_id, a.name AS admin_name, a.status AS admin_status
                                 FROM bot_admin_sessions bs
-                                LEFT JOIN teachers t ON t.id = bs.teacher_id
-                                LEFT JOIN admins  a ON a.id = bs.admin_id
-                               WHERE bs.platform = ? AND bs.is_active = 1", [$platform]);
-        $manager = []; $staff = [];
+                                LEFT JOIN admins a ON a.id = bs.admin_id
+                               WHERE bs.platform = ? AND bs.is_active = 1 AND bs.role_type = 'admin'
+                               ORDER BY bs.id DESC", [$platform]);
+        $chats = [];
         foreach ($rows as $r) {
-            if (($r['role_type'] ?? '') === 'admin') {
-                if (isset($r['admin_status']) && (int)$r['admin_status'] !== 1) continue;
-                $manager[] = ['chat_id' => (string)$r['chat_id'], 'name' => trim((string)$r['admin_name']), 'role' => 'مدیر'];
-                continue;
-            }
-            if (isset($r['teacher_status']) && (int)$r['teacher_status'] !== 1) continue;
-            $name = trim((string)$r['teacher_name']);
-            $staff[] = ['chat_id' => (string)$r['chat_id'], 'name' => $name, 'role' => 'کارکنان'];
-            if (!empty($r['is_deputy']))    $manager[] = ['chat_id' => (string)$r['chat_id'], 'name' => $name, 'role' => 'معاون/ناظم'];
-            if (!empty($r['is_executive'])) $manager[] = ['chat_id' => (string)$r['chat_id'], 'name' => $name, 'role' => 'معاون اجرایی'];
+            if (isset($r['admin_status']) && (int)$r['admin_status'] !== 1) continue;
+            $chats[] = ['chat_id' => (string)$r['chat_id'], 'name' => trim((string)$r['admin_name']), 'role' => 'مدیر'];
         }
-        $manager = att_unique_chats($manager); $staff = att_unique_chats($staff);
-        return ['chats' => $manager ? $manager : $staff, 'fallback' => $manager ? false : (bool)$staff];
+        return att_unique_chats($chats);
     }
 }
 
@@ -321,8 +316,9 @@ if (!function_exists('att_test_scan_message')) {
             $msg .= 'ساعت ورود: ' . tr_num($time, 'fa') . "\n";
         }
         $msg .= 'تاریخ: ' . tr_num(att_today(), 'fa') . "\n"
-              . 'دانش‌آموز: — (تگ آزمایشی، بدون دانش‌آموز واقعی)' . "\n\n"
-              . 'این پیام نمونهٔ آزمایشی است و با اسکن «تگ آزمایشی» فرستاده شده؛ هیچ حضور یا غیابی ثبت نشده و برای والدین ارسال نشده است.';
+              . 'دانش‌آموز: — (تگ آزمایشی، بدون دانش‌آموز واقعی)' . "\n"
+              . 'گیرنده: حساب مدیریت متصل به ربات' . "\n\n"
+              . 'این پیام نمونهٔ آزمایشی است و فقط برای حساب مدیریتِ متصل به ربات فرستاده شده؛ هیچ حضور یا غیابی ثبت نشده و هیچ پیامی برای والدین، دبیر یا معاون نرفته است.';
         return $msg;
     }
 }
@@ -330,13 +326,11 @@ if (!function_exists('att_test_scan_message')) {
 if (!function_exists('att_test_notify_management')) {
     /** ارسال پیام آزمایشی به حساب‌های مدیریتی — هم روی بله و هم روی تلگرام. */
     function att_test_notify_management($kind, $time = '', $minutesLate = 0) {
-        $result = ['bale' => 0, 'telegram' => 0, 'fallback' => [], 'missing' => []];
+        $result = ['bale' => 0, 'telegram' => 0, 'missing' => []];
         foreach (['bale', 'telegram'] as $platform) {
             try {
-                $found = att_management_chats($platform);
-                $chats = $found['chats'];
+                $chats = att_management_chats($platform);
                 if (!$chats) { $result['missing'][] = $platform; continue; }
-                if (!empty($found['fallback'])) $result['fallback'][] = $platform;
                 $msg = att_test_scan_message($platform, $kind, $time, $minutesLate);
                 foreach ($chats as $c) {
                     try {
@@ -359,7 +353,6 @@ if (!function_exists('att_test_notify_management')) {
                 'bale'     => $result['bale'],
                 'telegram' => $result['telegram'],
                 'missing'  => $result['missing'],
-                'fallback' => $result['fallback'],
             ], JSON_UNESCAPED_UNICODE));
         } catch (Exception $e) {}
         return $result;

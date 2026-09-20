@@ -14,8 +14,9 @@ const check=(v,m)=>{assert(v,m);checks++};
 const fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
 
 /* ── fixture ────────────────────────────────────────────────────────────────
-   Two active students of the default year, parent chats for both messengers, a
-   connected manager account and a deputy account — plus one INACTIVE session
+   Two active students of the default year, parent chats for both messengers and
+   manager accounts connected through the bot (one per messenger) — plus parents,
+   a deputy, a plain teacher, an INACTIVE session and a disabled manager account
    that must never receive anything.
    att_auto_finalize is paused and today's finalizer guard is set: the scan
    endpoint's opportunistic auto-absent run must not blur "the test tag changed
@@ -41,12 +42,19 @@ foreach ([['bale','8101','bale_chat_id'],['telegram','8102','telegram_chat_id']]
     DB::execute("INSERT INTO \`$table\` (\`{$p[2]}\`,student_id) VALUES (?,?)",[$p[1],7201]);
 }
 $adminRow=DB::fetch('SELECT id FROM admins ORDER BY id LIMIT 1'); $adminId=(int)($adminRow['id']??1);
+DB::execute("INSERT OR REPLACE INTO admins (id,username,password,name,role,status) VALUES (9701,'fixture-manager-two','x','مدیر دوم','super_admin',1)");
+DB::execute("INSERT OR REPLACE INTO admins (id,username,password,name,role,status) VALUES (9702,'fixture-manager-off','x','مدیر غیرفعال','super_admin',0)");
 DB::execute("INSERT OR REPLACE INTO teachers (id,national_id,full_name,password,status,academic_year,is_deputy,is_executive,is_counselor) VALUES (9501,'teacher9501','معاون آزمون','hash',1,'1404/1405',1,0,0)");
 DB::execute("INSERT OR REPLACE INTO teachers (id,national_id,full_name,password,status,academic_year,is_deputy,is_executive,is_counselor) VALUES (9502,'teacher9502','دبیر ساده','hash',1,'1404/1405',0,0,0)");
+/* Manager accounts registered through the bot (username+password) — the ONLY recipients. */
 DB::execute("INSERT INTO bot_admin_sessions (platform,chat_id,admin_id,role_type,is_active,created_at_jalali) VALUES ('bale','9001',?,'admin',1,'1404/06/29')",[$adminId]);
-DB::execute("INSERT INTO bot_admin_sessions (platform,chat_id,teacher_id,role_type,is_active,created_at_jalali) VALUES ('telegram','9002',9501,'teacher',1,'1404/06/29')");
-DB::execute("INSERT INTO bot_admin_sessions (platform,chat_id,teacher_id,role_type,is_active,created_at_jalali) VALUES ('telegram','9003',9502,'teacher',1,'1404/06/29')");
+DB::execute("INSERT INTO bot_admin_sessions (platform,chat_id,admin_id,role_type,is_active,created_at_jalali) VALUES ('telegram','9002',9701,'admin',1,'1404/06/29')");
+/* Everything else must stay silent: a deputy on Bale, a plain teacher on Telegram,
+   an inactive session and a disabled manager account. */
+DB::execute("INSERT INTO bot_admin_sessions (platform,chat_id,teacher_id,role_type,is_active,created_at_jalali) VALUES ('bale','9003',9501,'teacher',1,'1404/06/29')");
 DB::execute("INSERT INTO bot_admin_sessions (platform,chat_id,teacher_id,role_type,is_active,created_at_jalali) VALUES ('bale','9004',9501,'teacher',0,'1404/06/29')");
+DB::execute("INSERT INTO bot_admin_sessions (platform,chat_id,teacher_id,role_type,is_active,created_at_jalali) VALUES ('telegram','9005',9502,'teacher',1,'1404/06/29')");
+DB::execute("INSERT INTO bot_admin_sessions (platform,chat_id,admin_id,role_type,is_active,created_at_jalali) VALUES ('telegram','9006',9702,'admin',1,'1404/06/29')");
 echo 'FIXTURE_OK';`);
 assert(setup.out.includes('FIXTURE_OK'),setup.out+setup.err);
 
@@ -103,7 +111,7 @@ check(qrList(normal).length===2&&!qrList(normal).some(q=>q.includes('TEST')),
 
 const page=await render('attendance-tags.php');
 check(/تگ آزمایشی/.test(page)&&/openTestPrint\(\)/.test(page),'the tag page offers the «تگ آزمایشی» option');
-check(page.includes('اتصال حساب‌ها:')&&page.includes('حساب متصل'),'the page shows which messengers have a connected account');
+check(page.includes('حساب مدیریت:')&&page.includes('حساب مدیریت متصل'),'the page shows which messengers have a manager account connected');
 check(!/آخرین آزمون/.test(page),'no test has run yet, so no result line is shown');
 
 /* ── 2) scanning the test tags: real endpoint, no attendance, both bots ──── */
@@ -122,12 +130,14 @@ let w=wire();
 check(w.length===2,'one message per messenger after the first test scan');
 check(w.filter(x=>x.platform==='bale').length===1&&w.filter(x=>x.platform==='telegram').length===1,
       'Bale AND Telegram both received it');
-check(w.filter(x=>x.platform==='bale')[0].chat_id==='9001','Bale goes to the connected manager chat');
-check(w.filter(x=>x.platform==='telegram')[0].chat_id==='9002','Telegram goes to the connected manager chat');
-check(w.every(x=>!['8101','8102','9003','9004'].includes(x.chat_id)),
-      'parents and unconnected/inactive sessions get nothing');
+check(w.filter(x=>x.platform==='bale')[0].chat_id==='9001','Bale goes to the manager account connected through the bot');
+check(w.filter(x=>x.platform==='telegram')[0].chat_id==='9002','Telegram goes to the manager account connected through the bot');
+check(w.every(x=>!['8101','8102','9003','9004','9005','9006'].includes(x.chat_id)),
+      'no parent, teacher, deputy, inactive session or disabled manager receives the test message');
 check(w.every(x=>x.text.includes('آزمایشی')&&x.text.includes('آزمون سامانه')),
       'every message is the attendance test message');
+check(w.every(x=>x.text.includes('حساب مدیریت')),
+      'every message states it is for the connected manager account only');
 check(w.every(x=>x.text.includes('حضور به موقع')),'the message carries the simulated status');
 check(w.filter(x=>x.platform==='bale')[0].text.includes('بله')&&
       w.filter(x=>x.platform==='telegram')[0].text.includes('تلگرام'),
@@ -151,7 +161,8 @@ check((await db("SELECT COUNT(*) n FROM student_attendance WHERE student_id IN (
       'no attendance for the fixture students either');
 const jobs=await db('SELECT platform,state,payload FROM bot_outbox ORDER BY created_at');
 check(jobs.length===4&&jobs.every(j=>j.state==='sent'),'all four test messages were delivered by the durable outbox');
-check(jobs.every(j=>!JSON.parse(j.payload).chat_id.match(/^810|^900[34]$/)),'the outbox only targets management chats');
+check(jobs.every(j=>['9001','9002'].includes(JSON.parse(j.payload).chat_id)),
+      'the outbox only ever targets the two manager chats');
 const logs=await db("SELECT status,chat_id FROM bot_message_logs WHERE message_type='attendance_test'");
 check(logs.length===4&&logs.every(l=>l.status==='sent'),'the test messages are logged truthfully');
 
@@ -195,5 +206,23 @@ check(realWire.some(x=>['8101','8102'].includes(x.chat_id)),'the parent of the s
 check((await db("SELECT COUNT(*) n FROM bot_message_logs WHERE message_type='attendance_test'"))[0].n===4,
       'the real scan logged no test message');
 
-console.log(`PASS ${checks} attendance test-tag cases (sheet, scan path, management messages, no recording)`);
+/* ── 6) no manager account connected → nobody gets anything (no fallback) ─ */
+clearWire();
+const off=await run(`<?php require_once '/www/includes/functions.php';
+require_once '/www/includes/attendance_helpers.php';
+DB::execute("UPDATE bot_admin_sessions SET is_active=0 WHERE role_type='admin'");
+echo 'ADMINS_OFF';`);
+check(off.out.includes('ADMINS_OFF'),off.out+off.err);
+const outboxBefore=(await db('SELECT COUNT(*) n FROM bot_outbox'))[0].n;
+const orphan=await scan('MTAG-ATT-TEST:present');
+check(orphan.json&&orphan.json.ok===true,'the test tag still answers the scanner when no manager is connected');
+check(wire().length===0,'without a connected manager account nothing is sent to anyone — no fallback to teachers, deputies or parents');
+check((await db("SELECT COUNT(*) n FROM bot_message_logs WHERE message_type='attendance_test'"))[0].n===4,
+      'no extra test message was logged');
+check((await db('SELECT COUNT(*) n FROM bot_outbox'))[0].n===outboxBefore,'no extra outbox job was queued');
+const noMgr=await render('attendance-tags.php');
+check(noMgr.includes('بدون حساب مدیریت متصل'),'the page says no manager account is connected');
+check(/آخرین آزمون[^<]*بدون حساب مدیریت متصل/.test(noMgr),'the last-test line reports that nothing was delivered');
+
+console.log(`PASS ${checks} attendance test-tag cases (sheet, scan path, manager-only messages, no recording)`);
 process.exit(0);

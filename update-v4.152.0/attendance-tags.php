@@ -300,20 +300,21 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
 $testMgState = [];
 foreach (['bale' => 'بله', 'telegram' => 'تلگرام'] as $pfKey => $pfFa) {
     try {
-        $foundMg = att_management_chats($pfKey);
-        $cntMg = count($foundMg['chats']);
+        $cntMg = count(att_management_chats($pfKey));
         $testMgState[] = $pfFa . ': ' . ($cntMg > 0
-            ? (tr_num($cntMg, 'fa') . ' حساب متصل' . (!empty($foundMg['fallback']) ? ' (کارکنان)' : ''))
-            : 'بدون حساب متصل');
+            ? (tr_num($cntMg, 'fa') . ' حساب مدیریت متصل')
+            : 'بدون حساب مدیریت متصل');
     } catch (Exception $e) { $testMgState[] = $pfFa . ': نامشخص'; }
 }
 $lastTest = json_decode((string)get_setting('att_test_last_result', ''), true);
 $lastTestLine = '';
 if (is_array($lastTest)) {
+    $testMissing = array_map('strval', (array)($lastTest['missing'] ?? []));
     $testParts = [];
     foreach (['بله' => 'bale', 'تلگرام' => 'telegram'] as $pfFa => $pfKey) {
         $nMg = (int)($lastTest[$pfKey] ?? 0);
-        $testParts[] = $pfFa . ': ' . ($nMg > 0 ? (tr_num($nMg, 'fa') . ' پیام') : 'ارسال نشد');
+        if ($nMg > 0) $testParts[] = $pfFa . ': ' . tr_num($nMg, 'fa') . ' پیام';
+        else $testParts[] = $pfFa . ': ' . (in_array($pfKey, $testMissing, true) ? 'بدون حساب مدیریت متصل' : 'ارسال نشد');
     }
     $lastTestLine = 'آخرین آزمون ' . trim((string)($lastTest['at'] ?? '')) . ' — ' . implode(' | ', $testParts);
 }
@@ -342,11 +343,12 @@ require_once __DIR__ . '/includes/header.php';
         </div>
         <div class="text-xs text-muted" style="line-height:2">
             با این گزینه یک برگهٔ کوچک با دو تگ «حضور به موقع» و «تأخیر» چاپ می‌شود. با اسکن هر تگ، همان مسیر واقعی اسکنر طی می‌شود
-            (خواندن QR → سامانه → اطلاع‌رسانی) و پیام آزمایشی مربوط به همان وضعیت برای حساب مدیریت متصل به ربات — هم در بله و هم در تلگرام — فرستاده می‌شود.
-            هیچ حضور یا غیابی برای دانش‌آموزان ثبت نمی‌شود و پیامی هم برای والدین نمی‌رود.
+            (خواندن QR → سامانه → اطلاع‌رسانی) و پیام آزمایشی مربوط به همان وضعیت <b>فقط برای حساب مدیریتی</b> فرستاده می‌شود که خودش از طریق ربات
+            با نام کاربری و رمز حسابش را به ربات اضافه کرده است — هم در بله و هم در تلگرام. برای هیچ نقش دیگری (دبیر، معاون/ناظم، معاون اجرایی، مشاور) و
+            برای هیچ والدی پیام آزمایشی نمی‌رود؛ هیچ حضور یا غیابی هم ثبت نمی‌شود.
         </div>
         <div class="text-xs" style="margin-top:8px">
-            اتصال حساب‌ها: <?php echo clean(implode(' | ', $testMgState)); ?>
+            حساب مدیریت: <?php echo clean(implode(' | ', $testMgState)); ?>
             <?php if ($lastTestLine !== ''): ?><br><?php echo clean(tr_num($lastTestLine, 'fa')); ?><?php endif; ?>
         </div>
     </div>
