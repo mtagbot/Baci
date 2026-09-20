@@ -29,9 +29,9 @@ SITE_ARCHIVE = 'SITE-FIX-v4.152.0-cumulative.zip'
 DESKTOP_ARCHIVE = 'SchoolDeskPro-FIX-v2.83.0-cumulative.zip'
 PARTS = {
     'site': ['SITE-FIX-v4.152.0-scanner.zip', 'SITE-FIX-v4.152.0-desk-update.zip',
-             'SITE-FIX-v4.152.0-attendance-test-tag.zip'],
+             'SITE-FIX-v4.152.0-attendance-test-tag.zip', 'SITE-FIX-v4.152.0-bot-admin-login.zip'],
     'desktop': ['SchoolDeskPro-FIX-v2.83.0-scanner.zip', 'SchoolDeskPro-FIX-v2.83.0-desk-update.zip',
-                'SchoolDeskPro-FIX-v2.83.0-attendance-test-tag.zip'],
+                'SchoolDeskPro-FIX-v2.83.0-attendance-test-tag.zip', 'SchoolDeskPro-FIX-v2.83.0-bot-admin-login.zip'],
 }
 
 
@@ -61,10 +61,14 @@ def union(platform):
 def main():
     desk_update = load('release-desk-update.py')
     scanner = load('release-scanner.py')
+    test_tag = load('release-attendance-test-tag.py')
+    bot_login = load('release-bot-admin-login.py')
 
     # Build from source first, so the cumulative pair is never older than its parts.
     scanner.build()
     desk_update.build()
+    test_tag.build()
+    bot_login.build()
     launcher = desk_update.compile_launcher().read_bytes()
     assert launcher[:2] == b'MZ'
 

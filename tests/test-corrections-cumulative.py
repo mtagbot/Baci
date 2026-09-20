@@ -2,9 +2,10 @@
 
 `SITE-FIX-v4.152.0-cumulative.zip` and `SchoolDeskPro-FIX-v2.83.0-cumulative.zip`
 are what a school installs when it wants all corrections at once: the scanner
-near-band fast-scanner fix, the desktop online-update feature and the «تگ آزمایشی»
-test sheet with its management test message. This test rebuilds the union from the
-individual published packages and from the working tree,
+near-band fast-scanner fix, the desktop online-update feature, the «تگ آزمایشی»
+test sheet with its management-only test message and the manager login inside the
+bot (username → password → the account is connected). This test rebuilds the union
+from the individual published packages and from the working tree,
 then compares bytes — a missing or extra file, or a stale copy inside the ZIP,
 fails here and nowhere else.
 """
@@ -21,9 +22,10 @@ SITE_ARCHIVE = ROOT / 'SITE-FIX-v4.152.0-cumulative.zip'
 DESKTOP_ARCHIVE = ROOT / 'SchoolDeskPro-FIX-v2.83.0-cumulative.zip'
 PARTS = {
     'site': ['SITE-FIX-v4.152.0-scanner.zip', 'SITE-FIX-v4.152.0-desk-update.zip',
-             'SITE-FIX-v4.152.0-attendance-test-tag.zip'],
+             'SITE-FIX-v4.152.0-attendance-test-tag.zip', 'SITE-FIX-v4.152.0-bot-admin-login.zip'],
     'desktop': ['SchoolDeskPro-FIX-v2.83.0-scanner.zip', 'SchoolDeskPro-FIX-v2.83.0-desk-update.zip',
-                'SchoolDeskPro-FIX-v2.83.0-attendance-test-tag.zip'],
+                'SchoolDeskPro-FIX-v2.83.0-attendance-test-tag.zip',
+                'SchoolDeskPro-FIX-v2.83.0-bot-admin-login.zip'],
 }
 PRIVATE = ('config/', 'data/', 'php/', 'backups/', 'profile/', 'server/', 'licenses/')
 EXECUTABLE = ('.bat', '.cmd', '.ps1', '.vbs', '.sh', '.py', '.dll', '.so')
@@ -48,7 +50,7 @@ class CumulativeCorrective(unittest.TestCase):
             self.assertEqual(set(z.namelist()), set(expected))
             for name, data in expected.items():
                 self.assertEqual(z.read(name), data, name)
-            self.assertEqual(len(z.namelist()), 11)
+            self.assertEqual(len(z.namelist()), 13)
 
     def test_desktop_archive_is_the_union_plus_the_launcher(self):
         expected = {k: v for k, v in parts_union('desktop').items() if k != DESKTOP_PREFIX + 'SchoolDeskPro.exe'}
@@ -102,6 +104,8 @@ class CumulativeCorrective(unittest.TestCase):
             'includes/management_hub.php': ROOT / 'update-v4.152.0/includes/management_hub.php',
             'attendance-tags.php': ROOT / 'update-v4.152.0/attendance-tags.php',
             'includes/attendance_helpers.php': ROOT / 'update-v4.152.0/includes/attendance_helpers.php',
+            'includes/bot_login_flow.php': ROOT / 'update-v4.152.0/includes/bot_login_flow.php',
+            'includes/bot_webhook_engine.php': ROOT / 'update-v4.152.0/includes/bot_webhook_engine.php',
         }
         desktop_extra = {
             'desk-update.php': ROOT / 'desktop-app-v2/patch/www-desk-update.php',
@@ -131,7 +135,8 @@ class CumulativeCorrective(unittest.TestCase):
         self.assertIn('attendance-scanner.php', names)
         with ZipFile(SITE_ARCHIVE) as z:
             site = set(z.namelist())
-        for rel in ('desk-update-api.php', 'desk-updates.php', 'includes/desk_updates_store.php', 'attendance-scanner.php'):
+        for rel in ('desk-update-api.php', 'desk-updates.php', 'includes/desk_updates_store.php', 'attendance-scanner.php',
+                    'includes/bot_login_flow.php', 'includes/bot_webhook_engine.php'):
             self.assertIn(SITE_PREFIX + rel, site)
         self.assertIn('desk_update_auto(', (ROOT / 'desktop-app-v2/patch/includes-desk_update.php').read_text(encoding='utf-8'))
 

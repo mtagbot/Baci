@@ -15,8 +15,8 @@ STAMP = (2026, 9, 19, 0, 0, 0)
 # order (dependencies: svg → student-workflow → preview-navigation → fast-ui →
 # mobile-hubs → report-tools → settings-health → reports-layout → bot-outbox →
 # optimized-sync → event-sync → recovery-ui).
-SITE_CORRECTIVES = ['svg-responsive','student-workflow','preview-navigation','fast-ui','mobile-hubs','report-tools','settings-health','bot-outbox','recovery-ui','scanner','desk-update','attendance-test-tag']
-DESKTOP_CORRECTIVES = ['svg-responsive','student-workflow','preview-navigation','fast-ui','mobile-hubs','report-tools','settings-health','reports-layout','bot-outbox','optimized-sync','event-sync','recovery-ui','scanner','desk-update','attendance-test-tag']
+SITE_CORRECTIVES = ['svg-responsive','student-workflow','preview-navigation','fast-ui','mobile-hubs','report-tools','settings-health','bot-outbox','recovery-ui','scanner','desk-update','attendance-test-tag','bot-admin-login']
+DESKTOP_CORRECTIVES = ['svg-responsive','student-workflow','preview-navigation','fast-ui','mobile-hubs','report-tools','settings-health','reports-layout','bot-outbox','optimized-sync','event-sync','recovery-ui','scanner','desk-update','attendance-test-tag','bot-admin-login']
 SITE_CORRECTIVE_PREFIX = 'site-update-v4.152.0/'
 def sha(b): return hashlib.sha256(b).hexdigest()
 def run(*args): return subprocess.check_output(args, text=True)
