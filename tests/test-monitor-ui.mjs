@@ -9,18 +9,16 @@
  *
  * این سوئیت هم نشانه‌گذاری رندرشده و هم خودِ کد JS را می‌سنجد.
  */
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { req, loginAdmin, examId } from './harness/lib.mjs';
+import { resolveFile } from './harness/site.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, d = '') => c ? (pass++, console.log(`  ✅ ${n}`)) : (fail++, console.log(`  ❌ ${n}${d ? '  → ' + d : ''}`));
 
 /* ── منبع ─────────────────────────────────────────────── */
-const PATCH = process.env.PATCH;
-const cands = PATCH ? [join(process.cwd(), '..', PATCH, 'online-exam-monitor.php')] : [];
-cands.push(join(process.cwd(), '..', '.arena', 'current', 'SchoolDeskPro', 'www', 'online-exam-monitor.php'));
-const SRC = cands.find(existsSync);
+const SRC = resolveFile('online-exam-monitor.php');
+if (!SRC) { console.error('منبع پیدا نشد'); process.exit(2); }
 const src = readFileSync(SRC, 'utf8');
 console.log(`\n>>> منبع: ${SRC.replace(process.cwd() + '/', '')}  (${src.length} نویسه)`);
 

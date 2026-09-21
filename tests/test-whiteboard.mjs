@@ -8,20 +8,15 @@
  *   displayScale()    — نسبت وضوح داخلی به اندازهٔ نمایش
  * بعلاوه بازرسی خودِ نشانه‌گذاری رندرشده (کلاس CSS، حذف بزرگنمایی).
  */
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { req, examId } from './harness/lib.mjs';
+import { resolveFile } from './harness/site.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, d = '') => c ? (pass++, console.log(`  ✅ ${n}`)) : (fail++, console.log(`  ❌ ${n}${d ? '  → ' + d : ''}`));
 
 /* ── منبع ─────────────────────────────────────────────── */
-const PATCH = process.env.PATCH;
-const candidates = PATCH
-  ? [join(process.cwd(), '..', PATCH, 'online-exam-take.php')]
-  : [];
-candidates.push(join(process.cwd(), '..', '.arena', 'current', 'SchoolDeskPro', 'www', 'online-exam-take.php'));
-const SRC = candidates.find(existsSync);
+const SRC = resolveFile('online-exam-take.php');
 if (!SRC) { console.error('منبع پیدا نشد'); process.exit(2); }
 const src = readFileSync(SRC, 'utf8');
 console.log(`\n>>> منبع: ${SRC.replace(process.cwd() + '/', '')}  (${src.length} نویسه)`);
