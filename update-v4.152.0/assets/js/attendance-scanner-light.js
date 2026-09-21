@@ -51,6 +51,7 @@
         o.start(); o.stop(c.currentTime + 0.03);
       } catch(e){}
     }
+    preloadSounds();                        /* same tap unlocks the voices */
     var hint = document.getElementById('sndHint');
     if (hint) hint.style.display = 'none';
   }
@@ -89,27 +90,147 @@
   }
 
   /* ✅ ACCEPT: rising two-tone chime — E6 then B6 (positive, bright) */
-  function buzzOk(){
-    tone(1318.5, 0,    0.09, 'sine', 0.55);
-    tone(1975.5, 0.09, 0.22, 'sine', 0.55);
+  function buzzOk(at){
+    at = at || 0;
+    tone(1318.5, at,      0.09, 'sine', 0.55);
+    tone(1975.5, at+0.09, 0.22, 'sine', 0.55);
   }
   /* ⏰ WARN (late/duplicate): two mid beeps — attention, not failure */
-  function buzzWarn(){
-    tone(740, 0,    0.14, 'square', 0.30);
-    tone(740, 0.22, 0.14, 'square', 0.30);
+  function buzzWarn(at){
+    at = at || 0;
+    tone(740, at,      0.14, 'square', 0.30);
+    tone(740, at+0.22, 0.14, 'square', 0.30);
   }
   /* ❌ REJECT/ERROR: harsh low double BZZT — sawtooth + downward slide */
-  function buzzErr(){
-    tone(160, 0,    0.28, 'sawtooth', 0.60, 110);
-    tone(160, 0.34, 0.34, 'sawtooth', 0.60, 90);
+  function buzzErr(at){
+    at = at || 0;
+    tone(160, at,      0.28, 'sawtooth', 0.60, 110);
+    tone(160, at+0.34, 0.34, 'sawtooth', 0.60, 90);
   }
 
-  function showResult(kind, icon, name, stat, sub){
+  /* ── Recorded voice alerts ─────────────────────────────────────────────
+   * Three recordings live next to the scanner (assets/audio/):
+   *
+   *   حضور به موقع  →  buzzer first, then hzr.ogg
+   *   تأخیر         →  buzzer first, then tkhr.ogg
+   *   خطای شبکه     →  net.ogg ON ITS OWN: the recording replaces the buzzer,
+   *                    so a scan that never reached the server sounds clearly
+   *                    different from a tag the server rejected.
+   *
+   * They travel through the same AudioContext as the buzzer (both are unlocked
+   * by the same tap), are downloaded once and decoded once. If the browser
+   * cannot decode Vorbis, a plain <audio> element is tried; if that fails too,
+   * the scan is untouched and only the sound is lost — never a lost scan.
+   */
+  var SOUND_FILES = { net: 'net.ogg', present: 'hzr.ogg', late: 'tkhr.ogg' };
+  var SOUND_GAP = 0.06;                      /* silence between buzzer and voice */
+  var BUZZ_END = { ok: 0.31, warn: 0.36, err: 0.70 };
+  var soundBase = 'assets/audio/', soundMap = null;
+  (function () {
+    var cfg = config.sounds;                 /* page or config override, optional */
+    if (typeof cfg === 'string' && cfg) soundBase = cfg.charAt(cfg.length - 1) === '/' ? cfg : cfg + '/';
+    else if (cfg && typeof cfg === 'object') soundMap = cfg;
+  })();
+  function soundUrl(name){
+    if (soundMap && soundMap[name]) return String(soundMap[name]);
+    return SOUND_FILES[name] ? soundBase + SOUND_FILES[name] : '';
+  }
+  var sounds = {};                           /* name → {loading|data|buffer|element|failed} */
+
+  function soundElement(name, url, st){
+    st.loading = false;
+    if (st.element || st.failed || !url || typeof Audio === 'undefined') { st.failed = !st.element; return; }
+    try { var a = new Audio(url); if (a) { a.preload = 'auto'; st.element = a; } else st.failed = true; }
+    catch (e) { st.failed = true; }
+  }
+  function decodeSound(name, st){
+    if (!st || st.buffer || st.element || st.failed || !st.data || st.decoding) return;
+    var c = audioCtx();
+    if (!c || !c.decodeAudioData) { soundElement(name, soundUrl(name), st); return; }
+    st.decoding = true;
+    var ok = function (buf) {
+      st.decoding = false; st.data = null; st.buffer = buf;
+      /* A scan asked for this voice while the file was still being prepared. */
+      if (st.queued && now() - st.queuedAt < 1500) { st.queued = false; startVoice(st, 0); }
+    };
+    var no = function () { st.decoding = false; st.data = null; soundElement(name, soundUrl(name), st); };
+    try { c.decodeAudioData(st.data, ok, no); } catch (e) { no(); }
+  }
+  function loadSound(name){
+    var st = sounds[name];
+    if (st) { decodeSound(name, st); return st; }
+    st = sounds[name] = { loading: true };
+    var url = soundUrl(name);
+    if (!url || typeof XMLHttpRequest === 'undefined') { st.loading = false; soundElement(name, url, st); return st; }
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.responseType = 'arraybuffer';
+      xhr.onload = function () {
+        var body = xhr.response;
+        /* A file the server does not have is over; only a file that arrived and
+           could not be DECODED falls back to an <audio> element. */
+        if (!body || (xhr.status && (xhr.status < 200 || xhr.status >= 300))) { st.loading = false; st.failed = true; return; }
+        st.loading = false; st.data = body; decodeSound(name, st);
+      };
+      xhr.onerror = function () { st.loading = false; st.failed = true; };
+      xhr.send(null);
+    } catch (e) { st.loading = false; st.failed = true; }
+    return st;
+  }
+  function preloadSounds(){
+    for (var name in SOUND_FILES) if (SOUND_FILES.hasOwnProperty(name)) loadSound(name);
+  }
+  /* the voice itself, at `delay` seconds from now */
+  function startVoice(st, delay){
+    var d = delay || 0, c = audioCtx();
+    if (c && st.buffer && c.createBufferSource) {
+      try {
+        var src = c.createBufferSource(), g = c.createGain();
+        src.buffer = st.buffer;
+        if (g && g.gain && g.gain.setValueAtTime) g.gain.setValueAtTime(1, c.currentTime + d);
+        src.connect(g || c.destination); if (g) g.connect(c.destination);
+        src.start(c.currentTime + d);
+        return true;
+      } catch (e) {}
+    }
+    if (st.element) {
+      var play = function () { try { var p = st.element.play(); if (p && p.catch) p.catch(noop); } catch (e) {} };
+      if (d > 0) setTimeout(play, Math.round(d * 1000)); else play();
+      return true;
+    }
+    return false;
+  }
+  function playSound(name, delay){
+    var st = loadSound(name);
+    if (st.buffer || st.element) return startVoice(st, delay);
+    if (st.loading || st.data) { st.queued = true; st.queuedAt = now(); decodeSound(name, st); }
+    return false;
+  }
+  /* The operator hears the buzzer and the recording, in that order — except for
+     a network failure, where the recording is the only sound (it replaces the
+     buzzer). `voice` of '' or undefined keeps the plain buzzer of `kind`. */
+  var RESULT_AUDIO = {
+    present: { buzz: 'ok',   voice: 'present' },
+    late:    { buzz: 'warn', voice: 'late' },
+    net:     { buzz: '',     voice: 'net' }
+  };
+  function playAudio(kind, voice){
+    var plan = voice ? RESULT_AUDIO[voice] : null;
+    var buzzKind = plan ? plan.buzz : kind;
+    var delay = 0;
+    if (buzzKind === 'ok') { buzzOk(0); delay = BUZZ_END.ok + SOUND_GAP; }
+    else if (buzzKind === 'warn') { buzzWarn(0); delay = BUZZ_END.warn + SOUND_GAP; }
+    else if (buzzKind === 'err') { buzzErr(0); delay = BUZZ_END.err + SOUND_GAP; }
+    if (plan) playSound(plan.voice, delay);
+  }
+
+  /* `voice`: 'present' | 'late' | 'net' adds the recorded alert — anything else
+     (a duplicate, a rejected tag, a server error) keeps the plain buzzer. */
+  function showResult(kind, icon, name, stat, sub, voice){
     resBox.className = 'result ' + kind;
     resIcon.textContent = icon; resName.textContent = name; resStat.textContent = stat; resSub.textContent = sub || '';
-    if (kind === 'ok') buzzOk();
-    else if (kind === 'warn') buzzWarn();
-    else buzzErr();
+    playAudio(kind, voice);
     if (navigator.vibrate) {
       try { navigator.vibrate(kind === 'ok' ? 80 : kind === 'warn' ? [80,60,80] : [180,80,180]); } catch(e){}
     }
@@ -185,16 +306,18 @@
         busy = false;
         if (error) {
           forget(payload); sendAfter = now() + 1500;
+          /* The response never came back: the scan did not reach the server.
+             That is what net.ogg announces, in place of the buzzer. */
           if (error.server) showResult('err', '⚠️', 'خطای سرور', error.message, 'اسکن دوباره را امتحان کنید');
-          else showResult('err', '📡', error.timeout ? 'پاسخ سرور دیر شد' : 'خطای شبکه', 'ثبت حضور تأیید نشد — دوباره اسکن کنید', 'ممکن است ثبت انجام شده باشد؛ اسکن مجدد «تکراری» نشان می‌دهد');
+          else showResult('err', '📡', error.timeout ? 'پاسخ سرور دیر شد' : 'خطای شبکه', 'ثبت حضور تأیید نشد — دوباره اسکن کنید', 'ممکن است ثبت انجام شده باشد؛ اسکن مجدد «تکراری» نشان می‌دهد', 'net');
           return;
         }
         // Cooldown starts at confirmation, not before a possibly slow request.
         forget(payload); recentTags.push({ value: payload, time: now() });
         /* Only the name and whether the student made it on time — nothing else
            competes with the camera for attention. */
-        if (j.ok && j.code === 'present') showResult('ok', '✅', j.student, 'ورود به موقع — ' + j.time, j['class'] || '');
-        else if (j.ok && j.code === 'late') showResult('warn', '⏰', j.student, 'تأخیر — ' + j.time, j['class'] || '');
+        if (j.ok && j.code === 'present') showResult('ok', '✅', j.student, 'ورود به موقع — ' + j.time, j['class'] || '', 'present');
+        else if (j.ok && j.code === 'late') showResult('warn', '⏰', j.student, 'تأخیر — ' + j.time, j['class'] || '', 'late');
         else if (j.code === 'duplicate') showResult('warn', '🔁', j.student || 'تکراری', 'قبلاً ثبت شده: ' + (j.status || ''), j['class'] || '');
         else { forget(payload); sendAfter = now() + 1500; showResult('err', '❌', 'ناموفق', j.message || 'کد نامعتبر', ''); }
       });
@@ -1276,5 +1399,6 @@
       note('debug overlay on');
     }
   } catch (e) { debugBox = null; }
+  preloadSounds();                          /* bytes first, decode after the tap */
   openCamera(0, false);
 })();

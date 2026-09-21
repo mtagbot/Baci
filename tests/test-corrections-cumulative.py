@@ -50,7 +50,7 @@ class CumulativeCorrective(unittest.TestCase):
             self.assertEqual(set(z.namelist()), set(expected))
             for name, data in expected.items():
                 self.assertEqual(z.read(name), data, name)
-            self.assertEqual(len(z.namelist()), 13)
+            self.assertEqual(len(z.namelist()), 16)
 
     def test_desktop_archive_is_the_union_plus_the_launcher(self):
         expected = {k: v for k, v in parts_union('desktop').items() if k != DESKTOP_PREFIX + 'SchoolDeskPro.exe'}
@@ -106,6 +106,9 @@ class CumulativeCorrective(unittest.TestCase):
             'includes/attendance_helpers.php': ROOT / 'update-v4.152.0/includes/attendance_helpers.php',
             'includes/bot_login_flow.php': ROOT / 'update-v4.152.0/includes/bot_login_flow.php',
             'includes/bot_webhook_engine.php': ROOT / 'update-v4.152.0/includes/bot_webhook_engine.php',
+            'assets/audio/net.ogg': ROOT / 'update-v4.152.0/assets/audio/net.ogg',
+            'assets/audio/hzr.ogg': ROOT / 'update-v4.152.0/assets/audio/hzr.ogg',
+            'assets/audio/tkhr.ogg': ROOT / 'update-v4.152.0/assets/audio/tkhr.ogg',
         }
         desktop_extra = {
             'desk-update.php': ROOT / 'desktop-app-v2/patch/www-desk-update.php',
@@ -136,7 +139,8 @@ class CumulativeCorrective(unittest.TestCase):
         with ZipFile(SITE_ARCHIVE) as z:
             site = set(z.namelist())
         for rel in ('desk-update-api.php', 'desk-updates.php', 'includes/desk_updates_store.php', 'attendance-scanner.php',
-                    'includes/bot_login_flow.php', 'includes/bot_webhook_engine.php'):
+                    'includes/bot_login_flow.php', 'includes/bot_webhook_engine.php',
+                    'assets/audio/net.ogg', 'assets/audio/hzr.ogg', 'assets/audio/tkhr.ogg'):
             self.assertIn(SITE_PREFIX + rel, site)
         self.assertIn('desk_update_auto(', (ROOT / 'desktop-app-v2/patch/includes-desk_update.php').read_text(encoding='utf-8'))
 

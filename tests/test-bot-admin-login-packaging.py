@@ -123,14 +123,16 @@ class BotAdminLoginPackages(unittest.TestCase):
         self.assertTrue("$input = file_get_contents('php://input');" in engine, 'the input line the harness replaces')
 
     def test_08_historical_correctives_are_not_touched(self):
-        """This round ships two new files; the shipped scanner/desk-update/test-tag
-        packages must stay byte-identical (they are immutable inputs)."""
+        """This round ships two new files; the packages it does not own must stay
+        byte-identical (they are immutable inputs for it). The scanner packages are
+        rebuilt in the NEXT round (the recorded alerts), so only the packages no
+        later round touches are pinned here."""
         expected = {
-            'SITE-FIX-v4.152.0-scanner.zip': '87e68f0e5b2b60cad5eb0888a30ffc7d8f280838a421ac6c77b17de0516357b5',
-            'SchoolDeskPro-FIX-v2.83.0-scanner.zip': '69c8744718a425444eec82f6cec28d44e08227bc83065ce2fbda5b79da76b7f5',
-            'SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip': '14ae783f7456b073f0df9b969e736548b5e7c3c2a0b4bbdfd43e9a8b6b491a6e',
             'SITE-FIX-v4.152.0-desk-update.zip': '99366e9daeb0278b323ae1d696a435702c87bc0b57807d0d82f228e4b88e4fae',
             'SchoolDeskPro-FIX-v2.83.0-desk-update.zip': '06a6de4284d0ba22cdb3197cfbb82b0aebc39da4057e4c51e6b2c274f7fcbcaf',
+            'SITE-FIX-v4.152.0-attendance-test-tag.zip': '2d967419bc946fd62fd41e4b6ab1c6008b147310bd09ccc77d7d1f71cc269fca',
+            'SchoolDeskPro-FIX-v2.83.0-attendance-test-tag.zip': '3e78b6e84d82507e3c955274167d78738355b76aa6e838af43a585b6abb4c900',
+            'SchoolDeskPro-UPDATE-2.83.0-attendance-test-tag.zip': '6ebb96db98644963e4b9527cb2f60fe275422894c2229ccca0439ad888eb0867',
         }
         for name, digest in expected.items():
             self.assertEqual(hashlib.sha256((ROOT / name).read_bytes()).hexdigest(), digest, name)

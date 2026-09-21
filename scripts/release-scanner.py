@@ -9,13 +9,15 @@ import json
 ROOT = Path(__file__).resolve().parent.parent
 PATCH = ROOT / 'update-v4.152.0'
 FILES = ('attendance-scanner.php', 'attendance-scanner-legacy.php',
-         'assets/js/attendance-scanner-light.js', 'assets/js/attendance-decoder-worker.js')
+         'assets/js/attendance-scanner-light.js', 'assets/js/attendance-decoder-worker.js',
+         # v4.152.0-camera9-sounds: the recorded alerts the scanner plays
+         'assets/audio/net.ogg', 'assets/audio/hzr.ogg', 'assets/audio/tkhr.ogg')
 ARCHIVES = {'SITE-FIX-v4.152.0-scanner.zip': 'site-update-v4.152.0/',
             # The desktop web root was renamed www -> reports; the desktop updater
             # accepts both, reports/ is what a migrated machine expects.
             'SchoolDeskPro-FIX-v2.83.0-scanner.zip': 'SchoolDeskPro/reports/'}
 # Same payload, in the shape the desktop app can install ONLINE from the school
-# site (see docs/DESKTOP-ONLINE-UPDATE-FA.md). Same four files, no launcher.
+# site (see docs/DESKTOP-ONLINE-UPDATE-FA.md). Same files, no launcher.
 ONLINE_ARCHIVE = 'SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip'
 
 def manifest(version, payload, notes):
@@ -32,6 +34,9 @@ def build():
     backup = payload['attendance-scanner-legacy.php']
     assert backup == (ROOT / 'update-v4.94.0/attendance-scanner.php').read_bytes()
     assert hashlib.sha256(backup).hexdigest() == 'e64f8374c4ab8aaf23a00078d49ab9993bb12ce5ce33c599025265588b534d6a'
+    sounds = payload['assets/audio/net.ogg'] + payload['assets/audio/hzr.ogg'] + payload['assets/audio/tkhr.ogg']
+    assert sounds[:4] == b'OggS' and all(payload['assets/audio/' + n][:4] == b'OggS'
+                                         for n in ('net.ogg', 'hzr.ogg', 'tkhr.ogg'))
     for archive, prefix in ARCHIVES.items():
         target = ROOT / archive
         with ZipFile(target, 'w', compression=ZIP_DEFLATED, compresslevel=9) as z:
@@ -51,7 +56,9 @@ def build():
     online = {'SchoolDeskPro/reports/' + name: data for name, data in payload.items()}
     online['SchoolDeskPro/DESKTOP-UPDATE.json'] = manifest(
         '2.83.0-scanner-focus', payload,
-        'اسکنر سریع‌تر: فوکوس روی فاصلهٔ ۵ تا ۲۰ سانتی‌متر قفل می‌شود، شاتر کوتاه و نرخ فریم بالا می‌رود و بین اسکن‌های متوالی هیچ فوکوس مجددی رخ نمی‌دهد.')
+        'اسکنر سریع‌تر و باصدا: فوکوس روی بازهٔ ۱۰ تا ۳۰ سانتی‌متر قفل می‌شود، شاتر کوتاه و نرخ فریم بالا می‌رود، '
+        'بین اسکن‌های متوالی هیچ فوکوس مجددی رخ نمی‌دهد و سه اعلان صوتی ضبط‌شده همراه اسکنر نصب می‌شود: '
+        '«حضور به موقع» و «تأخیر» هر کدام پس از buzzer و «خطای شبکه» به‌جای buzzer.')
     target = ROOT / ONLINE_ARCHIVE
     with ZipFile(target, 'w', compression=ZIP_DEFLATED, compresslevel=9) as z:
         for name, content in sorted(online.items()):

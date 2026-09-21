@@ -2,7 +2,12 @@
 
 نسخه سایت **4.152.0** و دسکتاپ **2.83.0** تغییر نمی‌کنند. این اصلاح مستقل از بسته‌های قبلی لیست Word/PDF است؛ هیچ فایل گزارش، قاعده حضور/تأخیر، API ثبت، اعلان اولیا، غیبت خودکار، تنظیم یا دیتابیس در این بسته عوض نمی‌شود.
 
-## اصلاح نهم فعلی: نردبان ترمیم خودکار تا خوانده‌شدن اولین تگ (`camera9`)
+> **نوبت دهم (۲۰۲۶-۰۹-۲۱) — صداهای ضبط‌شده:** به درخواست کاربر، سه اعلان صوتی به اسکنر اضافه شد
+> (`hzr.ogg` برای «حضور به موقع» و `tkhr.ogg` برای «تأخیر» **بعد از** buzzer، و `net.ogg` **به‌جای** buzzer
+> در خطای شبکه). همین نوبت، **بسته‌های اسکنر بازسازی شدند** و سه فایل صوتی هم داخلشان است؛ پس هش‌های
+> جدول زیر (نوبت نهم) به‌روز شده‌اند. راهنمای کامل: [`docs/RELEASE-scanner-sounds-v4.152.0-FA.md`](RELEASE-scanner-sounds-v4.152.0-FA.md).
+
+## اصلاح نهم: نردبان ترمیم خودکار تا خوانده‌شدن اولین تگ (`camera9`)
 
 خواستهٔ کاربر (تکرار دوم در همان روز): «همچنان وقتی صفحهٔ اسکنر را باز می‌کنیم، اسکن انجام نمی‌شود تا مدت زیادی».
 
@@ -37,9 +42,9 @@
 
 | فایل | بایت | SHA256 |
 |---|---|---|
-| `SITE-FIX-v4.152.0-scanner.zip` | 36924 | `87e68f0e5b2b60cad5eb0888a30ffc7d8f280838a421ac6c77b17de0516357b5` |
-| `SchoolDeskPro-FIX-v2.83.0-scanner.zip` | 36932 | `69c8744718a425444eec82f6cec28d44e08227bc83065ce2fbda5b79da76b7f5` |
-| `SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip` (بستهٔ آنلاین) | 37599 | `14ae783f7456b073f0df9b969e736548b5e7c3c2a0b4bbdfd43e9a8b6b491a6e` |
+| `SITE-FIX-v4.152.0-scanner.zip` | ۹۹٬۲۴۷ | `7f7f81dfd64d63d5bbd94efa7a257c758f3201c7eb2a42dee01161b390698a88` (شامل سه فایل صوتی) |
+| `SchoolDeskPro-FIX-v2.83.0-scanner.zip` | ۹۹٬۲۶۱ | `be7bccad278102b5c3e8d9188e8683081a07b631fa0c398b27b8cc9c752f7857` (شامل سه فایل صوتی) |
+| `SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip` (بستهٔ آنلاین) | ۱۰۰٬۲۱۷ | `63fed6f02b725a908c1bf2268be50a8e78ab9fd8ecde9d35fb7aa4e73d58ba6f` (شامل سه فایل صوتی) |
 | `SITE-FIX-v4.152.0-cumulative.zip` | 49566 | `961c95ead4f41a68bd649b831eaa01990dc69441cbc180c0fb28f4bd6b8a8a96` |
 | `SchoolDeskPro-FIX-v2.83.0-cumulative.zip` | 79009 | `7d5ad4d2701af876e758f7f6e4183bd0fab2c4d0181993cbac6994fe81215fc3` |
 | `Release_V1.0-Site.zip` | 3489192 | `23abf44470069bf30eb7f8868e5a5422c935e0453c8cbf308e50d2b2e6c3b4d0` |
@@ -352,9 +357,9 @@ python3 tests/test-scanner-packaging.py
 
 | بسته | بایت | SHA256 |
 |---|---:|---|
-| `SITE-FIX-v4.152.0-scanner.zip` | 36924 | `87e68f0e5b2b60cad5eb0888a30ffc7d8f280838a421ac6c77b17de0516357b5` |
-| `SchoolDeskPro-FIX-v2.83.0-scanner.zip` | 36932 | `69c8744718a425444eec82f6cec28d44e08227bc83065ce2fbda5b79da76b7f5` |
-| `SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip` (بستهٔ آنلاین) | 37599 | `14ae783f7456b073f0df9b969e736548b5e7c3c2a0b4bbdfd43e9a8b6b491a6e` |
+| `SITE-FIX-v4.152.0-scanner.zip` | ۹۹٬۲۴۷ | `7f7f81dfd64d63d5bbd94efa7a257c758f3201c7eb2a42dee01161b390698a88` (شامل سه فایل صوتی) |
+| `SchoolDeskPro-FIX-v2.83.0-scanner.zip` | ۹۹٬۲۶۱ | `be7bccad278102b5c3e8d9188e8683081a07b631fa0c398b27b8cc9c752f7857` (شامل سه فایل صوتی) |
+| `SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip` (بستهٔ آنلاین) | ۱۰۰٬۲۱۷ | `63fed6f02b725a908c1bf2268be50a8e78ab9fd8ecde9d35fb7aa4e73d58ba6f` (شامل سه فایل صوتی) |
 
 پیشوند فایل‌های وب در بستهٔ دسکتاپ از این نسخه `SchoolDeskPro/reports/` است (پوشهٔ وب نرم‌افزار دسکتاپ به `reports` تغییر نام داده). بستهٔ نصب کامل همچنان `SchoolDeskPro/www/` است، چون خودِ برنامه در اولین اجرا نام پوشه را به `reports` می‌برد.
 

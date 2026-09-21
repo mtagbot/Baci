@@ -90,12 +90,13 @@ video{width:100%;height:100%;object-fit:cover;display:block}
 <canvas id="qrCanvas" style="display:none"></canvas>
 <script>
 window.ATT_SCANNER_CONFIG = {
+  sounds: 'assets/audio/',                 /* net.ogg · hzr.ogg · tkhr.ogg */
   key: <?php echo json_encode($byKey ? $key : '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
   api: 'attendance-scan-api.php',
   worker: 'assets/js/attendance-decoder-worker.js?v=4.152.0-camera9',
   decoder: 'assets/js/jsqr.min.js'
 };
 </script>
-<script src="assets/js/attendance-scanner-light.js?v=4.152.0-camera9"></script>
+<script src="assets/js/attendance-scanner-light.js?v=4.152.0-camera9-sounds"></script>
 </body>
 </html>

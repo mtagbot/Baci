@@ -7,13 +7,16 @@ import unittest
 ROOT = Path(__file__).resolve().parent.parent
 WEB = 'reports/'   # desktop web root since the reports migration
 FILES = {'attendance-scanner.php', 'attendance-scanner-legacy.php',
-         'assets/js/attendance-scanner-light.js', 'assets/js/attendance-decoder-worker.js'}
+         'assets/js/attendance-scanner-light.js', 'assets/js/attendance-decoder-worker.js',
+         # v4.152.0-camera9-sounds: the recorded voice alerts of the scanner
+         'assets/audio/net.ogg', 'assets/audio/hzr.ogg', 'assets/audio/tkhr.ogg'}
+SOUNDS = ('assets/audio/net.ogg', 'assets/audio/hzr.ogg', 'assets/audio/tkhr.ogg')
 
 class ScannerPackages(unittest.TestCase):
     def check_archive(self, archive, prefix):
         with ZipFile(ROOT / archive) as z:
             self.assertIsNone(z.testzip())
-            self.assertEqual(len(z.infolist()), 4)
+            self.assertEqual(len(z.infolist()), 7)
             self.assertEqual(set(z.namelist()), {prefix + name for name in FILES})
             for name in FILES:
                 self.assertEqual(z.read(prefix + name), (ROOT / 'update-v4.152.0' / name).read_bytes())
@@ -23,6 +26,20 @@ class ScannerPackages(unittest.TestCase):
 
     def test_desktop_payload(self):
         self.check_archive('SchoolDeskPro-FIX-v2.83.0-scanner.zip', 'SchoolDeskPro/' + WEB)
+
+    def test_voice_alerts_travel_as_real_ogg_files(self):
+        """The three recorded alerts must be the uploaded recordings, verbatim:
+        a truncated or re-encoded file would silence the scanner on the phone."""
+        for name in SOUNDS:
+            packaged = (ROOT / 'update-v4.152.0' / name).read_bytes()
+            self.assertTrue(packaged.startswith(b'OggS'), name)
+            self.assertEqual(packaged, (ROOT / name.rsplit('/', 1)[-1]).read_bytes(),
+                             name + ': the packaged recording differs from the uploaded one')
+        with ZipFile(ROOT / 'SITE-FIX-v4.152.0-scanner.zip') as z:
+            for name in SOUNDS:
+                data = z.read('site-update-v4.152.0/' + name)
+                self.assertTrue(data.startswith(b'OggS'), name)
+                self.assertEqual(data, (ROOT / 'update-v4.152.0' / name).read_bytes(), name)
 
     def test_backup_exact_hash_and_original(self):
         backup = (ROOT / 'update-v4.152.0/attendance-scanner-legacy.php').read_bytes()
