@@ -1,0 +1,17 @@
+{
+  "name": "baci-tests",
+  "private": true,
+  "type": "module",
+  "description": "هارنس تست SchoolDesk Pro — اجرای PHP واقعی با php-wasm + SQLite",
+  "scripts": {
+    "lint": "node lint.mjs",
+    "server": "node verify.mjs",
+    "timer": "node test-timer.mjs",
+    "save": "node test-save.mjs",
+    "all": "bash ../scripts/run-tests.sh"
+  },
+  "dependencies": {
+    "@php-wasm/node": "3.1.53",
+    "@php-wasm/universal": "3.1.53"
+  }
+}

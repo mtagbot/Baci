@@ -1,0 +1,286 @@
+/* ============================================================
+ * exam-ui.css — v4.129.0
+ * لایهٔ رابط کاربری بخش آزمون آنلاین (دانش‌آموز + مانیتورینگ دبیر)
+ *
+ * بعد از style.css و ui-modern.css بارگذاری می‌شود و از همان توکن‌های
+ * :root آن‌ها استفاده می‌کند؛ هیچ کلاس موجودی را نمی‌شکند.
+ *
+ * سه اصل:
+ *   ۱) موبایل‌اول — نقطهٔ شروع استایل عرض کوچک است، @media فقط بزرگ می‌کند.
+ *   ۲) هدف لمسی ≥ ۴۴ پیکسل — طبق راهنمای دسترسی‌پذیری Apple/Google.
+ *   ۳) آیکون به‌جای ایموجی — ایموجی بین پلتفرم‌ها متفاوت رندر می‌شود و
+ *      اندازه/هم‌ترازی‌اش قابل کنترل نیست؛ svg نیست.
+ *
+ * خودمیزبان، بدون CDN.
+ * ============================================================ */
+
+/* ---------- ۱) توکن‌های مخصوص این لایه ---------- */
+:root {
+    --em-surface: var(--bg-card, #fff);
+    --em-surface-2: #f7f8fc;
+    --em-line: var(--border-color, #e6e9f0);
+    --em-text: var(--text-main, #101828);
+    --em-muted: var(--text-muted, #667085);
+    --em-brand: var(--primary, #4f46e5);
+    --em-brand-soft: var(--primary-soft, rgba(79, 70, 229, .09));
+    --em-ok: var(--success, #10b981);
+    --em-warn: var(--warning, #f59e0b);
+    --em-bad: var(--danger, #ef4444);
+    --em-r: var(--radius-md, 12px);
+    --em-r-lg: var(--radius-lg, 16px);
+    --em-ease: var(--ease, cubic-bezier(.4, 0, .2, 1));
+    /* ارتفاع نوار ابزار موبایل — برای چسباندن دکمه‌ها به پایین صفحه */
+    --em-safe-b: env(safe-area-inset-bottom, 0px);
+    --em-safe-t: env(safe-area-inset-top, 0px);
+    --em-tap: 44px;
+}
+
+/* ---------- ۲) آیکون‌ها ----------
+   کاربرد:  <svg class="ic"><use href="#i-check"></use></svg>
+   sprite در همان صفحه تعریف می‌شود (بدون درخواست شبکهٔ اضافه). */
+.ic {
+    width: 1.15em; height: 1.15em;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vertical-align: -0.22em;
+}
+.ic-sm { width: .95em; height: .95em; }
+.ic-lg { width: 1.5em; height: 1.5em; }
+.ic-fill { fill: currentColor; stroke: none; }
+
+/* ---------- ۳) حالت‌های وضعیت (بدون ایموجی) ---------- */
+.em-state {
+    display: inline-flex; align-items: center; gap: .38em;
+    font-size: .78rem; font-weight: 600;
+    padding: .18em .62em; border-radius: 999px;
+    line-height: 1.7; white-space: nowrap;
+}
+.em-state::before {
+    content: ""; width: .5em; height: .5em; border-radius: 50%;
+    background: currentColor; flex: 0 0 auto;
+}
+.em-state.is-ok   { color: #047857; background: rgba(16, 185, 129, .12); }
+.em-state.is-bad  { color: #b91c1c; background: rgba(239, 68, 68, .12); }
+.em-state.is-warn { color: #b45309; background: rgba(245, 158, 11, .14); }
+.em-state.is-idle { color: var(--em-muted); background: rgba(102, 112, 133, .12); }
+/* نقطهٔ «آنلاین» با انیمیشن */
+.em-state.is-live::before { animation: em-pulse 1.6s var(--em-ease) infinite; }
+@keyframes em-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
+
+/* ---------- ۴) مودال — جایگزین پنل شناور و window.open ----------
+   چرا مودال و نه پنل شناور: پنل position:fixed با width ثابت روی گوشی
+   از قاب بیرون می‌زند و دکمهٔ بستنش می‌تواند بالای viewport بیفتد.
+   مودال با inset:0 و overflow:auto همیشه کامل در دسترس است. */
+.em-modal {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: flex-end; justify-content: center;
+    padding: 0;
+    visibility: hidden; opacity: 0;
+    transition: opacity .18s var(--em-ease), visibility .18s;
+}
+.em-modal.is-open { visibility: visible; opacity: 1; }
+.em-modal__bd {
+    position: absolute; inset: 0;
+    background: rgba(15, 23, 42, .55);
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+    /* لایهٔ جدا برای کلیکِ پس‌زمینه — تا خودِ پنل کلیک را نگیرد */
+}
+.em-modal__panel {
+    position: relative;
+    width: 100%;
+    max-height: 92dvh;                 /* dvh: منوی آدرس موبایل را لحاظ می‌کند */
+    display: flex; flex-direction: column;
+    background: var(--em-surface);
+    border-radius: var(--em-r-lg) var(--em-r-lg) 0 0;
+    box-shadow: var(--shadow-lg, 0 16px 40px -12px rgba(16, 24, 40, .18));
+    transform: translateY(12px);
+    transition: transform .2s var(--em-ease);
+    overscroll-behavior: contain;    /* اسکرول به صفحهٔ پشت سرایت نکند */
+}
+.em-modal.is-open .em-modal__panel { transform: none; }
+.em-modal__head {
+    display: flex; align-items: center; gap: .5rem;
+    padding: .85rem 1rem;
+    border-bottom: 1px solid var(--em-line);
+    flex: 0 0 auto;
+}
+.em-modal__title { font-weight: 700; font-size: .95rem; flex: 1 1 auto; min-width: 0; }
+.em-modal__body {
+    padding: 1rem;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1 1 auto;
+}
+.em-modal__foot {
+    display: flex; gap: .5rem;
+    padding: .75rem 1rem calc(.75rem + var(--em-safe-b));
+    border-top: 1px solid var(--em-line);
+    flex: 0 0 auto;
+}
+/* دکمهٔ بستن: بزرگ، مربع، همیشه در دسترس */
+.em-x {
+    width: var(--em-tap); height: var(--em-tap);
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--em-line); border-radius: var(--radius-sm, 8px);
+    background: var(--em-surface-2); color: var(--em-text);
+    cursor: pointer; flex: 0 0 auto;
+    -webkit-tap-highlight-color: transparent;
+}
+.em-x:active { background: var(--em-line); }
+
+/* قفل اسکرول صفحهٔ پشت مودال */
+body.em-lock { overflow: hidden; }
+
+/* روی صفحهٔ بزرگ، مودال وسط‌چین و محدود می‌شود */
+@media (min-width: 640px) {
+    .em-modal { align-items: center; padding: 1.25rem; }
+    .em-modal__panel {
+        width: auto; min-width: min(34rem, 100%); max-width: 46rem;
+        max-height: 86dvh;
+        border-radius: var(--em-r-lg);
+    }
+    .em-modal__foot { padding-bottom: .75rem; }
+}
+
+/* ---------- ۵) دکمه‌ها ---------- */
+.em-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: .4em;
+    min-height: var(--em-tap);
+    padding: .6rem 1rem;
+    font-size: .875rem; font-weight: 600;
+    border-radius: var(--radius-sm, 8px);
+    border: 1px solid transparent;
+    cursor: pointer; text-decoration: none;
+    transition: background .15s var(--em-ease), box-shadow .15s var(--em-ease), transform .08s;
+    -webkit-tap-highlight-color: transparent;
+}
+.em-btn:active { transform: scale(.985); }
+.em-btn--brand { background: var(--em-brand); color: #fff; box-shadow: var(--shadow-primary, none); }
+.em-btn--brand:hover { background: var(--primary-hover, #4338ca); }
+.em-btn--ghost { background: var(--em-surface); color: var(--em-text); border-color: var(--em-line); }
+.em-btn--ghost:hover { background: var(--em-surface-2); }
+.em-btn--danger { background: var(--em-bad); color: #fff; }
+.em-btn--soft { background: var(--em-brand-soft); color: var(--em-brand); }
+.em-btn--block { width: 100%; }
+.em-btn--sm { min-height: 38px; padding: .45rem .75rem; font-size: .8rem; }
+
+/* ---------- ۶) جدول → کارت در موبایل ----------
+   جدول ۸ ستونه روی گوشی غیرقابل خواندن است. با data-label هر سلول
+   برچسب خودش را می‌گیرد و ردیف‌ها به کارت تبدیل می‌شوند. */
+.em-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.em-table th { text-align: right; font-weight: 600; color: var(--em-muted); font-size: .72rem; }
+.em-table tbody tr { border-bottom: 1px solid var(--em-line); }
+.em-table tbody tr.is-stale { background: rgba(245, 158, 11, .06); }
+.em-table tbody tr.is-stale td { opacity: .92; }
+
+@media (max-width: 900px) {
+    .em-table thead { display: none; }
+    .em-table, .em-table tbody, .em-table tr, .em-table td { display: block; width: 100%; }
+    .em-table tbody tr {
+        background: var(--em-surface);
+        border: 1px solid var(--em-line);
+        border-radius: var(--em-r);
+        padding: .35rem .75rem;
+        margin-bottom: .6rem;
+    }
+    .em-table td {
+        display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+        padding: .45rem 0;
+        border-bottom: 1px dashed var(--em-line);
+        text-align: left;
+    }
+    .em-table tr td:last-child { border-bottom: 0; }
+    .em-table td::before {
+        content: attr(data-label);
+        flex: 0 0 auto;
+        font-size: .72rem; font-weight: 600; color: var(--em-muted);
+    }
+    /* سلولِ نام، سرتیترِ کارت است */
+    .em-table td.is-head {
+        font-size: .95rem; font-weight: 700;
+        padding-top: .7rem;
+    }
+    .em-table td.is-head::before { display: none; }
+    /* سلولِ کنش‌ها تمام‌عرض می‌شود تا انگشت راحت بخورد */
+    .em-table td.is-actions {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+        gap: .4rem; padding-bottom: .7rem;
+    }
+    .em-table td.is-actions::before { display: none; }
+}
+
+/* ---------- ۷) کارت آمار ---------- */
+.em-stats {
+    display: grid; gap: .6rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 700px) { .em-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.em-stat {
+    background: var(--em-surface);
+    border: 1px solid var(--em-line);
+    border-radius: var(--em-r);
+    padding: .7rem .8rem;
+    display: flex; align-items: center; gap: .6rem;
+}
+.em-stat__n { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+.em-stat__l { font-size: .72rem; color: var(--em-muted); }
+.em-stat__i {
+    width: 2.1rem; height: 2.1rem; flex: 0 0 auto;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-sm, 8px);
+    background: var(--em-brand-soft); color: var(--em-brand);
+}
+
+/* ---------- ۸) فهرست رویدادها (لاگ پایش) ---------- */
+.em-log {
+    display: flex; gap: .7rem; align-items: flex-start;
+    padding: .65rem .1rem;
+    border-bottom: 1px solid var(--em-line);
+}
+.em-log:last-child { border-bottom: 0; }
+.em-log__t {
+    flex: 0 0 auto;
+    font-size: .7rem; color: var(--em-muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 4.6em;
+    padding-top: .15em;
+}
+.em-log__x { flex: 1 1 auto; min-width: 0; }
+.em-log__k { font-weight: 600; font-size: .84rem; }
+.em-log__d { font-size: .76rem; color: var(--em-muted); margin-top: .15rem; word-break: break-word; }
+.em-log.is-bad .em-log__k { color: #b91c1c; }
+.em-log.is-warn .em-log__k { color: #b45309; }
+
+/* ---------- ۹) تصویر وب‌کم ---------- */
+.em-shot {
+    display: block; width: 100%; height: auto;
+    border-radius: var(--radius-sm, 8px);
+    background: #0b1220;
+}
+
+/* ---------- ۱۰) متفرقه ---------- */
+.em-hint { font-size: .76rem; color: var(--em-muted); line-height: 1.8; }
+.em-sep { height: 1px; background: var(--em-line); border: 0; margin: .9rem 0; }
+.em-scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* عدد فارسی با ارقام هم‌عرض تا ستون‌ها نلرزند */
+.em-num { font-variant-numeric: tabular-nums; }
+
+/* نوار اقدام چسبنده در پایین صفحهٔ دانش‌آموز */
+.em-dock {
+    position: sticky; bottom: 0; z-index: 50;
+    background: color-mix(in srgb, var(--em-surface) 92%, transparent);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    border-top: 1px solid var(--em-line);
+    padding: .6rem .75rem calc(.6rem + var(--em-safe-b));
+    display: flex; gap: .5rem; align-items: center;
+}
+
+/* احترام به ترجیح کاربر برای حذف انیمیشن */
+@media (prefers-reduced-motion: reduce) {
+    .em-modal, .em-modal__panel, .em-btn { transition: none; }
+    .em-state.is-live::before { animation: none; }
+}

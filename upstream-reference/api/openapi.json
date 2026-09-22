@@ -1,0 +1,60 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "سیستم مدیریت کارنامه دانش‌آموزی - Mobile / App API",
+    "version": "2.5.0",
+    "description": "مستندات رابط برنامه‌نویسی موبایل و اپلیکیشن با پشتیبانی از Access Token و Refresh Token"
+  },
+  "servers": [
+    {
+      "url": "/api",
+      "description": "Internal API Endpoint"
+    }
+  ],
+  "paths": {
+    "/index.php?action=config": {
+      "get": {
+        "summary": "دریافت اطلاعات و تنظیمات عمومی مدرسه",
+        "responses": {
+          "200": {
+            "description": "پاسخ موفق"
+          }
+        }
+      }
+    },
+    "/index.php?action=student_login": {
+      "post": {
+        "summary": "ورود دانش‌آموز با کد ملی و رمز عبور",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "national_id": { "type": "string" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "دریافت توکن دسترسی و رفرش توکن" } }
+      }
+    },
+    "/index.php?action=reports": {
+      "get": {
+        "summary": "دریافت لیست کارنامه‌های دانش‌آموز",
+        "security": [ { "BearerAuth": [] } ],
+        "responses": { "200": { "description": "لیست کارنامه‌ها" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
