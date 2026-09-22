@@ -16,8 +16,8 @@ if [ ! -d node_modules ]; then
   npm install --silent --no-audit --no-fund || { echo "❌ npm install ناموفق بود"; exit 1; }
 fi
 
-declare -a NAMES=("بررسی نحوی جاوااسکریپت" "بررسی نحوی PHP" "منطق تایمر" "انتخاب گزینه" "موقعیت مکانی" "راندن کامل آزمون" "قفل تک‌دستگاهی" "تختهٔ سفید و چیدمان" "حریم خصوصی گزارش" "رابط مانیتورینگ")
-declare -a CMDS=("node test-js-syntax.mjs" "node lint.mjs" "node test-timer.mjs" "node test-save.mjs" "node test-location.mjs" "node verify.mjs" "node test-device-lock.mjs" "node test-whiteboard.mjs" "node test-proctoring-privacy.mjs" "node test-monitor-ui.mjs")
+declare -a NAMES=("بررسی نحوی جاوااسکریپت" "بررسی نحوی PHP" "منطق تایمر" "انتخاب گزینه" "موقعیت مکانی" "راندن کامل آزمون" "قفل تک‌دستگاهی" "تختهٔ سفید و چیدمان" "حریم خصوصی گزارش" "رابط مانیتورینگ" "اعلان‌های صوتی اسکنر")
+declare -a CMDS=("node test-js-syntax.mjs" "node lint.mjs" "node test-timer.mjs" "node test-save.mjs" "node test-location.mjs" "node verify.mjs" "node test-device-lock.mjs" "node test-whiteboard.mjs" "node test-proctoring-privacy.mjs" "node test-monitor-ui.mjs" "node test-scanner-sounds.mjs")
 declare -a RC=()
 
 for i in "${!CMDS[@]}"; do
