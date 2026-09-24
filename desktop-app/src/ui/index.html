@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>SchoolDesk — پنل مدیریت مدرسه</title>
+<style>
+@font-face{font-family:'Vazirmatn';src:url('/fonts/vazir.woff') format('woff');font-weight:normal}
+@font-face{font-family:'Vazirmatn';src:url('/fonts/vazir-bold.woff') format('woff');font-weight:bold}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Vazirmatn',Tahoma,sans-serif;background:#eef1f6;color:#0f172a;font-size:14px;overflow:hidden}
+button,input,select{font-family:inherit;font-size:inherit}
+::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:#c7cdd8;border-radius:6px}
+
+.app{display:flex;height:100vh;overflow:hidden}
+.side{width:230px;background:#232059;background:linear-gradient(180deg,#1e1b4b,#312e81);color:#e0e7ff;display:flex;flex-direction:column;padding:16px 12px;flex-shrink:0}
+.brand{padding:4px 8px 16px;border-bottom:1px solid rgba(255,255,255,.14);margin-bottom:12px}
+.brand table{border-collapse:collapse}
+.logo{width:38px;height:38px;border-radius:11px;background:#818cf8;background:linear-gradient(135deg,#818cf8,#c084fc);text-align:center;line-height:38px;font-weight:bold;font-size:17px;color:#fff}
+.brand b{font-size:15px;display:block}
+.brand small{font-size:10.5px;color:#c7d2fe}
+.nav{flex:1 1 auto;overflow-y:auto}
+.nav button{display:block;width:100%;text-align:right;background:none;border:0;color:#c7d2fe;padding:10px 12px;border-radius:9px;cursor:pointer;font-size:13.5px;margin-bottom:3px}
+.nav button:hover{background:rgba(255,255,255,.08)}
+.nav button.on{background:rgba(255,255,255,.16);color:#fff;font-weight:bold}
+.nav .ic{display:inline-block;width:20px;text-align:center;margin-left:8px;font-family:'Segoe UI Symbol','Vazirmatn',sans-serif}
+.sidefoot{font-size:10.5px;color:#a5b4fc;padding:10px 8px 0;border-top:1px solid rgba(255,255,255,.14)}
+
+.main{flex:1 1 auto;display:flex;flex-direction:column;min-width:0}
+.top{background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 22px;position:relative}
+.top h1{font-size:16.5px;display:inline-block}
+.top .sub{font-size:11.5px;color:#64748b}
+.syncpill{position:absolute;left:22px;top:14px;background:#eef1f6;border:1px solid #e2e8f0;border-radius:999px;padding:6px 14px;font-size:12px;cursor:pointer}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#94a3b8;margin-left:7px;vertical-align:middle}
+.dot.ok{background:#059669}
+.dot.off{background:#d97706}
+.dot.sync{background:#4f46e5}
+.content{flex:1 1 auto;overflow:auto;padding:20px 22px}
+
+.stats{margin:-7px -7px 13px}
+.stats:after{content:"";display:table;clear:both}
+.stat{float:right;width:24%;min-width:170px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:15px 18px;margin:7px .5%;border-right:4px solid #4f46e5;box-shadow:0 1px 3px rgba(15,23,42,.07)}
+.stat.c2{border-right-color:#7c3aed}.stat.c3{border-right-color:#059669}.stat.c4{border-right-color:#d97706}
+.stat b{font-size:25px;display:block;margin-top:2px}
+.stat span{font-size:12px;color:#64748b}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 1px 3px rgba(15,23,42,.07);padding:18px;margin-bottom:16px}
+.card h3{font-size:14.5px;margin-bottom:12px}
+.card.tbl{padding:2px 8px}
+
+table.g{width:100%;border-collapse:collapse;font-size:13px}
+.g th{font-size:11.5px;color:#64748b;text-align:right;padding:9px 10px;border-bottom:2px solid #e2e8f0;white-space:nowrap}
+.g td{padding:8px 10px;border-bottom:1px solid #eef1f6;vertical-align:middle}
+.g tr:hover td{background:#f8fafc}
+.empty{color:#64748b;text-align:center;padding:32px 0;font-size:13px}
+
+.row{margin-bottom:13px}
+.row:after{content:"";display:table;clear:both}
+.row .it{float:right;margin-left:10px;margin-bottom:6px}
+.row .left{float:left;margin-left:0}
+.in{border:1px solid #d7dde8;background:#fff;border-radius:9px;padding:8px 12px;min-width:120px;outline:none}
+.in:focus{border-color:#4f46e5}
+.btn{border:0;border-radius:9px;padding:9px 16px;cursor:pointer;font-weight:bold;font-size:13px;color:#fff;background:#4f46e5}
+.btn:hover{background:#4338ca}
+.btn.gray{background:#e2e8f0;color:#0f172a}.btn.gray:hover{background:#d3dae5}
+.btn.green{background:#059669}.btn.green:hover{background:#047857}
+.btn.red{background:#dc2626}.btn.red:hover{background:#b91c1c}
+.btn.amber{background:#d97706}.btn.amber:hover{background:#b45309}
+.btn.ghost{background:none;color:#4f46e5;border:1.5px solid #4f46e5}
+.btn.sm{padding:4px 10px;font-size:12px;border-radius:7px}
+.badge{display:inline-block;border-radius:999px;padding:2.5px 10px;font-size:11px;font-weight:bold}
+.badge.g{background:#d1fae5;color:#065f46}.badge.o{background:#fef3c7;color:#92400e}
+.badge.r{background:#fee2e2;color:#991b1b}.badge.b{background:#e0e7ff;color:#3730a3}
+.badge.s{background:#f1f5f9;color:#64748b}
+
+.overlay{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(15,23,42,.45);display:none;z-index:50}
+.overlay.show{display:block}
+.modal{background:#fff;border-radius:15px;box-shadow:0 24px 60px rgba(15,23,42,.4);width:560px;max-width:92%;max-height:86%;overflow:auto;padding:22px;margin:6% auto 0}
+.modal h3{margin-bottom:14px;font-size:15.5px}
+.grid2{margin:-6px}
+.grid2:after{content:"";display:table;clear:both}
+.grid2 .f{float:right;width:50%;padding:6px}
+.grid2 .f.w100{width:100%}
+.f label{display:block;font-size:11.5px;font-weight:bold;color:#64748b;margin-bottom:5px}
+.f .in{width:100%}
+.mfoot{margin-top:16px}
+.mfoot .btn{margin-left:8px}
+
+#toast{position:fixed;bottom:22px;right:50%;margin-right:-140px;width:280px;text-align:center;background:#0f172a;color:#fff;padding:11px 18px;border-radius:11px;font-size:13px;display:none;z-index:99}
+.hide{display:none}
+.note{font-size:12px;color:#64748b;line-height:2}
+.qerr{color:#dc2626;font-size:11px}
+.ltr{direction:ltr;text-align:left}
+.mono{font-family:Consolas,monospace}
+
+@media print{
+  .side,.top,.row,.noprint{display:none!important}
+  body{overflow:visible;background:#fff}
+  .app,.main,.content{display:block;height:auto;overflow:visible}
+  .card{border:none;box-shadow:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="side noprint">
+    <div class="brand">
+      <table><tr><td><div class="logo">م</div></td><td style="padding-right:10px"><b>SchoolDesk</b><small id="brandSchool">پنل مدیریت مدرسه</small></td></tr></table>
+    </div>
+    <div class="nav" id="nav">
+      <button data-v="dash" class="on"><span class="ic">◈</span>داشبورد</button>
+      <button data-v="students"><span class="ic">◉</span>دانش‌آموزان</button>
+      <button data-v="classes"><span class="ic">▦</span>کلاس‌ها</button>
+      <button data-v="teachers"><span class="ic">✎</span>دبیران</button>
+      <button data-v="attendance"><span class="ic">✓</span>حضور و غیاب</button>
+      <button data-v="attreport"><span class="ic">▤</span>گزارش حضور</button>
+      <button data-v="grades"><span class="ic">۲۰</span>ثبت نمرات</button>
+      <button data-v="repcard"><span class="ic">≡</span>کارنامه</button>
+      <button data-v="queue"><span class="ic">⇄</span>صف همگام‌سازی <span id="qbadge" class="badge o hide">0</span></button>
+      <button data-v="settings"><span class="ic">⚙</span>تنظیمات اتصال</button>
+    </div>
+    <div class="sidefoot">نسخه <span id="ver">—</span> · پورتابل<br>ذخیره محلی + همگام‌سازی خودکار<br><a href="javascript:void(0)" onclick="showM('mKeys')" style="color:#94a3b8">میانبرهای صفحه‌کلید (F1)</a></div>
+  </div>
+
+  <div class="main">
+    <div class="top noprint">
+      <h1 id="pageTitle">داشبورد</h1>
+      <div class="sub" id="pageSub">نمای کلی اطلاعات مدرسه</div>
+      <div class="syncpill" id="syncPill" title="کلیک = همگام‌سازی فوری"><span class="dot" id="syncDot"></span><span id="syncTxt">در حال بررسی...</span></div>
+    </div>
+
+    <div class="content">
+      <!-- dashboard -->
+      <div id="v-dash">
+        <div class="stats">
+          <div class="stat"><span>دانش‌آموزان فعال</span><b id="stStudents">—</b></div>
+          <div class="stat c2"><span>کلاس‌ها</span><b id="stClasses">—</b></div>
+          <div class="stat c3"><span>حاضرین امروز</span><b id="stPresent">—</b></div>
+          <div class="stat c4"><span>تغییرات در صف</span><b id="stQueue">—</b></div>
+        </div>
+        <div class="card"><h3>وضعیت سامانه</h3><div class="note" id="dashNote">در حال بارگذاری...</div></div>
+        <div class="card" id="firstRun">
+          <h3>شروع سریع</h3>
+          <div class="note">۱) از منوی «تنظیمات اتصال»، آدرس سایت مدرسه و نام کاربری/رمز مدیر را وارد کنید.<br>
+          ۲) نرم‌افزار خودکار داده‌ها را دریافت و هر ۳۰ ثانیه همگام‌سازی می‌کند.<br>
+          ۳) بدون اینترنت هم کار کنید — تغییرات در صف نگه‌داری و بعداً ارسال می‌شوند.<br>
+          ۴) بستن پنجره برنامه را نمی‌بندد؛ از کنار ساعت (Tray) دوباره باز یا خارج شوید.</div>
+        </div>
+      </div>
+
+      <!-- students -->
+      <div id="v-students" class="hide">
+        <div class="row">
+          <span class="it"><input class="in" id="stuSearch" placeholder="جستجو: نام یا کد ملی" style="width:230px"></span>
+          <span class="it"><select class="in" id="stuClassFilter"><option value="">همه کلاس‌ها</option></select></span>
+          <span class="it left"><button class="btn" onclick="openStudent()">افزودن دانش‌آموز</button></span>
+        </div>
+        <div class="card tbl">
+          <table class="g"><thead><tr><th>#</th><th>نام و نام خانوادگی</th><th>کد ملی</th><th>نام پدر</th><th>پایه</th><th>کلاس</th><th>تلفن</th><th></th></tr></thead><tbody id="stuBody"></tbody></table>
+          <div class="empty hide" id="stuEmpty">دانش‌آموزی یافت نشد</div>
+        </div>
+      </div>
+
+      <!-- classes -->
+      <div id="v-classes" class="hide">
+        <div class="row"><span class="it left"><button class="btn" onclick="openClass()">افزودن کلاس</button></span></div>
+        <div class="card tbl">
+          <table class="g"><thead><tr><th>#</th><th>نام کلاس</th><th>پایه</th><th>سال تحصیلی</th><th>تعداد دانش‌آموز</th><th></th></tr></thead><tbody id="clsBody"></tbody></table>
+          <div class="empty hide" id="clsEmpty">کلاسی ثبت نشده است</div>
+        </div>
+      </div>
+
+      <!-- teachers -->
+      <div id="v-teachers" class="hide">
+        <div class="row">
+          <span class="it"><input class="in" id="tchSearch" placeholder="جستجو: نام یا کد ملی" style="width:230px"></span>
+          <span class="it left"><button class="btn" onclick="openTeacher()">افزودن دبیر</button></span>
+        </div>
+        <div class="card tbl">
+          <table class="g"><thead><tr><th>#</th><th>نام و نام خانوادگی</th><th>کد ملی</th><th>کد پرسنلی</th><th>موبایل</th><th></th></tr></thead><tbody id="tchBody"></tbody></table>
+          <div class="empty hide" id="tchEmpty">دبیری یافت نشد</div>
+        </div>
+      </div>
+
+      <!-- attendance -->
+      <div id="v-attendance" class="hide">
+        <div class="row">
+          <span class="it"><input class="in ltr mono" id="attDate" style="width:120px" placeholder="1404/06/08"></span>
+          <span class="it"><button class="btn gray" onclick="attToday()">امروز</button></span>
+          <span class="it"><select class="in" id="attClassFilter"><option value="">همه کلاس‌ها</option></select></span>
+          <span class="it"><span id="attSummary" class="note"></span></span>
+          <span class="it left"><button class="btn green" onclick="attAllPresent()">همه حاضر</button></span>
+        </div>
+        <div class="card tbl">
+          <table class="g"><thead><tr><th>#</th><th>نام و نام خانوادگی</th><th>کلاس</th><th>وضعیت</th><th>ساعت ثبت</th><th style="width:290px">ثبت</th></tr></thead><tbody id="attBody"></tbody></table>
+          <div class="empty hide" id="attEmpty">دانش‌آموزی یافت نشد</div>
+        </div>
+      </div>
+
+      <!-- attendance report -->
+      <div id="v-attreport" class="hide">
+        <div class="row noprint">
+          <span class="it"><input class="in ltr mono" id="repMonth" style="width:100px" placeholder="1404/06"></span>
+          <span class="it"><select class="in" id="repClassFilter"><option value="">همه کلاس‌ها</option></select></span>
+          <span class="it"><button class="btn" onclick="loadAttReport()">نمایش گزارش</button></span>
+          <span class="it left"><button class="btn gray" onclick="window.print()">چاپ گزارش</button></span>
+        </div>
+        <div class="card">
+          <h3 id="repTitle">گزارش ماهانه حضور و غیاب</h3>
+          <table class="g"><thead><tr><th>#</th><th>نام و نام خانوادگی</th><th>کلاس</th><th>حاضر</th><th>تاخیر</th><th>غایب</th></tr></thead><tbody id="repBody"></tbody></table>
+          <div class="empty hide" id="repEmpty">داده‌ای برای این ماه ثبت نشده است</div>
+        </div>
+      </div>
+
+      <!-- grades -->
+      <div id="v-grades" class="hide">
+        <div class="row">
+          <span class="it"><select class="in" id="grMonth"></select></span>
+          <span class="it"><select class="in" id="grClassFilter"><option value="">همه کلاس‌ها</option></select></span>
+          <span class="it"><select class="in" id="grSubject" style="min-width:150px"></select></span>
+          <span class="it"><button class="btn gray" onclick="addSubject()">درس جدید</button></span>
+          <span class="it"><span class="note" id="grHint">نمره را وارد و Enter بزنید — خودکار ذخیره می‌شود</span></span>
+        </div>
+        <div class="card tbl">
+          <table class="g"><thead><tr><th>#</th><th>نام و نام خانوادگی</th><th>کلاس</th><th style="width:120px">نمره این درس</th><th>معدل ماه</th><th>تعداد درس ثبت‌شده</th></tr></thead><tbody id="grBody"></tbody></table>
+          <div class="empty hide" id="grEmpty">دانش‌آموزی یافت نشد — ابتدا درس و ماه را انتخاب کنید</div>
+        </div>
+      </div>
+
+      <!-- report card -->
+      <div id="v-repcard" class="hide">
+        <div class="row noprint">
+          <span class="it"><select class="in" id="rcClassFilter"><option value="">انتخاب کلاس...</option></select></span>
+          <span class="it"><select class="in" id="rcStudent" style="min-width:190px"><option value="">انتخاب دانش‌آموز...</option></select></span>
+          <span class="it"><select class="in" id="rcMonth"></select></span>
+          <span class="it"><button class="btn" onclick="loadReportCard()">نمایش کارنامه</button></span>
+          <span class="it left"><button class="btn gray" onclick="window.print()">چاپ کارنامه</button></span>
+        </div>
+        <div class="card" id="rcCard" style="display:none">
+          <div style="text-align:center;border-bottom:2px solid #0f172a;padding-bottom:10px;margin-bottom:14px">
+            <b style="font-size:16px" id="rcSchool">کارنامه تحصیلی</b><br>
+            <span class="note" id="rcHead"></span>
+          </div>
+          <table class="g" style="margin-bottom:12px"><tbody id="rcInfo"></tbody></table>
+          <table class="g"><thead><tr><th>#</th><th>نام درس</th><th>نمره</th><th>رتبه در کلاس</th><th>وضعیت</th></tr></thead>
+            <tbody id="rcBody"></tbody>
+            <tfoot><tr style="background:#f1f5f9;font-weight:bold"><td colspan="2">معدل</td><td id="rcAvg">—</td><td id="rcRank">—</td><td id="rcRes">—</td></tr></tfoot>
+          </table>
+          <div class="empty hide" id="rcEmpty">نمره‌ای برای این ماه ثبت نشده است</div>
+        </div>
+      </div>
+
+      <!-- queue -->
+      <div id="v-queue" class="hide">
+        <div class="card">
+          <h3>صف همگام‌سازی با سرور</h3>
+          <div class="note" style="margin-bottom:10px">تغییراتی که هنوز به سرور نرفته‌اند اینجا هستند. ارسال خودکار در پس‌زمینه انجام می‌شود؛ نیازی به اقدام شما نیست.</div>
+          <button class="btn ghost sm" onclick="syncNow()">همگام‌سازی فوری</button>
+        </div>
+        <div class="card tbl">
+          <table class="g"><thead><tr><th>#</th><th>مورد</th><th>عملیات</th><th>زمان ثبت</th><th>تلاش‌ها</th><th>آخرین خطا</th></tr></thead><tbody id="qBody"></tbody></table>
+          <div class="empty hide" id="qEmpty">صف خالی است — همه تغییرات با سرور همگام شده‌اند ✓</div>
+        </div>
+      </div>
+
+      <!-- settings -->
+      <div id="v-settings" class="hide">
+        <div class="card" style="max-width:600px">
+          <h3>اتصال به سرور سایت مدرسه</h3>
+          <div class="note" style="margin-bottom:13px">آدرس سایت و مشخصات ورود مدیر را وارد کنید. یک کلید امن ساخته می‌شود و رمز شما ذخیره نمی‌گردد.</div>
+          <div class="f" style="margin-bottom:11px"><label>آدرس سایت</label><input class="in ltr" id="setUrl" placeholder="https://school.example.com"></div>
+          <div class="grid2">
+            <div class="f"><label>نام کاربری مدیر</label><input class="in ltr" id="setUser"></div>
+            <div class="f"><label>رمز عبور</label><input class="in ltr" id="setPass" type="password"></div>
+          </div>
+          <label style="display:block;font-size:12px;color:#64748b;margin-top:11px"><input type="checkbox" id="setInsecure"> پذیرش گواهی SSL نامعتبر</label>
+          <div class="mfoot"><button class="btn green" id="setBtn" onclick="saveSettings()">اتصال و دریافت اطلاعات</button>
+          <button class="btn gray" onclick="testServer()">تست آدرس سرور</button></div>
+          <div id="setResult" style="margin-top:10px;font-size:12.5px;line-height:2"></div>
+          <div class="note" id="setState" style="margin-top:8px"></div>
+        </div>
+        <div class="card" style="max-width:600px">
+          <h3>درباره</h3>
+          <div class="note">SchoolDesk — کلاینت دسکتاپ پورتابل سامانه مدیریت مدرسه<br>
+          پایگاه‌داده محلی: SQLite (فایل schooldesk.db کنار برنامه)<br>
+          سازگار با ویندوز ۷ / ۸ / ۱۰ / ۱۱ — بدون نیاز به نصب یا Runtime<br>
+          خروج کامل: کلیک راست روی آیکون برنامه کنار ساعت ویندوز ← خروج</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- student modal -->
+<div class="overlay" id="mStudent"><div class="modal">
+  <h3 id="mStuTitle">افزودن دانش‌آموز</h3>
+  <input type="hidden" id="fStuUuid">
+  <div class="grid2">
+    <div class="f"><label>نام *</label><input class="in" id="fStuFirst"></div>
+    <div class="f"><label>نام خانوادگی *</label><input class="in" id="fStuLast"></div>
+    <div class="f"><label>کد ملی *</label><input class="in ltr" id="fStuNid"></div>
+    <div class="f"><label>نام پدر</label><input class="in" id="fStuFather"></div>
+    <div class="f"><label>پایه</label><select class="in" id="fStuGrade"><option value="">—</option><option>هفتم</option><option>هشتم</option><option>نهم</option></select></div>
+    <div class="f"><label>کلاس</label><select class="in" id="fStuClass"><option value="">—</option></select></div>
+    <div class="f"><label>تلفن دانش‌آموز</label><input class="in ltr" id="fStuPhone"></div>
+    <div class="f"><label>تلفن پدر</label><input class="in ltr" id="fStuFPhone"></div>
+  </div>
+  <div class="mfoot"><button class="btn green" onclick="saveStudent()">ذخیره</button><button class="btn gray" onclick="hideM('mStudent')">انصراف</button></div>
+</div></div>
+
+<!-- class modal -->
+<div class="overlay" id="mClass"><div class="modal">
+  <h3 id="mClsTitle">افزودن کلاس</h3>
+  <input type="hidden" id="fClsUuid">
+  <div class="grid2">
+    <div class="f"><label>نام کلاس *</label><input class="in" id="fClsName" placeholder="مثلاً هفتم ۱"></div>
+    <div class="f"><label>پایه</label><select class="in" id="fClsGrade"><option value="">—</option><option>هفتم</option><option>هشتم</option><option>نهم</option></select></div>
+  </div>
+  <div class="mfoot"><button class="btn green" onclick="saveClass()">ذخیره</button><button class="btn gray" onclick="hideM('mClass')">انصراف</button></div>
+</div></div>
+
+<!-- teacher modal -->
+<div class="overlay" id="mTeacher"><div class="modal">
+  <h3 id="mTchTitle">افزودن دبیر</h3>
+  <input type="hidden" id="fTchUuid">
+  <div class="grid2">
+    <div class="f"><label>نام و نام خانوادگی *</label><input class="in" id="fTchName"></div>
+    <div class="f"><label>کد ملی</label><input class="in ltr" id="fTchNid"></div>
+    <div class="f"><label>کد پرسنلی</label><input class="in ltr" id="fTchCode"></div>
+    <div class="f"><label>موبایل</label><input class="in ltr" id="fTchMobile"></div>
+  </div>
+  <div class="mfoot"><button class="btn green" onclick="saveTeacher()">ذخیره</button><button class="btn gray" onclick="hideM('mTeacher')">انصراف</button></div>
+</div></div>
+
+<!-- keyboard shortcuts help -->
+<div class="overlay" id="mKeys"><div class="modal" style="max-width:560px">
+  <h3>میانبرهای صفحه‌کلید</h3>
+  <table class="g" style="margin-top:6px">
+    <tbody>
+      <tr><td class="mono ltr">Ctrl + C / X / V</td><td>کپی / برش / چسباندن (در همه فیلدها)</td></tr>
+      <tr><td class="mono ltr">Ctrl + A</td><td>انتخاب همه</td></tr>
+      <tr><td class="mono ltr">Ctrl + Z / Y</td><td>واگرد / از نو در فیلدهای متنی</td></tr>
+      <tr><td class="mono ltr">Ctrl + S</td><td>ذخیره فرم باز (افزودن/ویرایش)</td></tr>
+      <tr><td class="mono ltr">Ctrl + N</td><td>مورد جدید در بخش فعلی (دانش‌آموز/کلاس/دبیر/درس)</td></tr>
+      <tr><td class="mono ltr">Ctrl + F یا F3</td><td>پرش به کادر جستجو</td></tr>
+      <tr><td class="mono ltr">Ctrl + P</td><td>چاپ (گزارش حضور / کارنامه)</td></tr>
+      <tr><td class="mono ltr">F5 یا Ctrl + R</td><td>تازه‌سازی اطلاعات بخش فعلی</td></tr>
+      <tr><td class="mono ltr">F9</td><td>همگام‌سازی فوری با سرور</td></tr>
+      <tr><td class="mono ltr">Ctrl + 1 ... 9</td><td>پرش بین بخش‌ها (۱=داشبورد، ۲=دانش‌آموزان، ...)</td></tr>
+      <tr><td class="mono ltr">Enter</td><td>ذخیره فرم باز / ثبت نمره</td></tr>
+      <tr><td class="mono ltr">Esc</td><td>بستن پنجره باز (فرم/راهنما)</td></tr>
+      <tr><td class="mono ltr">Tab / Shift+Tab</td><td>حرکت بین فیلدها</td></tr>
+      <tr><td class="mono ltr">↑ / ↓</td><td>حرکت بین ردیف‌ها در جدول ثبت نمرات</td></tr>
+      <tr><td class="mono ltr">F1</td><td>نمایش همین راهنما</td></tr>
+    </tbody>
+  </table>
+  <div class="mfoot"><button class="btn gray" onclick="hideM('mKeys')">بستن (Esc)</button></div>
+</div></div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ---------- IE11-safe helpers ---------- */
+function $(id){return document.getElementById(id)}
+function each(list,fn){for(var i=0;i<list.length;i++)fn(list[i],i)}
+function setHide(el,cond){if(typeof el==='string')el=$(el);if(cond)el.className+=el.className.indexOf('hide')<0?' hide':'';else el.className=el.className.replace(/\s*\bhide\b/g,'')}
+var FA=['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+function fa(n){return String(n==null?'':n).replace(/[0-9]/g,function(d){return FA[+d]})}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+var toastT=null;
+function toast(m){var t=$('toast');t.innerHTML=esc(m);t.style.display='block';clearTimeout(toastT);toastT=setTimeout(function(){t.style.display='none'},2600)}
+function uuid(){var s='';for(var i=0;i<32;i++){s+='0123456789abcdef'[Math.floor(Math.random()*16)];if(i==7||i==11||i==15||i==19)s+='-'}return s}
+function showM(id,focusId){
+  $(id).className='overlay show';
+  if(focusId)setTimeout(function(){try{$(focusId).focus()}catch(e){}},60);
+}
+function hideM(id){$(id).className='overlay'}
+/* XHR-based api() — IE11 has no fetch/Promise */
+function api(path,body,cb,errcb){
+  var x=new XMLHttpRequest(),done=false;
+  x.open(body?'POST':'GET',path,true);
+  if(body)x.setRequestHeader('Content-Type','application/json');
+  x.onreadystatechange=function(){
+    if(x.readyState!==4||done)return;
+    done=true;
+    if(x.status>=200&&x.status<600&&x.responseText){
+      var j=null;try{j=JSON.parse(x.responseText)}catch(e){}
+      if(j){cb&&cb(j);return}
+    }
+    errcb&&errcb();
+  };
+  try{x.timeout=60000;x.ontimeout=function(){if(done)return;done=true;errcb&&errcb()}}catch(e){}
+  x.send(body?JSON.stringify(body):null);
+}
+function debounce(fn,ms){var t;return function(){clearTimeout(t);t=setTimeout(fn,ms)}}
+
+/* ---------- navigation ---------- */
+var curView='dash', classCache=[];
+var titles={dash:['داشبورد','نمای کلی اطلاعات مدرسه'],
+ students:['دانش‌آموزان','مدیریت دانش‌آموزان — تغییرات خودکار با سرور همگام می‌شود'],
+ classes:['کلاس‌ها','مدیریت کلاس‌های مدرسه'],
+ teachers:['دبیران','مدیریت دبیران'],
+ attendance:['حضور و غیاب','ثبت روزانه حضور، تاخیر و غیبت — آفلاین هم کار می‌کند'],
+ attreport:['گزارش حضور','جمع‌بندی ماهانه حضور و غیاب'],
+ grades:['ثبت نمرات','ثبت نمره هر درس برای هر ماه — با سایت همگام می‌شود'],
+ repcard:['کارنامه','مشاهده و چاپ کارنامه ماهانه دانش‌آموز'],
+ queue:['صف همگام‌سازی','تغییرات در انتظار ارسال به سرور'],
+ settings:['تنظیمات اتصال','پیکربندی ارتباط با سرور سایت مدرسه']};
+var views=['dash','students','classes','teachers','attendance','attreport','grades','repcard','queue','settings'];
+each(document.getElementById('nav').getElementsByTagName('button'),function(b){
+  b.onclick=function(){
+    each(document.getElementById('nav').getElementsByTagName('button'),function(x){x.className=x.className.replace(/\s*\bon\b/g,'')});
+    b.className+=' on';
+    curView=b.getAttribute('data-v');
+    each(views,function(v){setHide('v-'+v,v!==curView)});
+    $('pageTitle').innerHTML=titles[curView][0];
+    $('pageSub').innerHTML=titles[curView][1];
+    refreshView();
+  };
+});
+function refreshView(){
+  if(curView==='students')loadStudents();
+  else if(curView==='classes')loadClasses();
+  else if(curView==='teachers')loadTeachers();
+  else if(curView==='attendance')loadAttendance();
+  else if(curView==='attreport'){if(!$('repMonth').value)$('repMonth').value=todayJalali().substr(0,7);loadAttReport();}
+  else if(curView==='grades')loadGrades();
+  else if(curView==='repcard')initRepCard();
+  else if(curView==='queue')loadQueue();
+  loadState();
+}
+var lastToday='';
+function todayJalali(){return lastToday||''}
+
+/* ---------- state / dashboard ---------- */
+function loadState(){
+  api('/api/state',null,function(s){
+    $('ver').innerHTML=fa(s.version);
+    $('stStudents').innerHTML=fa(s.students);
+    $('stClasses').innerHTML=fa(s.classes);
+    $('stQueue').innerHTML=fa(s.queue);
+    if(s.school_name)$('brandSchool').innerHTML=esc(s.school_name);
+    var qb=$('qbadge');qb.innerHTML=fa(s.queue);setHide(qb,!(s.queue>0));
+    var dot=$('syncDot'),txt=$('syncTxt');
+    dot.className='dot';
+    if(s.sync_state==='ok'){dot.className='dot ok';txt.innerHTML='همگام با سرور'+(s.last_sync?' · '+fa(s.last_sync.substr(11,5)):'');}
+    else if(s.sync_state==='syncing'){dot.className='dot sync';txt.innerHTML='در حال همگام‌سازی...';}
+    else if(s.sync_state==='unconfigured'){txt.innerHTML='اتصال پیکربندی نشده';}
+    else{dot.className='dot off';txt.innerHTML='آفلاین — '+fa(s.queue)+' تغییر در صف';}
+    setHide('firstRun',s.configured);
+    var n='حالت کار: <b>'+(s.configured?'متصل به سرور':'محلی (بدون پیکربندی سرور)')+'</b><br>';
+    n+='آخرین همگام‌سازی موفق: <b>'+(s.last_sync?fa(s.last_sync):'هنوز انجام نشده')+'</b><br>';
+    n+='وضعیت: '+esc(s.sync_msg||'—')+'<br>';
+    n+='تغییرات در انتظار ارسال: <b>'+fa(s.queue)+'</b> مورد';
+    $('dashNote').innerHTML=n;
+    if(s.server_url&&!$('setUrl').value)$('setUrl').value=s.server_url;
+    $('setState').innerHTML=s.configured?'<span class="badge g">متصل</span> '+esc(s.server_url):'<span class="badge o">پیکربندی نشده</span>';
+  });
+  api('/api/attendance',null,function(r){
+    lastToday=r.date||'';
+    var p=0;each(r.items||[],function(x){if(x.att_status==='present'||x.att_status==='late')p++});
+    $('stPresent').innerHTML=fa(p);
+  });
+}
+
+/* ---------- students ---------- */
+function loadStudents(){
+  var q=encodeURIComponent($('stuSearch').value.replace(/^\s+|\s+$/g,''));
+  var c=encodeURIComponent($('stuClassFilter').value);
+  api('/api/students?q='+q+'&class='+c,null,function(r){
+    var h='',items=r.items||[];
+    each(items,function(s,i){
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(s.first_name)+' '+esc(s.last_name)+'</b></td>'+
+        '<td class="mono">'+fa(s.national_id)+'</td><td>'+esc(s.father_name||'—')+'</td>'+
+        '<td>'+esc(s.grade_level||'—')+'</td><td><span class="badge b">'+esc(s.class_name||'—')+'</span></td>'+
+        '<td class="mono">'+fa(s.phone||'—')+'</td>'+
+        '<td style="white-space:nowrap"><button class="btn gray sm" onclick="editStudent('+i+')">ویرایش</button> '+
+        '<button class="btn red sm" onclick="delStudent('+i+')">حذف</button></td></tr>';
+    });
+    window._stu=items;
+    $('stuBody').innerHTML=h;
+    setHide('stuEmpty',items.length>0);
+  });
+}
+function editStudent(i){openStudent(window._stu[i])}
+function delStudent(i){var s=window._stu[i];delEntity('student',s.uuid,s.first_name+' '+s.last_name)}
+$('stuSearch').onkeyup=debounce(loadStudents,300);
+$('stuClassFilter').onchange=loadStudents;
+function openStudent(s){
+  $('mStuTitle').innerHTML=s?'ویرایش دانش‌آموز':'افزودن دانش‌آموز';
+  $('fStuUuid').value=s?s.uuid:'';
+  $('fStuFirst').value=s?s.first_name||'':'';
+  $('fStuLast').value=s?s.last_name||'':'';
+  $('fStuNid').value=s?s.national_id||'':'';
+  $('fStuFather').value=s?s.father_name||'':'';
+  $('fStuGrade').value=s?s.grade_level||'':'';
+  fillClassSelect('fStuClass',s?s.class_name||'':'');
+  $('fStuPhone').value=s?s.phone||'':'';
+  $('fStuFPhone').value=s?s.father_phone||'':'';
+  showM('mStudent','fStuFirst');
+}
+function saveStudent(){
+  var u=$('fStuUuid').value,isNew=!u;
+  if(!$('fStuFirst').value||!$('fStuLast').value||!$('fStuNid').value)return toast('نام، نام خانوادگی و کد ملی الزامی است');
+  api('/api/mutate',{entity:'student',op:isNew?'create':'update',payload:{
+    uuid:isNew?uuid():u,first_name:$('fStuFirst').value,last_name:$('fStuLast').value,
+    national_id:$('fStuNid').value,father_name:$('fStuFather').value,
+    grade_level:$('fStuGrade').value,class_name:$('fStuClass').value,
+    phone:$('fStuPhone').value,father_phone:$('fStuFPhone').value
+  }},function(r){
+    if(r.ok){hideM('mStudent');toast('ذخیره شد — در پس‌زمینه با سرور همگام می‌شود');loadStudents();loadState();}
+    else toast(r.msg||'خطا در ذخیره');
+  });
+}
+
+/* ---------- classes ---------- */
+function loadClasses(){
+  api('/api/classes',null,function(r){
+    classCache=r.items||[];
+    var h='';
+    each(classCache,function(cl,i){
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(cl.name)+'</b></td><td>'+esc(cl.grade||'—')+'</td>'+
+        '<td>'+fa(cl.academic_year||'—')+'</td><td>'+fa(cl.student_count)+' نفر</td>'+
+        '<td style="white-space:nowrap"><button class="btn gray sm" onclick="editClass('+i+')">ویرایش</button> '+
+        '<button class="btn red sm" onclick="delClass('+i+')">حذف</button></td></tr>';
+    });
+    $('clsBody').innerHTML=h;
+    setHide('clsEmpty',classCache.length>0);
+    each(['stuClassFilter','attClassFilter','repClassFilter','grClassFilter'],function(id){
+      var sel=$(id),old=sel.value,o='<option value="">همه کلاس‌ها</option>';
+      each(classCache,function(cl){o+='<option value="'+esc(cl.name)+'">'+esc(cl.name)+'</option>'});
+      sel.innerHTML=o;sel.value=old;
+    });
+  });
+}
+function editClass(i){openClass(classCache[i])}
+function delClass(i){var c=classCache[i];delEntity('class',c.uuid,c.name)}
+function fillClassSelect(id,val){
+  var sel=$(id),o='<option value="">—</option>';
+  each(classCache,function(cl){o+='<option value="'+esc(cl.name)+'">'+esc(cl.name)+'</option>'});
+  sel.innerHTML=o;sel.value=val;
+}
+function openClass(cl){
+  $('mClsTitle').innerHTML=cl?'ویرایش کلاس':'افزودن کلاس';
+  $('fClsUuid').value=cl?cl.uuid:'';
+  $('fClsName').value=cl?cl.name||'':'';
+  $('fClsGrade').value=cl?cl.grade||'':'';
+  showM('mClass','fClsName');
+}
+function saveClass(){
+  var u=$('fClsUuid').value,isNew=!u;
+  if(!$('fClsName').value)return toast('نام کلاس الزامی است');
+  api('/api/mutate',{entity:'class',op:isNew?'create':'update',payload:{
+    uuid:isNew?uuid():u,name:$('fClsName').value,grade:$('fClsGrade').value,academic_year:''
+  }},function(r){
+    if(r.ok){hideM('mClass');toast('ذخیره شد');loadClasses();loadState();}
+    else toast(r.msg||'خطا');
+  });
+}
+
+/* ---------- teachers ---------- */
+function loadTeachers(){
+  var q=encodeURIComponent($('tchSearch').value.replace(/^\s+|\s+$/g,''));
+  api('/api/teachers?q='+q,null,function(r){
+    var h='',items=r.items||[];
+    each(items,function(t,i){
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(t.full_name)+'</b></td>'+
+        '<td class="mono">'+fa(t.national_id||'—')+'</td><td class="mono">'+fa(t.personnel_code||'—')+'</td>'+
+        '<td class="mono">'+fa(t.mobile||'—')+'</td>'+
+        '<td style="white-space:nowrap"><button class="btn gray sm" onclick="editTeacher('+i+')">ویرایش</button> '+
+        '<button class="btn red sm" onclick="delTeacher('+i+')">حذف</button></td></tr>';
+    });
+    window._tch=items;
+    $('tchBody').innerHTML=h;
+    setHide('tchEmpty',items.length>0);
+  });
+}
+function editTeacher(i){openTeacher(window._tch[i])}
+function delTeacher(i){var t=window._tch[i];delEntity('teacher',t.uuid,t.full_name)}
+$('tchSearch').onkeyup=debounce(loadTeachers,300);
+function openTeacher(t){
+  $('mTchTitle').innerHTML=t?'ویرایش دبیر':'افزودن دبیر';
+  $('fTchUuid').value=t?t.uuid:'';
+  $('fTchName').value=t?t.full_name||'':'';
+  $('fTchNid').value=t?t.national_id||'':'';
+  $('fTchCode').value=t?t.personnel_code||'':'';
+  $('fTchMobile').value=t?t.mobile||'':'';
+  showM('mTeacher','fTchName');
+}
+function saveTeacher(){
+  var u=$('fTchUuid').value,isNew=!u;
+  if(!$('fTchName').value)return toast('نام دبیر الزامی است');
+  api('/api/mutate',{entity:'teacher',op:isNew?'create':'update',payload:{
+    uuid:isNew?uuid():u,full_name:$('fTchName').value,national_id:$('fTchNid').value,
+    personnel_code:$('fTchCode').value,mobile:$('fTchMobile').value
+  }},function(r){
+    if(r.ok){hideM('mTeacher');toast('ذخیره شد');loadTeachers();loadState();}
+    else toast(r.msg||'خطا');
+  });
+}
+
+/* ---------- attendance ---------- */
+function attToday(){$('attDate').value='';loadAttendance()}
+function loadAttendance(){
+  var d=encodeURIComponent($('attDate').value.replace(/[۰-۹]/g,function(c){return FA.indexOf(c)}));
+  var c=encodeURIComponent($('attClassFilter').value);
+  api('/api/attendance?date='+d+'&class='+c,null,function(r){
+    lastToday=lastToday||r.date;
+    if(!$('attDate').value)$('attDate').value=r.date;
+    var h='',items=r.items||[],np=0,nl=0,na=0,nn=0;
+    each(items,function(s,i){
+      var st=s.att_status,pill;
+      if(st==='present'){pill='<span class="badge g">حاضر</span>';np++}
+      else if(st==='late'){pill='<span class="badge o">تاخیر '+(s.minutes_late?fa(s.minutes_late)+'ʼ':'')+'</span>';nl++}
+      else if(st==='absent'){pill='<span class="badge r">غایب</span>';na++}
+      else{pill='<span class="badge s">ثبت نشده</span>';nn++}
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(s.first_name)+' '+esc(s.last_name)+'</b></td>'+
+        '<td><span class="badge b">'+esc(s.class_name||'—')+'</span></td><td>'+pill+'</td>'+
+        '<td class="mono">'+fa(s.scan_time||'—')+'</td>'+
+        '<td><button class="btn green sm" onclick="attSet('+i+',\'present\')">حاضر</button> '+
+        '<button class="btn amber sm" onclick="attLate('+i+')">تاخیر</button> '+
+        '<button class="btn red sm" onclick="attSet('+i+',\'absent\')">غایب</button> '+
+        '<button class="btn gray sm" onclick="attSet('+i+',\'clear\')">پاک</button></td></tr>';
+    });
+    window._att=items;
+    $('attBody').innerHTML=h;
+    setHide('attEmpty',items.length>0);
+    $('attSummary').innerHTML='حاضر: <b>'+fa(np)+'</b> · تاخیر: <b>'+fa(nl)+'</b> · غایب: <b>'+fa(na)+'</b> · ثبت‌نشده: <b>'+fa(nn)+'</b>';
+  });
+}
+$('attDate').onkeyup=debounce(loadAttendance,500);
+$('attClassFilter').onchange=loadAttendance;
+function attSet(i,st,ml){
+  var s=window._att[i];
+  api('/api/attendance-set',{student_uuid:s.uuid,date_jalali:$('attDate').value,status:st,minutes_late:ml||0},function(r){
+    if(r.ok)loadAttendance();else toast(r.msg||'خطا');
+  });
+}
+function attLate(i){
+  var m=prompt('چند دقیقه تاخیر؟','10');
+  if(m===null)return;
+  attSet(i,'late',parseInt(m.replace(/[۰-۹]/g,function(c){return FA.indexOf(c)}),10)||0);
+}
+function attAllPresent(){
+  if(!confirm('همه دانش‌آموزانِ «ثبت‌نشده» این لیست حاضر ثبت شوند؟'))return;
+  var list=[];each(window._att||[],function(s){if(!s.att_status)list.push(s)});
+  if(!list.length)return toast('مورد ثبت‌نشده‌ای نیست');
+  var done=0;
+  each(list,function(s){
+    api('/api/attendance-set',{student_uuid:s.uuid,date_jalali:$('attDate').value,status:'present',minutes_late:0},function(){
+      done++;if(done===list.length){toast(fa(done)+' نفر حاضر ثبت شد');loadAttendance();loadState();}
+    });
+  });
+}
+
+/* ---------- attendance report ---------- */
+function loadAttReport(){
+  var m=encodeURIComponent($('repMonth').value.replace(/[۰-۹]/g,function(c){return FA.indexOf(c)}));
+  var c=encodeURIComponent($('repClassFilter').value);
+  api('/api/attendance-report?month='+m+'&class='+c,null,function(r){
+    $('repTitle').innerHTML='گزارش ماهانه حضور و غیاب — '+fa(r.month);
+    var h='',any=false;
+    each(r.items||[],function(s,i){
+      if(s.present||s.late||s.absent)any=true;
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(s.first_name)+' '+esc(s.last_name)+'</b></td>'+
+        '<td>'+esc(s.class_name||'—')+'</td>'+
+        '<td><span class="badge g">'+fa(s.present)+'</span></td>'+
+        '<td><span class="badge o">'+fa(s.late)+'</span></td>'+
+        '<td><span class="badge r">'+fa(s.absent)+'</span></td></tr>';
+    });
+    $('repBody').innerHTML=h;
+    setHide('repEmpty',any);
+  });
+}
+
+/* ---------- grades ---------- */
+var MONTHS=['مهر','آبان','آذر','دی','بهمن','اسفند','فروردین','اردیبهشت','خرداد','نوبت اول','نوبت دوم'];
+function fillMonths(id){
+  var sel=$(id);if(sel.options.length)return;
+  var o='';each(MONTHS,function(m){o+='<option value="'+m+'">'+m+'</option>'});
+  sel.innerHTML=o;
+}
+function faDigitsToEn(s){return String(s).replace(/[۰-۹]/g,function(c){return FA.indexOf(c)})}
+function loadGrades(){
+  fillMonths('grMonth');
+  var m=encodeURIComponent($('grMonth').value);
+  var c=encodeURIComponent($('grClassFilter').value);
+  var sj=$('grSubject').value;
+  api('/api/grades?month='+m+'&class='+c+'&subject='+encodeURIComponent(sj),null,function(r){
+    /* refill subject list, keep selection */
+    var subs=r.subjects||[],sel=$('grSubject'),old=sel.value,o='<option value="">انتخاب درس...</option>';
+    each(subs,function(s){o+='<option value="'+esc(s)+'">'+esc(s)+'</option>'});
+    sel.innerHTML=o;sel.value=old;
+    if(!sel.value&&subs.length){sel.value=subs[0];loadGrades();return}
+    var h='',items=r.items||[];
+    each(items,function(s,i){
+      var sc=(s.score==null?'':String(s.score));
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(s.first_name)+' '+esc(s.last_name)+'</b></td>'+
+        '<td><span class="badge b">'+esc(s.class_name||'—')+'</span></td>'+
+        '<td><input class="in mono gsc" data-i="'+i+'" style="width:80px;min-width:0;text-align:center" value="'+esc(sc)+'"'+
+        ' onkeydown="return grKey(event,this,'+i+')" onblur="gradeSave(this,'+i+')"></td>'+
+        '<td>'+(s.avg!=null?'<b>'+fa(s.avg)+'</b>':'—')+'</td>'+
+        '<td>'+fa(s.cnt||0)+' درس</td></tr>';
+    });
+    window._gr=items;
+    $('grBody').innerHTML=h;
+    setHide('grEmpty',items.length>0&&!!$('grSubject').value);
+  });
+}
+$('grMonth').onchange=loadGrades;
+$('grClassFilter').onchange=loadGrades;
+$('grSubject').onchange=loadGrades;
+/* Enter = save + go next row; Up/Down = move between score boxes */
+function grKey(ev,inp,i){
+  var k=ev.keyCode;
+  if(k===13||k===40||k===38){
+    gradeSave(inp,i);
+    var boxes=document.getElementsByTagName('input'),list=[],j;
+    for(j=0;j<boxes.length;j++)if(boxes[j].className.indexOf('gsc')>=0)list.push(boxes[j]);
+    var pos=-1;
+    for(j=0;j<list.length;j++)if(list[j]===inp){pos=j;break}
+    var next=(k===38)?pos-1:pos+1;
+    if(next>=0&&next<list.length){list[next].focus();try{list[next].select()}catch(e){}}
+    return false;
+  }
+  return true;
+}
+function gradeSave(inp,i){
+  var s=window._gr[i],subj=$('grSubject').value;
+  if(!subj)return toast('ابتدا درس را انتخاب کنید');
+  var v=faDigitsToEn(inp.value).replace(/[^0-9.]/g,'');
+  if(v!==''&&(parseFloat(v)<0||parseFloat(v)>20))return toast('نمره باید بین ۰ تا ۲۰ باشد');
+  if(v===String(s.score==null?'':s.score))return; /* unchanged */
+  api('/api/grade-set',{student_uuid:s.uuid,report_month:$('grMonth').value,subject_name:subj,score:v},function(r){
+    if(r.ok){s.score=(v===''?null:parseFloat(v));toast(v===''?'نمره پاک شد':'ذخیره شد');loadState();}
+    else toast(r.msg||'خطا');
+  });
+}
+function addSubject(){
+  var n=prompt('نام درس جدید:','');
+  if(!n)return;
+  api('/api/subject-add',{name:n},function(r){
+    if(r.ok){$('grSubject').innerHTML='';toast('درس اضافه شد');loadGrades();setTimeout(function(){$('grSubject').value=n;loadGrades()},300);}
+  });
+}
+
+/* ---------- report card ---------- */
+function initRepCard(){
+  fillMonths('rcMonth');
+  var sel=$('rcClassFilter'),old=sel.value,o='<option value="">انتخاب کلاس...</option>';
+  each(classCache,function(cl){o+='<option value="'+esc(cl.name)+'">'+esc(cl.name)+'</option>'});
+  sel.innerHTML=o;sel.value=old;
+}
+$('rcClassFilter').onchange=function(){
+  var c=encodeURIComponent(this.value);
+  api('/api/students?q=&class='+c,null,function(r){
+    var o='<option value="">انتخاب دانش‌آموز...</option>';
+    each(r.items||[],function(s){o+='<option value="'+esc(s.uuid)+'">'+esc(s.first_name)+' '+esc(s.last_name)+'</option>'});
+    $('rcStudent').innerHTML=o;
+  });
+};
+function loadReportCard(){
+  var u=$('rcStudent').value;
+  if(!u)return toast('دانش‌آموز را انتخاب کنید');
+  api('/api/reportcard?student='+encodeURIComponent(u)+'&month='+encodeURIComponent($('rcMonth').value),null,function(r){
+    if(!r.ok)return toast(r.msg||'خطا');
+    $('rcCard').style.display='block';
+    $('rcSchool').innerHTML=esc($('brandSchool').innerHTML)||'کارنامه تحصیلی';
+    $('rcHead').innerHTML='کارنامه ماهانه — '+esc($('rcMonth').value);
+    var st=r.student;
+    $('rcInfo').innerHTML='<tr><td><b>نام:</b> '+esc(st.first_name)+' '+esc(st.last_name)+'</td>'+
+      '<td><b>کد ملی:</b> <span class="mono">'+fa(st.national_id||'—')+'</span></td>'+
+      '<td><b>نام پدر:</b> '+esc(st.father_name||'—')+'</td>'+
+      '<td><b>کلاس:</b> '+esc(st.class_name||'—')+'</td></tr>';
+    var h='';
+    each(r.grades||[],function(g,i){
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(g.subject_name)+'</b></td><td><b>'+fa(g.score)+'</b></td>'+
+        '<td>#'+fa(g.class_rank)+'</td>'+
+        '<td>'+(g.score>=10?'<span class="badge g">قبول</span>':'<span class="badge r">مردود</span>')+'</td></tr>';
+    });
+    $('rcBody').innerHTML=h;
+    setHide('rcEmpty',(r.grades||[]).length>0);
+    $('rcAvg').innerHTML=r.avg?fa(r.avg):'—';
+    $('rcRank').innerHTML=r.class_rank>0?'#'+fa(r.class_rank):'—';
+    $('rcRes').innerHTML=r.avg?(parseFloat(r.avg)>=10?'قبول':'مردود'):'—';
+  });
+}
+
+/* ---------- shared ---------- */
+function delEntity(entity,u,label){
+  if(!confirm('«'+label+'» حذف شود؟'))return;
+  api('/api/mutate',{entity:entity,op:'delete',payload:{uuid:u}},function(r){
+    if(r.ok){toast('حذف شد');refreshView();}
+    else toast(r.msg||'خطا');
+  });
+}
+function loadQueue(){
+  api('/api/queue',null,function(r){
+    var ops={create:'ایجاد',update:'ویرایش','delete':'حذف',set:'ثبت'};
+    var ents={student:'دانش‌آموز','class':'کلاس',teacher:'دبیر',attendance:'حضورغیاب',grade:'نمره'};
+    var h='',items=r.items||[];
+    each(items,function(x,i){
+      h+='<tr><td>'+fa(i+1)+'</td><td><b>'+esc(ents[x.entity]||x.entity)+'</b> '+esc(x.title||'')+'</td>'+
+        '<td><span class="badge '+(x.op==='delete'?'r':x.op==='create'?'g':'b')+'">'+(ops[x.op]||x.op)+'</span></td>'+
+        '<td>'+fa(x.created_at)+'</td><td>'+fa(x.tries)+'</td>'+
+        '<td class="qerr">'+esc(x.last_error||'—')+'</td></tr>';
+    });
+    $('qBody').innerHTML=h;
+    setHide('qEmpty',items.length>0);
+  });
+}
+function syncNow(){
+  api('/api/sync-now',{},function(){toast('همگام‌سازی آغاز شد');setTimeout(loadState,1200);setTimeout(function(){if(curView==='queue')loadQueue()},2600)});
+}
+$('syncPill').onclick=syncNow;
+
+/* ---------- settings ---------- */
+function setResult(html,ok){
+  $('setResult').innerHTML='<div style="border-radius:9px;padding:10px 14px;border:1px solid '+
+    (ok?'#a7f3d0;background:#ecfdf5;color:#065f46':'#fecaca;background:#fef2f2;color:#991b1b')+'">'+html+'</div>';
+}
+function saveSettings(){
+  var u=$('setUrl').value.replace(/^\s+|\s+$/g,'');
+  if(!u)return setResult('آدرس سایت را وارد کنید',false);
+  if(!$('setUser').value)return setResult('نام کاربری مدیر را وارد کنید',false);
+  if(!$('setPass').value)return setResult('رمز عبور را وارد کنید',false);
+  if(!/^https?:\/\//.test(u)){u='https://'+u;$('setUrl').value=u;}
+  $('setBtn').disabled=true;
+  setResult('در حال اتصال به سرور... (تا ۳۰ ثانیه صبر کنید)',true);
+  api('/api/settings',{server_url:u,username:$('setUser').value,password:$('setPass').value,insecure:$('setInsecure').checked},function(r){
+    $('setBtn').disabled=false;
+    if(r.ok){setResult('✓ اتصال برقرار شد — دریافت اطلاعات در پس‌زمینه آغاز شد',true);$('setPass').value='';setTimeout(loadState,1500);setTimeout(loadState,5000);}
+    else setResult('✗ '+esc(r.msg||'خطای نامشخص در اتصال'),false);
+  },function(){
+    $('setBtn').disabled=false;
+    setResult('✗ خطای داخلی برنامه — دوباره تلاش کنید',false);
+  });
+}
+function testServer(){
+  var u=$('setUrl').value.replace(/^\s+|\s+$/g,'');
+  if(!u)return setResult('آدرس سایت را وارد کنید',false);
+  if(!/^https?:\/\//.test(u)){u='https://'+u;$('setUrl').value=u;}
+  setResult('در حال تست آدرس سرور...',true);
+  api('/api/settings',{server_url:u,username:'__ping__',password:'__ping__',insecure:$('setInsecure').checked},function(r){
+    /* wrong credentials but valid JSON response = the file IS reachable */
+    if(r.ok)setResult('✓ سرور در دسترس است و اتصال کامل برقرار شد',true);
+    else if(r.msg&&r.msg.indexOf('نام کاربری')>=0)setResult('✓ فایل sync-api.php روی سرور در دسترس است — حالا نام کاربری و رمز صحیح مدیر را وارد کنید',true);
+    else setResult('✗ '+esc(r.msg||'سرور پاسخ نداد'),false);
+  });
+}
+
+/* boot */
+loadClasses();
+/* ---------- keyboard shortcuts ---------- */
+var MODALS=['mStudent','mClass','mTeacher','mKeys'];
+function openModalId(){
+  for(var i=0;i<MODALS.length;i++)if($(MODALS[i]).className.indexOf('show')>=0)return MODALS[i];
+  return null;
+}
+function gotoView(v){
+  var btns=document.getElementById('nav').getElementsByTagName('button');
+  for(var i=0;i<btns.length;i++)if(btns[i].getAttribute('data-v')===v){btns[i].onclick();return}
+}
+function kbSave(){ /* Ctrl+S / Enter: save whatever form is open */
+  var m=openModalId();
+  if(m==='mStudent')saveStudent();
+  else if(m==='mClass')saveClass();
+  else if(m==='mTeacher')saveTeacher();
+  else if(m==='mKeys')hideM('mKeys');
+  else if(curView==='settings')saveSettings();
+  else toast('فرمی برای ذخیره باز نیست');
+}
+function kbNew(){ /* Ctrl+N: context-aware new record */
+  if(openModalId())return;
+  if(curView==='students')openStudent();
+  else if(curView==='classes')openClass();
+  else if(curView==='teachers')openTeacher();
+  else if(curView==='grades')addSubject();
+  else toast('در این بخش مورد جدیدی تعریف نمی‌شود');
+}
+function kbFind(){ /* Ctrl+F / F3: jump to the search box of this view */
+  var id=curView==='students'?'stuSearch':curView==='teachers'?'tchSearch':null;
+  if(!id&&curView!=='students'){gotoView('students');id='stuSearch'}
+  if(id){$(id).focus();try{$(id).select()}catch(e){}}
+}
+function kbPrint(){
+  if(curView==='attreport'||curView==='repcard')window.print();
+  else toast('چاپ در بخش «گزارش حضور» و «کارنامه» در دسترس است');
+}
+function kbRefresh(){refreshView();toast('تازه‌سازی شد')}
+function kbEsc(){
+  var m=openModalId();
+  if(m){hideM(m);return true}
+  return false;
+}
+/* called from the native window (webwin.c) for keys MSHTML would hijack */
+window.sdKey=function(name){
+  if(name==='save')kbSave();
+  else if(name==='new')kbNew();
+  else if(name==='find')kbFind();
+  else if(name==='print')kbPrint();
+  else if(name==='refresh')kbRefresh();
+  else if(name==='help')showM('mKeys');
+  else if(name&&name.indexOf('view')===0){
+    var n=+name.substr(4);
+    if(n>=1&&n<=views.length)gotoView(views[n-1]);
+  }
+};
+/* browser-level handler: covers fallback mode + keys MSHTML passes through */
+document.onkeydown=function(ev){
+  ev=ev||window.event;
+  var k=ev.keyCode,ctrl=ev.ctrlKey;
+  var tag=(ev.target||ev.srcElement||{}).tagName||'';
+  var typing=(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA');
+  if(k===27){if(kbEsc())return false;return true}                 /* Esc */
+  if(k===112){window.sdKey('help');return false}                  /* F1  */
+  if(k===114){window.sdKey('find');return false}                  /* F3  */
+  if(k===116){window.sdKey('refresh');return false}               /* F5  */
+  if(k===120){syncNow();return false}                             /* F9  */
+  if(ctrl&&!ev.altKey){
+    if(k===83){window.sdKey('save');return false}                 /* Ctrl+S */
+    if(k===78){window.sdKey('new');return false}                  /* Ctrl+N */
+    if(k===70){window.sdKey('find');return false}                 /* Ctrl+F */
+    if(k===80){window.sdKey('print');return false}                /* Ctrl+P */
+    if(k===82){window.sdKey('refresh');return false}              /* Ctrl+R */
+    if(k>=49&&k<=57){window.sdKey('view'+(k-48));return false}    /* Ctrl+1..9 */
+  }
+  if(k===13&&openModalId()&&openModalId()!=='mKeys'&&tag!=='TEXTAREA'){kbSave();return false} /* Enter in form */
+  if(k===13&&!typing)return true;
+  return true;
+};
+/* Enter inside settings fields = connect */
+each(['setUrl','setUser','setPass'],function(id){
+  $(id).onkeydown=function(ev){ev=ev||window.event;if(ev.keyCode===13){saveSettings();return false}return true};
+});
+/* Enter in search boxes should not submit anything, just filter */
+each(['stuSearch','tchSearch'],function(id){
+  $(id).onkeydown=function(ev){ev=ev||window.event;if(ev.keyCode===13)return false;return true};
+});
+/* clicking the dark backdrop closes the form (like pressing Esc) */
+each(MODALS,function(id){
+  $(id).onclick=function(ev){ev=ev||window.event;var t=ev.target||ev.srcElement;if(t===$(id))hideM(id)};
+});
+
+loadState();
+setInterval(loadState,5000);
+</script>
+</body>
+</html>
