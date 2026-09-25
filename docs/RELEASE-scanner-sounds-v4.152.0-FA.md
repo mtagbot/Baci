@@ -71,8 +71,8 @@
 | `SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip` (آنلاین) | ۱۶۱٬۱۸۲ | `9847319cc2fe4984899ceb202a3473c5b624b6291d4e31d8d3aa50dff80b9a22` | `SchoolDeskPro/reports/uploads/sounds/…` + fallback `assets/audio/…` |
 | `SITE-FIX-v4.152.0-cumulative.zip` | ۲۰۷٬۸۴۱ | `0aa92bde54c45ba96b6524cd100d5ab5534115450a3fcbfb56676db177e4eca8` | `site-update-v4.152.0/uploads/sounds/…` + fallback `assets/audio/…` |
 | `SchoolDeskPro-FIX-v2.83.0-cumulative.zip` | ۲۳۷٬۳۰۸ | `998f5ee1438a29b02ebfa839116cc21ce6efe056fcf419e8f453d0769a8dfa27` | `SchoolDeskPro/reports/uploads/sounds/…` + fallback `assets/audio/…` |
-| `Release_V1.0-Site.zip` (نصب کامل) | ۳٬۶۲۰٬۵۴۰ | `1f49b3638c1d64dffbf5227b30b3b1eec282db55919dbf1af5cfceffa8f14a14` | `uploads/sounds/…` + fallback `assets/audio/…` |
-| `Release_V1.0-Desktop.zip` (نصب کامل) | ۱۷٬۲۴۲٬۱۵۲ | `0457a99158ff95ce323110bf6927289338676b11d2fc279f795aee21c732a820` | `SchoolDeskPro/www/uploads/sounds/…` + fallback `assets/audio/…` |
+| `Release_V1.0-Site.zip` (نصب کامل) | ۳٬۶۲۰٬۵۱۸ | `2418e626d91af2f4f96e06de16b8d6a79a130a3e2325345ca5b84afefa112744` | `uploads/sounds/…` + fallback `assets/audio/…` |
+| `Release_V1.0-Desktop.zip` (نصب کامل) | ۱۷٬۲۴۲٬۱۲۹ | `ed4670828812bf243cb717992d089d894c9234f462376367d9821e7403a98285` | `SchoolDeskPro/www/uploads/sounds/…` + fallback `assets/audio/…` |
 | `SchoolDeskPro-UPDATE-2.83.0-bot-admin-login.zip` (نوبت قبل) | ۱۳٬۵۵۴ | `93b5fdcf83bce9ff1add25f380c4670676659dcb775f3f304f774aa93a202942` | — |
 
 **نکتهٔ مهم برای نصب:** بستهٔ اسکنر همین نوبت **هم** فایل‌های صوتی را دارد **هم** کنترلر/صفحهٔ تازه را؛ پس برای نصب مستقیم، `SITE-FIX-v4.152.0-scanner.zip` یا `SchoolDeskPro-FIX-v2.83.0-scanner.zip` کافی است؛ هرکدام هر سه صدا را در مسیر اصلی و fallback دارد. بستهٔ آنلاین نیز همین payload شش‌صدایی را دارد.
