@@ -449,7 +449,7 @@ body.modal-open{overflow:hidden}
    even with hundreds of print pages; ignored harmlessly by very old browsers.
    Print media is unaffected: all pages always render fully on paper. */
 @media screen{.page{content-visibility:auto;contain-intrinsic-size:210mm 297mm}}
-</style><link rel="stylesheet" href="assets/css/exam-designer-mobile.css?v=4.162.0"></head><body>
+</style><link rel="stylesheet" href="assets/css/exam-designer-mobile.css?v=4.163.0"></head><body>
 <div class="toolbar" id="mainToolbar">
   <div class="tb-group no-ajax"><span class="tb-title">فایل منبع</span><button type="button" onclick="openSourceUploadModal()">بارگذاری PDF/تصویر</button><button type="button" onclick="deleteLiveSource()">حذف/تغییر</button></div>
   <span class="tb-sep"></span>
@@ -696,7 +696,7 @@ function headerHtml(st,pageNo){if(pageNo%2===0)return '';
   /* عنوان با خطوط تزئینی دو طرف + زیرعنوان جدا */
   const title=`<div class="hcenter"><span class="hline"></span><b>${esc(examData.title)}</b><span class="hline"></span></div>${examData.subtitle?`<div class="hsub">${esc(examData.subtitle)}</div>`:''}`;
   return `<div class="exam-header"><div class="photo">${st.photo?`<img src="${esc(st.photo)}">`:'عکس'}</div><div>${title}<div class="meta">${fields}</div></div><div class="stampcol"><div class="stamp">${examData.stamp?`<img src="${esc(examData.stamp)}">`:'مهر'}</div><div class="seatno">${esc(st.seat!==undefined&&st.seat!==null?st.seat:'')}</div></div></div>`;}
-function sourceHtml(pageNo){const order=sourceOrder.length?sourceOrder:defaultSourceOrder(); const srcIndex=order[pageNo-1]; const src=srcIndex?((examData.sourcePages||[])[srcIndex-1]):''; const c=sourceCropData(pageNo); const blend=(+c.bg>0)?'multiply':'normal'; if(src)return `<div class="source-file" data-source-page="${pageNo}" data-cropt="${c.t}" data-cropb="${c.b}" tabindex="0" style="--cropT:${c.t}%;--cropR:${c.r}%;--cropB:${c.b}%;--cropL:${c.l}%;--srcW:${c.w}%;--srcX:${c.x}mm;--srcY:${c.y}mm;--srcContrast:${c.contrast}%;--srcBrightness:${c.brightness}%;--srcBlend:${blend}"><img src="${esc(src)}" draggable="false" onload="applySourceCropFits()"><div class="source-crop-overlay" role="group" aria-label="دستگیره‌های برش صفحه منبع"><button type="button" class="source-crop-handle source-crop-handle-nw" data-corner="nw" onpointerdown="sourceCropHandleDown(event,this)" aria-label="برش گوشه بالا چپ"></button><button type="button" class="source-crop-handle source-crop-handle-ne" data-corner="ne" onpointerdown="sourceCropHandleDown(event,this)" aria-label="برش گوشه بالا راست"></button><button type="button" class="source-crop-handle source-crop-handle-se" data-corner="se" onpointerdown="sourceCropHandleDown(event,this)" aria-label="برش گوشه پایین راست"></button><button type="button" class="source-crop-handle source-crop-handle-sw" data-corner="sw" onpointerdown="sourceCropHandleDown(event,this)" aria-label="برش گوشه پایین چپ"></button></div></div>`; return '';}
+function sourceHtml(pageNo){const order=sourceOrder.length?sourceOrder:defaultSourceOrder(); const srcIndex=order[pageNo-1]; const src=srcIndex?((examData.sourcePages||[])[srcIndex-1]):''; const c=sourceCropData(pageNo); const blend=(+c.bg>0)?'multiply':'normal'; if(src)return `<div class="source-file" data-source-page="${pageNo}" data-cropt="${c.t}" data-cropb="${c.b}" tabindex="0" style="--cropT:${c.t}%;--cropR:${c.r}%;--cropB:${c.b}%;--cropL:${c.l}%;--srcW:${c.w}%;--srcX:${c.x}mm;--srcY:${c.y}mm;--srcContrast:${c.contrast}%;--srcBrightness:${c.brightness}%;--srcBlend:${blend}"><img src="${esc(src)}" draggable="false" onload="applySourceCropFits()"><div class="source-crop-overlay" role="group" aria-label="دستگیره‌های برش صفحه منبع"><button type="button" class="source-crop-handle source-crop-handle-nw" data-corner="nw" onpointerdown="sourceCropHandleDown(event,this)" ondblclick="sourceCropResetCorner(event,this)" aria-label="برش گوشه بالا چپ"></button><button type="button" class="source-crop-handle source-crop-handle-ne" data-corner="ne" onpointerdown="sourceCropHandleDown(event,this)" ondblclick="sourceCropResetCorner(event,this)" aria-label="برش گوشه بالا راست"></button><button type="button" class="source-crop-handle source-crop-handle-se" data-corner="se" onpointerdown="sourceCropHandleDown(event,this)" ondblclick="sourceCropResetCorner(event,this)" aria-label="برش گوشه پایین راست"></button><button type="button" class="source-crop-handle source-crop-handle-sw" data-corner="sw" onpointerdown="sourceCropHandleDown(event,this)" ondblclick="sourceCropResetCorner(event,this)" aria-label="برش گوشه پایین چپ"></button></div></div>`; return '';}
 /* v4.101.0: ارتفاع layout بلوک منبع = فقط بخش دیده‌شده (برش بالا/پایین حذف) —
    جدول سوالات دقیقا چسبیده به زیر قسمت برش‌خورده شروع می‌شود. */
 let sourceFitSigs={};
@@ -705,9 +705,16 @@ function sourceCropData(page){const r=sourceCrops[page]||{}; return {t:+r.t||0,r
 function sourceCropApply(page,allowReflow=true){const c=sourceCropData(page); sourceCrops[page]=Object.assign(sourceCrops[page]||{},c); document.querySelectorAll(`.source-file[data-source-page="${page}"]`).forEach(sf=>{sf.dataset.cropt=c.t;sf.dataset.cropb=c.b;sf.style.setProperty('--cropT',c.t+'%');sf.style.setProperty('--cropR',c.r+'%');sf.style.setProperty('--cropB',c.b+'%');sf.style.setProperty('--cropL',c.l+'%');sf.style.setProperty('--srcW',c.w+'%');sf.style.setProperty('--srcX',c.x+'mm');sf.style.setProperty('--srcY',c.y+'mm');sf.style.setProperty('--srcContrast',c.contrast+'%');sf.style.setProperty('--srcBrightness',c.brightness+'%');sf.style.setProperty('--srcBlend',c.bg>0?'multiply':'normal');}); applySourceCropFits(allowReflow);}
 function sourceCropClamp(c,corner){c.t=Math.max(0,Math.min(45,c.t));c.r=Math.max(0,Math.min(45,c.r));c.b=Math.max(0,Math.min(45,c.b));c.l=Math.max(0,Math.min(45,c.l));if(c.t+c.b>88){if(corner.includes('n'))c.t=88-c.b;else c.b=88-c.t;}if(c.l+c.r>88){if(corner.includes('w'))c.l=88-c.r;else c.r=88-c.l;}return c;}
 let sourceCropDrag=null;
-function sourceCropHandleDown(e,handle){const sf=handle?.closest('.source-file'),img=sf?.querySelector('img');if(!sf||!img)return;e.preventDefault();e.stopPropagation();const r=img.getBoundingClientRect();sourceCropDrag={page:+sf.dataset.sourcePage,corner:handle.dataset.corner,sx:e.clientX,sy:e.clientY,w:Math.max(1,r.width),h:Math.max(1,r.height),pointerId:e.pointerId};handle.setPointerCapture?.(e.pointerId);document.body.classList.add('source-cropping');}
-function sourceCropHandleMove(e){if(!sourceCropDrag)return;const d=sourceCropDrag,c=sourceCropData(d.page),dx=(e.clientX-d.sx)/d.w*100,dy=(e.clientY-d.sy)/d.h*100;if(d.corner.includes('n'))c.t+=dy;if(d.corner.includes('s'))c.b-=dy;if(d.corner.includes('w'))c.l+=dx;if(d.corner.includes('e'))c.r-=dx;sourceCropClamp(c,d.corner);sourceCrops[d.page]=Object.assign(sourceCrops[d.page]||{},c);sourceCropApply(d.page,false);}
-function sourceCropHandleUp(){if(!sourceCropDrag)return;const p=sourceCropDrag.page;sourceCropDrag=null;document.body.classList.remove('source-cropping');sourceCropApply(p,true);if(+(document.getElementById('cropPage')?.value||0)===p)loadCropControls();autosaveLocal();}
+function sourceCropHandleDown(e,handle){const sf=handle?.closest('.source-file'),img=sf?.querySelector('img');if(!sf||!img)return;e.preventDefault();e.stopPropagation();const r=img.getBoundingClientRect();sourceCropDrag={page:+sf.dataset.sourcePage,corner:handle.dataset.corner,sx:e.clientX,sy:e.clientY,w:Math.max(1,r.width),h:Math.max(1,r.height),pointerId:e.pointerId};handle.setPointerCapture?.(e.pointerId);document.body.classList.add('source-cropping');sourceCropShowBadge(sourceCropDrag.page);}
+function sourceCropHandleMove(e){if(!sourceCropDrag)return;const d=sourceCropDrag,c=sourceCropData(d.page),dx=(e.clientX-d.sx)/d.w*100,dy=(e.clientY-d.sy)/d.h*100;if(d.corner.includes('n'))c.t+=dy;if(d.corner.includes('s'))c.b-=dy;if(d.corner.includes('w'))c.l+=dx;if(d.corner.includes('e'))c.r-=dx;sourceCropClamp(c,d.corner);sourceCrops[d.page]=Object.assign(sourceCrops[d.page]||{},c);sourceCropApply(d.page,false);const bdg=document.getElementById('sourceCropBadge');if(bdg)sourceCropBadgeText(bdg,d.page);}
+function sourceCropHandleUp(){if(!sourceCropDrag)return;const p=sourceCropDrag.page;sourceCropDrag=null;document.body.classList.remove('source-cropping');sourceCropApply(p,true);if(+(document.getElementById('cropPage')?.value||0)===p)loadCropControls();sourceCropHideBadge();autosaveLocal();}
+/* v4.163.0: UX لمسی برش — دوضربه روی هر دستگیره برش همان گوشه را صفر می‌کند
+   (بازگشت سریع از کشیدن اشتباه) و حین کشیدن، درصد برش روی نشانگر شناور
+   نمایش داده می‌شود. مقادیر ذخیره‌شدهٔ برش تغییری نمی‌کنند. */
+function sourceCropResetCorner(e,handle){e.preventDefault();e.stopPropagation();const sf=handle?.closest('.source-file');if(!sf)return;const p=+sf.dataset.sourcePage,c=sourceCropData(p),corner=handle.dataset.corner||'';if(corner.includes('n'))c.t=0;if(corner.includes('s'))c.b=0;if(corner.includes('w'))c.l=0;if(corner.includes('e'))c.r=0;sourceCropClamp(c,corner);sourceCrops[p]=Object.assign(sourceCrops[p]||{},c);sourceCropApply(p,true);if(+(document.getElementById('cropPage')?.value||0)===p)loadCropControls();autosaveLocal();showToast('برش این گوشه صفر شد');}
+function sourceCropShowBadge(page){let b=document.getElementById('sourceCropBadge');if(!b){b=document.createElement('div');b.id='sourceCropBadge';b.className='source-crop-badge';b.setAttribute('aria-live','polite');document.body.appendChild(b);}b.style.display='block';sourceCropBadgeText(b,page);}
+function sourceCropBadgeText(b,page){const c=sourceCropData(page);const fa=n=>Number(n||0).toLocaleString('fa-IR');b.textContent='برش — بالا '+fa(c.t)+'٪ پایین '+fa(c.b)+'٪ چپ '+fa(c.l)+'٪ راست '+fa(c.r)+'٪';}
+function sourceCropHideBadge(){const b=document.getElementById('sourceCropBadge');if(!b)return;clearTimeout(b._h);b._h=setTimeout(()=>{b.style.display='none';},1400);}
 document.addEventListener('pointermove',sourceCropHandleMove);document.addEventListener('pointerup',sourceCropHandleUp);document.addEventListener('pointercancel',sourceCropHandleUp);
 let reflowTimer=null;
 function scheduleQuestionReflow(){clearTimeout(reflowTimer); reflowTimer=setTimeout(()=>{renderQuestions();},120);}
@@ -793,7 +800,14 @@ document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault(); saveDesign(true).then(j=>showToast(j&&j.ok?'طراحی ذخیره شد':'خطا در ذخیره طراحی'));}
   if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){const qm=document.getElementById('questionModal'); if(qm&&qm.style.display==='flex'){e.preventDefault(); saveQuestion();}}
 });
+/* v4.163.0: پیش‌نمایش زنده در یک فریم انیمیشن ادغام می‌شود — تایپ سریع و
+   لغزنده‌ها چند نرمال‌سازی همزمان پشت هم صف نمی‌کنند (مخصوص گوشی ضعیف). */
+let qPreviewFrame=null;
 function updateQuestionPreview(){
+  if(qPreviewFrame!==null)return;
+  qPreviewFrame=requestAnimationFrame(()=>{qPreviewFrame=null;renderQuestionPreviewNow();});
+}
+function renderQuestionPreviewNow(){
   const c=document.getElementById('qPrevContent'),ed=document.getElementById('qText'); if(!c||!ed)return;
   const html=normalizeQuestionHtml(ed.innerHTML); c.innerHTML=html||`<span class="preview-empty">متن سوال را وارد کنید...</span>`;
   c.style.fontFamily=document.getElementById('qFont').value; c.style.fontSize=document.getElementById('qFontSize').value+'px'; c.style.height=document.getElementById('qHeight').value+'mm';
@@ -808,7 +822,9 @@ function toggleBank(){
   p.classList.toggle('collapsed'); updateMobileChrome();
   if(opening&&!bankCatalogReady&&!bankCatalogLoading)loadBank();
 }
-function cmd(c){document.execCommand(c,false,null);document.getElementById('qText').focus();}
+/* v4.163.0: پیش از اجرای دستور، انتخاب ذخیره‌شدهٔ متن برمی‌گردد — روی موبایل
+   بدون این، ضربه به نوارابزار انتخاب را می‌پراند و دستور به کل متن می‌خورد. */
+function cmd(c){qRestoreSel();document.execCommand(c,false,null);document.getElementById('qText').focus();}
 /* ============ v4.112.0: امکانات ویرایشگر حرفه‌ای (هم‌تراز پیش‌نمایش ایمپورت) ============ */
 let qSavedRange=null;
 document.addEventListener('selectionchange',()=>{const ed=document.getElementById('qText'); const sel=getSelection(); if(ed&&sel.rangeCount&&ed.contains(sel.anchorNode))qSavedRange=sel.getRangeAt(0).cloneRange();});
@@ -817,7 +833,11 @@ function qInsertHTML(html){qRestoreSel(); document.execCommand('insertHTML',fals
 function qFontStep(dir){const ed=document.getElementById('qText'); qRestoreSel(); const sel=getSelection();
   if(!sel.rangeCount||sel.isCollapsed){const cur=+document.getElementById('qFontSize').value||11; document.getElementById('qFontSize').value=Math.max(8,Math.min(22,cur+dir)); applyFontToEditor(); return;}
   document.execCommand('fontSize',false,'7');
-  ed.querySelectorAll('font[size="7"]').forEach(f=>{const span=document.createElement('span'); const base=parseFloat(getComputedStyle(f.parentElement).fontSize)||14; span.style.fontSize=Math.max(8,Math.min(26,base+dir*2))+'px'; span.innerHTML=f.innerHTML; f.replaceWith(span);});
+  const made=[];
+  ed.querySelectorAll('font[size="7"]').forEach(f=>{const span=document.createElement('span'); const base=parseFloat(getComputedStyle(f.parentElement).fontSize)||14; span.style.fontSize=Math.max(8,Math.min(26,base+dir*2))+'px'; span.innerHTML=f.innerHTML; f.replaceWith(span); made.push(span);});
+  /* v4.163.0: انتخاب روی اسپن تازه بازجا می‌افتد تا ضربه‌های پیاپی فقط همان
+     بخش انتخابی را بزرگ/کوچک کنند. */
+  if(made.length){const nr=document.createRange(); nr.setStartBefore(made[0]); nr.setEndAfter(made[made.length-1]); sel.removeAllRanges(); sel.addRange(nr); qSavedRange=nr.cloneRange();}
   updateQuestionPreview();}
 function qDirection(dir){const ed=document.getElementById('qText'); qRestoreSel(); const sel=getSelection();
   if(sel.rangeCount&&!sel.isCollapsed&&ed.contains(sel.anchorNode)&&ed.contains(sel.focusNode)){
@@ -892,7 +912,12 @@ function qStripEqSlots(html){const tmp=document.createElement('div'); tmp.innerH
   return tmp.innerHTML;}
 function clearQuestionForm(){deselectSelectedImage();document.getElementById('editingQid').value='';const qEditor=document.getElementById('qText');qEditor.innerHTML='';qEditor.removeAttribute('dir');qEditor.style.direction='';qEditor.style.textAlign='';document.getElementById('qScore').value='1';document.getElementById('qHeight').value='18';document.getElementById('qModalTitle').textContent='آماده‌سازی سوال جدید';document.getElementById('qInsertBtn').textContent='درج در آزمون';applyQuestionTemplate();renumberQuestions();updateQuestionPreview();}
 function applyQuestionTemplate(){const t=document.getElementById('qType').value, ed=document.getElementById('qText'); if(t==='text')ed.innerHTML='<p>صورت سوال تشریحی را اینجا بنویسید...</p>'; if(t==='mcq')ed.innerHTML='<p>صورت سوال چندگزینه‌ای را اینجا بنویسید.</p><div class="q-options"><span>الف) گزینه اول</span><span>ب) گزینه دوم</span><span>ج) گزینه سوم</span><span>د) گزینه چهارم</span></div>'; if(t==='blank')ed.innerHTML='<p>عبارت زیر را کامل کنید: <span class="blank-line"></span></p>'; if(t==='tf')ed.innerHTML='<p>متن عبارت... <span class="tf-square"></span> صحیح <span class="tf-square"></span> غلط</p>'; applyFontToEditor(); updateQuestionPreview();}
-function applyFontToEditor(){const ed=document.getElementById('qText'),family=document.getElementById('qFont').value,px=document.getElementById('qFontSize').value+'px';qRestoreSel();const sel=getSelection();const selected=sel&&sel.rangeCount&&!sel.isCollapsed&&ed.contains(sel.anchorNode)&&ed.contains(sel.focusNode);if(selected){document.execCommand('styleWithCSS',false,true);document.execCommand('fontName',false,family);document.execCommand('fontSize',false,'7');ed.querySelectorAll('font[size="7"]').forEach(f=>{const span=document.createElement('span');span.style.fontSize=px;span.innerHTML=f.innerHTML;f.replaceWith(span);});ed.querySelectorAll('font[face]').forEach(f=>{const span=document.createElement('span');span.style.fontFamily=f.getAttribute('face');span.innerHTML=f.innerHTML;f.replaceWith(span);});const s=getSelection();if(s&&s.rangeCount)qSavedRange=s.getRangeAt(0).cloneRange();updateQuestionPreview();return;}ed.style.setProperty('font-family',family,'important');ed.style.fontSize=px;updateQuestionPreview();}
+function applyFontToEditor(){const ed=document.getElementById('qText'),family=document.getElementById('qFont').value,px=document.getElementById('qFontSize').value+'px';qRestoreSel();const sel=getSelection();const selected=sel&&sel.rangeCount&&!sel.isCollapsed&&ed.contains(sel.anchorNode)&&ed.contains(sel.focusNode);if(selected){document.execCommand('styleWithCSS',false,true);document.execCommand('fontName',false,family);document.execCommand('fontSize',false,'7');const made=[];ed.querySelectorAll('font[size="7"]').forEach(f=>{const span=document.createElement('span');span.style.fontSize=px;span.dataset.qFontFix='1';span.innerHTML=f.innerHTML;f.replaceWith(span);made.push(span);});ed.querySelectorAll('font[face]').forEach(f=>{const span=document.createElement('span');span.style.fontFamily=f.getAttribute('face');span.dataset.qFontFix='1';span.innerHTML=f.innerHTML;f.replaceWith(span);made.push(span);});
+  /* v4.163.0: انتخاب روی خودِ متنِ استایل‌گرفته بازجا می‌افتد. قبلاً اولین تیکِ
+     لغزنده اندازه فونت انتخاب را از دست می‌داد و تیک‌های بعدی فونت را به کل
+     ویرایشگر اعمال می‌کردند؛ حالا هر تیک فقط همان بخش انتخابی را تغییر می‌دهد. */
+  if(made.length){const nr=document.createRange();nr.setStartBefore(made[0]);nr.setEndAfter(made[made.length-1]);const s2=getSelection();s2.removeAllRanges();s2.addRange(nr);qSavedRange=nr.cloneRange();made.forEach(sp=>{delete sp.dataset.qFontFix;});}
+  updateQuestionPreview();return;}ed.style.setProperty('font-family',family,'important');ed.style.fontSize=px;updateQuestionPreview();}
 function loadCustomFont(input){const file=input.files&&input.files[0]; if(!file)return; const name='CustomFont_'+Date.now(); const r=new FileReader(); r.onload=e=>{const st=document.createElement('style'); st.textContent=`@font-face{font-family:${name};src:url(${e.target.result})}`; document.head.appendChild(st); document.getElementById('qFont').appendChild(new Option(file.name,name,true,true)); applyFontToEditor();}; r.readAsDataURL(file);}
 function imageQualityBySize(bytes){ if(bytes>10*1024*1024) return 0; if(bytes>5*1024*1024) return .30; if(bytes>1*1024*1024) return .50; return .80; }
 function compressImageFile(file){return new Promise((resolve,reject)=>{const q=imageQualityBySize(file.size); if(!q){reject('حجم تصویر بیشتر از ۱۰ مگابایت است.'); return;} const img=new Image(); const r=new FileReader(); r.onload=e=>{img.onload=()=>{const max=800, scale=Math.min(1,max/Math.max(img.width,img.height)); const c=document.createElement('canvas'); c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale); c.getContext('2d').drawImage(img,0,0,c.width,c.height); resolve(c.toDataURL('image/webp',q));}; img.src=e.target.result;}; r.readAsDataURL(file);});}
@@ -909,7 +934,9 @@ function normalizeQuestionHtml(html,seen){
   });
   return box.innerHTML;
 }
-function normalizeAllQuestionImages(){const seen=new Set(); qItems.forEach(it=>{if(it.type==='q'&&it.html)it.html=normalizeQuestionHtml(it.html,seen);});}
+/* v4.163.0: متنی که از آخرین نرمال‌سازی تغییر نکرده دوباره پردازش نمی‌شود —
+   با تعداد زیاد سوال این تابع بعد از هر تغییر اجرا می‌شد. */
+function normalizeAllQuestionImages(){const seen=new Set(); qItems.forEach(it=>{if(it.type!=='q'||!it.html)return; if(it._normSrc===it.html)return; it.html=normalizeQuestionHtml(it.html,seen); it._normSrc=it.html;});}
 function decorateQuestionImages(root){
   if(!root)return;
   const images=root.tagName==='IMG'?[root]:[...root.querySelectorAll('img')];
@@ -1071,8 +1098,10 @@ document.addEventListener('pointerup',finishImageDrag);document.addEventListener
 function syncRenderedImagesToModel(persist=true){const first=studentsData[0]; qItems.forEach(it=>{if(it.type!=='q')return; const row=document.querySelector(`.page[data-student-id=\"${first.id}\"] [data-qid=\"${it.id}\"] .q-content`); if(row){const clone=row.cloneNode(true); clone.querySelector('.q-actions')?.remove(); clone.querySelector('.q-h-grip')?.remove(); clone.querySelectorAll('.img-resize-box').forEach(x=>x.remove()); it.html=normalizeQuestionHtml(clone.innerHTML);}}); if(persist)autosaveLocal();}
 function updateMobileChrome(){
   const e=document.getElementById('questionEditorPanel'), b=document.getElementById('bankPanel');
-  document.querySelectorAll('[data-mobile-control="editor"]').forEach(x=>x.setAttribute('aria-expanded',String(!!e&&!e.classList.contains('collapsed'))));
-  document.querySelectorAll('[data-mobile-control="bank"]').forEach(x=>x.setAttribute('aria-expanded',String(!!b&&!b.classList.contains('collapsed'))));
+  const eOpen=!!e&&!e.classList.contains('collapsed'), bOpen=!!b&&!b.classList.contains('collapsed');
+  document.querySelectorAll('[data-mobile-control="editor"]').forEach(x=>x.setAttribute('aria-expanded',String(eOpen)));
+  document.querySelectorAll('[data-mobile-control="bank"]').forEach(x=>x.setAttribute('aria-expanded',String(bOpen)));
+  document.body.classList.toggle('mobile-sheet-open',eOpen||bOpen);
 }
 function editorViewportScale(){
   const root=document.getElementById('pagesRoot'), page=root?.querySelector('.page');
@@ -1098,12 +1127,15 @@ function installMobileEditorChrome(){
   const dock=document.createElement('nav'); dock.id='mobileEditorDock'; dock.className='mobile-editor-dock';
   dock.setAttribute('aria-label','ابزار سریع ویرایشگر آزمون');
   dock.innerHTML='<button type="button" data-mobile-control="bank" onclick="toggleBank()" aria-expanded="false">بانک<br>سوال</button>'+
+    '<button type="button" data-mobile-control="newq" onclick="openQuestionModal()" aria-label="ثبت سوال جدید">سوال<br>جدید</button>'+
     '<button type="button" data-mobile-control="editor" onclick="toggleEditor()" aria-expanded="false">تنظیمات<br>برگه</button>'+
     '<button type="button" class="mobile-dock-zoom" onclick="setMobilePageZoom(-.1)" aria-label="کوچک‌نمایی">−</button>'+
     '<output id="mobilePageZoom" aria-live="polite">—</output>'+
     '<button type="button" class="mobile-dock-zoom" onclick="setMobilePageZoom(.1)" aria-label="بزرگ‌نمایی">+</button>'+
     '<button type="button" class="mobile-dock-save" onclick="saveDesign()">ذخیره</button>'+
     '<button type="button" class="mobile-dock-print" onclick="prepareAllAndPrint()">چاپ</button>';
+  /* v4.163.0: پس‌زمینهٔ ورقه‌ها — با لمسِ بیرونِ پنل، پنل بسته می‌شود. */
+  if(!document.getElementById('mobileSheetBackdrop')){const bd=document.createElement('div'); bd.id='mobileSheetBackdrop'; bd.className='mobile-sheet-backdrop'; bd.setAttribute('aria-hidden','true'); bd.addEventListener('click',()=>{const e=document.getElementById('questionEditorPanel'),b=document.getElementById('bankPanel'); if(e&&!e.classList.contains('collapsed'))toggleEditor(); else if(b&&!b.classList.contains('collapsed'))toggleBank();}); document.body.appendChild(bd);}
   document.body.appendChild(dock); updateMobileChrome(); editorViewportScale();
 }
 let mobileRangePointer=null,mobileRangeTarget=null;
@@ -1159,7 +1191,8 @@ function designPayload(){
   if(qm&&qm.style.display==='flex'&&document.getElementById('editingQid').value)updateModelFromDomImage();
   else syncRenderedImagesToModel(false);
   normalizeAllQuestionImages(); collectDrawings(); printNote=document.getElementById('printNote')?.value||printNote||'';
-  return {questions:qItems,headerFields,drawings:drawingsData,sourceCrops,sourceOrder,style:pageStyle,printNote,academicYear:'<?php echo addslashes($exam['academic_year'] ?? ''); ?>',examMonth:'<?php echo addslashes($exam['exam_month'] ?? ''); ?>',updatedAt:new Date().toISOString()};
+  /* v4.163.0: نشانهٔ داخلی memo (_normSrc) هرگز در فایل طراحی ذخیره نمی‌شود. */
+  return {questions:qItems.map(it=>{const{_normSrc,...rest}=it;return rest;}),headerFields,drawings:drawingsData,sourceCrops,sourceOrder,style:pageStyle,printNote,academicYear:'<?php echo addslashes($exam['academic_year'] ?? ''); ?>',examMonth:'<?php echo addslashes($exam['exam_month'] ?? ''); ?>',updatedAt:new Date().toISOString()};
 }
 function saveDesign(silent=false){const payload=designPayload(); autosaveLocal(); return fetch('exam-design-api.php?group_member='+classGroupMember+'&action=save&exam_id='+examId+'&dt='+encodeURIComponent(designToken),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({design:payload})}).then(r=>r.json()).then(j=>{if(!silent){if(j.ok)showToast(j.message||'طراحی ذخیره شد'); else alert(j.error||'خطا در ذخیره');} return j;});}
 function loadDesignAndBank(){
@@ -1191,28 +1224,45 @@ function loadDesignAndBank(){
   }).catch(()=>{booting=false;});
 }
 let bankCatalogReady=false, bankCatalogLoading=false, bankCatalogRequest=0, bankTotal=0, designBankTotal=0, bankCatalogAbort=null;
+/* v4.163.0: کاتالوگ در دو نیمهٔ مستقل می‌رسد (سوالات / طراحی‌ها) — یادمان
+   می‌ماند کدام نیمه آماده است تا صفحه‌بندی فقط همان نیمه را بخواهد. */
+let bankPartsReady={q:false,d:false};
 function deferBankCatalog(){
   const run=()=>{if(!bankCatalogReady&&!bankCatalogLoading)loadBank();};
   if(window.requestIdleCallback) window.requestIdleCallback(run,{timeout:1200}); else setTimeout(run,350);
 }
-function loadBank(options){
-  options=options||{};
+function bankCatalogUrl(options,part){
   const q=document.getElementById('bankSearch').value||'', y=document.getElementById('bankYear').value||'', m=document.getElementById('bankMonth').value||'', t=document.getElementById('bankType').value||'', d=document.getElementById('bankDesigner').value||'';
   const requestedBankPage=Math.max(1,Number(options.bankPage||1)), requestedDesignPage=Math.max(1,Number(options.designPage||1));
-  const url='exam-design-api.php?group_member='+classGroupMember+'&action=load&catalog=bank&exam_id='+examId+'&dt='+encodeURIComponent(designToken)+'&subject='+encodeURIComponent(q)+'&year='+encodeURIComponent(y)+'&month='+encodeURIComponent(m)+'&type='+encodeURIComponent(t)+'&designer='+encodeURIComponent(d)+'&bank_page='+requestedBankPage+'&design_page='+requestedDesignPage;
+  return 'exam-design-api.php?group_member='+classGroupMember+'&action=load&catalog=bank&exam_id='+examId+'&dt='+encodeURIComponent(designToken)+'&subject='+encodeURIComponent(q)+'&year='+encodeURIComponent(y)+'&month='+encodeURIComponent(m)+'&type='+encodeURIComponent(t)+'&designer='+encodeURIComponent(d)+'&bank_page='+requestedBankPage+'&design_page='+requestedDesignPage+'&part='+part;
+}
+/* v4.163.0: هر نیمهٔ پاسخ که رسیده باشد اعمال می‌شود؛ نیمهٔ نرسیده دست‌نخورده می‌ماند. */
+function applyBankCatalog(j){
+  showBankSubject(j.subject,j.grade);
+  if(j.filters)populateBankFilters(j.filters);
+  if(Array.isArray(j.bank)){bankPartsReady.q=true; renderBank(j.bank||[],j.bankTotal,j.bankPage);}
+  if(Array.isArray(j.designBank)){bankPartsReady.d=true; renderDesignBank(j.designBank||[],j.designBankTotal,j.designBankPage);}
+}
+function loadBank(options){
+  options=options||{};
+  /* v4.163.0: به‌جای یک درخواست سنگین، دو درخواست مستقل: part=q (سوالات و
+     فیلترها — فقط SQL، تقریباً آنی) و part=d (طراحی‌های ذخیره‌شده + بندانگشتی).
+     فهرست سوال‌ها پیش از آماده‌شدن بندانگشتی‌ها روی صفحه می‌نشیند. */
+  const needQ=options.part!=='d', needD=options.part!=='q';
   const request=++bankCatalogRequest; bankCatalogLoading=true;
   /* v4.160.1: درخواست کاتالوگ قبلی که هنوز در راه است لغو می‌شود — ورق‌زدن
      سریع صفحه‌ها دیگر چند جاروی همزمان روی سرور نمی‌اندازد. */
   if(bankCatalogAbort){try{bankCatalogAbort.abort();}catch(e){}}
   let fetchOpts; if(window.AbortController){bankCatalogAbort=new AbortController(); fetchOpts={signal:bankCatalogAbort.signal};}
   const bankBox=document.getElementById('bankList'), designBox=document.getElementById('designBankList');
-  if(!bankCatalogReady){if(bankBox)bankBox.innerHTML='<small>در حال آماده‌سازی بانک سوالات…</small>'; if(designBox)designBox.innerHTML='<small>در حال آماده‌سازی آزمون‌های ذخیره‌شده…</small>';}
-  return fetch(url,fetchOpts).then(r=>r.json()).then(j=>{
-    if(request!==bankCatalogRequest||!j.ok)return j;
-    showBankSubject(j.subject,j.grade); populateBankFilters(j.filters);
-    renderBank(j.bank||[],j.bankTotal,j.bankPage); renderDesignBank(j.designBank||[],j.designBankTotal,j.designBankPage);
-    bankCatalogReady=true;
-    return j;
+  if(!bankCatalogReady){if(needQ&&bankBox)bankBox.innerHTML='<small>در حال آماده‌سازی بانک سوالات…</small>'; if(needD&&designBox)designBox.innerHTML='<small>در حال آماده‌سازی آزمون‌های ذخیره‌شده…</small>';}
+  const jobs=[];
+  if(needQ)jobs.push(fetch(bankCatalogUrl(options,'q'),fetchOpts).then(r=>r.json()).then(j=>{if(request!==bankCatalogRequest||!j||!j.ok)return j; applyBankCatalog(j); return j;}));
+  if(needD)jobs.push(fetch(bankCatalogUrl(options,'d'),fetchOpts).then(r=>r.json()).then(j=>{if(request!==bankCatalogRequest||!j||!j.ok)return j; applyBankCatalog(j); return j;}));
+  return Promise.all(jobs).then(list=>{
+    if(request!==bankCatalogRequest)return null;
+    if(list.some(j=>j&&j.ok))bankCatalogReady=bankPartsReady.q&&bankPartsReady.d;
+    return list.length?list[0]:null;
   }).catch(()=>null).finally(()=>{if(request===bankCatalogRequest)bankCatalogLoading=false;});
 }
 function bankScoreNum(v){const t=String(v??'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace('/','.'); const n=parseFloat(t); return isNaN(n)?Infinity:n;}
@@ -1232,10 +1282,10 @@ function bankPagerHtml(total,page,fnName){
   return `<div class="bank-pager">${prev}${btns}${next}<span class="bp-info">صفحه ${page.toLocaleString('fa-IR')} از ${pages.toLocaleString('fa-IR')}</span></div>`;
 }
 function gotoBankPage(p){
-  p=Math.max(1,Number(p)||1); loadBank({bankPage:p,designPage:designBankPage}).then(()=>{const el=document.getElementById('bankList');if(el)el.scrollIntoView({block:'nearest'});});
+  p=Math.max(1,Number(p)||1); loadBank({bankPage:p,designPage:designBankPage,part:'q'}).then(()=>{const el=document.getElementById('bankList');if(el)el.scrollIntoView({block:'nearest'});});
 }
 function gotoDesignBankPage(p){
-  p=Math.max(1,Number(p)||1); loadBank({bankPage:bankPage,designPage:p}).then(()=>{const el=document.getElementById('designBankList');if(el)el.scrollIntoView({block:'nearest'});});
+  p=Math.max(1,Number(p)||1); loadBank({bankPage:bankPage,designPage:p,part:'d'}).then(()=>{const el=document.getElementById('designBankList');if(el)el.scrollIntoView({block:'nearest'});});
 }
 function renderBank(items,total,page){
   /* v4.115.0: چینش سوالات بانک به ترتیب بارم (صعودی؛ بدون بارم در انتها) */
@@ -1351,6 +1401,13 @@ function prepareAllStudents(){
   studentsData.forEach(st=>parts.push(studentPagesHtml(st,designedWraps)));
   document.getElementById('pagesRoot').innerHTML=parts.join('');
 }
+/* v4.163.0: روی دستگاه ضعیف (هسته/رم کم) برش‌های کوچک‌تر ساخته می‌شود تا UI
+   یخ نزند و اوج حافظه پایین بماند — صفحات خروجی مو‌به‌مو همان است. */
+function printChunkPages(pagesPerStudent){
+  const cores=navigator.hardwareConcurrency||8, mem=navigator.deviceMemory||8;
+  const budget=(cores<=4||mem<=4)?8:24;
+  return Math.max(1,Math.ceil(budget/Math.max(1,pagesPerStudent)));
+}
 function prepareAllStudentsAsync(assetMap,onProgress,cb){
   collectDrawings();
   applyDrawingOverlays();
@@ -1358,7 +1415,7 @@ function prepareAllStudentsAsync(assetMap,onProgress,cb){
   previewOnly=false;
   const holder=document.createElement('div');
   const total=studentsData.length; let i=0;
-  const CHUNK=Math.max(1,Math.ceil(24/Math.max(1,designedWraps.length))); // ~۲۴ صفحه در هر برش
+  const CHUNK=printChunkPages(designedWraps.length); // v4.163.0: اندازه برش به توان دستگاه بستگی دارد
   const step=()=>{
     let html='';
     const end=Math.min(total,i+CHUNK);
@@ -1490,9 +1547,13 @@ function buildPrintAssets(q,onProgress,cb){
   const srcs=Object.keys(bySrc);
   const map={};
   if(!srcs.length){cb(map);return;}
-  let done=0; const total=srcs.length;
-  const finish=(src,out)=>{ if(out&&out!==src){cache[src]=out; map[src]=out;} done++; if(onProgress)onProgress(done,total); if(done>=total)cb(map); };
-  srcs.forEach(src=>{
+  let done=0, active=0; const total=srcs.length; const queue=srcs.slice();
+  /* v4.163.0: به‌جای رمزگشایی همزمان همهٔ تصویرها، حداکثر دو مورد همزمان
+     پردازش می‌شود — اوج حافظهٔ بوم‌های بزرگ روی دستگاه کم‌رم پایین می‌آید
+     و نتیجهٔ نهایی مو به مو همان است. */
+  const finish=(src,out)=>{ if(out&&out!==src){cache[src]=out; map[src]=out;} done++; active--; if(onProgress)onProgress(done,total); if(done>=total){cb(map);return;} pump(); };
+  const pump=()=>{ while(active<2&&queue.length){const src=queue.shift(); active++; startSrc(src);} };
+  const startSrc=(src)=>{
     if(cache[src]){finish(src,cache[src]);return;}
     const isData=src.indexOf('data:')===0;
     if(!conf){ // کیفیت بالا: فقط data-URL های حجیم Blob می‌شوند؛ فایل‌های سرور دست‌نخورده.
@@ -1521,13 +1582,22 @@ function buildPrintAssets(q,onProgress,cb){
     };
     probe.onerror=()=>finish(src,null);
     probe.src=src;
-  });
+  };
+  pump();
 }
 window.addEventListener('beforeprint',()=>{if(previewOnly){prepareAllStudents();}});
 window.addEventListener('afterprint',()=>{if(printSavePromptPending||confirm('آیا طراحی آزمون و سوالات در بانک اطلاعاتی ذخیره شود؟')){saveDesign(true).then(j=>alert(j.ok?'طراحی و سوالات ذخیره شد.':(j.error||'خطا در ذخیره')));} printSavePromptPending=false; previewOnly=true; rerenderPages();});
 
 function draftKey(){return 'exam_live_design_'+examId;}
-function autosaveLocal(){if(booting)return; try{localStorage.setItem(draftKey(),JSON.stringify({expires:Date.now()+3*24*3600*1000,design:designPayload()}));}catch(e){}}
+/* v4.163.0: نوشتن پیش‌نویس محلی debounce شد — قبلاً بعد از هر تغییر یک
+   JSON.stringify کامل از کل طراحی اجرا می‌شد. فلاشِ pagehide/visibilitychange
+   تضمین می‌کند پیش‌نویس هرگز گم نمی‌شود. */
+let autosaveLocalTimer=null;
+function autosaveLocal(){if(booting)return; clearTimeout(autosaveLocalTimer); autosaveLocalTimer=setTimeout(autosaveLocalNow,220);}
+function autosaveLocalNow(){autosaveLocalTimer=null; if(booting)return; try{localStorage.setItem(draftKey(),JSON.stringify({expires:Date.now()+3*24*3600*1000,design:designPayload()}));}catch(e){}}
+function autosaveLocalFlush(){if(autosaveLocalTimer!==null){clearTimeout(autosaveLocalTimer); autosaveLocalNow();}}
+window.addEventListener('pagehide',autosaveLocalFlush);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')autosaveLocalFlush();});
 function loadLocalDraft(){try{const raw=localStorage.getItem(draftKey()); if(!raw)return null; const o=JSON.parse(raw); if(!o.expires||Date.now()>o.expires){localStorage.removeItem(draftKey()); return null;} return o.design||null;}catch(e){return null;}}
 function isCanvasBlank(c){const ctx=c.getContext('2d'), data=ctx.getImageData(0,0,c.width,c.height).data; for(let i=3;i<data.length;i+=4){if(data[i]!==0)return false;} return true;}
 function collectDrawings(){const first=studentsData[0]; if(!first)return; document.querySelectorAll(`.page[data-student-id="${first.id}"] .drawCanvas`).forEach(c=>{const page=c.closest('.page').dataset.pageIndex;
@@ -1634,7 +1704,15 @@ function loadImageForEdit(input){
   if(file.size>10*1024*1024){alert('حجم تصویر بیش از ۱۰ مگابایت است.'); input.value=''; return;}
   setImageEditorStatus('در حال بارگذاری فایل...'); const r=new FileReader(), seq=++imageEditLoadSeq; r.onload=e=>{const img=new Image();img.onload=()=>{if(seq!==imageEditLoadSeq)return;imageEditOriginal=img;setImageEditorSettings();setImageEditorStatus('تصویر آماده است');renderImageEdit();};img.onerror=()=>{setImageEditorStatus('خواندن فایل تصویر ناموفق بود.');};img.src=e.target.result;}; r.readAsDataURL(file);
 }
+/* v4.163.0: بوم ویرایشگر تصویر هم در یک فریم ادغام می‌شود؛ پیش از خواندن
+   پیکسل‌ها (درج در سوال) فلاش همگام انجام می‌شود تا خروجی تغییر نکند. */
+let imgEditFrame=null;
 function renderImageEdit(){
+  if(imgEditFrame!==null)return;
+  imgEditFrame=requestAnimationFrame(()=>{imgEditFrame=null;renderImageEditNow();});
+}
+function imgEditFlush(){if(imgEditFrame!==null){cancelAnimationFrame(imgEditFrame);imgEditFrame=null;}renderImageEditNow();}
+function renderImageEditNow(){
   const c=imageEditorControl('imageEditCanvas'),ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
   if(!imageEditOriginal){ctx.fillStyle='#64748b';ctx.font='16px Tahoma';ctx.textAlign='center';const msg=imageEditorControl('imageEditorStatus')?.textContent||'ابتدا تصویر را انتخاب کنید';ctx.fillText(msg,c.width/2,c.height/2,c.width-24);return;}
   const img=imageEditOriginal,iw=img.naturalWidth||img.width,ih=img.naturalHeight||img.height,l=+imageEditorControl('imgCropL').value/100,rr=+imageEditorControl('imgCropR').value/100,t=+imageEditorControl('imgCropT').value/100,b=+imageEditorControl('imgCropB').value/100;
@@ -1644,7 +1722,7 @@ function renderImageEdit(){
 }
 function insertEditedImageToQuestion(){
   if(!imageEditOriginal){alert('ابتدا تصویر را انتخاب کنید.');return;}
-  renderImageEdit();const c=imageEditorControl('imageEditCanvas'),settings=readImageEditorSettings();let src;try{src=c.toDataURL('image/webp',0.82);}catch(_){src=c.toDataURL('image/png');}
+  imgEditFlush();const c=imageEditorControl('imageEditCanvas'),settings=readImageEditorSettings();let src;try{src=c.toDataURL('image/webp',0.82);}catch(_){src=c.toDataURL('image/png');}
   if(imageEditTarget&&imageEditTarget.isConnected){
     const id=imageEditTarget.dataset.imgid||nextQuestionImageId();imageEditTarget.dataset.imgid=id;imageEditTarget.src=src;if(imageEditTarget.dataset.imageSource||!imageEditorSettingsAreDefault(settings))imageEditTarget.dataset.imageSource=imageEditOriginal.src;else delete imageEditTarget.dataset.imageSource;imageEditTarget.dataset.imageSettings=JSON.stringify(settings);imageEditTarget.setAttribute('onclick',`selectQuestionImage('${id}',this)`);selectQuestionImage(id,imageEditTarget);commitImageChange(imageEditTarget);closeImageEditor();return;
   }

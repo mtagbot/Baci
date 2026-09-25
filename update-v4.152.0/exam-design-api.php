@@ -97,37 +97,75 @@ function exam_catalog_filter_key($curSubject, $curGrade) {
         'd' => trim((string)($_GET['designer'] ?? '')), 'cs' => $curSubject, 'cg' => $curGrade,
     ], JSON_UNESCAPED_UNICODE));
 }
-function exam_catalog_scan_cached($examId, $curSubject, $curGrade) {
-    $key = exam_catalog_filter_key($curSubject, $curGrade);
-    $version = exam_catalog_data_version();
+/* v4.163.0: the catalog scan is split into a cheap SQL half (bank questions +
+   filter options) and the disk-heavy half (saved-design thumbnails). The page
+   asks for each half separately ("part=q" / "part=d") so the question list can
+   be on screen before the design thumbnails exist. Both halves share one cache
+   file; entries are prefixed so they never collide. */
+function exam_catalog_cache_read() {
     $file = exam_catalog_scan_file();
     $raw = exam_catalog_quiet(function () use ($file) { return is_file($file) ? file_get_contents($file) : ''; });
     $cache = (is_string($raw) && $raw !== '') ? (json_decode($raw, true) ?: []) : [];
-    if (($cache['version'] ?? '') === $version && isset($cache['entries'][$key]) && is_array($cache['entries'][$key])
-        && (time() - (int)($cache['entries'][$key]['at'] ?? 0)) < 80) {
-        $entry = $cache['entries'][$key];
-        return [
-            'bankMeta' => is_array($entry['bankMeta'] ?? null) ? $entry['bankMeta'] : [],
-            'designCandidates' => is_array($entry['designCandidates'] ?? null) ? $entry['designCandidates'] : [],
-            'filters' => is_array($entry['filters'] ?? null) ? $entry['filters'] : ['years'=>[], 'months'=>[], 'designers'=>[]],
-        ];
-    }
-    $scan = exam_catalog_scan_compute($examId, $curSubject, $curGrade);
-    $entries = (isset($cache['entries']) && is_array($cache['entries'])) ? $cache['entries'] : [];
+    return is_array($cache) ? $cache : [];
+}
+function exam_catalog_cache_entry($cache, $version, $key) {
+    if (($cache['version'] ?? '') !== $version) return null;
+    $entry = $cache['entries'][$key] ?? null;
+    if (!is_array($entry)) return null;
+    if ((time() - (int)($entry['at'] ?? 0)) >= 80) return null;
+    return $entry;
+}
+function exam_catalog_cache_put($cache, $version, $key, array $payload) {
+    $entries = (($cache['version'] ?? '') === $version && isset($cache['entries']) && is_array($cache['entries'])) ? $cache['entries'] : [];
     foreach ($entries as $k => $e) { if ((time() - (int)($e['at'] ?? 0)) >= 80) unset($entries[$k]); }
-    $entries[$key] = ['at' => time(), 'bankMeta' => $scan['bankMeta'], 'designCandidates' => $scan['designCandidates'], 'filters' => $scan['filters']];
+    $entries[$key] = array_merge(['at' => time()], $payload);
     if (count($entries) > 24) $entries = array_slice($entries, -24, null, true);
-    $payload = json_encode(['version' => $version, 'entries' => $entries], JSON_UNESCAPED_UNICODE);
-    if ($payload !== false) {
-        exam_catalog_quiet(function () use ($payload, $file) {
+    $file = exam_catalog_scan_file();
+    $newCache = ['version' => $version, 'entries' => $entries];
+    $encoded = json_encode($newCache, JSON_UNESCAPED_UNICODE);
+    if ($encoded !== false) {
+        exam_catalog_quiet(function () use ($encoded, $file) {
             $dir = __DIR__ . '/uploads/exams';
             if (!is_dir($dir)) mkdir($dir, 0775, true);
             $tmp = $file . '.' . getmypid() . '.tmp';
-            if (file_put_contents($tmp, $payload, LOCK_EX) !== false) rename($tmp, $file);
+            if (file_put_contents($tmp, $encoded, LOCK_EX) !== false) rename($tmp, $file);
             else unlink($tmp);
         });
     }
+    return $newCache;
+}
+function exam_catalog_bank_scan_cached($curSubject, $curGrade) {
+    $key = 'bank:' . exam_catalog_filter_key($curSubject, $curGrade);
+    $version = exam_catalog_data_version();
+    $cache = exam_catalog_cache_read();
+    $entry = exam_catalog_cache_entry($cache, $version, $key);
+    if ($entry !== null && isset($entry['bankMeta'], $entry['filters'])) {
+        return ['bankMeta' => $entry['bankMeta'], 'filters' => $entry['filters']];
+    }
+    $scan = exam_catalog_bank_scan_compute($curSubject, $curGrade);
+    exam_catalog_cache_put($cache, $version, $key, $scan);
     return $scan;
+}
+function exam_catalog_design_scan_cached($examId, $curSubject, $curGrade) {
+    $key = 'design:' . $examId . ':' . exam_catalog_filter_key($curSubject, $curGrade);
+    $version = exam_catalog_data_version();
+    $cache = exam_catalog_cache_read();
+    $entry = exam_catalog_cache_entry($cache, $version, $key);
+    if ($entry !== null && isset($entry['designCandidates'])) {
+        return ['designCandidates' => $entry['designCandidates']];
+    }
+    $scan = exam_catalog_design_scan_compute($examId, $curSubject, $curGrade);
+    exam_catalog_cache_put($cache, $version, $key, $scan);
+    return $scan;
+}
+function exam_catalog_scan_cached($examId, $curSubject, $curGrade) {
+    $bank = exam_catalog_bank_scan_cached($curSubject, $curGrade);
+    $design = exam_catalog_design_scan_cached($examId, $curSubject, $curGrade);
+    return [
+        'bankMeta' => $bank['bankMeta'],
+        'designCandidates' => $design['designCandidates'],
+        'filters' => $bank['filters'],
+    ];
 }
 function exam_page_thumb_rel($rel) {
     /* بندانگشتی ۳۲۰px در مسیر مرکزی uploads/exams/page-thumbs — هیچ glob صفحه‌ای
@@ -233,8 +271,9 @@ function exam_design_catalog_page($key, $default = 1) {
     return max(1, min(10000, $value));
 }
 
-function exam_catalog_scan_compute($examId, $curSubject, $curGrade) {
-    /* همان قواعد همیشگی کاتالوگ — فقط نتیجه برای کش‌شدن برگردانده می‌شود. */
+/* v4.163.0: نیمهٔ سبک (فقط SQL): متادیتای سوالات بانک + گزینه‌های فیلتر.
+   هیچ دسترسی دیسکی ندارد تا فهرست سوال‌ها تقریباً آنی برسد. */
+function exam_catalog_bank_scan_compute($curSubject, $curGrade) {
     $params = [];
     $where = ['1=1'];
     if (!empty($_GET['subject'])) {
@@ -270,6 +309,31 @@ function exam_catalog_scan_compute($examId, $curSubject, $curGrade) {
     });
     $bankMeta = array_slice($bankMeta, 0, 300);
 
+
+    $fYears = []; $fMonths = []; $fDesigners = [];
+    foreach (DB::fetchAll(
+        'SELECT academic_year, exam_month, designer_name, subject_name FROM exam_question_bank' .
+        ' UNION ALL SELECT es.academic_year, es.exam_month, ed.designer_name, es.subject_name' .
+        ' FROM exam_designs ed JOIN exam_schedules es ON es.id=ed.exam_id'
+    ) as $filterRow) {
+        if ($curSubject !== '' && !exam_subject_matches($filterRow['subject_name'] ?? '', $curSubject)) continue;
+        if (($filterRow['academic_year'] ?? '') !== '') $fYears[] = (string)$filterRow['academic_year'];
+        if (($filterRow['exam_month'] ?? '') !== '') $fMonths[] = (string)$filterRow['exam_month'];
+        if (($filterRow['designer_name'] ?? '') !== '') $fDesigners[] = (string)$filterRow['designer_name'];
+    }
+    $fYears = array_values(array_unique($fYears)); $fMonths = array_values(array_unique($fMonths)); $fDesigners = array_values(array_unique($fDesigners));
+    rsort($fYears);
+    $monthOrder = ['مهر'=>1,'آبان'=>2,'آذر'=>3,'دی'=>4,'بهمن'=>5,'اسفند'=>6,'فروردین'=>7,'اردیبهشت'=>8,'خرداد'=>9,'تیر'=>10,'مرداد'=>11,'شهریور'=>12];
+    usort($fMonths, function ($a, $b) use ($monthOrder) { return ($monthOrder[$a] ?? 99) <=> ($monthOrder[$b] ?? 99); });
+    sort($fDesigners);
+    $fDesigners = array_map(function ($designer) { return ['v'=>$designer, 'label'=>teacher_respectful_name($designer)]; }, $fDesigners);
+    return [
+        'bankMeta' => $bankMeta,
+        'filters' => ['years'=>$fYears, 'months'=>$fMonths, 'designers'=>$fDesigners],
+    ];
+}
+/* v4.163.0: نیمهٔ سنگین: ردیف‌های طراحی ذخیره‌شده + اثرانگشت صفحات (دیسک). */
+function exam_catalog_design_scan_compute($examId, $curSubject, $curGrade) {
     /* Saved exams use the same source-deduplication rules as the legacy
        catalog. Only metadata is selected for the scan; page URLs stay raw in
        the cache and are versioned when a page is actually returned. */
@@ -345,27 +409,8 @@ function exam_catalog_scan_compute($examId, $curSubject, $curGrade) {
     }
     $designCandidates = array_reverse($designCandidates);
 
-    $fYears = []; $fMonths = []; $fDesigners = [];
-    foreach (DB::fetchAll(
-        'SELECT academic_year, exam_month, designer_name, subject_name FROM exam_question_bank' .
-        ' UNION ALL SELECT es.academic_year, es.exam_month, ed.designer_name, es.subject_name' .
-        ' FROM exam_designs ed JOIN exam_schedules es ON es.id=ed.exam_id'
-    ) as $filterRow) {
-        if ($curSubject !== '' && !exam_subject_matches($filterRow['subject_name'] ?? '', $curSubject)) continue;
-        if (($filterRow['academic_year'] ?? '') !== '') $fYears[] = (string)$filterRow['academic_year'];
-        if (($filterRow['exam_month'] ?? '') !== '') $fMonths[] = (string)$filterRow['exam_month'];
-        if (($filterRow['designer_name'] ?? '') !== '') $fDesigners[] = (string)$filterRow['designer_name'];
-    }
-    $fYears = array_values(array_unique($fYears)); $fMonths = array_values(array_unique($fMonths)); $fDesigners = array_values(array_unique($fDesigners));
-    rsort($fYears);
-    $monthOrder = ['مهر'=>1,'آبان'=>2,'آذر'=>3,'دی'=>4,'بهمن'=>5,'اسفند'=>6,'فروردین'=>7,'اردیبهشت'=>8,'خرداد'=>9,'تیر'=>10,'مرداد'=>11,'شهریور'=>12];
-    usort($fMonths, function ($a, $b) use ($monthOrder) { return ($monthOrder[$a] ?? 99) <=> ($monthOrder[$b] ?? 99); });
-    sort($fDesigners);
-    $fDesigners = array_map(function ($designer) { return ['v'=>$designer, 'label'=>teacher_respectful_name($designer)]; }, $fDesigners);
     return [
-        'bankMeta' => $bankMeta,
         'designCandidates' => $designCandidates,
-        'filters' => ['years'=>$fYears, 'months'=>$fMonths, 'designers'=>$fDesigners],
     ];
 }
 
@@ -388,49 +433,63 @@ if ($action === 'load') {
         $designBankPage = exam_design_catalog_page('design_page');
         $pageSize = 5;
         /* v4.160.1: جاروی پرهزینه (متادیتا + اثرانگشت منابع + گزینه‌های فیلتر)
-           کش‌شده است؛ هر درخواست فقط ۵ ردیف نمایان را هیدریت می‌کند. */
-        $scan = exam_catalog_scan_cached($examId, $curSubject, $curGrade);
-        $bankMeta = $scan['bankMeta'];
-        $bankTotal = count($bankMeta);
-        $bankPageRows = array_slice($bankMeta, ($bankPage - 1) * $pageSize, $pageSize);
-        $bank = [];
-        if ($bankPageRows) {
-            $ids = array_values(array_map(function ($row) { return (int)$row['id']; }, $bankPageRows));
-            $marks = implode(',', array_fill(0, count($ids), '?')) ;
-            $bodyRows = DB::fetchAll("SELECT id, question_html FROM exam_question_bank WHERE id IN ($marks)", $ids);
-            $bodies = [];
-            foreach ($bodyRows as $body) $bodies[(int)$body['id']] = (string)$body['question_html'];
-            foreach ($bankPageRows as $row) {
-                $row['question_html'] = $bodies[(int)$row['id']] ?? '';
-                $bank[] = $row;
+           کش‌شده است؛ هر درخواست فقط ۵ ردیف نمایان را هیدریت می‌کند.
+           v4.163.0: با part=q فقط نیمهٔ سریع (سوالات + فیلترها) و با part=d فقط
+           نیمهٔ سنگین (طراحی‌های ذخیره‌شده) برمی‌گردد؛ بدون part همان پاسخ کامل
+           قبلی ارسال می‌شود تا لینک‌های قدیمی سالم بمانند. */
+        $part = strtolower(trim((string)($_GET['part'] ?? '')));
+        if (!in_array($part, ['', 'q', 'd'], true)) {
+            json_out(false, ['error' => 'پارامتر part نامعتبر است.']);
+        }
+        $response = ['subject' => $curSubject, 'grade' => $curGrade];
+        if ($part === '' || $part === 'q') {
+            $bankScan = exam_catalog_bank_scan_cached($curSubject, $curGrade);
+            $bankMeta = $bankScan['bankMeta'];
+            $bankTotal = count($bankMeta);
+            $bankPageRows = array_slice($bankMeta, ($bankPage - 1) * $pageSize, $pageSize);
+            $bank = [];
+            if ($bankPageRows) {
+                $ids = array_values(array_map(function ($row) { return (int)$row['id']; }, $bankPageRows));
+                $marks = implode(',', array_fill(0, count($ids), '?')) ;
+                $bodyRows = DB::fetchAll("SELECT id, question_html FROM exam_question_bank WHERE id IN ($marks)", $ids);
+                $bodies = [];
+                foreach ($bodyRows as $body) $bodies[(int)$body['id']] = (string)$body['question_html'];
+                foreach ($bankPageRows as $row) {
+                    $row['question_html'] = $bodies[(int)$row['id']] ?? '';
+                    $bank[] = $row;
+                }
             }
+            $response['bank'] = $bank;
+            $response['bankTotal'] = $bankTotal;
+            $response['bankPage'] = $bankPage;
+            $response['filters'] = $bankScan['filters'];
         }
-        $designCandidates = $scan['designCandidates'];
-        $designBankTotal = count($designCandidates);
-        $designPageRows = array_slice($designCandidates, ($designBankPage - 1) * $pageSize, $pageSize);
-        $designBank = [];
-        foreach ($designPageRows as $candidate) {
-            $design = $candidate['_archived']
-                ? DB::fetch('SELECT design_json FROM exam_design_archive WHERE id=?', [$candidate['_source_id']])
-                : DB::fetch('SELECT design_json FROM exam_designs WHERE exam_id=?', [$candidate['_source_id']]);
-            $decoded = $design ? (json_decode((string)$design['design_json'], true) ?: []) : [];
-            $candidate['crops'] = (isset($decoded['sourceCrops']) && is_array($decoded['sourceCrops']) && $decoded['sourceCrops']) ? $decoded['sourceCrops'] : new stdClass();
-            $candidate['order'] = (isset($decoded['sourceOrder']) && is_array($decoded['sourceOrder'])) ? array_values($decoded['sourceOrder']) : [];
-            /* آدرس نسخه‌دار در زمان خروجی ساخته می‌شود تا ورودی کش‌شده بعد از
-               تعویض فایل هم درست بماند؛ thumbs موازی pages برای شبکهٔ موبایل است. */
-            $rawPages = array_values((array)($candidate['pages'] ?? []));
-            $candidate['thumbs'] = exam_page_thumbs_for($rawPages);
-            $candidate['pages'] = array_map('exam_page_vurl', $rawPages);
-            unset($candidate['_source_id'], $candidate['_archived']);
-            $designBank[] = $candidate;
+        if ($part === '' || $part === 'd') {
+            $designScan = exam_catalog_design_scan_cached($examId, $curSubject, $curGrade);
+            $designCandidates = $designScan['designCandidates'];
+            $designBankTotal = count($designCandidates);
+            $designPageRows = array_slice($designCandidates, ($designBankPage - 1) * $pageSize, $pageSize);
+            $designBank = [];
+            foreach ($designPageRows as $candidate) {
+                $design = $candidate['_archived']
+                    ? DB::fetch('SELECT design_json FROM exam_design_archive WHERE id=?', [$candidate['_source_id']])
+                    : DB::fetch('SELECT design_json FROM exam_designs WHERE exam_id=?', [$candidate['_source_id']]);
+                $decoded = $design ? (json_decode((string)$design['design_json'], true) ?: []) : [];
+                $candidate['crops'] = (isset($decoded['sourceCrops']) && is_array($decoded['sourceCrops']) && $decoded['sourceCrops']) ? $decoded['sourceCrops'] : new stdClass();
+                $candidate['order'] = (isset($decoded['sourceOrder']) && is_array($decoded['sourceOrder'])) ? array_values($decoded['sourceOrder']) : [];
+                /* آدرس نسخه‌دار در زمان خروجی ساخته می‌شود تا ورودی کش‌شده بعد از
+                   تعویض فایل هم درست بماند؛ thumbs موازی pages برای شبکهٔ موبایل است. */
+                $rawPages = array_values((array)($candidate['pages'] ?? []));
+                $candidate['thumbs'] = exam_page_thumbs_for($rawPages);
+                $candidate['pages'] = array_map('exam_page_vurl', $rawPages);
+                unset($candidate['_source_id'], $candidate['_archived']);
+                $designBank[] = $candidate;
+            }
+            $response['designBank'] = $designBank;
+            $response['designBankTotal'] = $designBankTotal;
+            $response['designBankPage'] = $designBankPage;
         }
-        json_out(true, [
-            'bank' => $bank, 'designBank' => $designBank,
-            'bankTotal' => $bankTotal, 'bankPage' => $bankPage,
-            'designBankTotal' => $designBankTotal, 'designBankPage' => $designBankPage,
-            'subject' => $curSubject, 'grade' => $curGrade,
-            'filters' => $scan['filters'],
-        ]);
+        json_out(true, $response);
     }
 
     // Legacy load clients still receive the original complete response shape.

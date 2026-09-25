@@ -142,5 +142,17 @@ const designOnly = await api({ catalog: 'design' });
 check(designOnly.json && designOnly.json.ok === true && !('bank' in designOnly.json) && Array.isArray(designOnly.json.design?.questions),
       'catalog=design returns only the current design');
 
+/* ── 9) v4.163.0: the catalog can arrive in two independent halves ───────── */
+const partQ = await api({ catalog: 'bank', part: 'q' });
+check(partQ.json && partQ.json.ok === true, 'part=q answers ok: ' + partQ.raw.slice(0, 120) + partQ.err.slice(0, 120));
+check(partQ.json.bankTotal === 3 && Array.isArray(partQ.json.bank) && partQ.json.bank.length === 3, 'part=q carries the bank questions');
+check((partQ.json.filters?.years || []).includes('1404/1405'), 'part=q also carries the filter options (pure SQL)');
+check(!('designBank' in partQ.json), 'part=q skips the disk-heavy design half entirely');
+const partD = await api({ catalog: 'bank', part: 'd' });
+check(partD.json && partD.json.ok === true && partD.json.designBankTotal === 2, 'part=d carries only the saved designs: ' + partD.json.designBankTotal);
+check(!('bank' in partD.json) && !('filters' in partD.json), 'part=d omits the question half entirely');
+const badPart = await api({ catalog: 'bank', part: 'x' });
+check(badPart.json && badPart.json.ok === false, 'an unknown part value is rejected');
+
 console.log(`PASS ${checks} catalog speed cases (cached scan, fingerprints, invalidation, thumbs, legacy shape)`);
 process.exit(0);

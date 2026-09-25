@@ -1,5 +1,5 @@
 /*
- * Live exam designer — touch layout layer, v4.162.0
+ * Live exam designer — touch layout layer, v4.163.0
  *
  * This file is deliberately screen-only. The A4 page, millimetre dimensions,
  * print flow and all saved design values stay in exam-print.php and are not
@@ -11,6 +11,26 @@
 .mobile-editor-dock,
 .mobile-image-tools {
   display: none;
+}
+
+/* نشانگر درصد برش — اسکریپت موقع کشیدن display:block می‌گذارد؛ در چاپ پنهان است. */
+.source-crop-badge {
+  position: fixed;
+  top: calc(var(--toolbarH, 58px) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 130;
+  display: none;
+  max-width: calc(100vw - 28px);
+  padding: 7px 14px;
+  border-radius: 99px;
+  background: rgba(15, 23, 42, .93);
+  color: #fff;
+  font: 700 11px/1.6 Vazirmatn, Tahoma, sans-serif;
+  box-shadow: 0 6px 18px rgba(2, 6, 23, .35);
+  white-space: nowrap;
+  pointer-events: none;
+  direction: rtl;
 }
 
 .image-editor-status {
@@ -730,4 +750,165 @@
   .mobile-image-tools,
   .mobile-img-handle-layer {display:none!important;}
   .source-crop-overlay {display:none!important;}
+}
+
+/* ==========================================================================
+   v4.163.0 — لایهٔ تجربهٔ کاربری موبایل/تبلت
+   فقط screen است؛ ابعاد A4، مکانیزم چاپ و مقادیر ذخیره‌شده دست‌نخورده‌اند.
+   ========================================================================== */
+
+/* پس‌زمینهٔ ورقه‌ها: با باز شدن پنل بانک/ویرایشگر، بقیهٔ صفحه محو می‌شود و
+   با لمسِ آن پنل بسته می‌شود (کلیک از اسکریپت وصل است). */
+.mobile-sheet-backdrop {
+  display: none;
+}
+
+@media screen and (max-width: 860px) {
+  body.mobile-sheet-open .mobile-sheet-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 99;
+    background: rgba(2, 6, 23, .42);
+    animation: mobileSheetFade .14s ease;
+  }
+
+  @keyframes mobileSheetFade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* پنل‌ها به‌جای پوشاندن تمام صفحه، ورقهٔ پایین (bottom-sheet) هستند تا
+     بخشی از برگهٔ آزمون بالای آن‌ها دیده شود. */
+  .editor-panel,
+  .bank-panel {
+    top: auto;
+    height: min(74vh, 660px);
+    height: min(74dvh, 660px);
+    border-radius: 18px 18px 14px 14px;
+    animation: mobileSheetUp .16s ease;
+  }
+
+  @keyframes mobileSheetUp {
+    from { transform: translateY(14px); opacity: .4; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .panel-head::before {
+    content: "";
+    display: block;
+    width: 44px;
+    height: 4px;
+    margin: 0 auto 6px;
+    border-radius: 99px;
+    background: #cbd5e1;
+  }
+
+  /* شمارهٔ صفحه روی پیش‌نمایش A4 — فقط روی صفحهٔ نمایش، در چاپ نیست. */
+  #pagesRoot .page {
+    position: relative;
+  }
+
+  #pagesRoot .page::before {
+    content: attr(data-page-index);
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    z-index: 9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 21px;
+    height: 21px;
+    padding: 0 6px;
+    border-radius: 99px;
+    background: rgba(37, 99, 235, .88);
+    color: #fff;
+    font: 800 10px/1 Vazirmatn, Tahoma, sans-serif;
+    box-shadow: 0 2px 6px rgba(2, 6, 23, .3);
+    pointer-events: none;
+  }
+
+  /* دکمه‌های داک: حالت فعال و فشردهٔ واضح‌تر */
+  .mobile-editor-dock button[aria-expanded="true"] {
+    background: #1d4ed8;
+    border-color: #60a5fa;
+  }
+
+  .mobile-editor-dock button:active {
+    transform: scale(.96);
+  }
+
+  /* دستگیره‌های برش صفحهٔ منبع: بزرگ‌تر، با حلقهٔ سفید برای کنتراست روی هر
+     تصویری؛ حین کشیدن، قفل اسکرول بدنه و نشانگر درصد فعال می‌شود. */
+  .source-crop-handle {
+    width: 48px;
+    height: 48px;
+    border-width: 3px;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, .85), 0 3px 10px rgba(15, 23, 42, .4);
+    transition: transform .1s ease;
+  }
+
+  body.source-cropping {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body.source-cropping .source-crop-handle {
+    transform: scale(1.08);
+    background: #dbeafe;
+  }
+
+  /* راهنمای برش روی خود برگه — دوضربه روی دستگیره = صفرشدن آن گوشه. */
+  .source-crop-overlay::after {
+    content: "کشیدن گوشه = برش · دوضربه = صفر";
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 3px 9px;
+    border-radius: 99px;
+    background: rgba(15, 23, 42, .78);
+    color: #fff;
+    font: 600 9px/1.6 Vazirmatn, Tahoma, sans-serif;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+}
+
+/* در گوشی‌های کوچک، نوارابزار غنی مودال سوال به‌جای اسکرول افقی جمع می‌شود تا
+   همهٔ ابزارها بدون گشتن دیده شوند. */
+@media screen and (max-width: 600px) {
+  .rich-tools {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    justify-content: flex-start;
+  }
+
+  .rich-tools button {
+    flex: 0 1 auto;
+    min-width: 40px;
+    padding: 7px 8px;
+  }
+
+  .source-crop-overlay::after {
+    font-size: 8px;
+  }
+}
+
+/* تبلت: ورقه‌ها بلندتر، برگهٔ A4 با فضای بیشتر */
+@media screen and (min-width: 601px) and (max-width: 860px) {
+  .editor-panel,
+  .bank-panel {
+    height: min(80vh, 720px);
+    height: min(80dvh, 720px);
+  }
+}
+
+@media print {
+  #pagesRoot .page::before { content: none !important; }
+  .source-crop-badge,
+  .mobile-sheet-backdrop { display: none !important; }
+  .source-crop-overlay::after { content: none !important; }
+  body.source-cropping { overflow: visible; }
 }

@@ -48,9 +48,14 @@ def validate_sources():
     assert 'exam_catalog_scan_cached' in api_text
     assert 'exam_page_thumbs_for' in api_text
     assert "@md5_file(__DIR__ . '/' . $pages[0])" not in api_text
+    # v4.163.0 catalog split: fast bank half (part=q) + heavy design half (part=d)
+    assert 'exam_catalog_bank_scan_cached' in api_text
+    assert 'exam_catalog_design_scan_cached' in api_text
+    assert "$_GET['part']" in api_text
+    assert "in_array($part, ['', 'q', 'd'], true)" in api_text
     for page in (SITE_FILES['site-update-v4.152.0/exam-print.php'], DESKTOP_FILES['SchoolDeskPro/www/exam-print.php']):
         text = page.read_text(encoding='utf-8')
-        assert 'exam-designer-mobile.css?v=4.162.0' in text
+        assert 'exam-designer-mobile.css?v=4.163.0' in text
         assert 'function editorViewportScale()' in text
         assert 'function sourceCropHandleDown' in text
         assert 'function sourceCropApply' in text
@@ -73,6 +78,26 @@ def validate_sources():
         assert '@page{size:A4;margin:0}' in text
         assert 'width:210mm' in text and 'height:297mm' in text
         assert '@media print{' in text
+        # v4.163.0: catalog split client, selection-safe toolbar, adaptive print
+        # chunking, crop touch UX and the bottom-sheet chrome.
+        assert 'bankPartsReady' in text and "'&part='+part" in text
+        assert 'function applyBankCatalog' in text
+        assert 'function cmd(c){qRestoreSel();' in text
+        assert "span.dataset.qFontFix='1'" in text
+        assert 'function printChunkPages' in text
+        assert 'function autosaveLocalNow' in text
+        assert 'function imgEditFlush' in text
+        assert 'function sourceCropResetCorner' in text
+        assert 'sourceCropBadge' in text
+        assert 'data-mobile-control="newq"' in text
+        assert 'mobile-sheet-backdrop' in text
+        assert "const{_normSrc,...rest}=it" in text
+    css_text = SITE_FILES['site-update-v4.152.0/assets/css/exam-designer-mobile.css'].read_text(encoding='utf-8')
+    assert 'mobile-sheet-open' in css_text
+    assert '.source-crop-badge' in css_text
+    assert 'attr(data-page-index)' in css_text
+    assert '.mobile-sheet-backdrop' in css_text
+    assert '@media print {' in css_text
 
 
 def build(filename, payload):

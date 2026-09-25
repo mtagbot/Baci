@@ -12,7 +12,7 @@ function ok(condition, message) {
 }
 
 for (const [name, source] of [['site', site], ['desktop', desktop]]) {
-  ok(source.includes('assets/css/exam-designer-mobile.css?v=4.162.0'), `${name}: mobile layer is linked`);
+  ok(source.includes('assets/css/exam-designer-mobile.css?v=4.163.0'), `${name}: mobile layer is linked`);
   ok(source.includes('data-mobile-control="bank"'), `${name}: touch dock is installed`);
   ok(source.includes('function editorViewportScale()'), `${name}: preview scale helper exists`);
   ok(source.includes('source-crop-handle'), `${name}: source pages expose four direct crop handles`);
@@ -41,6 +41,18 @@ for (const [name, source] of [['site', site], ['desktop', desktop]]) {
   ok(source.includes('mobile-range-preview'), `${name}: range drag can reveal the page preview`);
   ok(source.includes('bankPageViews(x,x.thumbs)'), `${name}: design-bank grid uses the lightweight thumbnails`);
   ok(source.includes('bankCatalogAbort'), `${name}: superseded catalog requests are aborted`);
+  ok(source.includes("bankPartsReady") && source.includes("'&part='+part"), `${name}: catalog arrives as independent question/design halves`);
+  ok(source.includes('function applyBankCatalog'), `${name}: each arrived catalog half renders on its own`);
+  ok(source.includes('function cmd(c){qRestoreSel();'), `${name}: toolbar buttons restore the saved selection on touch`);
+  ok(source.includes("span.dataset.qFontFix='1'"), `${name}: font/size slider stays scoped to the selection across ticks`);
+  ok(source.includes('function printChunkPages'), `${name}: print prep chunking adapts to weak devices`);
+  ok(source.includes('function autosaveLocalNow') && source.includes("'pagehide',autosaveLocalFlush"), `${name}: autosave is debounced and flushed before the tab closes`);
+  ok(source.includes('function imgEditFlush'), `${name}: image editor canvas is flushed synchronously before insert`);
+  ok(source.includes('function sourceCropResetCorner'), `${name}: double-tap on a crop handle resets that corner`);
+  ok(source.includes('sourceCropBadge'), `${name}: crop drag shows a live percentage badge`);
+  ok(source.includes('data-mobile-control="newq"'), `${name}: dock offers one-tap new question`);
+  ok(source.includes('mobile-sheet-backdrop'), `${name}: sheet panels close on outside tap`);
+  ok(source.includes('const{_normSrc,...rest}=it'), `${name}: normalize memo tag never reaches the saved design`);
   ok(!/designPayload\(\)[\s\S]{0,900}mobileEditorZoom/.test(source), `${name}: screen zoom is not saved into the exam design`);
 }
 
@@ -59,5 +71,13 @@ ok(css.includes('.q-modal-card') && css.includes('max-height: calc(100dvh'), 'qu
 ok(css.includes('touch-action: none'), 'drag/resize controls reserve touch gestures');
 ok(css.includes('@media screen and (max-width: 600px)') && css.includes('.q-preview-col'), 'phone modal omits the preview while tablets retain it');
 ok(css.includes('@media print') && css.includes('mobile-editor-dock,') && css.includes('mobile-img-handle-layer {display:none!important;}'), 'mobile chrome is explicitly absent from print');
+ok(css.includes('body.mobile-sheet-open .mobile-sheet-backdrop') && css.includes('@keyframes mobileSheetUp'), 'panels behave as bottom sheets with a dimmed backdrop');
+ok(css.includes('.panel-head::before'), 'sheets show a grabber affordance');
+ok(css.includes('.source-crop-badge'), 'crop badge styling exists and stays out of print');
+ok(css.includes('body.source-cropping {') && css.includes('overflow: hidden'), 'page scroll is locked while a crop handle is dragged');
+ok(css.includes('content: attr(data-page-index)'), 'A4 preview pages carry a screen-only page chip');
+ok(css.includes('#pagesRoot .page::before { content: none !important; }'), 'page chips are removed from print output');
+ok(css.includes('.rich-tools') && css.includes('flex-wrap: wrap'), 'rich-text toolbar wraps instead of hiding buttons on phones');
+ok(css.includes('min(74vh, 660px)') && css.includes('min(74dvh, 660px)'), 'sheet height has a dvh fallback for older browsers');
 
 console.log(`PASS ${checks} mobile/tablet live-exam designer invariants`);
