@@ -434,7 +434,7 @@ body.modal-open{overflow:hidden}
    even with hundreds of print pages; ignored harmlessly by very old browsers.
    Print media is unaffected: all pages always render fully on paper. */
 @media screen{.page{content-visibility:auto;contain-intrinsic-size:210mm 297mm}}
-</style><link rel="stylesheet" href="assets/css/exam-designer-mobile.css?v=4.160.1"></head><body>
+</style><link rel="stylesheet" href="assets/css/exam-designer-mobile.css?v=4.161.0"></head><body>
 <div class="toolbar" id="mainToolbar">
   <div class="tb-group no-ajax"><span class="tb-title">فایل منبع</span><button type="button" onclick="openSourceUploadModal()">بارگذاری PDF/تصویر</button><button type="button" onclick="deleteLiveSource()">حذف/تغییر</button></div>
   <span class="tb-sep"></span>
@@ -569,7 +569,7 @@ body.modal-open{overflow:hidden}
     <div id="examZoomPages"></div>
   </div>
 </div>
-<div id="imageEditorModal" class="image-modal"><div class="image-card"><div style="display:flex;justify-content:space-between;align-items:center"><b>ویرایشگر حرفه‌ای تصویر سوال</b><button onclick="closeImageEditor()" style="background:#ef4444;color:white;border:0;border-radius:8px;padding:5px 12px">×</button></div><div class="image-editor-grid"><div class="image-canvas-wrap"><canvas id="imageEditCanvas" width="800" height="500"></canvas></div><div class="image-controls"><label>انتخاب تصویر</label><input type="file" id="imageEditFile" accept="image/*" onchange="loadImageForEdit(this)"><label>برش از چپ</label><input type="range" id="imgCropL" min="0" max="40" value="0" oninput="renderImageEdit()"><label>برش از راست</label><input type="range" id="imgCropR" min="0" max="40" value="0" oninput="renderImageEdit()"><label>برش از بالا</label><input type="range" id="imgCropT" min="0" max="40" value="0" oninput="renderImageEdit()"><label>برش از پایین</label><input type="range" id="imgCropB" min="0" max="40" value="0" oninput="renderImageEdit()"><label>عرض خروجی</label><input type="range" id="imgOutW" min="80" max="800" value="420" oninput="renderImageEdit()"><label>روشنایی</label><input type="range" id="imgBright" min="-80" max="80" value="0" oninput="renderImageEdit()"><label>کنتراست</label><input type="range" id="imgContrast" min="-80" max="80" value="0" oninput="renderImageEdit()"><label><input type="checkbox" id="imgRemoveBg" onchange="renderImageEdit()"> حذف پس‌زمینه روشن/سفید</label><label>شدت حذف پس‌زمینه</label><input type="range" id="imgBgThreshold" min="180" max="255" value="238" oninput="renderImageEdit()"><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn-save" onclick="insertEditedImageToQuestion()">درج تصویر در سوال</button><button onclick="closeImageEditor()">انصراف</button></div><small>همه پردازش‌ها داخل مرورگر و بدون CDN انجام می‌شود. خروجی WebP فشرده با حداکثر ۸۰۰px است.</small></div></div></div></div><!-- v4.112.0: مودال نمادها (مثل Word) برای پنجره سوال -->
+<div id="imageEditorModal" class="image-modal"><div class="image-card"><div style="display:flex;justify-content:space-between;align-items:center"><b>ویرایشگر حرفه‌ای تصویر سوال</b><button onclick="closeImageEditor()" style="background:#ef4444;color:white;border:0;border-radius:8px;padding:5px 12px">×</button></div><div class="image-editor-grid"><div class="image-canvas-wrap"><canvas id="imageEditCanvas" width="800" height="500"></canvas></div><div class="image-controls"><label>انتخاب تصویر</label><input type="file" id="imageEditFile" accept="image/*" onchange="loadImageForEdit(this)"><label>برش از چپ</label><input type="range" id="imgCropL" min="0" max="40" value="0" oninput="renderImageEdit()"><label>برش از راست</label><input type="range" id="imgCropR" min="0" max="40" value="0" oninput="renderImageEdit()"><label>برش از بالا</label><input type="range" id="imgCropT" min="0" max="40" value="0" oninput="renderImageEdit()"><label>برش از پایین</label><input type="range" id="imgCropB" min="0" max="40" value="0" oninput="renderImageEdit()"><label>عرض خروجی</label><input type="range" id="imgOutW" min="80" max="800" value="420" oninput="renderImageEdit()"><label>روشنایی</label><input type="range" id="imgBright" min="-80" max="80" value="0" oninput="renderImageEdit()"><label>کنتراست</label><input type="range" id="imgContrast" min="-80" max="80" value="0" oninput="renderImageEdit()"><label><input type="checkbox" id="imgRemoveBg" onchange="renderImageEdit()"> حذف پس‌زمینه روشن/سفید</label><label>شدت حذف پس‌زمینه</label><input type="range" id="imgBgThreshold" min="180" max="255" value="238" oninput="renderImageEdit()"><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" id="imageEditorApplyBtn" class="btn-save" onclick="insertEditedImageToQuestion()">درج تصویر در سوال</button><button onclick="closeImageEditor()">انصراف</button></div><small id="imageEditorTargetHint">برای درج تصویر تازه، فایل را انتخاب کنید.</small><small>همه پردازش‌ها داخل مرورگر و بدون CDN انجام می‌شود. خروجی WebP فشرده با حداکثر ۸۰۰px است.</small></div></div></div></div><!-- v4.112.0: مودال نمادها (مثل Word) برای پنجره سوال -->
 <div id="qSymModal" class="math-modal" onclick="if(event.target===this)qCloseSym()">
   <div class="math-card" style="width:min(640px,94vw)">
     <div style="display:flex;justify-content:space-between;align-items:center"><b>درج نماد (Symbols)</b><button onclick="qCloseSym()" style="background:#ef4444;color:white;border:0;border-radius:8px;padding:5px 12px">×</button></div>
@@ -634,7 +634,7 @@ const classGroupScope=<?php echo json_encode($groupScope); ?>;
 const designToken=<?php echo json_encode($designToken, JSON_UNESCAPED_UNICODE); ?>;
 const canEditBank=<?php echo is_admin_logged_in() ? 'true' : 'false'; ?>;
 let previewOnly=true, mobileEditorZoom=null;
-let qItems=[], bankItems=[], drawingsData={}, sourceCrops={}, sourceOrder=[], pageStyle={}, printNote='', selectedImageId=null, tool='off', drawing=false, last=null, booting=true, printSavePromptPending=false, canvasTouched={};
+let qItems=[], bankItems=[], drawingsData={}, sourceCrops={}, sourceOrder=[], pageStyle={}, printNote='', selectedImageId=null, selectedImageNode=null, imageTouchTools=null, tool='off', drawing=false, last=null, booting=true, printSavePromptPending=false, canvasTouched={};
 let headerFields=[{key:'studentName',label:'نام',source:'name',on:true},{key:'class',label:'کلاس',source:'class_name',on:true},{key:'teacher',label:'دبیر',value:examData.teacher,on:true},{key:'subject',label:'درس',value:examData.subject,on:true},{key:'seat',label:'صندلی',source:'seat',on:true},{key:'date',label:'تاریخ',value:examData.date,on:true},{key:'time',label:'ساعت',value:examData.time,on:true},{key:'score',label:'نمره',value:'',on:true}];
 /* v4.92.0: در طرح‌های ذخیره‌شده قدیمی هم جای «دبیر» و «صندلی» عوض می‌شود */
 /* v4.93.0: در طرح‌های ذخیره‌شده قدیمی، سربرگ کوتاه‌تر از ۳۹mm به ۳۹ ارتقا می‌یابد
@@ -745,7 +745,7 @@ function qHeightGripDown(e,qid){
 }
 function renumberQuestions(){/* v4.101.0: شماره دستی کاربر دیگر بازنویسی نمی‌شود — فقط شماره بعدی پیشنهاد می‌شود */ let mx=0; qItems.forEach(it=>{if(it.type!=='q')return; const v=parseInt(String(it.no??'').replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))),10); if(!isNaN(v)&&v>mx)mx=v;}); const inp=document.getElementById('qNumber'); if(inp && document.getElementById('editingQid').value==='') inp.value=mx+1;}
 function pageHasSource(page){const order=sourceOrder.length?sourceOrder:defaultSourceOrder(); return !!(order[page-1]&&(examData.sourcePages||[])[order[page-1]-1]);}
-function renderQuestions(){removeImgHandles();collectDrawings();renumberQuestions();syncHeaderScore();document.getElementById('pagesRoot').innerHTML=''; /* v4.102.0: سوالات فرم فقط بعد از صفحات فایل منبع قرار می‌گیرند */ const srcN=(examData.sourcePages||[]).length?sourcePageCount():0; let page=srcN>0?srcN+1:1; ensurePages(Math.max(1,srcN)); applySourceCropFits(); qItems.forEach(it=>{ if(it.type==='page'){page++; ensurePages(page); return;} ensurePages(page); appendItemToPage(it,page); if(isPageOverflow(page) && questionCountOnPage(page)>1){removeItemFromPage(it.id,page); page++; ensurePages(page); appendItemToPage(it,page);} }); toggleEmptyTables(); enableDrag(); resizeCanvases(); restoreDrawings(); autosaveLocal(); editorViewportScale(); }
+function renderQuestions(){normalizeAllQuestionImages();removeImgHandles();collectDrawings();syncHeaderScore();document.getElementById('pagesRoot').innerHTML=''; /* v4.102.0: سوالات فرم فقط بعد از صفحات فایل منبع قرار می‌گیرند */ const srcN=(examData.sourcePages||[]).length?sourcePageCount():0; let page=srcN>0?srcN+1:1; ensurePages(Math.max(1,srcN)); applySourceCropFits(); qItems.forEach(it=>{ if(it.type==='page'){page++; ensurePages(page); return;} ensurePages(page); appendItemToPage(it,page); if(isPageOverflow(page) && questionCountOnPage(page)>1){removeItemFromPage(it.id,page); page++; ensurePages(page); appendItemToPage(it,page);} }); toggleEmptyTables(); enableDrag(); resizeCanvases(); restoreDrawings(); autosaveLocal(); editorViewportScale(); }
 function toggleEmptyTables(){/* v4.102.0: روی صفحات منبع که سوالی ندارند، جدول خالی (سرستون شماره/سوال/بارم) نمایش داده نمی‌شود */ document.querySelectorAll('.questions-table').forEach(t=>{const b=t.querySelector('.questions-body'); t.style.display=(b&&b.children.length)?'':'none';});}
 function questionCountOnPage(page){const first=studentsData[0]; return document.querySelectorAll(`.page[data-student-id="${first.id}"][data-page-index="${page}"] .question-row`).length;}
 function isPageOverflow(page){const first=studentsData[0]; const q=document.querySelector(`.page[data-student-id="${first.id}"][data-page-index="${page}"] .qwrap`); if(!q)return false; return q.scrollHeight > q.clientHeight + 4;}
@@ -756,11 +756,12 @@ function toggleEditor(){
   const p=document.getElementById('questionEditorPanel'), bank=document.getElementById('bankPanel');
   const opening=p.classList.contains('collapsed');
   if(opening&&bank)bank.classList.add('collapsed');
+  if(opening)hideImageTouchTools();
   p.classList.toggle('collapsed'); updateMobileChrome();
 }
 /* v4.102.0: مودال «ثبت سوال جدید» — آماده‌سازی سوال با پیش‌نمایش زنده و درج در آزمون */
 function openQuestionModal(editId){const m=document.getElementById('questionModal'); m.style.display='flex'; document.body.classList.add('modal-open'); if(!editId){clearQuestionForm(); renumberQuestions(); document.getElementById('qModalTitle').textContent='آماده‌سازی سوال جدید'; document.getElementById('qInsertBtn').textContent='درج در آزمون';} updateQuestionPreview(); setTimeout(()=>{const ed=document.getElementById('qText'); ed.focus(); const r=document.createRange(); r.selectNodeContents(ed); r.collapse(false); const sel=getSelection(); sel.removeAllRanges(); sel.addRange(r);},60);}
-function closeQuestionModal(){document.getElementById('questionModal').style.display='none'; document.body.classList.remove('modal-open'); document.getElementById('editingQid').value='';}
+function closeQuestionModal(){document.getElementById('questionModal').style.display='none'; document.body.classList.remove('modal-open'); document.getElementById('editingQid').value=''; deselectSelectedImage();}
 function showToast(msg){let t=document.getElementById('uiToast'); if(!t){t=document.createElement('div'); t.id='uiToast'; document.body.appendChild(t);} t.textContent=msg; requestAnimationFrame(()=>{t.classList.add('show');}); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600);}
 /* v4.102.0: ESC هر مودال باز را می‌بندد؛ Ctrl+S ذخیره طراحی؛ Ctrl+Enter در مودال سوال = درج */
 document.addEventListener('keydown',e=>{
@@ -777,11 +778,12 @@ document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault(); saveDesign(true).then(j=>showToast(j&&j.ok?'طراحی ذخیره شد':'خطا در ذخیره طراحی'));}
   if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){const qm=document.getElementById('questionModal'); if(qm&&qm.style.display==='flex'){e.preventDefault(); saveQuestion();}}
 });
-function updateQuestionPreview(){const c=document.getElementById('qPrevContent'); if(!c)return; c.innerHTML=document.getElementById('qText').innerHTML; c.style.fontFamily=document.getElementById('qFont').value; c.style.fontSize=document.getElementById('qFontSize').value+'px'; c.style.height=document.getElementById('qHeight').value+'mm'; document.getElementById('qPrevNo').textContent=document.getElementById('qNumber').value||'۱'; document.getElementById('qPrevScore').textContent=document.getElementById('qScore').value||''; const fv=document.getElementById('qFontSizeVal'); if(fv)fv.textContent=(+document.getElementById('qFontSize').value).toLocaleString('fa-IR'); const hv=document.getElementById('qHeightVal'); if(hv)hv.textContent=(+document.getElementById('qHeight').value).toLocaleString('fa-IR');}
+function updateQuestionPreview(){const c=document.getElementById('qPrevContent'); if(!c)return; c.innerHTML=normalizeQuestionHtml(document.getElementById('qText').innerHTML); c.style.fontFamily=document.getElementById('qFont').value; c.style.fontSize=document.getElementById('qFontSize').value+'px'; c.style.height=document.getElementById('qHeight').value+'mm'; document.getElementById('qPrevNo').textContent=document.getElementById('qNumber').value||'۱'; document.getElementById('qPrevScore').textContent=document.getElementById('qScore').value||''; const fv=document.getElementById('qFontSizeVal'); if(fv)fv.textContent=(+document.getElementById('qFontSize').value).toLocaleString('fa-IR'); const hv=document.getElementById('qHeightVal'); if(hv)hv.textContent=(+document.getElementById('qHeight').value).toLocaleString('fa-IR');}
 function toggleBank(){
   const p=document.getElementById('bankPanel'), editor=document.getElementById('questionEditorPanel');
   const opening=p.classList.contains('collapsed');
   if(opening&&editor)editor.classList.add('collapsed');
+  if(opening)hideImageTouchTools();
   p.classList.toggle('collapsed'); updateMobileChrome();
 }
 function cmd(c){document.execCommand(c,false,null);document.getElementById('qText').focus();}
@@ -866,91 +868,145 @@ function qStripEqSlots(html){const tmp=document.createElement('div'); tmp.innerH
     const txt=x.textContent.replace(/\u200b/g,'').trim();
     if(txt==='')x.remove(); else if(x.attributes.length===0)x.replaceWith(...x.childNodes);});
   return tmp.innerHTML;}
-function clearQuestionForm(){document.getElementById('editingQid').value='';const qEditor=document.getElementById('qText');qEditor.innerHTML='';qEditor.removeAttribute('dir');qEditor.style.direction='';qEditor.style.textAlign='';document.getElementById('qScore').value='1';document.getElementById('qHeight').value='18';document.getElementById('qModalTitle').textContent='آماده‌سازی سوال جدید';document.getElementById('qInsertBtn').textContent='درج در آزمون';applyQuestionTemplate();renumberQuestions();updateQuestionPreview();}
+function clearQuestionForm(){deselectSelectedImage();document.getElementById('editingQid').value='';const qEditor=document.getElementById('qText');qEditor.innerHTML='';qEditor.removeAttribute('dir');qEditor.style.direction='';qEditor.style.textAlign='';document.getElementById('qScore').value='1';document.getElementById('qHeight').value='18';document.getElementById('qModalTitle').textContent='آماده‌سازی سوال جدید';document.getElementById('qInsertBtn').textContent='درج در آزمون';applyQuestionTemplate();renumberQuestions();updateQuestionPreview();}
 function applyQuestionTemplate(){const t=document.getElementById('qType').value, ed=document.getElementById('qText'); if(t==='text')ed.innerHTML='<p>صورت سوال تشریحی را اینجا بنویسید...</p>'; if(t==='mcq')ed.innerHTML='<p>صورت سوال چندگزینه‌ای را اینجا بنویسید.</p><div class="q-options"><span>الف) گزینه اول</span><span>ب) گزینه دوم</span><span>ج) گزینه سوم</span><span>د) گزینه چهارم</span></div>'; if(t==='blank')ed.innerHTML='<p>عبارت زیر را کامل کنید: <span class="blank-line"></span></p>'; if(t==='tf')ed.innerHTML='<p>متن عبارت... <span class="tf-square"></span> صحیح <span class="tf-square"></span> غلط</p>'; applyFontToEditor(); updateQuestionPreview();}
 function applyFontToEditor(){const ed=document.getElementById('qText'),family=document.getElementById('qFont').value,px=document.getElementById('qFontSize').value+'px';qRestoreSel();const sel=getSelection();const selected=sel&&sel.rangeCount&&!sel.isCollapsed&&ed.contains(sel.anchorNode)&&ed.contains(sel.focusNode);if(selected){document.execCommand('styleWithCSS',false,true);document.execCommand('fontName',false,family);document.execCommand('fontSize',false,'7');ed.querySelectorAll('font[size="7"]').forEach(f=>{const span=document.createElement('span');span.style.fontSize=px;span.innerHTML=f.innerHTML;f.replaceWith(span);});ed.querySelectorAll('font[face]').forEach(f=>{const span=document.createElement('span');span.style.fontFamily=f.getAttribute('face');span.innerHTML=f.innerHTML;f.replaceWith(span);});const s=getSelection();if(s&&s.rangeCount)qSavedRange=s.getRangeAt(0).cloneRange();updateQuestionPreview();return;}ed.style.setProperty('font-family',family,'important');ed.style.fontSize=px;updateQuestionPreview();}
 function loadCustomFont(input){const file=input.files&&input.files[0]; if(!file)return; const name='CustomFont_'+Date.now(); const r=new FileReader(); r.onload=e=>{const st=document.createElement('style'); st.textContent=`@font-face{font-family:${name};src:url(${e.target.result})}`; document.head.appendChild(st); document.getElementById('qFont').appendChild(new Option(file.name,name,true,true)); applyFontToEditor();}; r.readAsDataURL(file);}
 function imageQualityBySize(bytes){ if(bytes>10*1024*1024) return 0; if(bytes>5*1024*1024) return .30; if(bytes>1*1024*1024) return .50; return .80; }
 function compressImageFile(file){return new Promise((resolve,reject)=>{const q=imageQualityBySize(file.size); if(!q){reject('حجم تصویر بیشتر از ۱۰ مگابایت است.'); return;} const img=new Image(); const r=new FileReader(); r.onload=e=>{img.onload=()=>{const max=800, scale=Math.min(1,max/Math.max(img.width,img.height)); const c=document.createElement('canvas'); c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale); c.getContext('2d').drawImage(img,0,0,c.width,c.height); resolve(c.toDataURL('image/webp',q));}; img.src=e.target.result;}; r.readAsDataURL(file);});}
-function insertQuestionImage(input){[...(input.files||[])].forEach(file=>{compressImageFile(file).then(src=>{const id='img_'+Date.now()+'_'+Math.random().toString(16).slice(2); document.getElementById('qText').focus(); document.execCommand('insertHTML',false,`<img src="${src}" data-imgid="${id}" style="width:220px;height:auto;position:absolute;left:0px;top:0px" onclick="selectQuestionImage('${id}',this)">`);}).catch(msg=>alert(msg));}); input.value='';}
-function selectQuestionImage(id,img){selectedImageId=id; document.querySelectorAll('.selected-img').forEach(i=>i.classList.remove('selected-img')); document.querySelectorAll(`[data-imgid="${id}"]`).forEach(i=>i.classList.add('selected-img')); attachImgHandles(img);}
-function resizeSelectedImage(w){if(!selectedImageId)return; document.querySelectorAll(`[data-imgid="${selectedImageId}"]`).forEach(img=>{img.style.width=w+'px';img.style.height='auto';}); updateModelFromDomImage(); syncRenderedImagesToModel();}
-/* ============ v4.113.0: دستگیره‌های کشیدنی تغییر اندازه تصویر روی خود برگه ============ */
-let imgHandleBox=null, imgResizeState=null;
-function removeImgHandles(){if(imgHandleBox){imgHandleBox.remove(); imgHandleBox=null;} imgResizeState=null;}
+function nextQuestionImageId(){return 'img_'+Date.now()+'_'+Math.random().toString(16).slice(2);}
+function normalizeQuestionHtml(html,seen){
+  const box=document.createElement('div'); box.innerHTML=String(html||'');
+  box.querySelectorAll('.img-resize-box').forEach(x=>x.remove());
+  const used=seen||new Set();
+  box.querySelectorAll('img').forEach(img=>{
+    let id=img.dataset.imgid||'';
+    if(!id||used.has(id)){id=nextQuestionImageId(); while(used.has(id))id=nextQuestionImageId();}
+    used.add(id); img.dataset.imgid=id; img.setAttribute('draggable','false'); img.classList.remove('selected-img');
+    img.setAttribute('onclick',`selectQuestionImage('${id}',this)`);
+  });
+  return box.innerHTML;
+}
+function normalizeAllQuestionImages(){const seen=new Set(); qItems.forEach(it=>{if(it.type==='q'&&it.html)it.html=normalizeQuestionHtml(it.html,seen);});}
+function decorateQuestionImages(root){
+  if(!root)return;
+  const images=root.tagName==='IMG'?[root]:[...root.querySelectorAll('img')];
+  images.forEach(img=>{
+    if(!img.dataset.imgid)img.dataset.imgid=nextQuestionImageId();
+    img.setAttribute('draggable','false');
+    img.setAttribute('onclick',`selectQuestionImage('${img.dataset.imgid}',this)`);
+    img.onclick=e=>{e.preventDefault();e.stopPropagation();selectQuestionImage(img.dataset.imgid,img);};
+  });
+}
+function questionImageNodes(id){return [...document.querySelectorAll('img[data-imgid]')].filter(x=>String(x.dataset.imgid)===String(id));}
+function currentSelectedImage(){
+  const nodes=questionImageNodes(selectedImageId);
+  if(selectedImageNode&&selectedImageNode.isConnected&&String(selectedImageNode.dataset.imgid)===String(selectedImageId))return selectedImageNode;
+  return nodes.find(x=>x.classList.contains('selected-img'))||nodes[0]||null;
+}
+function imageLayoutScale(img){
+  if(!img)return 1;
+  const r=img.getBoundingClientRect(), w=img.offsetWidth||r.width;
+  return Math.max(.1,Math.min(8,r.width/Math.max(1,w)));
+}
+function hideImageTouchTools(){if(imageTouchTools)imageTouchTools.style.display='none';}
+function ensureImageTouchTools(){
+  if(imageTouchTools)return imageTouchTools;
+  const box=document.createElement('div'); box.id='mobileImageTools'; box.className='mobile-image-tools';
+  box.innerHTML='<span id="mobileImageToolsLabel" class="mobile-image-tools-label">تصویر انتخاب نشده</span>'+
+    '<button type="button" onclick="moveSelectedImage(-1,0)" aria-label="حرکت به چپ">←</button>'+
+    '<button type="button" onclick="moveSelectedImage(1,0)" aria-label="حرکت به راست">→</button>'+
+    '<button type="button" onclick="moveSelectedImage(0,-1)" aria-label="حرکت به بالا">↑</button>'+
+    '<button type="button" onclick="moveSelectedImage(0,1)" aria-label="حرکت به پایین">↓</button>'+
+    '<button type="button" onclick="resizeSelectedImageBy(-12)" aria-label="کوچک کردن تصویر">− اندازه</button>'+
+    '<button type="button" onclick="resizeSelectedImageBy(12)" aria-label="بزرگ کردن تصویر">+ اندازه</button>'+
+    '<button type="button" class="mobile-image-tools-edit" onclick="openImageEditor()">ویرایش تصویر</button>'+
+    '<button type="button" class="mobile-image-tools-close" onclick="deselectSelectedImage()" aria-label="بستن ابزار تصویر">×</button>';
+  document.body.appendChild(box); imageTouchTools=box; return box;
+}
+function updateImageTouchTools(img){
+  const box=ensureImageTouchTools();
+  if(!window.matchMedia||!window.matchMedia('(max-width:860px)').matches){box.style.display='none';return;}
+  const label=box.querySelector('#mobileImageToolsLabel');
+  if(label)label.textContent='تصویر انتخاب شد · اندازه و جایگاه';
+  box.style.display='flex';
+}
+function deselectSelectedImage(){removeImgHandles();document.querySelectorAll('.selected-img').forEach(i=>i.classList.remove('selected-img'));selectedImageId=null;selectedImageNode=null;hideImageTouchTools();}
+function commitImageChange(img){
+  const ed=document.getElementById('qText');
+  if(ed&&img&&ed.contains(img)){updateModelFromDomImage();updateQuestionPreview();}
+  else syncRenderedImagesToModel();
+}
+function insertQuestionImage(input){[...(input.files||[])].forEach(file=>{compressImageFile(file).then(src=>{const id=nextQuestionImageId(); const ed=document.getElementById('qText'); ed.focus(); qRestoreSel(); document.execCommand('insertHTML',false,`<img src="${src}" data-imgid="${id}" draggable="false" style="width:220px;height:auto;position:absolute;left:0px;top:0px" onclick="selectQuestionImage('${id}',this)">`); decorateQuestionImages(ed); const inserted=questionImageNodes(id).find(x=>ed.contains(x)); if(inserted)selectQuestionImage(id,inserted); updateQuestionPreview();}).catch(msg=>alert(msg));}); input.value='';}
+function selectQuestionImage(id,img){
+  if(!id&&img)id=img.dataset.imgid;
+  if(!id)return;
+  selectedImageId=id; document.querySelectorAll('.selected-img').forEach(i=>i.classList.remove('selected-img'));
+  const nodes=questionImageNodes(id); nodes.forEach(i=>i.classList.add('selected-img'));
+  const target=img&&img.isConnected?img:(nodes[0]||null); selectedImageNode=target; if(target)attachImgHandles(target); updateImageTouchTools(target);
+}
+function resizeSelectedImage(w){
+  if(!selectedImageId)return;
+  const img=currentSelectedImage(); const current=img?(img.offsetWidth||parseFloat(img.style.width)||220):220;
+  const width=Math.max(30,Math.min(760,Math.round(+w||current)));
+  questionImageNodes(selectedImageId).forEach(i=>{i.style.width=width+'px';i.style.height='auto';});
+  if(img)positionImgHandles(img); commitImageChange(img);
+}
+function resizeSelectedImageBy(delta){const img=currentSelectedImage();if(!img)return;resizeSelectedImage((img.offsetWidth||parseFloat(img.style.width)||220)+delta);}
+function moveSelectedImage(dx,dy){
+  const img=currentSelectedImage();if(!img)return; const scale=imageLayoutScale(img);
+  const left=(parseFloat(img.style.left)||0)+dx/Math.max(.1,scale), top=(parseFloat(img.style.top)||0)+dy/Math.max(.1,scale);
+  questionImageNodes(selectedImageId).forEach(i=>{i.style.left=Math.round(left)+'px';i.style.top=Math.round(top)+'px';});
+  positionImgHandles(img); commitImageChange(img);
+}
+/* ============ v4.161.0: دستگیره‌های کشیدنی تغییر اندازه تصویر روی خود برگه ============ */
+let imgHandleBox=null, imgResizeState=null, imgDragState=null;
+function removeImgHandles(){if(imgHandleBox){imgHandleBox.remove(); imgHandleBox=null;} imgResizeState=null; hideImageTouchTools();}
 function attachImgHandles(img){
   removeImgHandles();
   if(!img||!img.isConnected)return;
   const host=img.offsetParent||img.parentElement; if(!host)return;
-  const box=document.createElement('div');
-  box.className='img-resize-box';
-  /* ۸ دستگیره: ۴ گوشه + ۴ ضلع */
+  const box=document.createElement('div'); box.className='img-resize-box';
   ['nw','n','ne','e','se','s','sw','w'].forEach(dir=>{
-    const h=document.createElement('span');
-    h.className='img-handle img-handle-'+dir; h.dataset.dir=dir;
+    const h=document.createElement('span'); h.className='img-handle img-handle-'+dir; h.dataset.dir=dir;
     h.addEventListener('pointerdown',e=>{
       e.preventDefault(); e.stopPropagation();
-      const r=img.getBoundingClientRect();
-      imgResizeState={img,dir,sx:e.clientX,sy:e.clientY,w:r.width,h:r.height,
-                      l:parseFloat(img.style.left||0),t:parseFloat(img.style.top||0),
-                      ratio:r.width/Math.max(1,r.height)};
+      const r=img.getBoundingClientRect(), scale=imageLayoutScale(img);
+      imgResizeState={img,dir,sx:e.clientX,sy:e.clientY,w:Math.max(1,img.offsetWidth||r.width/scale),h:Math.max(1,img.offsetHeight||r.height/scale),
+                      l:parseFloat(img.style.left||0),t:parseFloat(img.style.top||0),ratio:(img.offsetWidth||r.width/scale)/Math.max(1,img.offsetHeight||r.height/scale),scale,pointerId:e.pointerId};
+      try{h.setPointerCapture(e.pointerId);}catch(_){ }
       document.body.classList.add('img-resizing');
     });
     box.appendChild(h);
   });
-  host.appendChild(box);
-  imgHandleBox=box;
-  positionImgHandles(img);
+  host.appendChild(box); imgHandleBox=box; positionImgHandles(img);
 }
 function positionImgHandles(img){
   if(!imgHandleBox||!img||!img.isConnected){removeImgHandles();return;}
-  imgHandleBox.style.left=(img.offsetLeft-5)+'px';
-  imgHandleBox.style.top=(img.offsetTop-5)+'px';
-  imgHandleBox.style.width=(img.offsetWidth+10)+'px';
-  imgHandleBox.style.height=(img.offsetHeight+10)+'px';
+  imgHandleBox.style.left=(img.offsetLeft-5)+'px'; imgHandleBox.style.top=(img.offsetTop-5)+'px';
+  imgHandleBox.style.width=(img.offsetWidth+10)+'px'; imgHandleBox.style.height=(img.offsetHeight+10)+'px';
 }
 document.addEventListener('pointermove',e=>{
   if(!imgResizeState)return;
-  const st=imgResizeState, dx=e.clientX-st.sx, dy=e.clientY-st.sy;
-  let w=st.w, h=st.h, l=st.l, t=st.t;
-  const dir=st.dir;
-  /* اضلاع افقی/عمودی: تغییر آزاد؛ گوشه‌ها: حفظ نسبت تصویر */
+  const st=imgResizeState, dx=(e.clientX-st.sx)/st.scale, dy=(e.clientY-st.sy)/st.scale;
+  let w=st.w, h=st.h, l=st.l, t=st.t, dir=st.dir;
   if(dir==='e'){w=st.w+dx;}
   else if(dir==='w'){w=st.w-dx; l=st.l+dx;}
   else if(dir==='s'){h=st.h+dy; w=h*st.ratio;}
   else if(dir==='n'){h=st.h-dy; w=h*st.ratio; t=st.t+dy;}
-  else{ /* گوشه‌ها — بر اساس بزرگ‌ترین جابه‌جایی، با حفظ نسبت */
-    const sx=(dir.includes('w')?-1:1), sy=(dir.includes('n')?-1:1);
-    const dw=dx*sx, dh=dy*sy;
-    w=st.w+(Math.abs(dw)>=Math.abs(dh*st.ratio)?dw:dh*st.ratio);
-    h=w/st.ratio;
-    if(dir.includes('w')) l=st.l+(st.w-w);
-    if(dir.includes('n')) t=st.t+(st.h-h);
-  }
+  else{const sx=(dir.includes('w')?-1:1), sy=(dir.includes('n')?-1:1), dw=dx*sx, dh=dy*sy; w=st.w+(Math.abs(dw)>=Math.abs(dh*st.ratio)?dw:dh*st.ratio); h=w/st.ratio; if(dir.includes('w'))l=st.l+(st.w-w); if(dir.includes('n'))t=st.t+(st.h-h);}
   w=Math.max(30,Math.min(760,w));
-  document.querySelectorAll(`[data-imgid="${st.img.dataset.imgid}"]`).forEach(i=>{
-    i.style.width=Math.round(w)+'px'; i.style.height='auto';
-    i.style.left=Math.round(l)+'px'; i.style.top=Math.round(t)+'px';
-  });
+  questionImageNodes(st.img.dataset.imgid).forEach(i=>{i.style.width=Math.round(w)+'px';i.style.height='auto';i.style.left=Math.round(l)+'px';i.style.top=Math.round(t)+'px';});
   positionImgHandles(st.img);
 });
-document.addEventListener('pointerup',()=>{
-  if(imgResizeState){
-    document.body.classList.remove('img-resizing');
-    imgResizeState=null;
-    updateModelFromDomImage(); syncRenderedImagesToModel();
-    const sel=document.querySelector('.selected-img'); if(sel)positionImgHandles(sel);
-  }
-});
+function finishImageResize(){if(!imgResizeState)return; document.body.classList.remove('img-resizing'); const img=imgResizeState.img; imgResizeState=null; if(img&&img.isConnected){positionImgHandles(img);commitImageChange(img);}}
+document.addEventListener('pointerup',finishImageResize);document.addEventListener('pointercancel',finishImageResize);
 /* کلیک خارج از تصویر: لغو انتخاب و حذف دستگیره‌ها */
-document.addEventListener('pointerdown',e=>{
-  if(e.target.closest&&(e.target.closest('.img-handle')||e.target.tagName==='IMG'&&e.target.dataset.imgid))return;
-  if(imgHandleBox){removeImgHandles(); document.querySelectorAll('.selected-img').forEach(i=>i.classList.remove('selected-img')); selectedImageId=null;}
-});
-function updateModelFromDomImage(){const edit=document.getElementById('editingQid').value; if(edit){const it=qItems.find(x=>x.id===edit); if(it)it.html=document.getElementById('qText').innerHTML;}}
+document.addEventListener('pointerdown',e=>{if(e.target.closest&&(e.target.closest('.img-handle')||e.target.closest('img[data-imgid]')||e.target.closest('.mobile-image-tools')||e.target.closest('.rich-tools')))return;if(imgHandleBox)deselectSelectedImage();});
+function updateModelFromDomImage(){const edit=document.getElementById('editingQid').value; const ed=document.getElementById('qText'); if(edit&&ed){const it=qItems.find(x=>x.id===edit); if(it)it.html=normalizeQuestionHtml(ed.innerHTML);}}
 function previewQuestionHeight(v){updateQuestionPreview(); const id=document.getElementById('editingQid').value; if(id){const it=qItems.find(x=>x.id===id); if(it){it.height=v;renderQuestions();}}}
-function saveQuestion(){const edit=document.getElementById('editingQid').value, no=document.getElementById('qNumber').value||'1', score=document.getElementById('qScore').value||'', html=qStripEqSlots(document.getElementById('qText').innerHTML.trim()), height=document.getElementById('qHeight').value||18, font=document.getElementById('qFont').value, fontSize=document.getElementById('qFontSize').value||11, qtype=document.getElementById('qType').value; if(!html){alert('متن سوال را وارد کنید.');return;} if(edit){const it=qItems.find(x=>x.id===edit); if(!it){document.getElementById('editingQid').value=''; qItems.push({type:'q',id:'q_'+Date.now(),qtype,no,score,html,height,font,fontSize});} else Object.assign(it,{no,score,html,height,font,fontSize,qtype});} else qItems.push({type:'q',id:'q_'+Date.now(),qtype,no,score,html,height,font,fontSize}); renderQuestions(); clearQuestionForm(); autosaveLocal(); closeQuestionModal(); showToast(edit?'سوال ویرایش و در برگه به‌روزرسانی شد':'سوال در آزمون درج شد');}
-function editQuestion(id){const it=qItems.find(x=>x.id===id); if(!it)return; document.getElementById('editingQid').value=id; document.getElementById('qNumber').value=it.no; document.getElementById('qScore').value=it.score; document.getElementById('qText').innerHTML=it.html; document.getElementById('qHeight').value=it.height; document.getElementById('qFont').value=it.font; document.getElementById('qFontSize').value=it.fontSize; document.getElementById('qModalTitle').textContent='ویرایش سوال'; document.getElementById('qInsertBtn').textContent='ذخیره تغییرات'; applyFontToEditor(); openQuestionModal(id);}
+function saveQuestion(){const edit=document.getElementById('editingQid').value; decorateQuestionImages(document.getElementById('qText')); const no=document.getElementById('qNumber').value||'1', score=document.getElementById('qScore').value||'', html=qStripEqSlots(normalizeQuestionHtml(document.getElementById('qText').innerHTML.trim())), height=document.getElementById('qHeight').value||18, font=document.getElementById('qFont').value, fontSize=document.getElementById('qFontSize').value||11, qtype=document.getElementById('qType').value; if(!html){alert('متن سوال را وارد کنید.');return;} if(edit){const it=qItems.find(x=>x.id===edit); if(!it){document.getElementById('editingQid').value=''; qItems.push({type:'q',id:'q_'+Date.now(),qtype,no,score,html,height,font,fontSize});} else Object.assign(it,{no,score,html,height,font,fontSize,qtype});} else qItems.push({type:'q',id:'q_'+Date.now(),qtype,no,score,html,height,font,fontSize}); renderQuestions(); clearQuestionForm(); autosaveLocal(); closeQuestionModal(); showToast(edit?'سوال ویرایش و در برگه به‌روزرسانی شد':'سوال در آزمون درج شد');}
+function editQuestion(id){const it=qItems.find(x=>x.id===id); if(!it)return; deselectSelectedImage(); document.getElementById('editingQid').value=id; document.getElementById('qNumber').value=it.no; document.getElementById('qScore').value=it.score; document.getElementById('qText').innerHTML=normalizeQuestionHtml(it.html); decorateQuestionImages(document.getElementById('qText')); document.getElementById('qHeight').value=it.height; document.getElementById('qFont').value=it.font; document.getElementById('qFontSize').value=it.fontSize; document.getElementById('qModalTitle').textContent='ویرایش سوال'; document.getElementById('qInsertBtn').textContent='ذخیره تغییرات'; applyFontToEditor(); openQuestionModal(id);}
 function deleteQuestion(id){if(confirm('سوال حذف شود؟')){qItems=qItems.filter(x=>x.id!==id); if(document.getElementById('editingQid').value===id) clearQuestionForm(); renderQuestions(); autosaveLocal();}}
 /* Touch-safe ordering: the saved qItems order remains the single source of truth
    for desktop drag, mobile buttons, print and the question bank copy. */
@@ -975,9 +1031,13 @@ function deleteLastEmptyPage(){
 }
 function enableDrag(){document.querySelectorAll('.q-h-grip').forEach(g=>{g.addEventListener('dragstart',e=>e.preventDefault());}); document.querySelectorAll('.question-row').forEach(row=>{row.ondragstart=e=>{row.classList.add('dragging');e.dataTransfer.setData('text/plain',row.dataset.qid)};row.ondragend=()=>{row.classList.remove('dragging');syncOrderFromFirst();};row.ondragover=e=>e.preventDefault();row.ondrop=e=>{e.preventDefault();const dragged=document.querySelector('.dragging');if(dragged&&dragged!==row)row.parentNode.insertBefore(dragged,row.nextSibling);};}); enableImageDrag();}
 function syncOrderFromFirst(){const first=studentsData[0]; const ids=[...document.querySelectorAll(`.page[data-student-id="${first.id}"] .question-row`)].map(r=>r.dataset.qid); const map=Object.fromEntries(qItems.map(x=>[x.id,x])); qItems=ids.map(id=>map[id]).filter(Boolean); renderQuestions();}
-function enableImageDrag(){document.querySelectorAll('.q-content img').forEach(img=>{img.onpointerdown=e=>{if(imgResizeState)return; selectQuestionImage(img.dataset.imgid,img); img.dataset.drag='1'; img.dataset.sx=e.clientX; img.dataset.sy=e.clientY; img.dataset.l=parseFloat(img.style.left||0); img.dataset.t=parseFloat(img.style.top||0); e.preventDefault();};});}
-document.addEventListener('pointermove',e=>{const img=document.querySelector('.selected-img[data-drag="1"]'); if(!img)return; const dx=e.clientX-img.dataset.sx, dy=e.clientY-img.dataset.sy, l=(+img.dataset.l)+dx, t=(+img.dataset.t)+dy; document.querySelectorAll(`[data-imgid="${img.dataset.imgid}"]`).forEach(i=>{i.style.left=l+'px';i.style.top=t+'px';}); positionImgHandles(img);});document.addEventListener('pointerup',()=>{document.querySelectorAll('[data-drag="1"]').forEach(i=>i.dataset.drag='0'); syncRenderedImagesToModel();});
-function syncRenderedImagesToModel(){const first=studentsData[0]; qItems.forEach(it=>{if(it.type!=='q')return; const row=document.querySelector(`.page[data-student-id="${first.id}"] [data-qid="${it.id}"] .q-content`); if(row){const clone=row.cloneNode(true); clone.querySelector('.q-actions')?.remove(); it.html=clone.innerHTML;}}); autosaveLocal();}
+function enableImageDrag(){
+  const imgs=[...document.querySelectorAll('.q-content img,#qText img')]; imgs.forEach(img=>{decorateQuestionImages(img);img.onpointerdown=e=>{if(imgResizeState||e.button&&e.button!==0)return;selectQuestionImage(img.dataset.imgid,img);imgDragState={img,sx:e.clientX,sy:e.clientY,l:parseFloat(img.style.left||0),t:parseFloat(img.style.top||0),scale:imageLayoutScale(img),pointerId:e.pointerId};try{img.setPointerCapture(e.pointerId);}catch(_){ }e.preventDefault();};});
+}
+document.addEventListener('pointermove',e=>{if(!imgDragState||imgResizeState)return;const st=imgDragState,dx=(e.clientX-st.sx)/st.scale,dy=(e.clientY-st.sy)/st.scale,l=st.l+dx,t=st.t+dy;questionImageNodes(st.img.dataset.imgid).forEach(i=>{i.style.left=Math.round(l)+'px';i.style.top=Math.round(t)+'px';});positionImgHandles(st.img);});
+function finishImageDrag(){if(!imgDragState)return;const img=imgDragState.img;imgDragState=null;if(img&&img.isConnected)commitImageChange(img);}
+document.addEventListener('pointerup',finishImageDrag);document.addEventListener('pointercancel',finishImageDrag);
+function syncRenderedImagesToModel(){const first=studentsData[0]; qItems.forEach(it=>{if(it.type!=='q')return; const row=document.querySelector(`.page[data-student-id=\"${first.id}\"] [data-qid=\"${it.id}\"] .q-content`); if(row){const clone=row.cloneNode(true); clone.querySelector('.q-actions')?.remove(); clone.querySelector('.q-h-grip')?.remove(); clone.querySelectorAll('.img-resize-box').forEach(x=>x.remove()); it.html=normalizeQuestionHtml(clone.innerHTML);}}); autosaveLocal();}
 function updateMobileChrome(){
   const e=document.getElementById('questionEditorPanel'), b=document.getElementById('bankPanel');
   document.querySelectorAll('[data-mobile-control="editor"]').forEach(x=>x.setAttribute('aria-expanded',String(!!e&&!e.classList.contains('collapsed'))));
@@ -987,7 +1047,7 @@ function editorViewportScale(){
   const root=document.getElementById('pagesRoot'), page=root?.querySelector('.page');
   if(!root||!page)return;
   const mobile=window.matchMedia&&window.matchMedia('(max-width:860px)').matches;
-  if(!mobile){root.style.setProperty('--editorScale','1');root.style.setProperty('--editorPageOffset','0px');root.style.setProperty('--editorVisualWidth',page.offsetWidth+'px');return;}
+  if(!mobile){root.style.setProperty('--editorScale','1');root.style.setProperty('--editorPageOffset','0px');root.style.setProperty('--editorVisualWidth',page.offsetWidth+'px');hideImageTouchTools();return;}
   const base=page.offsetWidth||793, available=Math.max(260,root.clientWidth||window.innerWidth-20);
   let scale=mobileEditorZoom===null?Math.min(1,available/base):mobileEditorZoom;
   scale=Math.max(.38,Math.min(1.15,scale)); root.style.setProperty('--editorScale',scale.toFixed(3));
@@ -1121,7 +1181,7 @@ function renderDesignBankPage(){const box=document.getElementById('designBankLis
   box.insertAdjacentHTML('beforeend',bankPagerHtml(designBankItems.length,designBankPage,'gotoDesignBankPage'));}
 function openExamZoom(ref){const x=designBankItems.find(e=>(e.ref||('e'+e.exam_id))===String(ref)); if(!x)return; /* v4.100.0: وسط‌چینی فلکس مثل صفحه اصلی — تصویر با عرض بیش از ۱۰۰٪ دیگر از یک طرف بریده نمی‌شود */ document.getElementById('examZoomPages').innerHTML=`<div style="margin-bottom:8px"><b>${esc(x.subject||'')}</b> — طراح: ${esc(x.designer||'—')} | ماه: ${esc(x.month||'—')} | سال: ${esc(x.year||'—')}</div>`+bankPageViews(x).map(p=>`<div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:8px;overflow:hidden;display:flex;justify-content:center;align-items:flex-start"><img src="${esc(p.src)}" style="${p.style};border:0;margin:0;flex:none"></div>`).join(''); document.getElementById('examZoomModal').style.display='flex';}
 function closeExamZoom(){document.getElementById('examZoomModal').style.display='none';}
-function importSavedExam(ref){if(!confirm('آزمون انتخابی از بانک در ویرایشگر فعلی درج شود؟ طراحی فعلی جایگزین می‌شود.'))return; const fd=new FormData(); fd.append('action','import_design'); fd.append('exam_id',examId); fd.append('dt',designToken); fd.append('source_ref',ref); fetch('exam-design-api.php?group_member='+classGroupMember,{method:'POST',body:fd}).then(r=>r.json()).then(j=>{if(!j.ok){alert(j.error||'خطا در درج آزمون'); return;} examData.sourcePages=j.sourcePages||[]; const d=j.design||{}; qItems=d.questions||[]; if(d.headerFields) headerFields=fixHeaderFieldOrder(d.headerFields); drawingsData=d.drawings||{}; sourceCrops=d.sourceCrops||{}; sourceOrder=d.sourceOrder||[]; pageStyle=fixLoadedHeaderH(d.style||{}); printNote=d.printNote||''; const pn=document.getElementById('printNote'); if(pn)pn.value=printNote; renderHeaderEditor(); rerenderPages(); autosaveLocal(); alert(j.message||'آزمون درج شد.');});}
+function importSavedExam(ref){if(!confirm('آزمون انتخابی از بانک در ویرایشگر فعلی درج شود؟ طراحی فعلی جایگزین می‌شود.'))return; const fd=new FormData(); fd.append('action','import_design'); fd.append('exam_id',examId); fd.append('dt',designToken); fd.append('source_ref',ref); fetch('exam-design-api.php?group_member='+classGroupMember,{method:'POST',body:fd}).then(r=>r.json()).then(j=>{if(!j.ok){alert(j.error||'خطا در درج آزمون'); return;} examData.sourcePages=j.sourcePages||[]; const d=j.design||{}; qItems=d.questions||[]; normalizeAllQuestionImages(); if(d.headerFields) headerFields=fixHeaderFieldOrder(d.headerFields); drawingsData=d.drawings||{}; sourceCrops=d.sourceCrops||{}; sourceOrder=d.sourceOrder||[]; pageStyle=fixLoadedHeaderH(d.style||{}); printNote=d.printNote||''; const pn=document.getElementById('printNote'); if(pn)pn.value=printNote; renderHeaderEditor(); rerenderPages(); autosaveLocal(); alert(j.message||'آزمون درج شد.');});}
 function deleteSavedExam(ref){if(!confirm('این آزمون ذخیره‌شده به‌طور کامل از بانک حذف شود؟'))return; const fd=new FormData(); fd.append('action','delete_design'); fd.append('exam_id',examId); fd.append('dt',designToken); fd.append('source_ref',ref); fetch('exam-design-api.php?group_member='+classGroupMember,{method:'POST',body:fd}).then(r=>r.json()).then(j=>{if(j.ok)loadBank(); else alert(j.error||'خطا');});}
 function measureBankQuestionHeightMM(html,fontFamily,fontSizePx){
   /* v4.114.0: اندازه‌گیری ارتفاع واقعی محتوا در سلول آزمایشی هم‌عرض ستون سوال */
@@ -1146,7 +1206,7 @@ function insertBankQuestion(id){const b=(bankItems||[]).find(x=>+x.id===+id); if
   /* v4.114.0: فرمت پیش‌فرض درج از بانک — فونت تیتر، اندازه ۱۴، ارتفاع به‌اندازه کل محتوا */
   const font='BTitr', fontSize=14;
   const height=measureBankQuestionHeightMM(b.question_html,font+',Vazirmatn,Tahoma,sans-serif',fontSize);
-  qItems.push({type:'q',id:'q_'+Date.now(),bank_id:b.id,qtype:b.question_type||'text',no:mx+1,score:b.score||'',html:b.question_html,height,font,fontSize}); renderQuestions(); showToast('سوال از بانک درج شد');}
+  qItems.push({type:'q',id:'q_'+Date.now(),bank_id:b.id,qtype:b.question_type||'text',no:mx+1,score:b.score||'',html:normalizeQuestionHtml(b.question_html),height,font,fontSize}); renderQuestions(); showToast('سوال از بانک درج شد');}
 function deleteBankQuestion(id){if(!confirm('سوال از بانک حذف شود؟'))return; const fd=new FormData(); fd.append('action','delete_bank'); fd.append('exam_id',examId); fd.append('question_id',id); fetch('exam-design-api.php?group_member='+classGroupMember,{method:'POST',body:fd}).then(r=>r.json()).then(j=>{if(j.ok)loadBank();else alert(j.error||'خطا');});}
 /* v4.79.0: خط لوله چاپ برای «بدترین سناریو» بازطراحی شد — ۳ کلاس × ۱۰۰
    دانش‌آموز × ۴ صفحه = ۴۰۰ صفحه چاپی باید بدون فریز و بدون کمبود حافظه
@@ -1449,38 +1509,45 @@ function deleteLiveSource(){
 }
 
 
-let imageEditOriginal=null;
-function openImageEditor(){document.getElementById('imageEditorModal').style.display='flex';}
-function closeImageEditor(){document.getElementById('imageEditorModal').style.display='none';}
+let imageEditOriginal=null, imageEditTarget=null, imageEditLoadSeq=0;
+function imageEditorControl(id){return document.getElementById(id);}
+function imageEditorDefaults(){return {cropL:0,cropR:0,cropT:0,cropB:0,outW:420,bright:0,contrast:0,removeBg:false,bgThreshold:238};}
+function readImageEditorSettings(){return {cropL:+imageEditorControl('imgCropL').value||0,cropR:+imageEditorControl('imgCropR').value||0,cropT:+imageEditorControl('imgCropT').value||0,cropB:+imageEditorControl('imgCropB').value||0,outW:+imageEditorControl('imgOutW').value||420,bright:+imageEditorControl('imgBright').value||0,contrast:+imageEditorControl('imgContrast').value||0,removeBg:!!imageEditorControl('imgRemoveBg').checked,bgThreshold:+imageEditorControl('imgBgThreshold').value||238};}
+function imageEditorSettingsAreDefault(s){return !(+s.cropL||+s.cropR||+s.cropT||+s.cropB||+s.bright||+s.contrast||s.removeBg||+s.bgThreshold!==238||+s.outW!==420);}
+function setImageEditorSettings(raw){const d=Object.assign(imageEditorDefaults(),raw||{}), set=(id,v)=>{const el=imageEditorControl(id);if(el)el.value=v;}; set('imgCropL',d.cropL);set('imgCropR',d.cropR);set('imgCropT',d.cropT);set('imgCropB',d.cropB);set('imgOutW',d.outW);set('imgBright',d.bright);set('imgContrast',d.contrast);set('imgBgThreshold',d.bgThreshold);const rm=imageEditorControl('imgRemoveBg');if(rm)rm.checked=!!d.removeBg;}
+function imageEditorTargetInQuestion(){const ed=document.getElementById('qText');if(!ed)return null;const chosen=selectedImageId?questionImageNodes(selectedImageId).find(x=>ed.contains(x)):null;return chosen||ed.querySelector('img.selected-img')||null;}
+function updateImageEditorMode(){const btn=imageEditorControl('imageEditorApplyBtn'),hint=imageEditorControl('imageEditorTargetHint');if(btn)btn.textContent=imageEditTarget?'به‌روزرسانی تصویر':'درج تصویر در سوال';if(hint)hint.textContent=imageEditTarget?'تصویر انتخاب‌شده ویرایش می‌شود؛ تصویر تازه‌ای به فرم اضافه نخواهد شد.':'برای درج تصویر تازه، فایل را انتخاب کنید.';}
+function openImageEditor(){
+  hideImageTouchTools();
+  const target=imageEditorTargetInQuestion(); imageEditTarget=target||null; const modal=document.getElementById('imageEditorModal'); modal.style.display='flex';
+  const file=imageEditorControl('imageEditFile');if(file)file.value=''; updateImageEditorMode();
+  if(imageEditTarget){
+    let settings={}; try{settings=JSON.parse(imageEditTarget.dataset.imageSettings||'{}');}catch(_){ }
+    setImageEditorSettings(settings); const src=imageEditTarget.dataset.imageSource||imageEditTarget.currentSrc||imageEditTarget.src; const seq=++imageEditLoadSeq; const img=new Image();
+    img.onload=()=>{if(seq!==imageEditLoadSeq)return;imageEditOriginal=img;renderImageEdit();}; img.onerror=()=>{if(seq!==imageEditLoadSeq)return;imageEditOriginal=null;renderImageEdit();alert('تصویر انتخاب‌شده برای ویرایش قابل خواندن نیست.');}; img.src=src;
+  }else{++imageEditLoadSeq;imageEditOriginal=null;setImageEditorSettings();renderImageEdit();}
+}
+function closeImageEditor(){const target=imageEditTarget;imageEditLoadSeq++;document.getElementById('imageEditorModal').style.display='none';imageEditOriginal=null;imageEditTarget=null;updateImageEditorMode();if(target&&target.isConnected)updateImageTouchTools(target);}
 function loadImageForEdit(input){
   const file=input.files&&input.files[0]; if(!file)return;
   if(file.size>10*1024*1024){alert('حجم تصویر بیش از ۱۰ مگابایت است.'); input.value=''; return;}
-  const r=new FileReader(); r.onload=e=>{const img=new Image(); img.onload=()=>{imageEditOriginal=img; renderImageEdit();}; img.src=e.target.result;}; r.readAsDataURL(file);
+  const r=new FileReader(), seq=++imageEditLoadSeq; r.onload=e=>{const img=new Image();img.onload=()=>{if(seq!==imageEditLoadSeq)return;imageEditOriginal=img;setImageEditorSettings();renderImageEdit();};img.src=e.target.result;}; r.readAsDataURL(file);
 }
 function renderImageEdit(){
-  const c=document.getElementById('imageEditCanvas'), ctx=c.getContext('2d');
-  ctx.clearRect(0,0,c.width,c.height); ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height);
+  const c=imageEditorControl('imageEditCanvas'),ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
   if(!imageEditOriginal){ctx.fillStyle='#64748b';ctx.font='20px Tahoma';ctx.textAlign='center';ctx.fillText('ابتدا تصویر را انتخاب کنید',c.width/2,c.height/2);return;}
-  const img=imageEditOriginal, l=+imgCropL.value/100, rr=+imgCropR.value/100, t=+imgCropT.value/100, b=+imgCropB.value/100;
-  const sx=Math.round(img.width*l), sy=Math.round(img.height*t), sw=Math.max(1,Math.round(img.width*(1-l-rr))), sh=Math.max(1,Math.round(img.height*(1-t-b)));
-  const outW=Math.min(800,+imgOutW.value||420), outH=Math.round(outW*sh/sw); c.width=Math.max(120,outW); c.height=Math.max(80,outH);
-  ctx.drawImage(img,sx,sy,sw,sh,0,0,outW,outH);
-  let data=ctx.getImageData(0,0,outW,outH), d=data.data, br=+imgBright.value, ct=+imgContrast.value;
-  const factor=(259*(ct+255))/(255*(259-ct)); const rm=imgRemoveBg.checked, th=+imgBgThreshold.value;
-  for(let i=0;i<d.length;i+=4){
-    d[i]=Math.max(0,Math.min(255,factor*(d[i]-128)+128+br));
-    d[i+1]=Math.max(0,Math.min(255,factor*(d[i+1]-128)+128+br));
-    d[i+2]=Math.max(0,Math.min(255,factor*(d[i+2]-128)+128+br));
-    if(rm && d[i]>th && d[i+1]>th && d[i+2]>th) d[i+3]=0;
-  }
-  ctx.putImageData(data,0,0);
+  const img=imageEditOriginal,l=+imageEditorControl('imgCropL').value/100,rr=+imageEditorControl('imgCropR').value/100,t=+imageEditorControl('imgCropT').value/100,b=+imageEditorControl('imgCropB').value/100;
+  const sx=Math.round(img.width*l),sy=Math.round(img.height*t),sw=Math.max(1,Math.round(img.width*(1-l-rr))),sh=Math.max(1,Math.round(img.height*(1-t-b))),outW=Math.min(800,+imageEditorControl('imgOutW').value||420),outH=Math.round(outW*sh/sw);c.width=Math.max(120,outW);c.height=Math.max(80,outH);ctx.drawImage(img,sx,sy,sw,sh,0,0,outW,outH);
+  let data;try{data=ctx.getImageData(0,0,outW,outH);}catch(_){return;}const d=data.data,br=+imageEditorControl('imgBright').value,ct=+imageEditorControl('imgContrast').value,factor=(259*(ct+255))/(255*(259-ct)),rm=imageEditorControl('imgRemoveBg').checked,th=+imageEditorControl('imgBgThreshold').value;
+  for(let i=0;i<d.length;i+=4){d[i]=Math.max(0,Math.min(255,factor*(d[i]-128)+128+br));d[i+1]=Math.max(0,Math.min(255,factor*(d[i+1]-128)+128+br));d[i+2]=Math.max(0,Math.min(255,factor*(d[i+2]-128)+128+br));if(rm&&d[i]>th&&d[i+1]>th&&d[i+2]>th)d[i+3]=0;}ctx.putImageData(data,0,0);
 }
 function insertEditedImageToQuestion(){
   if(!imageEditOriginal){alert('ابتدا تصویر را انتخاب کنید.');return;}
-  renderImageEdit(); const c=document.getElementById('imageEditCanvas');
-  const id='img_'+Date.now()+'_'+Math.random().toString(16).slice(2); const src=c.toDataURL('image/webp',0.82);
-  document.getElementById('qText').focus(); document.execCommand('insertHTML',false,`<img src="${src}" data-imgid="${id}" style="width:${Math.min(420,c.width)}px;height:auto;position:absolute;left:0px;top:0px" onclick="selectQuestionImage('${id}',this)">`);
-  closeImageEditor();
+  renderImageEdit();const c=imageEditorControl('imageEditCanvas'),settings=readImageEditorSettings();let src;try{src=c.toDataURL('image/webp',0.82);}catch(_){src=c.toDataURL('image/png');}
+  if(imageEditTarget&&imageEditTarget.isConnected){
+    const id=imageEditTarget.dataset.imgid||nextQuestionImageId();imageEditTarget.dataset.imgid=id;imageEditTarget.src=src;if(imageEditTarget.dataset.imageSource||!imageEditorSettingsAreDefault(settings))imageEditTarget.dataset.imageSource=imageEditOriginal.src;else delete imageEditTarget.dataset.imageSource;imageEditTarget.dataset.imageSettings=JSON.stringify(settings);imageEditTarget.setAttribute('onclick',`selectQuestionImage('${id}',this)`);selectQuestionImage(id,imageEditTarget);commitImageChange(imageEditTarget);closeImageEditor();return;
+  }
+  const id=nextQuestionImageId(),ed=document.getElementById('qText');ed.focus();qRestoreSel();document.execCommand('insertHTML',false,`<img src="${src}" data-imgid="${id}" draggable="false" style="width:${Math.min(420,c.width)}px;height:auto;position:absolute;left:0px;top:0px" onclick="selectQuestionImage('${id}',this)">`);decorateQuestionImages(ed);const inserted=questionImageNodes(id).find(x=>ed.contains(x));if(inserted){if(!imageEditorSettingsAreDefault(settings))inserted.dataset.imageSource=imageEditOriginal.src;inserted.dataset.imageSettings=JSON.stringify(settings);selectQuestionImage(id,inserted);}updateQuestionPreview();closeImageEditor();
 }
 const mathSymbols=['+','−','×','÷','=','≠','≈','≤','≥','∞','π','θ','α','β','γ','Δ','√','∛','∑','∫','∠','⊥','∥','≅','∼','∈','∉','⊂','∪','∩','→','↔','°','²','³','⁴','₁','₂','₃','₄','±','∓','∧','∨','¬','∀','∃','∴','∵','٪'];
 const mathTemplates={

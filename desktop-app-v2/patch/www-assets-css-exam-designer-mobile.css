@@ -1,10 +1,18 @@
 /*
- * Live exam designer — touch layout layer, v4.160.0
+ * Live exam designer — touch layout layer, v4.161.0
  *
  * This file is deliberately screen-only. The A4 page, millimetre dimensions,
  * print flow and all saved design values stay in exam-print.php and are not
  * changed by this layer. The same bytes are shipped to the desktop web root.
  */
+
+/* The dock and image tools are injected once for responsive switching, but must not
+   leak into the desktop page when the desktop viewport is active. */
+.mobile-editor-dock,
+.mobile-image-tools {
+  display: none;
+}
+
 @media screen and (max-width: 860px) {
   :root {
     --mobile-dock-h: 68px;
@@ -257,6 +265,77 @@
     touch-action: none;
   }
 
+  /* The A4 preview is scaled on phones. These larger hit areas are deliberately
+     laid inside the image edge so table-cell overflow cannot clip the finger target. */
+  .img-resize-box {
+    border-width: 2px;
+  }
+
+  .img-handle {
+    width: 42px;
+    height: 42px;
+    margin: 0;
+    border-width: 3px;
+  }
+
+  .img-handle-nw { left: 26px; top: 26px; }
+  .img-handle-n { left: 50%; top: 26px; transform: translateX(-50%); }
+  .img-handle-ne { right: 26px; top: 26px; }
+  .img-handle-e { right: 26px; top: 50%; transform: translateY(-50%); }
+  .img-handle-se { right: 26px; bottom: 26px; }
+  .img-handle-s { left: 50%; bottom: 26px; transform: translateX(-50%); }
+  .img-handle-sw { left: 26px; bottom: 26px; }
+  .img-handle-w { left: 26px; top: 50%; transform: translateY(-50%); }
+
+  .mobile-image-tools {
+    position: fixed;
+    z-index: 120;
+    left: 7px;
+    right: 7px;
+    bottom: calc(var(--mobile-dock-h) + var(--mobile-safe-bottom) + 7px);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px;
+    border: 1px solid rgba(148,163,184,.35);
+    border-radius: 13px;
+    background: rgba(15,23,42,.96);
+    box-shadow: 0 8px 22px rgba(2,6,23,.28);
+    direction: rtl;
+  }
+
+  .mobile-image-tools button {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 6px 8px;
+    border: 1px solid rgba(203,213,225,.4);
+    border-radius: 9px;
+    background: rgba(148,163,184,.18);
+    color: #f8fafc;
+    font: 700 11px/1.1 Vazirmatn,Tahoma,sans-serif;
+    touch-action: manipulation;
+  }
+
+  .mobile-image-tools-label {
+    flex: 1 1 100%;
+    color: #dbeafe;
+    font: 700 10px Vazirmatn,Tahoma,sans-serif;
+    text-align: center;
+  }
+
+  .mobile-image-tools .mobile-image-tools-edit {
+    flex: 1 1 115px;
+    background: #1d4ed8;
+    border-color: #60a5fa;
+  }
+
+  .mobile-image-tools .mobile-image-tools-close {
+    background: #991b1b;
+    border-color: #f87171;
+  }
+
   /* Source-page crop is performed directly on the page. The four handles are
      deliberately larger than the image itself after A4 scaling, so a finger
      does not have to land on a one-pixel corner. */
@@ -266,9 +345,10 @@
   }
 
   .source-crop-handle {
-    width: 26px;
-    height: 26px;
-    margin: -13px;
+    width: 42px;
+    height: 42px;
+    margin: 0;
+    border-width: 3px;
     touch-action: none;
   }
 
@@ -580,6 +660,7 @@
 }
 
 @media print {
-  .mobile-editor-dock {display:none!important;}
+  .mobile-editor-dock,
+  .mobile-image-tools {display:none!important;}
   .source-crop-overlay {display:none!important;}
 }
