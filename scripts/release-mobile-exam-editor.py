@@ -38,6 +38,10 @@ def validate_sources():
         text = page.read_text(encoding='utf-8')
         assert 'exam-designer-mobile.css?v=4.160.0' in text
         assert 'function editorViewportScale()' in text
+        assert 'function sourceCropHandleDown' in text
+        assert 'function sourceCropApply' in text
+        assert 'document.execCommand(\'fontName\'' in text
+        assert 'mobile-range-preview' in text
         assert 'function moveQuestion(id,delta)' in text
         assert '@page{size:A4;margin:0}' in text
         assert 'width:210mm' in text and 'height:297mm' in text

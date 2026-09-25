@@ -125,25 +125,39 @@
   }
 
   #pagesRoot {
+    --editorPageOffset: 0px;
+    --editorVisualWidth: 0px;
     min-height: 100vh;
     padding: calc(var(--toolbarH, 58px) + 7px) 0 18px;
-    overflow-x: hidden;
-    overscroll-behavior-x: none;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    position: relative;
   }
 
   /* The design surface is still exactly 210mm × 297mm. Only its on-screen
      preview is scaled; the print media rule in the page source removes this
-     transform completely. */
+     transform completely.  The unscaled A4 box is wider than a phone, so
+     centring the transformed box itself is not reliable in RTL layouts: the
+     script supplies a physical left gutter and the transform starts at the
+     visual top-left corner. */
   #pagesRoot .page {
+    direction: ltr;
     transform: scale(var(--editorScale, .44));
-    transform-origin: top center;
-    margin: 8px auto 0;
+    transform-origin: top left;
+    margin-top: 8px;
+    margin-right: 0 !important;
+    margin-left: var(--editorPageOffset, 0px) !important;
     margin-bottom: calc(-297mm * (1 - var(--editorScale, .44)));
     will-change: transform;
   }
 
   #pagesRoot .page:first-child {
     margin-top: 0;
+  }
+
+  #pagesRoot .page .exam-header,
+  #pagesRoot .page .qwrap {
+    direction: rtl;
   }
 
   .editor-panel,
@@ -241,6 +255,61 @@
     touch-action: none;
   }
 
+  /* Source-page crop is performed directly on the page. The four handles are
+     deliberately larger than the image itself after A4 scaling, so a finger
+     does not have to land on a one-pixel corner. */
+  .source-crop-overlay {
+    display: block;
+    opacity: 1;
+  }
+
+  .source-crop-handle {
+    width: 26px;
+    height: 26px;
+    margin: -13px;
+    touch-action: none;
+  }
+
+  .editor-panel input[type="range"],
+  .image-controls input[type="range"] {
+    width: 100%;
+    min-height: 46px;
+    height: 46px;
+    margin: 0 0 8px;
+    touch-action: pan-x;
+  }
+
+  .editor-panel details.source-adjustments {
+    overflow: visible;
+  }
+
+  .editor-panel details.source-adjustments > label {
+    margin-top: 12px;
+    padding: 5px 8px 0;
+    border-radius: 8px 8px 0 0;
+    background: #f8fafc;
+  }
+
+  .source-crop-hint {
+    margin: 7px 0 10px;
+    padding: 8px;
+    border: 1px solid #bfdbfe;
+    border-radius: 9px;
+    background: #eff6ff;
+    color: #1e40af;
+    font-size: 10px;
+    line-height: 1.7;
+  }
+
+  /* A range remains the active pointer target while it is being dragged, but
+     the panel becomes visually transparent so the designer can see the page
+     changing underneath it. */
+  body.mobile-range-preview .editor-panel,
+  body.mobile-range-preview .image-controls {
+    opacity: 0 !important;
+    transition: opacity .12s ease;
+  }
+
   .q-modal {
     align-items: flex-start;
     padding: calc(var(--toolbarH, 58px) + 6px) 6px calc(var(--mobile-dock-h) + var(--mobile-safe-bottom) + 6px);
@@ -254,6 +323,20 @@
     margin: 0;
     padding: 12px;
     border-radius: 16px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .q-modal-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .q-form-col,
+  .q-preview-col {
+    min-width: 0;
   }
 
   .q-modal-head {
@@ -296,24 +379,48 @@
 
   .q-preview-col {
     position: static;
+    order: 2;
+  }
+
+  .q-form-col {
+    order: 1;
+  }
+
+  .rich-editor {
+    min-height: 150px;
+    max-height: 34vh;
+    overflow: auto;
+    direction: rtl;
+    unicode-bidi: plaintext;
+    text-align: start;
+    overscroll-behavior: contain;
   }
 
   .q-preview-sheet {
-    max-height: 38vh;
+    max-height: 26vh;
     padding: 7px;
+    overflow: auto;
+    direction: rtl;
   }
 
   .q-modal-actions {
     position: sticky;
     bottom: -12px;
     z-index: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     margin-inline: -12px;
     padding: 10px 12px calc(10px + var(--mobile-safe-bottom));
     background: rgba(255, 255, 255, .97);
   }
 
+  .q-modal-actions > span {
+    display: none;
+  }
+
   .q-modal-actions button {
-    flex: 1 1 0;
+    min-width: 0;
+    width: 100%;
   }
 
   .upload-modal,
@@ -333,6 +440,42 @@
     max-width: none;
     max-height: calc(100dvh - var(--toolbarH, 58px) - var(--mobile-dock-h) - var(--mobile-safe-bottom) - 12px);
     border-radius: 16px;
+  }
+
+  .image-editor-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .image-canvas-wrap {
+    max-height: 32vh;
+    overflow: auto;
+  }
+
+  .image-canvas-wrap canvas {
+    max-height: 30vh;
+    width: auto;
+    max-width: 100%;
+  }
+
+  .image-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 8px;
+    align-items: center;
+  }
+
+  .image-controls label:first-child,
+  .image-controls input[type="file"],
+  .image-controls label:has(input[type="checkbox"]),
+  .image-controls button,
+  .image-controls > div,
+  .image-controls small {
+    grid-column: 1 / -1;
+  }
+
+  .image-controls input[type="range"] {
+    margin-bottom: 2px;
   }
 
   .math-grid {
@@ -389,6 +532,52 @@
   }
 }
 
+@media screen {
+  .source-crop-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    pointer-events: none;
+    border: 1px dashed rgba(37, 99, 235, .7);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7);
+    opacity: 0;
+    transition: opacity .12s ease;
+  }
+
+  .source-crop-handle {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    margin: -10px;
+    padding: 0;
+    border: 2px solid #1d4ed8;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 5px rgba(15, 23, 42, .35);
+    pointer-events: auto;
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  .source-crop-handle-nw { top: 0; left: 0; }
+  .source-crop-handle-ne { top: 0; right: 0; }
+  .source-crop-handle-se { right: 0; bottom: 0; }
+  .source-crop-handle-sw { bottom: 0; left: 0; }
+
+  .source-file:hover .source-crop-overlay,
+  .source-file:focus-within .source-crop-overlay,
+  body.source-cropping .source-crop-overlay {
+    opacity: 1;
+  }
+}
+
+@media screen and (max-width: 860px) {
+  .source-crop-overlay {
+    opacity: 1;
+  }
+}
+
 @media print {
   .mobile-editor-dock {display:none!important;}
+  .source-crop-overlay {display:none!important;}
 }
