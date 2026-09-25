@@ -180,27 +180,42 @@ if (is_student_logged_in()) {
         }
         if(!$ownedClasses)die('هیچ کلاس فعالی در این آزمون پایه باقی نمانده است.');
         $marks=implode(',',array_fill(0,count($ownedClasses),'?'));
-        $students=DB::fetchAll("SELECT s.* FROM students s WHERE s.status='active' AND s.class_name IN ($marks) AND $exySql",array_merge($ownedClasses,$exyParams));
+        $students=DB::fetchAll("SELECT s.id,s.first_name,s.last_name,s.class_name,s.grade_level,s.photo_url FROM students s WHERE s.status='active' AND s.class_name IN ($marks) AND $exySql",array_merge($ownedClasses,$exyParams));
     } elseif ($gradeAll && ($exam['exam_kind'] ?? '') === 'class') {
         require_once __DIR__ . '/includes/class_exam_helpers.php';
         $ownedClasses = class_exam_grade_classes($exam);
         if (!$ownedClasses) die('برای این درس و پایه، کلاسی به دبیر آزمون تخصیص ندارد.');
         $marks = implode(',',array_fill(0,count($ownedClasses),'?'));
-        $students = DB::fetchAll("SELECT s.* FROM students s WHERE s.status='active' AND s.class_name IN ($marks) AND $exySql",array_merge($ownedClasses,$exyParams));
+        $students = DB::fetchAll("SELECT s.id,s.first_name,s.last_name,s.class_name,s.grade_level,s.photo_url FROM students s WHERE s.status='active' AND s.class_name IN ($marks) AND $exySql",array_merge($ownedClasses,$exyParams));
     } elseif ($gradeAll && $targetGrade !== '') {
         // Grade-wide printing: use the saved design for all students in the same grade,
         // independent of class teacher or original class of the design.
-        $students = DB::fetchAll("SELECT s.* FROM students s WHERE s.status='active' AND (s.grade_level=? OR s.class_name LIKE ?) AND $exySql", array_merge([$targetGrade, $targetGrade . '%'], $exyParams));
+        $students = DB::fetchAll("SELECT s.id,s.first_name,s.last_name,s.class_name,s.grade_level,s.photo_url FROM students s WHERE s.status='active' AND (s.grade_level=? OR s.class_name LIKE ?) AND $exySql", array_merge([$targetGrade, $targetGrade . '%'], $exyParams));
     } else {
-        $students = DB::fetchAll("SELECT s.* FROM students s WHERE s.status='active' AND (?='' OR s.class_name=?) AND (?='' OR s.grade_level=?) AND $exySql", array_merge([$exam['class_name'],$exam['class_name'],$exam['grade_level'],$exam['grade_level']], $exyParams));
+        $students = DB::fetchAll("SELECT s.id,s.first_name,s.last_name,s.class_name,s.grade_level,s.photo_url FROM students s WHERE s.status='active' AND (?='' OR s.class_name=?) AND (?='' OR s.grade_level=?) AND $exySql", array_merge([$exam['class_name'],$exam['class_name'],$exam['grade_level'],$exam['grade_level']], $exyParams));
     }
     persian_usort_by($students, ['class_name','last_name','first_name']);   // v4.77.0: آ قبل از ا
 }
 if (!$students) $students=[['id'=>0,'first_name'=>'نمونه','last_name'=>'دانش‌آموز','class_name'=>$exam['class_name'],'grade_level'=>$exam['grade_level'],'national_id'=>'','photo_url'=>'']];
 
+/* v4.160.0: the editor only needs one seat row per student. Fetch those rows
+   in one indexed query instead of issuing a query while rendering every card. */
+$studentSeats = [];
+if ($students && in_array($type, ['schedule','questions','questions_editor'], true)) {
+    $studentIds = array_values(array_unique(array_filter(array_map(function ($student) { return (int)($student['id'] ?? 0); }, $students), function ($id) { return $id > 0; })));
+    if ($studentIds) {
+        $seatMarks = implode(',', array_fill(0, count($studentIds), '?'));
+        $seatRows = DB::fetchAll(
+            "SELECT seat.* FROM exam_student_seating seat JOIN (SELECT MAX(id) AS mid FROM exam_student_seating WHERE academic_year=? AND student_id IN ($seatMarks) GROUP BY student_id) latest ON latest.mid=seat.id",
+            array_merge([$exam['academic_year']], $studentIds)
+        );
+        foreach ($seatRows as $seatRow) $studentSeats[(int)$seatRow['student_id']] = $seatRow;
+    }
+}
+
 if ($type === 'schedule') {
 ?><!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><title>برنامه امتحانی</title><style>@page{size:A4;margin:10mm}@font-face{font-family:Vazirmatn;src:url('uploads/Vazirmatn/Vazirmatn-Regular.woff2')}body{font-family:Vazirmatn,Tahoma,sans-serif;margin:0}table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;padding:7px;text-align:center;font-size:12px}th{background:#eee}.head{text-align:center;margin-bottom:10px}</style></head><body><div class="head"><b><?php echo clean($school); ?></b><br>جدول برنامه امتحانی</div><table><thead><tr><th>نام دانش‌آموز</th><th>کلاس</th><th>درس</th><th>تاریخ</th><th>روز</th><th>ساعت</th><th>مدت</th><th>کلاس امتحانی</th><th>صندلی</th></tr></thead><tbody>
-<?php foreach($students as $s): $seat=DB::fetch('SELECT * FROM exam_student_seating WHERE academic_year=? AND student_id=? ORDER BY id DESC LIMIT 1',[$exam['academic_year'],$s['id']]); ?><tr><td><?php echo clean($s['first_name'].' '.$s['last_name']); ?></td><td><?php echo clean($s['class_name']); ?></td><td><?php echo clean($exam['subject_name']); ?></td><td><?php echo tr_num($exam['exam_date_jalali'],'fa'); ?></td><td><?php echo clean($exam['exam_day_name']); ?></td><td><?php echo tr_num($exam['start_time'],'fa'); ?></td><td><?php echo tr_num($exam['duration_minutes'],'fa'); ?></td><td><?php echo clean(($seat['exam_room']??'') ?: $exam['exam_room_default']); ?></td><td><?php echo tr_num($seat['seat_number']??'---','fa'); ?></td></tr><?php endforeach; ?>
+<?php foreach($students as $s): $seat=$studentSeats[(int)$s['id']] ?? []; ?><tr><td><?php echo clean($s['first_name'].' '.$s['last_name']); ?></td><td><?php echo clean($s['class_name']); ?></td><td><?php echo clean($exam['subject_name']); ?></td><td><?php echo tr_num($exam['exam_date_jalali'],'fa'); ?></td><td><?php echo clean($exam['exam_day_name']); ?></td><td><?php echo tr_num($exam['start_time'],'fa'); ?></td><td><?php echo tr_num($exam['duration_minutes'],'fa'); ?></td><td><?php echo clean(($seat['exam_room']??'') ?: $exam['exam_room_default']); ?></td><td><?php echo tr_num($seat['seat_number']??'---','fa'); ?></td></tr><?php endforeach; ?>
 </tbody></table><script>window.print()</script></body></html><?php exit; }
 
 if ($type === 'questions') { $type = 'questions_editor'; }
@@ -234,7 +249,7 @@ if ($type === 'questions_editor') {
     }, $sourcePages);
     $studentsData = [];
     foreach ($students as $s0) {
-        $seat0 = DB::fetch('SELECT * FROM exam_student_seating WHERE academic_year=? AND student_id=? ORDER BY id DESC LIMIT 1', [$exam['academic_year'], $s0['id']]);
+        $seat0 = $studentSeats[(int)$s0['id']] ?? [];
         $studentsData[] = [
             'id' => (int)$s0['id'],
             'name' => trim(($s0['first_name'] ?? '') . ' ' . ($s0['last_name'] ?? '')),
@@ -791,6 +806,7 @@ function toggleBank(){
   if(opening&&editor)editor.classList.add('collapsed');
   if(opening)hideImageTouchTools();
   p.classList.toggle('collapsed'); updateMobileChrome();
+  if(opening&&!bankCatalogReady&&!bankCatalogLoading)loadBank();
 }
 function cmd(c){document.execCommand(c,false,null);document.getElementById('qText').focus();}
 /* ============ v4.112.0: امکانات ویرایشگر حرفه‌ای (هم‌تراز پیش‌نمایش ایمپورت) ============ */
@@ -1146,38 +1162,87 @@ function designPayload(){
   return {questions:qItems,headerFields,drawings:drawingsData,sourceCrops,sourceOrder,style:pageStyle,printNote,academicYear:'<?php echo addslashes($exam['academic_year'] ?? ''); ?>',examMonth:'<?php echo addslashes($exam['exam_month'] ?? ''); ?>',updatedAt:new Date().toISOString()};
 }
 function saveDesign(silent=false){const payload=designPayload(); autosaveLocal(); return fetch('exam-design-api.php?group_member='+classGroupMember+'&action=save&exam_id='+examId+'&dt='+encodeURIComponent(designToken),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({design:payload})}).then(r=>r.json()).then(j=>{if(!silent){if(j.ok)showToast(j.message||'طراحی ذخیره شد'); else alert(j.error||'خطا در ذخیره');} return j;});}
-function loadDesignAndBank(){fetch('exam-design-api.php?group_member='+classGroupMember+'&action=load&exam_id='+examId+'&dt='+encodeURIComponent(designToken)).then(r=>r.json()).then(j=>{if(j.ok){let loaded=false; if(j.design){qItems=j.design.questions||[]; if(j.design.headerFields) headerFields=fixHeaderFieldOrder(j.design.headerFields); drawingsData=j.design.drawings||{}; sourceCrops=j.design.sourceCrops||{}; sourceOrder=j.design.sourceOrder||[]; pageStyle=fixLoadedHeaderH(j.design.style||{}); printNote=j.design.printNote||''; const pn=document.getElementById('printNote'); if(pn)pn.value=printNote; loaded=true; try{localStorage.removeItem(draftKey());}catch(e){} } const local=(!loaded)?loadLocalDraft():null; if(local){qItems=local.questions||[]; if(local.headerFields) headerFields=fixHeaderFieldOrder(local.headerFields); drawingsData=local.drawings||{}; sourceCrops=local.sourceCrops||{}; sourceOrder=local.sourceOrder||[]; pageStyle=fixLoadedHeaderH(local.style||{}); printNote=local.printNote||''; const pn=document.getElementById('printNote'); if(pn)pn.value=printNote; loaded=true;} renderHeaderEditor(); rerenderPages(); showBankSubject(j.subject,j.grade); populateBankFilters(j.filters); renderBank(j.bank||[]); renderDesignBank(j.designBank||[]); booting=false; autosaveLocal();}});}
-function loadBank(){const q=document.getElementById('bankSearch').value||'', y=document.getElementById('bankYear').value||'', m=document.getElementById('bankMonth').value||'', t=document.getElementById('bankType').value||'', d=document.getElementById('bankDesigner').value||''; fetch('exam-design-api.php?group_member='+classGroupMember+'&action=load&exam_id='+examId+'&dt='+encodeURIComponent(designToken)+'&subject='+encodeURIComponent(q)+'&year='+encodeURIComponent(y)+'&month='+encodeURIComponent(m)+'&type='+encodeURIComponent(t)+'&designer='+encodeURIComponent(d)).then(r=>r.json()).then(j=>{if(j.ok){showBankSubject(j.subject,j.grade); populateBankFilters(j.filters); renderBank(j.bank||[]); renderDesignBank(j.designBank||[]);}});}
+function loadDesignAndBank(){
+  const url='exam-design-api.php?group_member='+classGroupMember+'&action=load&catalog=design&exam_id='+examId+'&dt='+encodeURIComponent(designToken);
+  fetch(url).then(r=>r.json()).then(j=>{
+    if(!j.ok){booting=false; return;}
+    let loaded=false;
+    if(j.design){
+      qItems=j.design.questions||[];
+      if(j.design.headerFields) headerFields=fixHeaderFieldOrder(j.design.headerFields);
+      drawingsData=j.design.drawings||{}; sourceCrops=j.design.sourceCrops||{}; sourceOrder=j.design.sourceOrder||[];
+      pageStyle=fixLoadedHeaderH(j.design.style||{}); printNote=j.design.printNote||'';
+      const pn=document.getElementById('printNote'); if(pn)pn.value=printNote;
+      loaded=true;
+      try{localStorage.removeItem(draftKey());}catch(e){}
+    }
+    const local=(!loaded)?loadLocalDraft():null;
+    if(local){
+      qItems=local.questions||[];
+      if(local.headerFields) headerFields=fixHeaderFieldOrder(local.headerFields);
+      drawingsData=local.drawings||{}; sourceCrops=local.sourceCrops||{}; sourceOrder=local.sourceOrder||[];
+      pageStyle=fixLoadedHeaderH(local.style||{}); printNote=local.printNote||'';
+      const pn=document.getElementById('printNote'); if(pn)pn.value=printNote;
+      loaded=true;
+    }
+    renderHeaderEditor(); rerenderPages(); showBankSubject(j.subject,j.grade);
+    booting=false; autosaveLocal();
+    deferBankCatalog();
+  }).catch(()=>{booting=false;});
+}
+let bankCatalogReady=false, bankCatalogLoading=false, bankCatalogRequest=0, bankTotal=0, designBankTotal=0;
+function deferBankCatalog(){
+  const run=()=>{if(!bankCatalogReady&&!bankCatalogLoading)loadBank();};
+  if(window.requestIdleCallback) window.requestIdleCallback(run,{timeout:1200}); else setTimeout(run,350);
+}
+function loadBank(options){
+  options=options||{};
+  const q=document.getElementById('bankSearch').value||'', y=document.getElementById('bankYear').value||'', m=document.getElementById('bankMonth').value||'', t=document.getElementById('bankType').value||'', d=document.getElementById('bankDesigner').value||'';
+  const requestedBankPage=Math.max(1,Number(options.bankPage||1)), requestedDesignPage=Math.max(1,Number(options.designPage||1));
+  const url='exam-design-api.php?group_member='+classGroupMember+'&action=load&catalog=bank&exam_id='+examId+'&dt='+encodeURIComponent(designToken)+'&subject='+encodeURIComponent(q)+'&year='+encodeURIComponent(y)+'&month='+encodeURIComponent(m)+'&type='+encodeURIComponent(t)+'&designer='+encodeURIComponent(d)+'&bank_page='+requestedBankPage+'&design_page='+requestedDesignPage;
+  const request=++bankCatalogRequest; bankCatalogLoading=true;
+  const bankBox=document.getElementById('bankList'), designBox=document.getElementById('designBankList');
+  if(!bankCatalogReady){if(bankBox)bankBox.innerHTML='<small>در حال آماده‌سازی بانک سوالات…</small>'; if(designBox)designBox.innerHTML='<small>در حال آماده‌سازی آزمون‌های ذخیره‌شده…</small>';}
+  return fetch(url).then(r=>r.json()).then(j=>{
+    if(request!==bankCatalogRequest||!j.ok)return j;
+    showBankSubject(j.subject,j.grade); populateBankFilters(j.filters);
+    renderBank(j.bank||[],j.bankTotal,j.bankPage); renderDesignBank(j.designBank||[],j.designBankTotal,j.designBankPage);
+    bankCatalogReady=true;
+    return j;
+  }).catch(()=>null).finally(()=>{if(request===bankCatalogRequest)bankCatalogLoading=false;});
+}
 function bankScoreNum(v){const t=String(v??'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace('/','.'); const n=parseFloat(t); return isNaN(n)?Infinity:n;}
 /* ============ v4.116.0: صفحه‌بندی بانک — ۵ مورد در هر صفحه + ناوبری ============ */
 const BANK_PAGE_SIZE=5;
 let bankPage=1, designBankPage=1;
 function bankPagerHtml(total,page,fnName){
-  const pages=Math.max(1,Math.ceil(total/BANK_PAGE_SIZE));
+  const pages=Math.max(1,Math.ceil((Number(total)||0)/BANK_PAGE_SIZE));
   if(pages<=1)return '';
   let btns='';
   for(let i=1;i<=pages;i++){
-    if(pages>7 && i>2 && i<pages-1 && Math.abs(i-page)>1){ if(!btns.endsWith('</span>'))btns+='<span class="bp-dots">…</span>'; continue; }
+    if(pages>7 && i>2 && i<pages-1 && Math.abs(i-page)>1){if(!btns.endsWith('</span>'))btns+='<span class="bp-dots">…</span>';continue;}
     btns+=`<button type="button" class="bp-btn${i===page?' active':''}" onclick="${fnName}(${i})">${i.toLocaleString('fa-IR')}</button>`;
   }
   const prev=page>1?`<button type="button" class="bp-btn bp-nav" onclick="${fnName}(${page-1})">‹ قبلی</button>`:'';
   const next=page<pages?`<button type="button" class="bp-btn bp-nav" onclick="${fnName}(${page+1})">بعدی ›</button>`:'';
   return `<div class="bank-pager">${prev}${btns}${next}<span class="bp-info">صفحه ${page.toLocaleString('fa-IR')} از ${pages.toLocaleString('fa-IR')}</span></div>`;
 }
-function gotoBankPage(p){bankPage=p; renderBankPage(); const el=document.getElementById('bankList'); if(el)el.scrollIntoView({block:'nearest'});}
-function gotoDesignBankPage(p){designBankPage=p; renderDesignBankPage(); const el=document.getElementById('designBankList'); if(el)el.scrollIntoView({block:'nearest'});}
-function renderBank(items){
+function gotoBankPage(p){
+  p=Math.max(1,Number(p)||1); loadBank({bankPage:p,designPage:designBankPage}).then(()=>{const el=document.getElementById('bankList');if(el)el.scrollIntoView({block:'nearest'});});
+}
+function gotoDesignBankPage(p){
+  p=Math.max(1,Number(p)||1); loadBank({bankPage:bankPage,designPage:p}).then(()=>{const el=document.getElementById('designBankList');if(el)el.scrollIntoView({block:'nearest'});});
+}
+function renderBank(items,total,page){
   /* v4.115.0: چینش سوالات بانک به ترتیب بارم (صعودی؛ بدون بارم در انتها) */
-  items=[...(items||[])].sort((a,b)=>{const d=bankScoreNum(a.score)-bankScoreNum(b.score); return d!==0?d:(+b.id)-(+a.id);});
-  bankItems=items; bankPage=1; renderBankPage();
+  items=[...(items||[])].sort((a,b)=>{const d=bankScoreNum(a.score)-bankScoreNum(b.score);return d!==0?d:(+b.id)-(+a.id);});
+  bankItems=items; bankPage=Math.max(1,Number(page)||1); bankTotal=Number.isFinite(Number(total))?Number(total):items.length; renderBankPage();
 }
 function renderBankPage(){
   const items=bankItems||[];
-  const box=document.getElementById('bankList'); box.innerHTML='';
-  const cnt=document.getElementById('bankCount'); if(cnt)cnt.textContent=(items.length).toLocaleString('fa-IR');
-  const start=(bankPage-1)*BANK_PAGE_SIZE;
-  const pageItems=items.slice(start,start+BANK_PAGE_SIZE);
-  pageItems.forEach(b=>{
+  const box=document.getElementById('bankList'); if(!box)return; box.innerHTML='';
+  const cnt=document.getElementById('bankCount'); if(cnt)cnt.textContent=(bankTotal||0).toLocaleString('fa-IR');
+  items.forEach(b=>{
     /* v4.115.0: نوار جزئیات استایل‌دار و جدا از متن سوال */
     const chips=[];
     if(b.grade_level)chips.push(`<span class="bi-chip bi-grade">${esc(b.grade_level)}</span>`);
@@ -1185,8 +1250,10 @@ function renderBankPage(){
     if(b.exam_month)chips.push(`<span class="bi-chip">${esc(b.exam_month)}</span>`);
     if(b.designer_name)chips.push(`<span class="bi-chip bi-designer">طراح: ${esc(b.designer_name)}</span>`);
     if(b.score!==null&&b.score!==''&&b.score!==undefined)chips.push(`<span class="bi-chip bi-score">بارم: ${esc(String(b.score))}</span>`);
-    box.insertAdjacentHTML('beforeend',`<div class="bank-item"><div class="bi-head"><b class="bi-subject">${esc(b.subject_name)}</b><span class="bi-chips">${chips.join('')}</span></div><div class="bank-q">${b.question_html}</div><div class="bi-actions"><button class="bi-insert" onclick="insertBankQuestion(${b.id})">درج در برگه</button>${canEditBank?`<button class="bi-del" onclick="deleteBankQuestion(${b.id})">حذف از بانک</button>`:''}</div></div>`);});
-  box.insertAdjacentHTML('beforeend',bankPagerHtml(items.length,bankPage,'gotoBankPage'));}
+    box.insertAdjacentHTML('beforeend',`<div class="bank-item"><div class="bi-head"><b class="bi-subject">${esc(b.subject_name)}</b><span class="bi-chips">${chips.join('')}</span></div><div class="bank-q">${b.question_html}</div><div class="bi-actions"><button class="bi-insert" onclick="insertBankQuestion(${b.id})">درج در برگه</button>${canEditBank?`<button class="bi-del" onclick="deleteBankQuestion(${b.id})">حذف از بانک</button>`:''}</div></div>`);
+  });
+  box.insertAdjacentHTML('beforeend',bankPagerHtml(bankTotal,bankPage,'gotoBankPage'));
+}
 /* v4.97.0: نشان درس جاری روی پنل بانک — یادآوری اینکه فقط محتوای هم‌درس نمایش داده می‌شود */
 function showBankSubject(subj,grade){const el=document.getElementById('bankSubjectBadge'); if(!el)return; const g=grade?(' — پایه '+grade):''; if(subj){el.textContent='درس: '+subj+g; el.style.display='inline-block';} else {el.style.display='none';}}
 /* v4.96.0: پرکردن لیست‌های بازشونده فیلتر بانک (سال/ماه/طراح) با حفظ انتخاب فعلی */
@@ -1195,12 +1262,14 @@ function populateBankFilters(f){if(!f)return; const fill=(id,items,valKey,labKey
 function bankPageViews(x){const pages=x.pages||[]; const order=(x.order&&x.order.length)?x.order:pages.map((_,i)=>i+1); const out=[]; order.forEach((srcIdx,i)=>{const src=pages[srcIdx-1]; if(!src)return; const c=(x.crops&&x.crops[i+1])||{}; const t=+c.t||0,r=+c.r||0,b=+c.b||0,l=+c.l||0,w=+c.w||100,ct=+c.contrast||100,br=+c.brightness||100; const blend=(+ (c.bg||0)>0)?'multiply':'normal'; out.push({src,style:`width:${w}%;clip-path:inset(${t}% ${r}% ${b}% ${l}%);filter:contrast(${ct}%) brightness(${br}%);mix-blend-mode:${blend}`});}); return out;}
 /* v4.95.0: آزمون‌های کامل ذخیره‌شده در بانک — بندانگشتی صفحات + نام طراح + ماه/سال، زوم شناور، درج در ویرایشگر، حذف */
 let designBankItems=[];
-function renderDesignBank(items){designBankItems=items||[]; designBankPage=1; renderDesignBankPage();}
+function renderDesignBank(items,total,page){
+  designBankItems=items||[]; designBankPage=Math.max(1,Number(page)||1); designBankTotal=Number.isFinite(Number(total))?Number(total):designBankItems.length; renderDesignBankPage();
+}
 function renderDesignBankPage(){const box=document.getElementById('designBankList'); if(!box)return; box.innerHTML='';
-  const dc=document.getElementById('designBankCount'); if(dc)dc.textContent=(designBankItems.length).toLocaleString('fa-IR'); if(!designBankItems.length){box.innerHTML='<small>آزمون ذخیره‌شده‌ای با فایل منبع یافت نشد.</small>'; return;}
-  const start=(designBankPage-1)*BANK_PAGE_SIZE;
-  designBankItems.slice(start,start+BANK_PAGE_SIZE).forEach(x=>{const ref=x.ref||('e'+x.exam_id); const thumbs=bankPageViews(x).slice(0,6).map(p=>`<span style="display:inline-block;background:#fff;overflow:hidden;flex:none"><img src="${esc(p.src)}" loading="lazy" style="${p.style};height:86px;width:auto"></span>`).join(''); const archBadge=x.archived?` <small style="background:#fef3c7;color:#92400e;border-radius:5px;padding:1px 6px">نسخه قبلی (بایگانی)</small>`:''; box.insertAdjacentHTML('beforeend',`<div class="bank-exam"><b>${esc(x.subject||'')}</b> <small>${esc(x.grade||'')} ${esc(x.class||'')}</small>${archBadge}<br><small>طراح: ${esc(x.designer||'—')} | ماه: ${esc(x.month||'—')} | سال: ${esc(x.year||'—')}</small><div class="bank-exam-thumbs" onclick="openExamZoom('${ref}')" title="بزرگ‌نمایی صفحات">${thumbs}</div><div style="display:flex;gap:4px"><button onclick="importSavedExam('${ref}')">درج این آزمون در ویرایشگر</button>${canEditBank?`<button onclick="deleteSavedExam('${ref}')" style="background:#fee2e2">حذف از بانک</button>`:''}</div></div>`);});
-  box.insertAdjacentHTML('beforeend',bankPagerHtml(designBankItems.length,designBankPage,'gotoDesignBankPage'));}
+  const dc=document.getElementById('designBankCount'); if(dc)dc.textContent=(designBankTotal||0).toLocaleString('fa-IR');
+  if(!designBankItems.length){box.innerHTML='<small>آزمون ذخیره‌شده‌ای با فایل منبع یافت نشد.</small>'; return;}
+  designBankItems.forEach(x=>{const ref=x.ref||('e'+x.exam_id); const thumbs=bankPageViews(x).slice(0,6).map(p=>`<span style="display:inline-block;background:#fff;overflow:hidden;flex:none"><img src="${esc(p.src)}" loading="lazy" style="${p.style};height:86px;width:auto"></span>`).join(''); const archBadge=x.archived?` <small style="background:#fef3c7;color:#92400e;border-radius:5px;padding:1px 6px">نسخه قبلی (بایگانی)</small>`:''; box.insertAdjacentHTML('beforeend',`<div class="bank-exam"><b>${esc(x.subject||'')}</b> <small>${esc(x.grade||'')} ${esc(x.class||'')}</small>${archBadge}<br><small>طراح: ${esc(x.designer||'—')} | ماه: ${esc(x.month||'—')} | سال: ${esc(x.year||'—')}</small><div class="bank-exam-thumbs" onclick="openExamZoom('${ref}')" title="بزرگ‌نمایی صفحات">${thumbs}</div><div style="display:flex;gap:4px"><button onclick="importSavedExam('${ref}')">درج این آزمون در ویرایشگر</button>${canEditBank?`<button onclick="deleteSavedExam('${ref}')" style="background:#fee2e2">حذف از بانک</button>`:''}</div></div>`);});
+  box.insertAdjacentHTML('beforeend',bankPagerHtml(designBankTotal,designBankPage,'gotoDesignBankPage'));}
 function openExamZoom(ref){const x=designBankItems.find(e=>(e.ref||('e'+e.exam_id))===String(ref)); if(!x)return; /* v4.100.0: وسط‌چینی فلکس مثل صفحه اصلی — تصویر با عرض بیش از ۱۰۰٪ دیگر از یک طرف بریده نمی‌شود */ document.getElementById('examZoomPages').innerHTML=`<div style="margin-bottom:8px"><b>${esc(x.subject||'')}</b> — طراح: ${esc(x.designer||'—')} | ماه: ${esc(x.month||'—')} | سال: ${esc(x.year||'—')}</div>`+bankPageViews(x).map(p=>`<div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:8px;overflow:hidden;display:flex;justify-content:center;align-items:flex-start"><img src="${esc(p.src)}" style="${p.style};border:0;margin:0;flex:none"></div>`).join(''); document.getElementById('examZoomModal').style.display='flex';}
 function closeExamZoom(){document.getElementById('examZoomModal').style.display='none';}
 function importSavedExam(ref){if(!confirm('آزمون انتخابی از بانک در ویرایشگر فعلی درج شود؟ طراحی فعلی جایگزین می‌شود.'))return; const fd=new FormData(); fd.append('action','import_design'); fd.append('exam_id',examId); fd.append('dt',designToken); fd.append('source_ref',ref); fetch('exam-design-api.php?group_member='+classGroupMember,{method:'POST',body:fd}).then(r=>r.json()).then(j=>{if(!j.ok){alert(j.error||'خطا در درج آزمون'); return;} examData.sourcePages=j.sourcePages||[]; const d=j.design||{}; qItems=d.questions||[]; normalizeAllQuestionImages(); if(d.headerFields) headerFields=fixHeaderFieldOrder(d.headerFields); drawingsData=d.drawings||{}; sourceCrops=d.sourceCrops||{}; sourceOrder=d.sourceOrder||[]; pageStyle=fixLoadedHeaderH(d.style||{}); printNote=d.printNote||''; const pn=document.getElementById('printNote'); if(pn)pn.value=printNote; renderHeaderEditor(); rerenderPages(); autosaveLocal(); alert(j.message||'آزمون درج شد.');});}
