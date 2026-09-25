@@ -36,7 +36,7 @@ def validate_sources():
             assert data
     for page in (SITE_FILES['site-update-v4.152.0/exam-print.php'], DESKTOP_FILES['SchoolDeskPro/www/exam-print.php']):
         text = page.read_text(encoding='utf-8')
-        assert 'exam-designer-mobile.css?v=4.160.0' in text
+        assert 'exam-designer-mobile.css?v=4.160.1' in text
         assert 'function editorViewportScale()' in text
         assert 'function sourceCropHandleDown' in text
         assert 'function sourceCropApply' in text

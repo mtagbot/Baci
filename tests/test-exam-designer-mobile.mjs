@@ -12,7 +12,7 @@ function ok(condition, message) {
 }
 
 for (const [name, source] of [['site', site], ['desktop', desktop]]) {
-  ok(source.includes('assets/css/exam-designer-mobile.css?v=4.160.0'), `${name}: mobile layer is linked`);
+  ok(source.includes('assets/css/exam-designer-mobile.css?v=4.160.1'), `${name}: mobile layer is linked`);
   ok(source.includes('data-mobile-control="bank"'), `${name}: touch dock is installed`);
   ok(source.includes('function editorViewportScale()'), `${name}: preview scale helper exists`);
   ok(source.includes('source-crop-handle'), `${name}: source pages expose four direct crop handles`);
@@ -35,7 +35,7 @@ ok(css === desktopCss, 'site and desktop receive byte-identical mobile CSS');
 ok(css.includes('@media screen and (max-width: 860px)'), 'phone/tablet breakpoint exists');
 ok(css.includes('.mobile-editor-dock'), 'thumb-reachable mobile dock exists');
 ok(css.includes('#pagesRoot .page') && css.includes('transform: scale(var(--editorScale'), 'only the screen preview is scaled');
-ok(css.includes('transform-origin: top left') && css.includes('--editorPageOffset'), 'the scaled A4 page is centred from a phone-safe left gutter');
+ok(css.includes('transform-origin: top left') && css.includes('--editorPageOffset') && css.includes('direction: ltr'), 'the scaled A4 page is centred from a phone-safe left gutter');
 ok(css.includes('source-crop-handle') && css.includes('touch-action: none'), 'source-page crop handles are touch-safe');
 ok(css.includes('mobile-range-preview .editor-panel'), 'settings panel can disappear while a range is held');
 ok(css.includes('grid-template-columns: 1fr !important'), 'bank filters collapse to a touch-friendly column');

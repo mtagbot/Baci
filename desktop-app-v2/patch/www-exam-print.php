@@ -434,7 +434,7 @@ body.modal-open{overflow:hidden}
    even with hundreds of print pages; ignored harmlessly by very old browsers.
    Print media is unaffected: all pages always render fully on paper. */
 @media screen{.page{content-visibility:auto;contain-intrinsic-size:210mm 297mm}}
-</style><link rel="stylesheet" href="assets/css/exam-designer-mobile.css?v=4.160.0"></head><body>
+</style><link rel="stylesheet" href="assets/css/exam-designer-mobile.css?v=4.160.1"></head><body>
 <div class="toolbar" id="mainToolbar">
   <div class="tb-group no-ajax"><span class="tb-title">فایل منبع</span><button type="button" onclick="openSourceUploadModal()">بارگذاری PDF/تصویر</button><button type="button" onclick="deleteLiveSource()">حذف/تغییر</button></div>
   <span class="tb-sep"></span>

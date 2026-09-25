@@ -127,6 +127,7 @@
   #pagesRoot {
     --editorPageOffset: 0px;
     --editorVisualWidth: 0px;
+    direction: ltr;
     min-height: 100vh;
     padding: calc(var(--toolbarH, 58px) + 7px) 0 18px;
     overflow-x: auto;
@@ -172,6 +173,7 @@
     padding: 10px;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
 
   .editor-panel {
