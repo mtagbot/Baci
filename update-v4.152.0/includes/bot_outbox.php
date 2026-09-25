@@ -75,6 +75,11 @@ function bot_outbox_enqueue($platform,$payload) {
         if(DeskSync::enabled())$owner='relay';
     }
     $id=bot_outbox_store(bin2hex(random_bytes(16)),$platform,$payload,$owner);
+    /* v4.165.0: پیام تازه برای چتی که قبلاً مسدود شناخته شده، مستقیم با
+       state='blocked' ثبت می‌شود — صفر تلاش بی‌نتیجه؛ با رفع مسدودی بیدار می‌شود. */
+    if($owner==='local' && bot_outbox_chat_is_blocked($platform,(string)($payload['chat_id']??''))) {
+        bot_outbox_sql("UPDATE bot_outbox SET state='blocked' WHERE job_id=? AND state='pending'",[$id]);
+    }
     // Enqueue the ENTIRE recipient loop before any site network I/O. A single offline
     // recipient must never prevent later recipients from even entering the queue.
     static $scheduled=false;
@@ -115,6 +120,14 @@ function bot_outbox_deliver($id) {
         bot_outbox_sql("UPDATE bot_outbox SET state='sent',sent_at=?,lease_until=0,claim_token='',last_error='',message_id=? WHERE job_id=? AND claim_token=?",[time(),(string)($result['result']['message_id']??''),$id,$claim]);
         bot_outbox_log_state($id,'sent');return $result;
     } catch(Throwable $e) {
+        /* v4.165.0: سه ۴۰۳ پشت‌سرهم یعنی کاربر ربات را مسدود کرده است. job از
+           چرخهٔ تلاش خارج می‌شود (state='blocked') تا worker بی‌خودی API را
+           نکوبد؛ پیام سالم می‌ماند و با اولین پیام کاربر پس از رفع مسدودی
+           (bot_outbox_unblock_chat در وب‌هوک) خودکار به چرخه برمی‌گردد. */
+        if($row['owner']==='local' && (int)$row['attempts']+1>=3 && preg_match('/HTTP 403\b/',$e->getMessage())) {
+            bot_outbox_sql("UPDATE bot_outbox SET state='blocked',next_try=0,lease_until=0,claim_token='',last_error=? WHERE job_id=? AND claim_token=?", [bot_outbox_clean_error($e,$row['platform']),$id,$claim]);
+            bot_outbox_log_state($id,'blocked');return null;
+        }
         $retry=min(60,10*(2**min(3,(int)$row['attempts'])));
         if(preg_match('/HTTP (?:400|401|403)\b/',$e->getMessage()))$retry=min(3600,10*(2**min(9,(int)$row['attempts'])));
         $pausePlatform=(bool)preg_match('/خطای ارتباط|توکن ربات تنظیم نشده|HTTP (?:5\d\d|401)\b/u',$e->getMessage());
@@ -216,4 +229,30 @@ function bot_outbox_blocked_chats($platform) {
     $out = array_values($chats);
     usort($out, function ($a, $b) { return $b['attempts'] <=> $a['attempts']; });
     return $out;
+}
+
+/* v4.165.0: آیا این چت قبلاً مسدود شناخته شده؟ (یک job با state='blocked'
+   برای همان chat_id کافی است). payload همیشه با {"chat_id":"…","text": شروع
+   می‌شود (bot_outbox_payload ترتیب پایدار می‌سازد) پس تطبیق prefix دقیق است. */
+function bot_outbox_chat_is_blocked($platform, $chatId) {
+    $chatId = trim((string)$chatId);
+    if ($chatId === '' || !in_array($platform, ['telegram', 'bale'], true)) return false;
+    try {
+        $like = '{"chat_id":' . json_encode($chatId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ',%';
+        $hit = bot_outbox_sql("SELECT job_id FROM bot_outbox WHERE platform=? AND owner='local' AND state='blocked' AND payload LIKE ? LIMIT 1", [$platform, $like])->fetch(PDO::FETCH_ASSOC);
+        return (bool)$hit;
+    } catch (Throwable $e) { return false; }
+}
+
+/* v4.165.0: کاربر پس از رفع مسدودی پیامی می‌فرستد (شامل /start) ← همهٔ
+   پیام‌های پارک‌شدهٔ او بدون دخالت مدیر به چرخهٔ ارسال برمی‌گردند.
+   این تابع از وب‌هوک داخل try/catch جدا صدا زده می‌شود و هرگز نباید روی
+   جریان اتصال اولیا اثر بگذارد. jobهای رله (دسکتاپ) دست‌نخورده می‌مانند. */
+function bot_outbox_unblock_chat($platform, $chatId) {
+    $chatId = trim((string)$chatId);
+    if ($chatId === '' || !in_array($platform, ['telegram', 'bale'], true)) return 0;
+    bot_outbox_schema();
+    $like = '{"chat_id":' . json_encode($chatId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ',%';
+    $n = bot_outbox_sql("UPDATE bot_outbox SET state='pending',next_try=0,attempts=0,last_error='' WHERE platform=? AND owner='local' AND state='blocked' AND payload LIKE ?", [$platform, $like])->rowCount();
+    return (int)$n;
 }

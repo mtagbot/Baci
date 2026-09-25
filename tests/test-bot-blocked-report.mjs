@@ -62,6 +62,55 @@ require_once '/www/includes/bot_outbox.php';
 var_dump(bot_outbox_blocked_chats('sms') === []);`);
 check(empty.out.includes('bool(true)'), 'an unknown platform yields an empty report');
 
+/* ── v4.165.0 cycle: 3rd 403 parks the job, later messages are born parked,
+      any user message wakes them, and relay jobs are never touched ───────── */
+const cycle = await run(`<?php
+/* mock the provider before bot_helpers' function_exists guard, exactly like
+   the other bot suites: fail403 mode throws the real Bale error shape. */
+function bot_api_request($platform,$method,$data=[],$multipart=false){
+    $mode=trim((string)@file_get_contents('/harness/botmode.txt'));
+    if($mode==='ok')return ['ok'=>true,'result'=>['message_id'=>9001]];
+    throw new RuntimeException('پاسخ ناموفق API: HTTP 403 - {"ok":false,"error_code":403,"description":"Forbidden: permission_denied"}');
+}
+require_once '/www/includes/functions.php';
+require_once '/www/includes/bot_helpers.php';
+require_once '/www/includes/bot_outbox.php';
+@mkdir('/harness'); file_put_contents('/harness/botmode.txt','fail403');
+DB::execute("DELETE FROM bot_outbox WHERE job_id LIKE 'cyc%'");
+DB::execute("DELETE FROM bot_outbox_limits WHERE platform='bale'");
+DB::execute("INSERT INTO bot_outbox (job_id,platform,payload,payload_hash,owner,state,attempts,next_try,created_at,last_error) VALUES ('cyc00000000000000000000000000b1','bale',?,?,'local','pending',2,0,?,?)",
+  [json_encode(['chat_id'=>'888001','text'=>'اعلان ۱'],JSON_UNESCAPED_UNICODE), 'hashb1', time(), 'پاسخ ناموفق API: HTTP 403 - Forbidden']);
+bot_outbox_drain(10,5);
+$s1=DB::fetch("SELECT state,attempts FROM bot_outbox WHERE job_id='cyc00000000000000000000000000b1'");
+echo 'AFTER3='.$s1['state'].'/'.$s1['attempts'].';';
+bot_outbox_drain(10,5);
+$s2=DB::fetch("SELECT attempts FROM bot_outbox WHERE job_id='cyc00000000000000000000000000b1'");
+echo 'STABLE='.$s2['attempts'].';';
+bot_outbox_enqueue('bale',['chat_id'=>'888001','text'=>'اعلان ۲']);
+$nb=DB::fetch("SELECT job_id,state FROM bot_outbox WHERE platform='bale' AND payload LIKE '%اعلان ۲%' ORDER BY created_at DESC LIMIT 1");
+echo 'BORN='.$nb['state'].';';
+DB::execute("INSERT INTO bot_outbox (job_id,platform,payload,payload_hash,owner,state,attempts,next_try,created_at,last_error) VALUES ('cyc00000000000000000000000000b9','bale',?,?,'relay','blocked',1,0,?,'')",
+  [json_encode(['chat_id'=>'888001','text'=>'رله'],JSON_UNESCAPED_UNICODE),'hashb9',time()]);
+$n=bot_outbox_unblock_chat('bale','888001');
+echo 'WOKE='.$n.';';
+$rl=DB::fetch("SELECT state FROM bot_outbox WHERE job_id='cyc00000000000000000000000000b9'");
+echo 'RELAY='.$rl['state'].';';
+file_put_contents('/harness/botmode.txt','ok');
+$sent=bot_outbox_drain(10,5);
+$s3=DB::fetch("SELECT state FROM bot_outbox WHERE job_id='cyc00000000000000000000000000b1'");
+$s4=DB::fetch("SELECT state FROM bot_outbox WHERE job_id='".$nb['job_id']."'");
+echo 'DELIV='.$s3['state'].'/'.$s4['state'].'/'.$sent;`);
+const c = Object.fromEntries((cycle.out.match(/([A-Z0-9]+)=([^;]*)/g) || []).map(kv => { const i = kv.indexOf('='); return [kv.slice(0, i), kv.slice(i + 1)]; }));
+check(c.AFTER3 === 'blocked/3', 'the third consecutive 403 parks the job instead of re-queueing it: ' + cycle.out.slice(0, 200) + cycle.err.slice(0, 200));
+check(c.STABLE === '3', 'a parked job is never claimed again (no wasted attempts)');
+check(c.BORN === 'blocked', 'a NEW message to an already-blocked chat is born parked (zero attempts)');
+check(c.WOKE === '2', 'unblocking wakes exactly the local parked jobs of that chat');
+check(c.RELAY === 'blocked', 'relay (desktop) jobs are never touched by the unblock flush');
+check(c.DELIV === 'sent/sent/2', 'woken jobs deliver normally once the provider accepts again: ' + c.DELIV);
+
+const engine = readFileSync(new URL('../update-v4.152.0/includes/bot_webhook_engine.php', import.meta.url), 'utf8');
+check(engine.includes("try { bot_outbox_unblock_chat($platform, $chatId); }"), 'the webhook flush is wrapped in its own try/catch before the /start flow');
+
 /* ── the shipped admin page must render the section ──────────────────────── */
 const ui = readFileSync(new URL('../update-v4.152.0/includes/bot_admin_ui.php', import.meta.url), 'utf8');
 check(ui.includes('$blockedChats = bot_outbox_blocked_chats($platform);'), 'the bot admin page calls the report helper');

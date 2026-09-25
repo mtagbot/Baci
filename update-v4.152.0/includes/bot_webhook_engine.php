@@ -185,6 +185,13 @@ if ($chatId === '') {
     exit;
 }
 
+/* v4.165.0: همین که کاربر توانست پیامی بفرستد یعنی کانال باز است؛ اگر قبلاً
+   مسدود کرده بود، پیام‌های پارک‌شده‌اش خودکار به چرخهٔ ارسال برمی‌گردند.
+   کاملاً ایزوله: هر خطای صف فقط لاگ می‌شود و هرگز جریان اتصال را مختل نمی‌کند. */
+if (function_exists('bot_outbox_unblock_chat')) {
+    try { bot_outbox_unblock_chat($platform, $chatId); } catch (Throwable $e) { error_log('bot_outbox_unblock_chat: ' . $e->getMessage()); }
+}
+
 if ($text === '/start') {
     DB::execute("REPLACE INTO `$stateTable` (`$chatCol`, step, temp_nid) VALUES (?, 'awaiting_nid', NULL)", [$chatId]);
     // v4.87.0: an already-signed-in staff member gets the staff panel back

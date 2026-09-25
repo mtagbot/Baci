@@ -282,7 +282,7 @@ if (!function_exists('bot_admin_render_page')) {
     bot_outbox_schema();
     $queueCounts=bot_outbox_sql('SELECT state,COUNT(*) AS n FROM bot_outbox WHERE platform=? GROUP BY state',[$platform])->fetchAll(PDO::FETCH_ASSOC);
     $queueRows=bot_outbox_sql("SELECT job_id,state,owner,attempts,created_at,last_error FROM bot_outbox WHERE platform=? AND state<>'sent' ORDER BY created_at DESC LIMIT 10",[$platform])->fetchAll(PDO::FETCH_ASSOC);
-    $stateNames=['pending'=>'در انتظار تلاش','sending'=>'در حال ارسال','relayed'=>'در صف سایت','sent'=>'ارسال تأییدشده'];
+    $stateNames=['pending'=>'در انتظار تلاش','sending'=>'در حال ارسال','relayed'=>'در صف سایت','blocked'=>'مسدود (بدون تلاش)','sent'=>'ارسال تأییدشده'];
     ?>
     <section class="card space-y-3" aria-labelledby="bot-queue-heading">
         <h3 id="bot-queue-heading" class="font-bold">صف ماندگار اعلان‌ها</h3>
@@ -300,7 +300,7 @@ if (!function_exists('bot_admin_render_page')) {
         if ($blockedChats): ?>
         <div class="soft-panel text-xs space-y-1" style="overflow-wrap:anywhere;word-break:break-word">
             <b>ولی‌هایی که ربات را مسدود کرده‌اند (خطای ۴۰۳):</b>
-            <p class="text-muted">پیام‌های این چت‌ها تا رفع مسدودی تحویل نمی‌شود ولی سالم در صف می‌مانند. ولی باید ربات را از فهرست مسدودها خارج کند و دوباره /start بزند؛ پیام‌های معوقه سپس خودکار ارسال می‌شوند.</p>
+            <p class="text-muted">پیام‌های این چت‌ها تا رفع مسدودی تحویل نمی‌شود ولی سالم در صف می‌مانند و پس از سه تلاش ناموفق از چرخهٔ تلاش خارج می‌شوند (تلاش بی‌نتیجهٔ بیشتر انجام نمی‌شود). ولی باید ربات را از فهرست مسدودها خارج کند و دوباره /start بزند؛ همهٔ پیام‌های معوقهٔ او سپس خودکار ارسال می‌شوند.</p>
             <?php foreach ($blockedChats as $bc): ?><div>• <?php if ($bc['students']): ?><b><?php echo clean(implode('، ', $bc['students'])); ?></b><?php else: ?>چت ناشناس <code dir="ltr"><?php echo clean($bc['chat_id']); ?></code><?php endif; ?> — <?php echo tr_num((int)$bc['jobs'], 'fa'); ?> پیام معوق · <?php echo tr_num((int)$bc['attempts'], 'fa'); ?> تلاش</div><?php endforeach; ?>
         </div>
         <?php endif; ?>

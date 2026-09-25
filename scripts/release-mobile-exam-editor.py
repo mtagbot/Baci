@@ -20,8 +20,10 @@ SITE_FILES = {
     'site-update-v4.152.0/exam-print.php': ROOT / 'update-v4.152.0/exam-print.php',
     'site-update-v4.152.0/assets/css/exam-designer-mobile.css': ROOT / 'update-v4.152.0/assets/css/exam-designer-mobile.css',
     # v4.164.0: report which parents blocked the bot (403 chats → linked students).
+    # v4.165.0: blocked chats leave the retry cycle and wake on the next user message.
     'site-update-v4.152.0/includes/bot_admin_ui.php': ROOT / 'update-v4.152.0/includes/bot_admin_ui.php',
     'site-update-v4.152.0/includes/bot_outbox.php': ROOT / 'update-v4.152.0/includes/bot_outbox.php',
+    'site-update-v4.152.0/includes/bot_webhook_engine.php': ROOT / 'update-v4.152.0/includes/bot_webhook_engine.php',
 }
 DESKTOP_FILES = {
     'SchoolDeskPro/www/exam-design-api.php': ROOT / 'desktop-app-v2/patch/www-exam-design-api.php',
@@ -108,6 +110,13 @@ def validate_sources():
     ui_text = SITE_FILES['site-update-v4.152.0/includes/bot_admin_ui.php'].read_text(encoding='utf-8')
     assert 'bot_outbox_blocked_chats($platform)' in ui_text
     assert 'ولی‌هایی که ربات را مسدود کرده‌اند' in ui_text
+    # v4.165.0: blocked chats park after 3x403, born-parked messages, auto wake
+    assert "state='blocked'" in outbox_text
+    assert 'function bot_outbox_chat_is_blocked' in outbox_text
+    assert 'function bot_outbox_unblock_chat' in outbox_text
+    assert "'blocked'=>'مسدود (بدون تلاش)'" in ui_text
+    engine_text = SITE_FILES['site-update-v4.152.0/includes/bot_webhook_engine.php'].read_text(encoding='utf-8')
+    assert 'bot_outbox_unblock_chat($platform, $chatId)' in engine_text
 
 
 def build(filename, payload):
