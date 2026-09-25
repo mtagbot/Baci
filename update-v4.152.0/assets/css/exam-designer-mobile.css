@@ -1,5 +1,5 @@
 /*
- * Live exam designer — touch layout layer, v4.161.0
+ * Live exam designer — touch layout layer, v4.162.0
  *
  * This file is deliberately screen-only. The A4 page, millimetre dimensions,
  * print flow and all saved design values stay in exam-print.php and are not
@@ -11,6 +11,15 @@
 .mobile-editor-dock,
 .mobile-image-tools {
   display: none;
+}
+
+.image-editor-status {
+  display: block;
+  min-height: 1.5em;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.6;
 }
 
 @media screen and (max-width: 860px) {
@@ -286,6 +295,40 @@
   .img-handle-s { left: 50%; bottom: 26px; transform: translateX(-50%); }
   .img-handle-sw { left: 26px; bottom: 26px; }
   .img-handle-w { left: 26px; top: 50%; transform: translateY(-50%); }
+
+  /* Mobile handles are a separate four-corner layer outside the table cell.
+     The old eight-handle box was clipped by .q-content and was too crowded
+     on a scaled A4 page. */
+  .mobile-img-handle-layer {
+    position: fixed !important;
+    z-index: 126 !important;
+    pointer-events: none !important;
+    overflow: visible !important;
+    border: 2px dashed #2563eb;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.75);
+  }
+
+  .mobile-img-handle-layer .img-handle {
+    width: 46px;
+    height: 46px;
+    margin: 0;
+    border: 3px solid #1d4ed8;
+    border-radius: 11px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(15,23,42,.38);
+  }
+
+  .mobile-img-handle-layer .img-handle-n,
+  .mobile-img-handle-layer .img-handle-e,
+  .mobile-img-handle-layer .img-handle-s,
+  .mobile-img-handle-layer .img-handle-w {
+    display: none;
+  }
+
+  .mobile-img-handle-layer .img-handle-nw { left: -23px; top: -23px; }
+  .mobile-img-handle-layer .img-handle-ne { right: -23px; top: -23px; }
+  .mobile-img-handle-layer .img-handle-se { right: -23px; bottom: -23px; }
+  .mobile-img-handle-layer .img-handle-sw { left: -23px; bottom: -23px; }
 
   .mobile-image-tools {
     position: fixed;
@@ -607,6 +650,29 @@
   }
 }
 
+
+@media screen and (max-width: 600px) {
+  .q-preview-col {
+    display: none !important;
+  }
+
+  .upload-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .upload-step-body {
+    padding: 9px;
+  }
+
+  .q-modal-card,
+  .upload-card,
+  .image-card,
+  .math-card,
+  .exam-zoom-card {
+    padding: 10px;
+  }
+}
+
 @media screen and (min-width: 521px) and (max-width: 860px) {
   .q-modal-card {
     width: min(760px, 100%);
@@ -661,6 +727,7 @@
 
 @media print {
   .mobile-editor-dock,
-  .mobile-image-tools {display:none!important;}
+  .mobile-image-tools,
+  .mobile-img-handle-layer {display:none!important;}
   .source-crop-overlay {display:none!important;}
 }

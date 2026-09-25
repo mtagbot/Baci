@@ -12,7 +12,7 @@ function ok(condition, message) {
 }
 
 for (const [name, source] of [['site', site], ['desktop', desktop]]) {
-  ok(source.includes('assets/css/exam-designer-mobile.css?v=4.161.0'), `${name}: mobile layer is linked`);
+  ok(source.includes('assets/css/exam-designer-mobile.css?v=4.162.0'), `${name}: mobile layer is linked`);
   ok(source.includes('data-mobile-control="bank"'), `${name}: touch dock is installed`);
   ok(source.includes('function editorViewportScale()'), `${name}: preview scale helper exists`);
   ok(source.includes('source-crop-handle'), `${name}: source pages expose four direct crop handles`);
@@ -21,6 +21,10 @@ for (const [name, source] of [['site', site], ['desktop', desktop]]) {
   ok(source.includes('function normalizeQuestionHtml'), `${name}: saved/bank question images are normalized for touch editing`);
   ok(source.includes('function imageLayoutScale'), `${name}: scaled preview converts touch movement to page pixels`);
   ok(source.includes('function finishImageResize'), `${name}: image resize has a touch-safe completion path`);
+  ok(source.includes('mobile-img-handle-layer'), `${name}: mobile handles use an unclipped four-corner layer`);
+  ok(source.includes('function setImageEditorStatus') && source.includes('imageEditorTargetInQuestion'), `${name}: selected image editor has a visible load/target path`);
+  ok(source.includes('syncRenderedImagesToModel(false)') && source.includes('function designPayload'), `${name}: save and print snapshot live image changes`);
+  ok(source.includes('preview-empty'), `${name}: question preview has an explicit render fallback`);
   ok(source.includes('function moveSelectedImage') && source.includes('mobileImageTools'), `${name}: mobile image nudge tools exist`);
   ok(source.includes('let imageEditOriginal=null, imageEditTarget=null'), `${name}: image editor can reopen a selected image`);
   ok(source.includes('imageSettings'), `${name}: image editor settings remain revisitable`);
@@ -42,6 +46,7 @@ ok(css === desktopCss, 'site and desktop receive byte-identical mobile CSS');
 ok(css.includes('@media screen and (max-width: 860px)'), 'phone/tablet breakpoint exists');
 ok(css.includes('.mobile-editor-dock') && css.includes('display: none;'), 'thumb-reachable mobile dock exists but stays hidden on desktop');
 ok(css.includes('.mobile-image-tools') && css.includes('mobile-image-tools-edit'), 'selected question images get a touch toolbar');
+ok(css.includes('.mobile-img-handle-layer') && css.includes('.mobile-img-handle-layer .img-handle-nw'), 'mobile image handles are unclipped and corner-only');
 ok(css.includes('.img-handle') && css.includes('width: 42px'), 'image resize handles have larger mobile hit areas');
 ok(css.includes('#pagesRoot .page') && css.includes('transform: scale(var(--editorScale'), 'only the screen preview is scaled');
 ok(css.includes('transform-origin: top left') && css.includes('--editorPageOffset') && css.includes('direction: ltr'), 'the scaled A4 page is centred from a phone-safe left gutter');
@@ -50,6 +55,7 @@ ok(css.includes('mobile-range-preview .editor-panel'), 'settings panel can disap
 ok(css.includes('grid-template-columns: 1fr !important'), 'bank filters collapse to a touch-friendly column');
 ok(css.includes('.q-modal-card') && css.includes('max-height: calc(100dvh'), 'question editor fits the dynamic mobile viewport');
 ok(css.includes('touch-action: none'), 'drag/resize controls reserve touch gestures');
-ok(css.includes('@media print') && css.includes('mobile-editor-dock,') && css.includes('mobile-image-tools {display:none!important;}'), 'mobile chrome is explicitly absent from print');
+ok(css.includes('@media screen and (max-width: 600px)') && css.includes('.q-preview-col'), 'phone modal omits the preview while tablets retain it');
+ok(css.includes('@media print') && css.includes('mobile-editor-dock,') && css.includes('mobile-img-handle-layer {display:none!important;}'), 'mobile chrome is explicitly absent from print');
 
 console.log(`PASS ${checks} mobile/tablet live-exam designer invariants`);

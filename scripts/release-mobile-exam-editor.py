@@ -36,14 +36,17 @@ def validate_sources():
             assert data
     for page in (SITE_FILES['site-update-v4.152.0/exam-print.php'], DESKTOP_FILES['SchoolDeskPro/www/exam-print.php']):
         text = page.read_text(encoding='utf-8')
-        assert 'exam-designer-mobile.css?v=4.161.0' in text
+        assert 'exam-designer-mobile.css?v=4.162.0' in text
         assert 'function editorViewportScale()' in text
         assert 'function sourceCropHandleDown' in text
         assert 'function sourceCropApply' in text
         assert 'function normalizeQuestionHtml' in text
         assert 'function finishImageResize' in text
+        assert 'mobile-img-handle-layer' in text
         assert 'let imageEditOriginal=null, imageEditTarget=null' in text
+        assert 'imageEditorStatus' in text
         assert 'mobileImageTools' in text
+        assert 'syncRenderedImagesToModel(false)' in text
         assert 'document.execCommand(\'fontName\'' in text
         assert 'mobile-range-preview' in text
         assert 'function moveQuestion(id,delta)' in text
