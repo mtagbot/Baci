@@ -21,14 +21,18 @@ SITE_FILES = {
     'site-update-v4.152.0/assets/css/exam-designer-mobile.css': ROOT / 'update-v4.152.0/assets/css/exam-designer-mobile.css',
     # v4.164.0: report which parents blocked the bot (403 chats → linked students).
     # v4.165.0: blocked chats leave the retry cycle and wake on the next user message.
+    # v4.166.0: profile identity resolver — the 6-digit part links, letters/prefix never matter.
     'site-update-v4.152.0/includes/bot_admin_ui.php': ROOT / 'update-v4.152.0/includes/bot_admin_ui.php',
     'site-update-v4.152.0/includes/bot_outbox.php': ROOT / 'update-v4.152.0/includes/bot_outbox.php',
     'site-update-v4.152.0/includes/bot_webhook_engine.php': ROOT / 'update-v4.152.0/includes/bot_webhook_engine.php',
+    'site-update-v4.152.0/includes/bot_helpers.php': ROOT / 'update-v4.152.0/includes/bot_helpers.php',
 }
 DESKTOP_FILES = {
     'SchoolDeskPro/www/exam-design-api.php': ROOT / 'desktop-app-v2/patch/www-exam-design-api.php',
     'SchoolDeskPro/www/exam-print.php': ROOT / 'desktop-app-v2/patch/www-exam-print.php',
     'SchoolDeskPro/www/assets/css/exam-designer-mobile.css': ROOT / 'desktop-app-v2/patch/www-assets-css-exam-designer-mobile.css',
+    # v4.166.0: identity resolver parity (the desktop mirror of bot_helpers).
+    'SchoolDeskPro/reports/includes/bot_helpers.php': ROOT / 'desktop-app-v2/patch/includes-bot_helpers.php',
 }
 
 
@@ -117,6 +121,15 @@ def validate_sources():
     assert "'blocked'=>'مسدود (بدون تلاش)'" in ui_text
     engine_text = SITE_FILES['site-update-v4.152.0/includes/bot_webhook_engine.php'].read_text(encoding='utf-8')
     assert 'bot_outbox_unblock_chat($platform, $chatId)' in engine_text
+    # v4.166.0: identity resolver — 6-digit profile identity links; letters/prefix never matter
+    helpers_text = SITE_FILES['site-update-v4.152.0/includes/bot_helpers.php'].read_text(encoding='utf-8')
+    desk_helpers_text = DESKTOP_FILES['SchoolDeskPro/reports/includes/bot_helpers.php'].read_text(encoding='utf-8')
+    for text in (helpers_text, desk_helpers_text):
+        assert 'function bot_find_student_by_identity' in text
+        assert 'شناسهٔ ۶ رقمی پرونده' in text
+    assert "preg_match('/^\\d{6,10}$/', $nid)" in engine_text
+    assert 'bot_find_student_by_identity($nid)' in engine_text
+    assert "(string)$student['national_id']" in engine_text
 
 
 def build(filename, payload):

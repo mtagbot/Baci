@@ -107,7 +107,7 @@ if (!function_exists('bot_default_messages')) {
     function bot_default_messages() {
         return [
             'welcome' => "🌺 سلام! به ربات رسمی آموزشگاه خوش آمدید.\n\nبرای احراز هویت، لطفاً کد ملی ۱۰ رقمی دانش‌آموز را ارسال کنید.",
-            'invalid_nid' => '⚠️ کد ملی باید دقیقاً ۱۰ رقم عددی باشد. لطفاً دوباره ارسال کنید:',
+            'invalid_nid' => '⚠️ کد ملی ۱۰ رقمی (یا شناسهٔ ۶ رقمی پرونده) را فقط با عدد ارسال کنید. لطفاً دوباره ارسال کنید:',
             'student_not_found' => '❌ دانش‌آموزی با این کد ملی در سیستم یافت نشد. لطفاً کد ملی صحیح را ارسال کنید:',
             'ask_serial' => '✔️ دانش‌آموز شناسایی شد. اکنون سریال ۶ رقمی شناسنامه/رمز ورود را ارسال کنید:',
             'invalid_serial' => '❌ سریال یا رمز وارد شده اشتباه است. لطفاً دوباره تلاش کنید:',
@@ -642,6 +642,38 @@ if (!function_exists('get_latest_student_by_national_id')) {
         } catch (Exception $e) {}
         // Fallback to any
         return DB::fetch("SELECT * FROM students WHERE national_id=? AND status='active' LIMIT 1", [$nationalId]);
+    }
+}
+
+if (!function_exists('bot_find_student_by_identity')) {
+    /* v4.166.0: شناسهٔ مؤثر دانش‌آموز = بلندترین بخش رقمی پرونده. در پرونده‌هایی
+       مثل «26/ب/265486» حرف و دو رقم پیشرو هیچ نقشی در اتصال ندارند؛ همان
+       «265486» (یا کل رقم‌ها «26265486») برای اتصال کافی است. پرونده‌های کاملاً
+       رقمی (کد ملی ۱۰ رقمی استاندارد) فقط از همان مسیر تطبیق دقیق قبلی
+       می‌گذرند، پس رفتار آن‌ها ذره‌ای تغییر نمی‌کند. اگر چند دانش‌آموز متفاوت
+       یک شناسهٔ ۶ رقمی داشته باشند، عمداً «یافت نشد» برمی‌گردد (ابهام = عدم
+       اتصال) تا هیچ‌وقت دانش‌آموز اشتباهی به ولی وصل نشود. */
+    function bot_find_student_by_identity($input) {
+        $digits = preg_replace('/\D+/', '', tr_num((string)$input, 'en'));
+        if ($digits === '') return null;
+        $exact = get_latest_student_by_national_id($digits);
+        if ($exact) return $exact;
+        if (!preg_match('/^\d{6,10}$/', $digits)) return null;
+        try {
+            $rows = DB::fetchAll("SELECT national_id FROM students WHERE status='active' AND national_id<>'' LIMIT 20000");
+        } catch (Exception $e) { return null; }
+        $hits = [];
+        foreach ($rows as $r) {
+            $stored = (string)($r['national_id'] ?? '');
+            if ($stored === '' || preg_match('/^\d+$/', $stored)) continue;
+            $identity = '';
+            foreach (preg_split('/\D+/', $stored, -1, PREG_SPLIT_NO_EMPTY) as $run) {
+                if (strlen($run) > strlen($identity)) $identity = $run;
+            }
+            if ($identity === $digits || preg_replace('/\D+/', '', $stored) === $digits) $hits[$stored] = true;
+        }
+        if (count($hits) !== 1) return null;
+        return get_latest_student_by_national_id((string)array_key_first($hits));
     }
 }
 

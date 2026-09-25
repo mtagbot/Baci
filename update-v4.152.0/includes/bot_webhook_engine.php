@@ -516,7 +516,10 @@ if ($step === 'awaiting_nid') {
         exit;
     }
     $nid = preg_replace('/\D+/', '', tr_num($text, 'en'));
-    if (!preg_match('/^\d{10}$/', $nid)) {
+    /* v4.166.0: ۱۰ رقم = کد ملی استاندارد (مسیر قبلی، بدون هیچ تغییر). ورودی
+       ۶ تا ۹ رقمی فقط وقتی پذیرفته می‌شود که با «بلندترین بخش رقمی» یک پروندهٔ
+       شناسه‌دار مثل «26/ب/265486» مطابقت کند — حرف و پیشوند بی‌اثرند. */
+    if (!preg_match('/^\d{6,10}$/', $nid)) {
         $invalidNidMsg = bot_text($platform, 'invalid_nid');
         /* نام کاربری مدیر عددی نیست؛ پس راهنمای مدیر در پیام خطا می‌آید. */
         if ($rawIdentity !== '' && !preg_match('/^\d+$/', $rawIdentity)) {
@@ -530,7 +533,9 @@ if ($step === 'awaiting_nid') {
        TEACHER (any staff role), switch to the staff flow: ask for the
        personnel code instead of the student serial. Teacher id wins over a
        student with the same id (rare data-entry collision). */
-    $staffMatch = DB::fetch("SELECT * FROM teachers WHERE national_id=? AND status=1", [$nid]);
+    /* v4.166.0: جست‌وجوی دبیر فقط با کد ۱۰ رقمی — شناسهٔ کوتاه پرونده هرگز
+       نمی‌تواند تصادفاً به حساب دبیری بخورد. */
+    $staffMatch = strlen($nid) === 10 ? DB::fetch("SELECT * FROM teachers WHERE national_id=? AND status=1", [$nid]) : null;
     if ($staffMatch) {
         DB::execute("REPLACE INTO `$stateTable` (`$chatCol`, step, temp_nid) VALUES (?, 'staff_personnel_code', ?)", [$chatId, $nid]);
         $roleNames = [];
@@ -541,7 +546,9 @@ if ($step === 'awaiting_nid') {
         exit;
     }
     // Use latest academic year for student who exists in multiple years (7th,8th,9th)
-    $student = get_latest_student_by_national_id($nid);
+    /* v4.166.0: تفکیک‌گر هویت — تطبیق دقیق برای کد ملی ۱۰ رقمی + بخش رقمی
+       پرونده‌های شناسه‌دار؛ ابهام بین دو دانش‌آموز = یافت نشدنِ امن. */
+    $student = bot_find_student_by_identity($nid);
     if (!$student) {
         /* v4.152.0: نام کاربری مدیر می‌تواند ده‌رقمی باشد؛ پیش از پیام
            «دانش‌آموزی با این کد ملی پیدا نشد» همین احتمال بررسی می‌شود. */
@@ -550,7 +557,9 @@ if ($step === 'awaiting_nid') {
         http_response_code(200);
         exit;
     }
-    DB::execute("REPLACE INTO `$stateTable` (`$chatCol`, step, temp_nid) VALUES (?, 'awaiting_serial', ?)", [$chatId, $nid]);
+    /* v4.166.0: مقدار خام پرونده ذخیره می‌شود تا بازخوانی مرحلهٔ رمز (که
+       تطبیق دقیق است) حتی برای پرونده‌های «26/ب/265486» همیشه موفق باشد. */
+    DB::execute("REPLACE INTO `$stateTable` (`$chatCol`, step, temp_nid) VALUES (?, 'awaiting_serial', ?)", [$chatId, (string)$student['national_id']]);
     bot_webhook_safe_send($platform, $chatId, bot_text($platform, 'ask_serial', ['student_name' => trim($student['first_name'] . ' ' . $student['last_name'])]));
     http_response_code(200);
     exit;
