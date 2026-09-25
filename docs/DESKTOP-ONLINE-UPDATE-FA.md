@@ -15,11 +15,11 @@
 | فایل‌های برنامه: `.php`, `.css`, `.js`, `assets/`, `vendor/`, `sql/`, `.htaccess`, فونت‌های `uploads/` | به‌روزرسانی می‌شود |
 | `SchoolDeskPro.exe` (فایل اجرایی) | مرحله‌بندی و در اجرای بعدی جای‌گزین می‌شود |
 | `reports-layout-update/router.php` | فقط اگر بسته همراه داشته باشد و نشانهٔ `SDP_REPORTS_ROOT_V1` داشته باشد |
-| `uploads/` | بستهٔ آنلاین فقط فونت می‌تواند همراه داشته باشد؛ ساختار انتشار، پوشهٔ `uploads` را نمی‌برد |
+| `uploads/` | فونت‌ها و فقط سه فایل ثابت صدای اسکنر در `uploads/sounds/` مجازند؛ فایل‌های مدرسه هرگز منتشر نمی‌شوند |
 | `config/` (تنظیمات نصب، کلید همگام‌سازی، رمز پایگاه داده) | **هرگز** |
 | `data/` (پایگاه دادهٔ مدرسه، نشست‌ها، پشتیبان‌ها، فایل‌های همگام‌سازی) | **هرگز** |
 | `php/` (زمان اجرای PHP ویندوز) و `licenses/` | **هرگز** |
-| تصاویر/فایل‌های `uploads/` به‌جز فونت | **هرگز** (بستهٔ ناشناس نمی‌تواند محتوای مدرسه را عوض کند) |
+| تصاویر/فایل‌های `uploads/` به‌جز فونت و سه صدای ثابت اسکنر | **هرگز** (بستهٔ ناشناس نمی‌تواند محتوای مدرسه را عوض کند) |
 | ساختار پایگاه داده (مایگریشن) | به‌روزرسانی دسکتاپ فقط فایل جابه‌جا می‌کند؛ مایگریشن‌ها همچنان با کد خود برنامه و از مسیر «مایگریشن» انجام می‌شوند |
 
 ## معماری
@@ -57,7 +57,7 @@
 - **احراز هویت با کلید همان مدرسه**: `config/desk-sync-key.php` (حداقل ۳۲ نویسه). کلید در بدنهٔ POST فرستاده می‌شود تا در لاگ آدرس‌ها نیفتد و هیچ‌وقت در پاسخ یا صفحه چاپ نمی‌شود.
 - **HTTPS اجباری** برای نصب آنلاین؛ نشانی HTTP پذیرفته نمی‌شود.
 - **مسیرها**: پیشوند اجباری `SchoolDeskPro/`، رد مسیرهای `..`، قطعهٔ `.`، بک‌اسلش، دونقطه و کاراکترهای کنترلی؛ رد `config/`, `data/`, `php/`, `profile/`, `server/`, `backups/`, `licenses/`.
-- **نوع فایل**: هر `.exe/.dll/.bat/.cmd/.ps1/.vbs/.msi/.scr/.com/.pif/.so/.sh/.py` رد می‌شود؛ تنها استثنا `SchoolDeskPro/SchoolDeskPro.exe` در ریشهٔ بسته با بررسی PE. در `uploads/` فقط `.ttf/.woff/.woff2/.otf`.
+- **نوع فایل**: هر `.exe/.dll/.bat/.cmd/.ps1/.vbs/.msi/.scr/.com/.pif/.so/.sh/.py` رد می‌شود؛ تنها استثنا `SchoolDeskPro/SchoolDeskPro.exe` در ریشهٔ بسته با بررسی PE. در `uploads/` فقط فونت‌های `.ttf/.woff/.woff2/.otf` و سه نام ثابت `uploads/sounds/net.ogg`، `uploads/sounds/hzr.ogg` و `uploads/sounds/tkhr.ogg` مجازند.
 - **روتر**: هر `router.php` باید نشانهٔ `SDP_REPORTS_ROOT_V1` داشته باشد.
 - **سقف حجم**: هر فایل ۳۲ مگابایت، باز‌شدهٔ کل ۳۰۰ مایگابایت، بارگذاری در سایت ۶۴ مایگابایت، حداکثر ۵۰۰۰ فایل.
 - **دسترسی‌ها**: صفحهٔ انتشار فقط `super_admin` با توکن CSRF؛ صفحهٔ به‌روزرسانی روی دستگاه فقط `super_admin`/`edu_admin`. پوشهٔ `uploads/desktop-updates/` با `.htaccess` از دسترسی مستقیم بسته است (روی Nginx این قاعده را اضافه کنید: `location ^~ /uploads/desktop-updates/ { deny all; }`).
@@ -68,7 +68,7 @@
 
 ### ۱) روی سایت (یک بار)
 
-محتوای `SITE-FIX-v4.152.0-desk-update.zip` را (پوشهٔ `site-update-v4.152.0/` روی ریشهٔ سایت) کپی کنید: فایل‌های `desk-updates.php`، `desk-update-api.php`، `includes/desk_update_zip.php`، `includes/desk_updates_store.php`، `includes/management_hub.php`. پوشهٔ `uploads/desktop-updates/` و محافظ `.htaccess` آن خودکار و همان لحظهٔ بازکردن صفحهٔ انتشار ساخته می‌شوند (ساختار انتشار، پوشهٔ `uploads` را هرگز همراه نمی‌برد).
+محتوای `SITE-FIX-v4.152.0-desk-update.zip` را (پوشهٔ `site-update-v4.152.0/` روی ریشهٔ سایت) کپی کنید: فایل‌های `desk-updates.php`، `desk-update-api.php`، `includes/desk_update_zip.php`، `includes/desk_updates_store.php`، `includes/management_hub.php`. پوشهٔ `uploads/desktop-updates/` و محافظ `.htaccess` آن خودکار و همان لحظهٔ بازکردن صفحهٔ انتشار ساخته می‌شوند (ساختار انتشار، فایل‌های مدرسه در پوشهٔ `uploads` را هرگز همراه نمی‌برد؛ سه صدای ثابت اسکنر استثنای صریح بستهٔ اسکنر است).
 
 ### ۲) روی هر دستگاه دسکتاپ (یک بار)
 

@@ -152,8 +152,12 @@ def assemble():
         for d in ['config','sql','backups']:
             if (web/d).exists():shutil.rmtree(web/d)
             (web/d).mkdir()
+        keep_uploads = {
+            'sounds/net.ogg', 'sounds/hzr.ogg', 'sounds/tkhr.ogg',
+        }
         for f in (web/'uploads').rglob('*'):
-            if f.is_file() and f.suffix.lower() not in ['.ttf','.woff2','.woff']:f.unlink()
+            rel = str(f.relative_to(web/'uploads')).replace('\\', '/')
+            if f.is_file() and f.suffix.lower() not in ['.ttf','.woff2','.woff'] and rel not in keep_uploads:f.unlink()
         for f in list(web.rglob('*')):
             if f.is_file() and (f.suffix.lower() in ['.sqlite','.db','.log','.bak','.zip','.csv'] or f.name in ['installer.log']):f.unlink()
         copy(ROOT/'upstream-reference/config/defaults.php',web/'config/defaults.php')

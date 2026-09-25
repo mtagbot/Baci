@@ -91,7 +91,7 @@ function desk_updates_report(string $path): array {
             if (!desk_updates_safe_rel($target)) return ['ok' => false, 'error' => 'مسیر ناایمن در بسته: '.$name];
             if (preg_match('~\A(?:config|data|php|profile|server|backups|licenses)/~i', $target)) return ['ok' => false, 'error' => 'بسته اجازهٔ تغییر پوشهٔ محرمانه را ندارد: '.$target];
             if (preg_match('~\A.*\.(?:exe|dll|bat|cmd|ps1|vbs|msi|scr|com|pif|so|sh|py)$~i', $target)) return ['ok' => false, 'error' => 'فایل اجرایی/اسکریپتی در بسته مجاز نیست: '.$target];
-            if (strpos($target, 'uploads/') === 0 && !preg_match('~\.(?:ttf|woff|woff2|otf)$~i', $target)) return ['ok' => false, 'error' => 'در پوشهٔ uploads فقط فونت مجاز است: '.$target];
+            if (strpos($target, 'uploads/') === 0 && !preg_match('~\Auploads/(?:sounds/(?:net|hzr|tkhr)\.ogg|.*\.(?:ttf|woff|woff2|otf))\z~i', $target)) return ['ok' => false, 'error' => 'در پوشهٔ uploads فقط فونت یا صدای ثابت اسکنر مجاز است: '.$target];
             if (basename($target) === 'router.php' && strpos($target, '/') === false && strpos($zip->read($name), 'SDP_REPORTS_ROOT_V1') === false) return ['ok' => false, 'error' => 'روتر جدید نشانهٔ امنیتی SDP_REPORTS_ROOT_V1 را ندارد.'];
             $files++; $hasWeb = true;
         }

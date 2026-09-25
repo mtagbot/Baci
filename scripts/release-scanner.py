@@ -10,7 +10,9 @@ ROOT = Path(__file__).resolve().parent.parent
 PATCH = ROOT / 'update-v4.152.0'
 FILES = ('attendance-scanner.php', 'attendance-scanner-legacy.php',
          'assets/js/attendance-scanner-light.js', 'assets/js/attendance-decoder-worker.js',
-         # v4.152.0-camera9-sounds: the recorded alerts the scanner plays
+         # uploads/sounds: primary administrator-replaceable location
+         'uploads/sounds/net.ogg', 'uploads/sounds/hzr.ogg', 'uploads/sounds/tkhr.ogg',
+         # assets/audio: read-only fallback used by full/older installs
          'assets/audio/net.ogg', 'assets/audio/hzr.ogg', 'assets/audio/tkhr.ogg')
 ARCHIVES = {'SITE-FIX-v4.152.0-scanner.zip': 'site-update-v4.152.0/',
             # The desktop web root was renamed www -> reports; the desktop updater
@@ -34,9 +36,12 @@ def build():
     backup = payload['attendance-scanner-legacy.php']
     assert backup == (ROOT / 'update-v4.94.0/attendance-scanner.php').read_bytes()
     assert hashlib.sha256(backup).hexdigest() == 'e64f8374c4ab8aaf23a00078d49ab9993bb12ce5ce33c599025265588b534d6a'
-    sounds = payload['assets/audio/net.ogg'] + payload['assets/audio/hzr.ogg'] + payload['assets/audio/tkhr.ogg']
-    assert sounds[:4] == b'OggS' and all(payload['assets/audio/' + n][:4] == b'OggS'
-                                         for n in ('net.ogg', 'hzr.ogg', 'tkhr.ogg'))
+    for name in ('net.ogg', 'hzr.ogg', 'tkhr.ogg'):
+        upload = payload['uploads/sounds/' + name]
+        asset = payload['assets/audio/' + name]
+        original = (ROOT / name).read_bytes()
+        assert upload.startswith(b'OggS') and asset.startswith(b'OggS')
+        assert upload == asset == original, name + ': packaged sound copies differ'
     for archive, prefix in ARCHIVES.items():
         target = ROOT / archive
         with ZipFile(target, 'w', compression=ZIP_DEFLATED, compresslevel=9) as z:
@@ -57,8 +62,8 @@ def build():
     online['SchoolDeskPro/DESKTOP-UPDATE.json'] = manifest(
         '2.83.0-scanner-focus', payload,
         'اسکنر سریع‌تر و باصدا: فوکوس روی بازهٔ ۱۰ تا ۳۰ سانتی‌متر قفل می‌شود، شاتر کوتاه و نرخ فریم بالا می‌رود، '
-        'بین اسکن‌های متوالی هیچ فوکوس مجددی رخ نمی‌دهد و سه اعلان صوتی ضبط‌شده همراه اسکنر نصب می‌شود: '
-        '«حضور به موقع» و «تأخیر» هر کدام پس از buzzer و «خطای شبکه» به‌جای buzzer.')
+        'بین اسکن‌های متوالی هیچ فوکوس مجددی رخ نمی‌دهد و سه اعلان صوتی ضبط‌شده در uploads/sounds نصب می‌شود: '
+        '«حضور به موقع» و «تأخیر» هر کدام پس از buzzer و «خطای شبکه» به‌جای buzzer؛ نسخهٔ کامل assets/audio را نیز به‌عنوان fallback دارد.')
     target = ROOT / ONLINE_ARCHIVE
     with ZipFile(target, 'w', compression=ZIP_DEFLATED, compresslevel=9) as z:
         for name, content in sorted(online.items()):

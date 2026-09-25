@@ -102,7 +102,11 @@ function harness(options = {}) {
   ctx.window = ctx;
   ctx.addEventListener = (k, f) => { events[k] = f };
   if (!options.noAudio) ctx.AudioContext = AudioContextStub;
-  if (!options.noElementAudio) ctx.Audio = class { constructor(url) { this.src = url; audio.elements.push(this) } play() { this.plays = (this.plays || 0) + 1; return {catch() {}} } };
+  if (!options.noElementAudio) ctx.Audio = class {
+    constructor(url) { this.src = url; this.events = {}; audio.elements.push(this) }
+    addEventListener(name, fn) { this.events[name] = fn }
+    play() { this.plays = (this.plays || 0) + 1; return {catch() {}} }
+  };
   vm.createContext(ctx);
   vm.runInContext(instrumented, ctx);
 
@@ -145,10 +149,10 @@ function scan(h, response, payload = 'MTAG-ATT:1:abcdef') {
   h.posts().pop().respond(response);
 }
 
-test('boot: هر سه فایل صوتی یک‌بار و از مسیر assets/audio دانلود می‌شوند', () => {
+test('boot: هر سه فایل صوتی یک‌بار و از مسیر uploads/sounds دانلود می‌شوند', () => {
   const h = harness();
   const gets = h.sounds();
-  assert.deepEqual(gets.map(r => r.url).sort(), ['assets/audio/hzr.ogg', 'assets/audio/net.ogg', 'assets/audio/tkhr.ogg']);
+  assert.deepEqual(gets.map(r => r.url).sort(), ['uploads/sounds/hzr.ogg', 'uploads/sounds/net.ogg', 'uploads/sounds/tkhr.ogg']);
   assert(gets.every(r => r.responseType === 'arraybuffer'), 'the sounds are fetched as bytes');
   assert.equal(new Set(gets.map(r => r.url)).size, 3, 'each file is requested exactly once');
   h.serveSounds();
@@ -274,19 +278,34 @@ test('شکست decode (Vorbis پشتیبانی نمی‌شود): به عنصر <
   const h = harness({decodeFails: true});
   h.serveSounds();
   assert.equal(h.audio.elements.length, 3, 'the fallback element is created for each alert');
-  assert.deepEqual(h.audio.elements.map(a => a.src).sort(), ['assets/audio/hzr.ogg', 'assets/audio/net.ogg', 'assets/audio/tkhr.ogg']);
+  assert.deepEqual(h.audio.elements.map(a => a.src).sort(), ['uploads/sounds/hzr.ogg', 'uploads/sounds/net.ogg', 'uploads/sounds/tkhr.ogg']);
   h.open();
   scan(h, present, 'tag-fallback');
-  const el = h.audio.elements.find(a => a.src === 'assets/audio/hzr.ogg');
+  const el = h.audio.elements.find(a => a.src === 'uploads/sounds/hzr.ogg');
   assert(!el.plays, 'the voice waits for the buzzer to finish');
   h.tick(400);
   assert.equal(el.plays, 1, 'then the recorded alert plays through the element');
 });
 
-test('نبود فایل صوتی (۴۰۴): اسکنر سالم می‌ماند و هیچ صدایی ادعا نمی‌شود', () => {
+test('نبود مسیر اصلی: از uploads/sounds به assets/audio برمی‌گردد', () => {
   const h = harness();
-  h.requests.filter(r => r.method === 'GET').forEach(r => { r.status = 404; r.response = null; if (r.onload) r.onload() });
-  assert.equal(h.audio.elements.length, 0, 'a 404 must not become an element to play');
+  const primary = h.sounds().filter(r => r.url.indexOf('uploads/sounds/') === 0);
+  primary.forEach(r => { r.status = 404; r.response = null; if (r.onload) r.onload() });
+  const fallback = h.sounds().filter(r => r.url.indexOf('assets/audio/') === 0);
+  assert.equal(fallback.length, 3, 'the read-only fallback is requested for all three files');
+  fallback.forEach(r => r.serveSound());
+  assert.deepEqual(h.audio.decoded.sort(), ['hzr.ogg', 'net.ogg', 'tkhr.ogg']);
+  h.open();
+  scan(h, present, 'tag-assets-fallback');
+  assert.equal(h.voices()[0].name, 'hzr.ogg');
+  assert.equal(h.el('resBox').className, 'result ok');
+});
+
+test('نبود هر دو مسیر صوتی (۴۰۴): اسکنر سالم می‌ماند و هیچ صدایی ادعا نمی‌شود', () => {
+  const h = harness();
+  h.sounds().slice().forEach(r => { r.status = 404; r.response = null; if (r.onload) r.onload() });
+  h.sounds().filter(r => r.url.indexOf('assets/audio/') === 0 && !r.response)
+    .forEach(r => { r.status = 404; r.response = null; if (r.onload) r.onload() });
   h.open();
   scan(h, present, 'tag-404');
   assert.equal(h.buzzes().length, 2, 'the buzzer keeps working');
@@ -294,10 +313,24 @@ test('نبود فایل صوتی (۴۰۴): اسکنر سالم می‌ماند �
   assert.equal(h.el('resBox').className, 'result ok');
 });
 
-test('مسیر صدا از پیکربندی صفحه قابل تغییر است (و پیش‌فرض assets/audio است)', () => {
+test('خرابی عنصر audio هم مسیر جایگزین را امتحان می‌کند', () => {
+  const h = harness({decodeFails: true});
+  h.serveSounds();
+  const primary = h.audio.elements.find(a => a.src === 'uploads/sounds/hzr.ogg');
+  assert(primary && primary.events.error, 'the primary audio element has an error fallback');
+  primary.events.error();
+  const fallback = h.audio.elements.find(a => a.src === 'assets/audio/hzr.ogg');
+  assert(fallback, 'the fallback audio element is created');
+  h.open();
+  scan(h, present, 'tag-element-fallback');
+  h.tick(400);
+  assert.equal(fallback.plays, 1);
+});
+
+test('مسیر صدا از پیکربندی صفحه قابل تغییر است (و پیش‌فرض uploads/sounds است)', () => {
   const html = readFileSync(new URL('../update-v4.152.0/attendance-scanner.php', import.meta.url), 'utf8');
-  assert.match(html, /sounds:\s*'assets\/audio\/'/, 'the page must point at the sounds directory');
-  assert.match(html, /attendance-scanner-light\.js\?v=4\.152\.0-camera9-sounds/, 'the JS cache id must change');
+  assert.match(html, /sounds:\s*'uploads\/sounds\/'/, 'the page must point at the sounds directory');
+  assert.match(html, /attendance-scanner-light\.js\?v=4\.152\.0-camera9-sounds-upload-path/, 'the JS cache id must change');
   assert.match(html, /camera9/, 'the existing cache token is kept (rollback and page tests rely on it)');
   const js = readFileSync(JS_PATH, 'utf8');
   assert.match(js, /SOUND_FILES = \{ net: 'net\.ogg', present: 'hzr\.ogg', late: 'tkhr\.ogg' \}/);

@@ -50,7 +50,7 @@ class CumulativeCorrective(unittest.TestCase):
             self.assertEqual(set(z.namelist()), set(expected))
             for name, data in expected.items():
                 self.assertEqual(z.read(name), data, name)
-            self.assertEqual(len(z.namelist()), 16)
+            self.assertEqual(len(z.namelist()), len(expected))
 
     def test_desktop_archive_is_the_union_plus_the_launcher(self):
         expected = {k: v for k, v in parts_union('desktop').items() if k != DESKTOP_PREFIX + 'SchoolDeskPro.exe'}
@@ -89,7 +89,8 @@ class CumulativeCorrective(unittest.TestCase):
                     if entry == DESKTOP_PREFIX + 'SchoolDeskPro.exe':
                         continue
                     self.assertFalse(entry.lower().endswith(EXECUTABLE), entry)
-                    self.assertFalse('uploads/' in entry, entry)
+                    if 'uploads/' in entry:
+                        self.assertRegex(rel, r'^uploads/sounds/(?:net|hzr|tkhr)\.ogg$', entry)
 
     def test_sources_in_the_working_tree_are_what_shipped(self):
         site_sources = {
@@ -106,6 +107,9 @@ class CumulativeCorrective(unittest.TestCase):
             'includes/attendance_helpers.php': ROOT / 'update-v4.152.0/includes/attendance_helpers.php',
             'includes/bot_login_flow.php': ROOT / 'update-v4.152.0/includes/bot_login_flow.php',
             'includes/bot_webhook_engine.php': ROOT / 'update-v4.152.0/includes/bot_webhook_engine.php',
+            'uploads/sounds/net.ogg': ROOT / 'update-v4.152.0/uploads/sounds/net.ogg',
+            'uploads/sounds/hzr.ogg': ROOT / 'update-v4.152.0/uploads/sounds/hzr.ogg',
+            'uploads/sounds/tkhr.ogg': ROOT / 'update-v4.152.0/uploads/sounds/tkhr.ogg',
             'assets/audio/net.ogg': ROOT / 'update-v4.152.0/assets/audio/net.ogg',
             'assets/audio/hzr.ogg': ROOT / 'update-v4.152.0/assets/audio/hzr.ogg',
             'assets/audio/tkhr.ogg': ROOT / 'update-v4.152.0/assets/audio/tkhr.ogg',
@@ -140,6 +144,7 @@ class CumulativeCorrective(unittest.TestCase):
             site = set(z.namelist())
         for rel in ('desk-update-api.php', 'desk-updates.php', 'includes/desk_updates_store.php', 'attendance-scanner.php',
                     'includes/bot_login_flow.php', 'includes/bot_webhook_engine.php',
+                    'uploads/sounds/net.ogg', 'uploads/sounds/hzr.ogg', 'uploads/sounds/tkhr.ogg',
                     'assets/audio/net.ogg', 'assets/audio/hzr.ogg', 'assets/audio/tkhr.ogg'):
             self.assertIn(SITE_PREFIX + rel, site)
         self.assertIn('desk_update_auto(', (ROOT / 'desktop-app-v2/patch/includes-desk_update.php').read_text(encoding='utf-8'))
