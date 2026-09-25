@@ -1,0 +1,394 @@
+/*
+ * Live exam designer — touch layout layer, v4.160.0
+ *
+ * This file is deliberately screen-only. The A4 page, millimetre dimensions,
+ * print flow and all saved design values stay in exam-print.php and are not
+ * changed by this layer. The same bytes are shipped to the desktop web root.
+ */
+@media screen and (max-width: 860px) {
+  :root {
+    --mobile-dock-h: 68px;
+    --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  html,
+  body {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    padding-bottom: calc(var(--mobile-dock-h) + var(--mobile-safe-bottom));
+  }
+
+  /* The complete toolbar remains available by horizontal swipe. The fixed
+     dock below keeps the five actions people need most within one thumb reach. */
+  .toolbar {
+    top: 0;
+    max-height: 64px;
+    min-height: 52px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .toolbar .tb-group {
+    flex: 0 0 auto;
+    padding: 0 2px;
+    gap: 4px;
+  }
+
+  .toolbar .tb-title,
+  .toolbar .tb-sep,
+  .toolbar .tb-spacer,
+  .toolbar .tb-actions {
+    display: none;
+  }
+
+  .toolbar button {
+    min-height: 40px;
+    min-width: 44px;
+    padding: 8px 10px;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  .mobile-editor-dock {
+    position: fixed;
+    z-index: 110;
+    inset-inline: 0;
+    bottom: 0;
+    display: flex;
+    align-items: stretch;
+    gap: 5px;
+    min-height: var(--mobile-dock-h);
+    padding: 6px 8px calc(6px + var(--mobile-safe-bottom));
+    background: rgba(15, 23, 42, .97);
+    border-top: 1px solid rgba(148, 163, 184, .3);
+    box-shadow: 0 -8px 24px rgba(2, 6, 23, .24);
+    direction: rtl;
+  }
+
+  .mobile-editor-dock button {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 44px;
+    border: 1px solid rgba(203, 213, 225, .3);
+    border-radius: 10px;
+    background: rgba(148, 163, 184, .16);
+    color: #f8fafc;
+    font: 700 11px/1.15 Vazirmatn, Tahoma, sans-serif;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .mobile-editor-dock button:active {
+    transform: translateY(1px);
+    background: rgba(148, 163, 184, .3);
+  }
+
+  .mobile-editor-dock .mobile-dock-save {
+    background: #15803d;
+    border-color: #16a34a;
+  }
+
+  .mobile-editor-dock .mobile-dock-print {
+    background: #b45309;
+    border-color: #f59e0b;
+  }
+
+  .mobile-editor-dock .mobile-dock-zoom {
+    flex: 0 0 42px;
+    font-size: 19px;
+  }
+
+  .mobile-editor-dock output {
+    display: flex;
+    cursor: pointer;
+    flex: 0 0 42px;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    color: #dbeafe;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  #pagesRoot {
+    min-height: 100vh;
+    padding: calc(var(--toolbarH, 58px) + 7px) 0 18px;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+  }
+
+  /* The design surface is still exactly 210mm × 297mm. Only its on-screen
+     preview is scaled; the print media rule in the page source removes this
+     transform completely. */
+  #pagesRoot .page {
+    transform: scale(var(--editorScale, .44));
+    transform-origin: top center;
+    margin: 8px auto 0;
+    margin-bottom: calc(-297mm * (1 - var(--editorScale, .44)));
+    will-change: transform;
+  }
+
+  #pagesRoot .page:first-child {
+    margin-top: 0;
+  }
+
+  .editor-panel,
+  .bank-panel {
+    top: calc(var(--toolbarH, 58px) + 6px);
+    right: 8px;
+    bottom: calc(var(--mobile-dock-h) + var(--mobile-safe-bottom) + 8px);
+    left: 8px;
+    width: auto;
+    max-height: none;
+    border-radius: 16px;
+    padding: 10px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .editor-panel {
+    z-index: 101;
+  }
+
+  .bank-panel {
+    z-index: 100;
+  }
+
+  .editor-panel button,
+  .bank-panel button,
+  .editor-panel input,
+  .editor-panel select,
+  .bank-panel input,
+  .bank-panel select {
+    min-height: 40px;
+    touch-action: manipulation;
+  }
+
+  .bank-panel > div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .bank-item,
+  .bank-exam {
+    margin-bottom: 10px;
+  }
+
+  .bi-actions {
+    flex-wrap: wrap;
+  }
+
+  .bi-actions button,
+  .bank-item .bi-insert,
+  .bank-item .bi-del {
+    flex: 1 1 120px;
+    min-height: 42px;
+  }
+
+  .bank-exam-thumbs {
+    min-height: 92px;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+  }
+
+  .bank-exam-thumbs img {
+    scroll-snap-align: start;
+  }
+
+  .panel-head {
+    position: sticky;
+    top: -10px;
+    z-index: 2;
+    padding-top: 4px;
+    background: var(--card, #fff);
+  }
+
+  .q-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 4px 0;
+  }
+
+  .q-actions button {
+    min-width: 42px;
+    min-height: 38px;
+    padding: 7px 9px;
+    font-size: 11px;
+    touch-action: manipulation;
+  }
+
+  .q-h-grip {
+    min-height: 22px;
+    margin-top: 2px;
+    touch-action: none;
+  }
+
+  .q-content img {
+    touch-action: none;
+  }
+
+  .q-modal {
+    align-items: flex-start;
+    padding: calc(var(--toolbarH, 58px) + 6px) 6px calc(var(--mobile-dock-h) + var(--mobile-safe-bottom) + 6px);
+    overflow-y: auto;
+  }
+
+  .q-modal-card {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - var(--toolbarH, 58px) - var(--mobile-dock-h) - var(--mobile-safe-bottom) - 12px);
+    margin: 0;
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .q-modal-head {
+    position: sticky;
+    top: -12px;
+    z-index: 3;
+    padding-top: 4px;
+    background: var(--card, #fff);
+  }
+
+  .q-field-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .q-form-col input,
+  .q-form-col select,
+  .q-form-col button,
+  .q-modal-actions button {
+    min-height: 42px;
+  }
+
+  .rich-tools {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 3px 1px 7px;
+    margin-inline: -2px;
+    scrollbar-width: thin;
+    overscroll-behavior-x: contain;
+  }
+
+  .rich-tools button {
+    flex: 0 0 auto;
+    min-width: 42px;
+    min-height: 42px;
+    padding: 8px 10px;
+    touch-action: manipulation;
+  }
+
+  .q-preview-col {
+    position: static;
+  }
+
+  .q-preview-sheet {
+    max-height: 38vh;
+    padding: 7px;
+  }
+
+  .q-modal-actions {
+    position: sticky;
+    bottom: -12px;
+    z-index: 2;
+    margin-inline: -12px;
+    padding: 10px 12px calc(10px + var(--mobile-safe-bottom));
+    background: rgba(255, 255, 255, .97);
+  }
+
+  .q-modal-actions button {
+    flex: 1 1 0;
+  }
+
+  .upload-modal,
+  .math-modal,
+  .image-modal,
+  .exam-zoom-modal {
+    align-items: flex-start;
+    padding: calc(var(--toolbarH, 58px) + 6px) 6px calc(var(--mobile-dock-h) + var(--mobile-safe-bottom) + 6px);
+    overflow-y: auto;
+  }
+
+  .upload-card,
+  .math-card,
+  .image-card,
+  .exam-zoom-card {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - var(--toolbarH, 58px) - var(--mobile-dock-h) - var(--mobile-safe-bottom) - 12px);
+    border-radius: 16px;
+  }
+
+  .math-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .math-grid button,
+  .image-controls button,
+  .upload-actions button {
+    min-height: 42px;
+  }
+
+  #uiToast {
+    bottom: calc(var(--mobile-dock-h) + var(--mobile-safe-bottom) + 8px);
+    max-width: calc(100vw - 24px);
+    width: max-content;
+    text-align: center;
+  }
+
+  .header-field-row {
+    grid-template-columns: 34px 1fr 1fr 42px;
+  }
+}
+
+@media screen and (max-width: 520px) {
+  .q-field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .q-modal-head b {
+    font-size: 14px;
+  }
+
+  .mobile-editor-dock {
+    gap: 3px;
+    padding-inline: 4px;
+  }
+
+  .mobile-editor-dock button {
+    font-size: 10px;
+    padding-inline: 3px;
+  }
+
+  .mobile-editor-dock .mobile-dock-zoom,
+  .mobile-editor-dock output {
+    flex-basis: 34px;
+  }
+}
+
+@media screen and (min-width: 521px) and (max-width: 860px) {
+  .q-modal-card {
+    width: min(760px, 100%);
+    margin-inline: auto;
+  }
+}
+
+@media print {
+  .mobile-editor-dock {display:none!important;}
+}

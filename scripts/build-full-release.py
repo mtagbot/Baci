@@ -14,9 +14,9 @@ STAMP = (2026, 9, 19, 0, 0, 0)
 # need the whole corrective chain afterwards. Order is the documented installation
 # order (dependencies: svg → student-workflow → preview-navigation → fast-ui →
 # mobile-hubs → report-tools → settings-health → reports-layout → bot-outbox →
-# optimized-sync → event-sync → recovery-ui).
-SITE_CORRECTIVES = ['svg-responsive','student-workflow','preview-navigation','fast-ui','mobile-hubs','report-tools','settings-health','bot-outbox','recovery-ui','scanner','desk-update','attendance-test-tag','bot-admin-login']
-DESKTOP_CORRECTIVES = ['svg-responsive','student-workflow','preview-navigation','fast-ui','mobile-hubs','report-tools','settings-health','reports-layout','bot-outbox','optimized-sync','event-sync','recovery-ui','scanner','desk-update','attendance-test-tag','bot-admin-login']
+# optimized-sync → event-sync → recovery-ui → mobile-exam-editor).
+SITE_CORRECTIVES = ['svg-responsive','student-workflow','preview-navigation','fast-ui','mobile-hubs','report-tools','settings-health','bot-outbox','recovery-ui','scanner','desk-update','attendance-test-tag','bot-admin-login','mobile-exam-editor']
+DESKTOP_CORRECTIVES = ['svg-responsive','student-workflow','preview-navigation','fast-ui','mobile-hubs','report-tools','settings-health','reports-layout','bot-outbox','optimized-sync','event-sync','recovery-ui','scanner','desk-update','attendance-test-tag','bot-admin-login','mobile-exam-editor']
 SITE_CORRECTIVE_PREFIX = 'site-update-v4.152.0/'
 def sha(b): return hashlib.sha256(b).hexdigest()
 def run(*args): return subprocess.check_output(args, text=True)
@@ -88,7 +88,10 @@ def corrective_payload(platform):
     """
     packages=[];payload={};staged={};provenance={}
     for slug in (SITE_CORRECTIVES if platform=='site' else DESKTOP_CORRECTIVES):
-        name=(f'SITE-FIX-v4.152.0-{slug}.zip' if platform=='site' else f'SchoolDeskPro-FIX-v2.83.0-{slug}.zip')
+        if slug=='mobile-exam-editor':
+            name='MODIFIED-FILES-V4.160.0.zip' if platform=='site' else 'SchoolDesk-FIX-v2.90.0.zip'
+        else:
+            name=(f'SITE-FIX-v4.152.0-{slug}.zip' if platform=='site' else f'SchoolDeskPro-FIX-v2.83.0-{slug}.zip')
         path=ROOT/name
         if not path.is_file():raise SystemExit('Missing corrective package: '+name)
         with zipfile.ZipFile(path) as z:
