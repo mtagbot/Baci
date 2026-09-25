@@ -119,6 +119,10 @@ def validate_sources():
     assert 'function bot_outbox_chat_is_blocked' in outbox_text
     assert 'function bot_outbox_unblock_chat' in outbox_text
     assert "'blocked'=>'مسدود (بدون تلاش)'" in ui_text
+    # v4.168.0: compact queue list — repeated errors grouped, raw JSON never shown
+    assert "state NOT IN ('sent','blocked')" in ui_text
+    assert 'خطای ۴۰۳ — کاربر ربات را مسدود کرده است' in ui_text
+    assert '$queueGroups' in ui_text
     engine_text = SITE_FILES['site-update-v4.152.0/includes/bot_webhook_engine.php'].read_text(encoding='utf-8')
     assert 'bot_outbox_unblock_chat($platform, $chatId)' in engine_text
     # v4.166.0: identity resolver — 6-digit profile identity links; letters/prefix never matter

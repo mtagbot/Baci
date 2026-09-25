@@ -281,18 +281,40 @@ if (!function_exists('bot_admin_render_page')) {
     <?php
     bot_outbox_schema();
     $queueCounts=bot_outbox_sql('SELECT state,COUNT(*) AS n FROM bot_outbox WHERE platform=? GROUP BY state',[$platform])->fetchAll(PDO::FETCH_ASSOC);
-    $queueRows=bot_outbox_sql("SELECT job_id,state,owner,attempts,created_at,last_error FROM bot_outbox WHERE platform=? AND state<>'sent' ORDER BY created_at DESC LIMIT 10",[$platform])->fetchAll(PDO::FETCH_ASSOC);
+    /* v4.168.0: فهرست فشردهٔ صف — پیام‌های state='blocked' (خطای ۴۰۳) بخش
+       اختصاصی خودشان را پایین‌تر با نام ولی/دانش‌آموز دارند، پس اینجا نمی‌آیند؛
+       بقیه بر اساس (وضعیت + خطا) گروه می‌شوند تا صفحه با ده‌ها ردیف تکراریِ
+       یک خطای یکسان پُر نشود. متن خطا هم خلاصه و خوانا نمایش داده می‌شود. */
+    $queueRows=bot_outbox_sql("SELECT state,owner,attempts,last_error FROM bot_outbox WHERE platform=? AND state NOT IN ('sent','blocked') ORDER BY created_at DESC LIMIT 40",[$platform])->fetchAll(PDO::FETCH_ASSOC);
     $stateNames=['pending'=>'در انتظار تلاش','sending'=>'در حال ارسال','relayed'=>'در صف سایت','blocked'=>'مسدود (بدون تلاش)','sent'=>'ارسال تأییدشده'];
+    $botErrLabel=function($e){
+        $e=trim((string)$e);
+        if($e==='')return '';
+        $code='';$desc='';
+        if(preg_match('/HTTP (\d{3})/',$e,$m))$code=$m[1];
+        if(preg_match('/"description"\s*:\s*"([^"]{1,160})"/u',$e,$d))$desc=trim($d[1]);
+        if($code==='403')return 'خطای ۴۰۳ — کاربر ربات را مسدود کرده است';
+        if($code!=='')return 'خطای HTTP '.$code.($desc!==''?' — '.$desc:'');
+        return function_exists('mb_substr')?mb_substr($e,0,120,'UTF-8'):substr($e,0,120);
+    };
+    $queueGroups=[];
+    foreach($queueRows as $q){
+        $err=$botErrLabel($q['last_error']);
+        $sig=$q['state'].'|'.$q['owner'].'|'.$err;
+        if(!isset($queueGroups[$sig]))$queueGroups[$sig]=['state'=>$q['state'],'owner'=>$q['owner'],'err'=>$err,'n'=>0,'minA'=>PHP_INT_MAX,'maxA'=>0];
+        $queueGroups[$sig]['n']++;
+        $queueGroups[$sig]['minA']=min($queueGroups[$sig]['minA'],(int)$q['attempts']);
+        $queueGroups[$sig]['maxA']=max($queueGroups[$sig]['maxA'],(int)$q['attempts']);
+    }
     ?>
     <section class="card space-y-3" aria-labelledby="bot-queue-heading">
         <h3 id="bot-queue-heading" class="font-bold">صف ماندگار اعلان‌ها</h3>
         <p class="text-xs text-muted">اعلان‌های متنی همهٔ نقش‌ها پس از قطعی حفظ می‌شوند. «در صف» به معنی تحویل به پیام‌رسان نیست. اتصال حساب کاربر به ربات و دسترسی سرور به API لازم است.</p>
         <div class="flex gap-3 flex-wrap" role="status"><?php foreach($queueCounts as $q): ?><span><?php echo clean($stateNames[$q['state']]??$q['state']); ?>: <?php echo tr_num((int)$q['n'],'fa'); ?></span><?php endforeach; ?><?php if(!$queueCounts): ?>صف خالی است.<?php endif; ?></div>
-        <?php foreach($queueRows as $q): ?><div class="soft-panel text-xs" style="overflow-wrap:anywhere;word-break:break-word">
-            <b><?php echo clean($stateNames[$q['state']]??$q['state']); ?></b> — تلاش: <?php echo tr_num((int)$q['attempts'],'fa'); ?>
-            <?php if($q['owner']==='relay'): ?> · ارسال از سایت<?php endif; ?>
-            <?php if($q['last_error']!==''): ?><p><?php echo clean($q['last_error']); ?></p><?php endif; ?>
-        </div><?php endforeach; ?>
+        <?php $qShown=0; foreach($queueGroups as $g): if($qShown>=6)break; $qShown++; ?><div class="soft-panel text-xs" style="overflow-wrap:anywhere;word-break:break-word">
+            <b><?php echo clean($stateNames[$g['state']]??$g['state']); ?></b> — <?php echo tr_num((int)$g['n'],'fa'); ?> پیام<?php if($g['owner']==='relay'): ?> · ارسال از سایت<?php endif; ?> · تلاش: <?php echo $g['minA']===$g['maxA']?tr_num((int)$g['minA'],'fa'):tr_num((int)$g['minA'],'fa').' تا '.tr_num((int)$g['maxA'],'fa'); ?>
+            <?php if($g['err']!==''): ?><p class="text-muted"><?php echo clean($g['err']); ?></p><?php endif; ?>
+        </div><?php endforeach; ?><?php if(count($queueGroups)>6): ?><p class="text-xs text-muted">… و <?php echo tr_num(count($queueGroups)-6,'fa'); ?> گروه دیگر</p><?php endif; ?>
         <?php
         /* v4.164.0: نام دانش‌آموزانِ ولی‌هایی که ربات را مسدود کرده‌اند — از
            chat_id پیام‌های ۴۰۳‌خورده و جدول اتصال همان پلتفرم. */

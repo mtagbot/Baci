@@ -12,7 +12,7 @@
 //   5) the bot admin page actually renders the report section.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { php, run, db, loginAdmin } from './harness/lib.mjs';
+import { php, run, db, loginAdmin, req } from './harness/lib.mjs';
 
 const sid = 'testBotBlockedReport';
 await loginAdmin(sid);
@@ -116,6 +116,36 @@ const ui = readFileSync(new URL('../update-v4.152.0/includes/bot_admin_ui.php', 
 check(ui.includes('$blockedChats = bot_outbox_blocked_chats($platform);'), 'the bot admin page calls the report helper');
 check(ui.includes('ولی‌هایی که ربات را مسدود کرده‌اند'), 'the report has a parent-facing Persian heading');
 check(ui.includes("implode('، ', $bc['students'])") && ui.includes('چت ناشناس'), 'named students and anonymous chats are both rendered');
+
+/* ── v4.168.0: compact queue list — repeated errors collapse into one
+      grouped line, blocked jobs stay out of it, raw API JSON is gone ────── */
+const fx = await run(`<?php require_once '/www/includes/functions.php';
+require_once '/www/includes/bot_helpers.php';
+require_once '/www/includes/bot_outbox.php';
+bot_outbox_schema();
+DB::execute("DELETE FROM bot_outbox WHERE job_id LIKE 'blk%'");
+$mk = function ($id, $chat, $state, $err, $attempts) {
+    DB::execute("INSERT INTO bot_outbox (job_id,platform,payload,payload_hash,owner,state,attempts,created_at,last_error) VALUES (?,'bale',?,?,'local',?,?,?,?)",
+        [$id, json_encode(['chat_id' => $chat, 'text' => 'اعلان حضور و غیاب'], JSON_UNESCAPED_UNICODE), hash('sha256', 'fx' . $id), $state, $attempts, time(), $err]);
+};
+$e403 = 'پاسخ ناموفق API: HTTP 403 - {"ok":false,"error_code":403,"description":"Forbidden: permission_denied"}';
+$mk('blk00000000000000000000000000b1','777001','pending',$e403,3);
+$mk('blk00000000000000000000000000b2','777001','pending',$e403,5);
+$mk('blk00000000000000000000000000b3','777002','pending',$e403,8);
+$mk('blk00000000000000000000000000b4','777003','pending','خطای ارتباط با API ربات: timeout',1);
+$mk('blk00000000000000000000000000b5','777001','blocked',$e403,10);
+$mk('blk00000000000000000000000000b6','777003','sent','',4);
+echo 'FX=OK';`);
+check(fx.out.includes('FX=OK'), 'the v4.168 fixture ran: ' + fx.out.slice(0, 200) + fx.err.slice(0, 200));
+const qpage = await req('', { file: 'bale-bot.php', sid });
+const qhtml = qpage.res.page || '';
+check(!qpage.res.fatal, 'the bot admin page renders without fatals: ' + (qpage.res.fatal || ''));
+check(qhtml.includes('صف ماندگار اعلان‌ها'), 'the queue card is rendered');
+check((qhtml.match(/کاربر ربات را مسدود کرده است/g) || []).length === 1, 'the three identical 403 rows collapse into ONE grouped line');
+check(qhtml.includes('۳ پیام'), 'the grouped line states how many messages it covers');
+check(!qhtml.includes('"error_code":403'), 'raw API JSON is never dumped into the page');
+check(!(qhtml.match(/مسدود \(بدون تلاش\)<\/b> —/g) || []).length, 'blocked jobs no longer appear as repeated rows in the compact list');
+check(qhtml.includes('ولی‌هایی که ربات را مسدود کرده‌اند'), 'the blocked-parent section still renders with names');
 
 console.log(`PASS ${checks} bot blocked-parent report cases (403 mapping, students, exclusions, admin UI)`);
 process.exit(0);
