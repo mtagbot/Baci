@@ -655,8 +655,23 @@ if ($step === 'awaiting_serial') {
     if ($student) {
         /* v4.131.0: شمارهٔ سریال عمداً «عامل اتصال حساب» است و می‌ماند.
            مقایسه با ستون خام password حذف شد. */
-        $valid = hash_equals((string)$student['serial_number'], $serial)
-            || verify_user_password($serial, (string)$student['password'], ['table'=>'students','id'=>$student['id']]);
+        $valid = hash_equals((string)$student['serial_number'], $serial);
+        /* v4.167.0: فرم دانش‌آموز سریال را مرکب ذخیره می‌کند («ب/26/265486») —
+           همان پارسر رسمی فرم (student_serial_parts) بخش ۶ رقمی را بیرون
+           می‌کشد تا حرف و دو رقم در «رمز» بی‌اثر باشند. سریال/رمز کاملاً
+           عددی فقط همان تطبیق دقیق قبلی را دارد (بدون هیچ تسهیل). */
+        if (!$valid && is_file(__DIR__ . '/student_profile_fields.php')) {
+            require_once __DIR__ . '/student_profile_fields.php';
+            if (function_exists('student_serial_parts')) {
+                $sp = student_serial_parts((string)$student['serial_number']);
+                if ($sp['recognized'] && $sp['number'] !== '' && $sp['letter'] !== '') {
+                    $valid = hash_equals($sp['number'], $serial);
+                }
+            }
+        }
+        if (!$valid) {
+            $valid = verify_user_password($serial, (string)$student['password'], ['table'=>'students','id'=>$student['id']]);
+        }
     }
     if ($valid) {
         // Link to latest student id for this national_id (newest academic year)

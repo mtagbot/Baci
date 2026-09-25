@@ -130,6 +130,9 @@ def validate_sources():
     assert "preg_match('/^\\d{6,10}$/', $nid)" in engine_text
     assert 'bot_find_student_by_identity($nid)' in engine_text
     assert "(string)$student['national_id']" in engine_text
+    # v4.167.0: composite serials («ب/26/265486») match by their 6-digit part
+    assert 'student_serial_parts((string)$student[\'serial_number\'])' in engine_text
+    assert "$sp['recognized'] && $sp['number'] !== '' && $sp['letter'] !== ''" in engine_text
 
 
 def build(filename, payload):

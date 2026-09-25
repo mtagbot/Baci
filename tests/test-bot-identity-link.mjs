@@ -32,6 +32,9 @@ DB::execute("INSERT INTO students (id,national_id,first_name,last_name,class_nam
 DB::execute("INSERT INTO students (id,national_id,first_name,last_name,class_name,grade_level,status,academic_year,serial_number) VALUES (7005,'26/ب/265486','مریم','شناسه‌دار','هشتم ۱','هشتم','active','1405/1406','654321')");
 DB::execute("INSERT INTO students (id,national_id,first_name,last_name,class_name,grade_level,status,academic_year,serial_number) VALUES (7003,'99/الف/111111','ابهام','یک','101','دهم','active','1404/1405','999999')");
 DB::execute("INSERT INTO students (id,national_id,first_name,last_name,class_name,grade_level,status,academic_year,serial_number) VALUES (7004,'45/ب/111111','ابهام','دو','101','دهم','active','1404/1405','888888')");
+/* v4.167.0: exactly what student_serial_from_form() stores for a serial with
+   letter + 2-digit prefix — the cohort that got «سریال یا رمز اشتباه». */
+DB::execute("INSERT INTO students (id,national_id,first_name,last_name,class_name,grade_level,status,academic_year,serial_number) VALUES (7006,'9876543210','رضا','سریال‌مرکب','101','دهم','active','1404/1405','ب/26/654987')");
 DB::execute("DELETE FROM bale_bot_users WHERE bale_chat_id IN ('555001','555002','555003')");
 DB::execute("DELETE FROM bale_bot_state WHERE bale_chat_id IN ('555001','555002','555003')");
 echo 'FIXTURE_OK';`);
@@ -100,7 +103,15 @@ check(w.wire.some(x => x.text.includes('سریال')), 'standard 10-digit login 
 w = await webhook('555003', '111222');
 check(await linkedStudent('555003') === 'LINK=7001', 'the standard student links exactly as before');
 
-/* d) ambiguity and too-short inputs are rejected with the right messages */
+/* d) v4.167.0: composite serial («ب/26/654987») — the 6-digit part is the password */
+w = await webhook('555006', '9876543210');
+check(w.wire.some(x => x.text.includes('سریال')), 'a clean 10-digit national id with a composite serial reaches the serial step');
+w = await webhook('555006', '111111');
+check(w.wire.some(x => x.text.includes('اشتباه است')), 'a wrong serial for the composite-serial student is still rejected');
+w = await webhook('555006', '654987');
+check(await linkedStudent('555006') === 'LINK=7006', 'the 6-digit part of the composite serial links the student (letters/prefix never matter)');
+
+/* e) ambiguity and too-short inputs are rejected with the right messages */
 w = await webhook('555004', '111111');
 check(w.wire.some(x => x.text.includes('یافت نشد')), 'an ambiguous 6-digit identity answers "not found", never a wrong link');
 w = await webhook('555005', '12345');
