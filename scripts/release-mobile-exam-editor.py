@@ -19,6 +19,9 @@ SITE_FILES = {
     'site-update-v4.152.0/exam-design-api.php': ROOT / 'update-v4.152.0/exam-design-api.php',
     'site-update-v4.152.0/exam-print.php': ROOT / 'update-v4.152.0/exam-print.php',
     'site-update-v4.152.0/assets/css/exam-designer-mobile.css': ROOT / 'update-v4.152.0/assets/css/exam-designer-mobile.css',
+    # v4.164.0: report which parents blocked the bot (403 chats → linked students).
+    'site-update-v4.152.0/includes/bot_admin_ui.php': ROOT / 'update-v4.152.0/includes/bot_admin_ui.php',
+    'site-update-v4.152.0/includes/bot_outbox.php': ROOT / 'update-v4.152.0/includes/bot_outbox.php',
 }
 DESKTOP_FILES = {
     'SchoolDeskPro/www/exam-design-api.php': ROOT / 'desktop-app-v2/patch/www-exam-design-api.php',
@@ -98,6 +101,13 @@ def validate_sources():
     assert 'attr(data-page-index)' in css_text
     assert '.mobile-sheet-backdrop' in css_text
     assert '@media print {' in css_text
+    # v4.164.0: blocked-parent report (403 chats mapped to linked students)
+    outbox_text = SITE_FILES['site-update-v4.152.0/includes/bot_outbox.php'].read_text(encoding='utf-8')
+    assert 'function bot_outbox_blocked_chats' in outbox_text
+    assert "last_error LIKE '%HTTP 403%'" in outbox_text
+    ui_text = SITE_FILES['site-update-v4.152.0/includes/bot_admin_ui.php'].read_text(encoding='utf-8')
+    assert 'bot_outbox_blocked_chats($platform)' in ui_text
+    assert 'ولی‌هایی که ربات را مسدود کرده‌اند' in ui_text
 
 
 def build(filename, payload):

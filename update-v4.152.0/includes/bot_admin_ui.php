@@ -293,6 +293,17 @@ if (!function_exists('bot_admin_render_page')) {
             <?php if($q['owner']==='relay'): ?> · ارسال از سایت<?php endif; ?>
             <?php if($q['last_error']!==''): ?><p><?php echo clean($q['last_error']); ?></p><?php endif; ?>
         </div><?php endforeach; ?>
+        <?php
+        /* v4.164.0: نام دانش‌آموزانِ ولی‌هایی که ربات را مسدود کرده‌اند — از
+           chat_id پیام‌های ۴۰۳‌خورده و جدول اتصال همان پلتفرم. */
+        $blockedChats = bot_outbox_blocked_chats($platform);
+        if ($blockedChats): ?>
+        <div class="soft-panel text-xs space-y-1" style="overflow-wrap:anywhere;word-break:break-word">
+            <b>ولی‌هایی که ربات را مسدود کرده‌اند (خطای ۴۰۳):</b>
+            <p class="text-muted">پیام‌های این چت‌ها تا رفع مسدودی تحویل نمی‌شود ولی سالم در صف می‌مانند. ولی باید ربات را از فهرست مسدودها خارج کند و دوباره /start بزند؛ پیام‌های معوقه سپس خودکار ارسال می‌شوند.</p>
+            <?php foreach ($blockedChats as $bc): ?><div>• <?php if ($bc['students']): ?><b><?php echo clean(implode('، ', $bc['students'])); ?></b><?php else: ?>چت ناشناس <code dir="ltr"><?php echo clean($bc['chat_id']); ?></code><?php endif; ?> — <?php echo tr_num((int)$bc['jobs'], 'fa'); ?> پیام معوق · <?php echo tr_num((int)$bc['attempts'], 'fa'); ?> تلاش</div><?php endforeach; ?>
+        </div>
+        <?php endif; ?>
         <?php if(bot_outbox_desktop() && get_setting('desk_bot_outbox_error','')!==''): ?><p class="text-xs"><?php echo clean(get_setting('desk_bot_outbox_error','')); ?></p><?php endif; ?>
         <form method="POST"><input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>"><button class="btn btn-secondary text-xs" name="retry_bot_outbox" value="1">آماده‌سازی صف برای تلاش مجدد</button></form>
         <p class="text-xs text-muted">برای ادامهٔ ارسال روی سایت حتی پس از بسته‌شدن نرم‌افزار، Cron هاست را هر دقیقه روی <code dir="ltr">php /absolute/path/reports/cron/bot-outbox-worker.php</code> تنظیم کنید. مسیر نمونه را با مسیر واقعی هاست عوض کنید. این worker جدا از دریافت پیام‌های ربات است.</p>

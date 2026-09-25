@@ -178,3 +178,42 @@ function bot_outbox_apply_receipts($jobs,$receipts) {
     }
     if(count($seen)!==count($expected))throw new RuntimeException('Incomplete notification acknowledgements');
 }
+
+/* v4.164.0: گزارش «چه کسی ربات را مسدود کرده؟» — چت‌هایی که پاسخ HTTP 403
+   (permission_denied) گرفته‌اند از صف ارسال‌نشده بیرون کشیده می‌شوند و
+   دانش‌آموزان متصلِ هر چت از جدول اتصال همان پلتفرم نشان داده می‌شوند.
+   این تابع فقط گزارش می‌دهد؛ صف و وضعیت jobها را تغییر نمی‌دهد. */
+function bot_outbox_blocked_chats($platform) {
+    if (!in_array($platform, ['telegram', 'bale'], true)) return [];
+    bot_outbox_schema();
+    $rows = bot_outbox_sql("SELECT payload, attempts FROM bot_outbox WHERE platform=? AND state<>'sent' AND last_error LIKE '%HTTP 403%'", [$platform])->fetchAll(PDO::FETCH_ASSOC);
+    $chats = [];
+    foreach ($rows as $r) {
+        $p = json_decode((string)$r['payload'], true);
+        $chat = is_array($p) ? trim((string)($p['chat_id'] ?? '')) : '';
+        if ($chat === '') continue;
+        if (!isset($chats[$chat])) $chats[$chat] = ['chat_id' => $chat, 'jobs' => 0, 'attempts' => 0, 'students' => []];
+        $chats[$chat]['jobs']++;
+        $chats[$chat]['attempts'] = max($chats[$chat]['attempts'], (int)$r['attempts']);
+    }
+    if (!$chats) return [];
+    /* همان قرارداد نام‌گذاری bot_user_table() — عمداً محلی نگه داشته شده تا این
+       گزارش بدون بارگذاری کامل هلپرهای ربات هم کار کند. */
+    $table   = $platform === 'telegram' ? 'telegram_bot_users' : 'bale_bot_users';
+    $chatCol = $platform === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
+    $marks = implode(',', array_fill(0, count($chats), '?'));
+    try {
+        $srows = DB::fetchAll("SELECT b.`$chatCol` AS chat_id, s.first_name, s.last_name, s.class_name FROM `$table` b JOIN students s ON s.id=b.student_id WHERE b.`$chatCol` IN ($marks)", array_keys($chats));
+    } catch (Throwable $e) { $srows = []; }
+    foreach ($srows as $sr) {
+        $chat = (string)$sr['chat_id'];
+        if (!isset($chats[$chat])) continue;
+        $name = trim((string)$sr['first_name'] . ' ' . (string)$sr['last_name']);
+        $label = $name !== '' ? $name : 'بدون نام';
+        if (trim((string)($sr['class_name'] ?? '')) !== '') $label .= ' — ' . trim((string)$sr['class_name']);
+        if (!in_array($label, $chats[$chat]['students'], true)) $chats[$chat]['students'][] = $label;
+    }
+    $out = array_values($chats);
+    usort($out, function ($a, $b) { return $b['attempts'] <=> $a['attempts']; });
+    return $out;
+}
