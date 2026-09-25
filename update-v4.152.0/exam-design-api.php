@@ -13,6 +13,163 @@ function exam_page_vurl($rel) {
     $full = __DIR__ . '/' . ltrim((string)$rel, '/');
     return is_file($full) ? ($rel . '?v=' . filemtime($full)) : $rel;
 }
+
+/* v4.160.1 — سرعت بارگذاری کاتالوگ بانک (آزمون‌های ذخیره‌شده + سوالات + فیلترها):
+   ۱) کش ماندگار اثرانگشت: MD5 صفحهٔ اول هر منبع فقط یک‌بار برای هر نسخهٔ فایل
+      (size+mtime) محاسبه می‌شود. خودِ اثرانگشت همان MD5 محتوای واقعی است، پس
+      قاعدهٔ «فقط اولین طراحی هر منبع در بانک بماند» دقیقاً مثل قبل کار می‌کند.
+   ۲) کش اسکن کاتالوگ: فهرست متادیتای بانک/طراحی‌ها + گزینه‌های فیلتر برای هر
+      مجموعه فیلتر در یک فایل کوچک ذخیره می‌شود و با «نسخهٔ داده» (COUNT/MAX id/
+      MAX تاریخ سه جدول) باطل می‌شود؛ هر ذخیره/حذف بلافاصله کش را تازه می‌کند و
+      یک TTL کوتاه هم تغییرات فقط-فایلی را پوشش می‌دهد. نتیجه: ورق‌زدن صفحه‌های
+      بانک دیگر کل دیسک/دیتابیس را جارو نمی‌کند.
+   ۳) بندانگشتی سبک ۳۲۰px کنار صفحات ساخته و بازیابی می‌شود؛ بدون GD یا بدون
+      مجوز نوشتن، همان تصویر اصلی برگردانده می‌شود (مکانیزم هیچ‌وقت نمی‌شکند). */
+function exam_catalog_quiet(callable $fn) {
+    /* I/O اختیاری کش هرگز نباید warning به خروجی نشت کند — حتی زیر
+       error handler سخت‌گیرانه‌تر از خودِ @. */
+    set_error_handler(function () { return true; });
+    try { return $fn(); } finally { restore_error_handler(); }
+}
+function exam_catalog_sig_file() { return __DIR__ . '/uploads/exams/.catalog-signatures.json'; }
+function &exam_catalog_sig_store() {
+    static $cache = null;
+    if ($cache === null) {
+        $cache = [];
+        $file = exam_catalog_sig_file();
+        $raw = exam_catalog_quiet(function () use ($file) { return is_file($file) ? file_get_contents($file) : ''; });
+        if (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) $cache = $decoded;
+        }
+    }
+    return $cache;
+}
+function exam_catalog_sig_commit() {
+    $cache = &exam_catalog_sig_store();
+    if (count($cache) > 5000) $cache = array_slice($cache, -2500, null, true);
+    $json = json_encode($cache, JSON_UNESCAPED_UNICODE);
+    if ($json === false) return;
+    exam_catalog_quiet(function () use ($json) {
+        $dir = __DIR__ . '/uploads/exams';
+        if (!is_dir($dir)) mkdir($dir, 0775, true);
+        $file = exam_catalog_sig_file();
+        $tmp = $file . '.' . getmypid() . '.tmp';
+        if (file_put_contents($tmp, $json, LOCK_EX) !== false) rename($tmp, $file);
+        else unlink($tmp);
+    });
+}
+function exam_page_signature_cached($rel) {
+    $full = __DIR__ . '/' . ltrim((string)$rel, '/');
+    [$size, $mtime] = exam_catalog_quiet(function () use ($full) {
+        return is_file($full) ? [filesize($full), filemtime($full)] : [false, false];
+    });
+    $cache = &exam_catalog_sig_store();
+    if ($size !== false && $mtime !== false) {
+        $entry = $cache[$rel] ?? null;
+        if (is_array($entry) && (int)($entry['s'] ?? -1) === (int)$size && (int)($entry['m'] ?? -1) === (int)$mtime && isset($entry['h'])) {
+            return (string)$entry['h'];
+        }
+    }
+    $hash = (string)exam_catalog_quiet(function () use ($full) { return is_file($full) ? md5_file($full) : ''; });
+    if ($hash !== '' && $size !== false && $mtime !== false) {
+        $cache[$rel] = ['s' => (int)$size, 'm' => (int)$mtime, 'h' => $hash];
+        exam_catalog_sig_commit();
+    }
+    return $hash;
+}
+function exam_catalog_scan_file() { return __DIR__ . '/uploads/exams/.catalog-scan-cache.json'; }
+function exam_catalog_data_version() {
+    $parts = [];
+    foreach ([['exam_question_bank','updated_at_jalali'], ['exam_designs','updated_at_jalali'], ['exam_design_archive','created_at_jalali']] as $t) {
+        try {
+            $row = DB::fetch('SELECT COUNT(*) AS c, MAX(id) AS i, MAX(' . $t[1] . ') AS u FROM ' . $t[0]);
+            $parts[] = $t[0] . ':' . (int)($row['c'] ?? 0) . ':' . (int)($row['i'] ?? 0) . ':' . (string)($row['u'] ?? '');
+        } catch (Throwable $e) { $parts[] = $t[0] . ':na'; }
+    }
+    $parts[] = 'grade:' . (exam_design_bank_has_grade_column() ? '1' : '0');
+    return implode('|', $parts);
+}
+function exam_catalog_filter_key($curSubject, $curGrade) {
+    return md5((string)json_encode([
+        's' => trim((string)($_GET['subject'] ?? '')), 'y' => trim((string)($_GET['year'] ?? '')),
+        'm' => trim((string)($_GET['month'] ?? '')), 't' => trim((string)($_GET['type'] ?? '')),
+        'd' => trim((string)($_GET['designer'] ?? '')), 'cs' => $curSubject, 'cg' => $curGrade,
+    ], JSON_UNESCAPED_UNICODE));
+}
+function exam_catalog_scan_cached($examId, $curSubject, $curGrade) {
+    $key = exam_catalog_filter_key($curSubject, $curGrade);
+    $version = exam_catalog_data_version();
+    $file = exam_catalog_scan_file();
+    $raw = exam_catalog_quiet(function () use ($file) { return is_file($file) ? file_get_contents($file) : ''; });
+    $cache = (is_string($raw) && $raw !== '') ? (json_decode($raw, true) ?: []) : [];
+    if (($cache['version'] ?? '') === $version && isset($cache['entries'][$key]) && is_array($cache['entries'][$key])
+        && (time() - (int)($cache['entries'][$key]['at'] ?? 0)) < 80) {
+        $entry = $cache['entries'][$key];
+        return [
+            'bankMeta' => is_array($entry['bankMeta'] ?? null) ? $entry['bankMeta'] : [],
+            'designCandidates' => is_array($entry['designCandidates'] ?? null) ? $entry['designCandidates'] : [],
+            'filters' => is_array($entry['filters'] ?? null) ? $entry['filters'] : ['years'=>[], 'months'=>[], 'designers'=>[]],
+        ];
+    }
+    $scan = exam_catalog_scan_compute($examId, $curSubject, $curGrade);
+    $entries = (isset($cache['entries']) && is_array($cache['entries'])) ? $cache['entries'] : [];
+    foreach ($entries as $k => $e) { if ((time() - (int)($e['at'] ?? 0)) >= 80) unset($entries[$k]); }
+    $entries[$key] = ['at' => time(), 'bankMeta' => $scan['bankMeta'], 'designCandidates' => $scan['designCandidates'], 'filters' => $scan['filters']];
+    if (count($entries) > 24) $entries = array_slice($entries, -24, null, true);
+    $payload = json_encode(['version' => $version, 'entries' => $entries], JSON_UNESCAPED_UNICODE);
+    if ($payload !== false) {
+        exam_catalog_quiet(function () use ($payload, $file) {
+            $dir = __DIR__ . '/uploads/exams';
+            if (!is_dir($dir)) mkdir($dir, 0775, true);
+            $tmp = $file . '.' . getmypid() . '.tmp';
+            if (file_put_contents($tmp, $payload, LOCK_EX) !== false) rename($tmp, $file);
+            else unlink($tmp);
+        });
+    }
+    return $scan;
+}
+function exam_page_thumb_rel($rel) {
+    /* بندانگشتی ۳۲۰px در مسیر مرکزی uploads/exams/page-thumbs — هیچ glob صفحه‌ای
+       را تحت تأثیر قرار نمی‌دهد و با تغییر فایل منبع خودش تازه می‌شود. */
+    if (!function_exists('imagejpeg') || !function_exists('imagecreatefromstring')) return '';
+    $full = __DIR__ . '/' . ltrim((string)$rel, '/');
+    if (!is_file($full)) return '';
+    $ext = strtolower((string)pathinfo($full, PATHINFO_EXTENSION));
+    if (!in_array($ext, ['jpg','jpeg','png','webp'], true)) return '';
+    $thumbRel = 'uploads/exams/page-thumbs/' . md5((string)$rel) . '.jpg';
+    return (string)exam_catalog_quiet(function () use ($rel, $full, $thumbRel) {
+        $dir = __DIR__ . '/uploads/exams/page-thumbs';
+        $thumbFull = __DIR__ . '/' . $thumbRel;
+        $srcMtime = (int)filemtime($full);
+        if (is_file($thumbFull) && (int)filemtime($thumbFull) >= $srcMtime) return $thumbRel;
+        $data = file_get_contents($full);
+        if (!is_string($data) || $data === '') return '';
+        $src = imagecreatefromstring($data);
+        if (!$src) return '';
+        $w = imagesx($src); $h = imagesy($src);
+        if ($w > 320 && $h > 0) {
+            $nh = max(1, (int)round($h * 320 / $w));
+            $dst = imagecreatetruecolor(320, $nh);
+            if ($dst) { imagecopyresampled($dst, $src, 0, 0, 0, 0, 320, $nh, $w, $h); imagedestroy($src); $src = $dst; }
+        }
+        if (!is_dir($dir)) mkdir($dir, 0775, true);
+        $tmp = $thumbFull . '.' . getmypid() . '.tmp';
+        $ok = imagejpeg($src, $tmp, 72);
+        imagedestroy($src);
+        if (!$ok || !rename($tmp, $thumbFull)) { if (is_file($tmp)) unlink($tmp); return ''; }
+        touch($thumbFull, max($srcMtime, time()));
+        return $thumbRel;
+    });
+}
+function exam_page_thumbs_for(array $rawPages) {
+    $out = [];
+    foreach ($rawPages as $rel) {
+        $thumb = exam_page_thumb_rel((string)$rel);
+        $out[] = ($thumb !== '' && is_file(__DIR__ . '/' . ltrim($thumb, '/'))) ? exam_page_vurl($thumb) : '';
+    }
+    return $out;
+}
 header('Content-Type: application/json; charset=utf-8');
 
 function json_out($ok, $data = []) { ceg_write_end($ok); echo json_encode(array_merge(['ok'=>$ok], $data), JSON_UNESCAPED_UNICODE); exit; }
@@ -76,6 +233,142 @@ function exam_design_catalog_page($key, $default = 1) {
     return max(1, min(10000, $value));
 }
 
+function exam_catalog_scan_compute($examId, $curSubject, $curGrade) {
+    /* همان قواعد همیشگی کاتالوگ — فقط نتیجه برای کش‌شدن برگردانده می‌شود. */
+    $params = [];
+    $where = ['1=1'];
+    if (!empty($_GET['subject'])) {
+        $where[] = '(subject_name LIKE ? OR question_html LIKE ?)';
+        $params[] = '%' . trim($_GET['subject']) . '%';
+        $params[] = '%' . trim($_GET['subject']) . '%';
+    }
+    if (!empty($_GET['year'])) { $where[] = 'academic_year=?'; $params[] = trim($_GET['year']); }
+    if (!empty($_GET['month'])) { $where[] = 'exam_month=?'; $params[] = trim($_GET['month']); }
+    if (!empty($_GET['type'])) { $where[] = 'question_type=?'; $params[] = trim($_GET['type']); }
+    if (!empty($_GET['designer'])) { $where[] = 'designer_name=?'; $params[] = trim($_GET['designer']); }
+    $gradeColumn = exam_design_bank_has_grade_column();
+    $gradeSelect = $gradeColumn ? ', grade_level' : '';
+    $bankMeta = DB::fetchAll(
+        'SELECT id, source_exam_id, academic_year, exam_month, subject_name, teacher_id, designer_name, question_type, score, created_at_jalali, updated_at_jalali' . $gradeSelect .
+        ' FROM exam_question_bank WHERE ' . implode(' AND ', $where) . ' ORDER BY id DESC LIMIT 1000',
+        $params
+    );
+    if ($curSubject !== '') {
+        $bankMeta = array_values(array_filter($bankMeta, function ($row) use ($curSubject) {
+            return exam_subject_matches($row['subject_name'] ?? '', $curSubject);
+        }));
+    }
+    if ($curGrade !== '' && $gradeColumn) {
+        $bankMeta = array_values(array_filter($bankMeta, function ($row) use ($curGrade) {
+            $grade = trim((string)($row['grade_level'] ?? ''));
+            return $grade === '' || $grade === $curGrade;
+        }));
+    }
+    usort($bankMeta, function ($a, $b) {
+        $score = exam_design_score_value($a['score'] ?? '') <=> exam_design_score_value($b['score'] ?? '');
+        return $score !== 0 ? $score : ((int)($b['id'] ?? 0) <=> (int)($a['id'] ?? 0));
+    });
+    $bankMeta = array_slice($bankMeta, 0, 300);
+
+    /* Saved exams use the same source-deduplication rules as the legacy
+       catalog. Only metadata is selected for the scan; page URLs stay raw in
+       the cache and are versioned when a page is actually returned. */
+    $dWhere = ["COALESCE(es.exam_kind,'official')<>'class_deleted'"];
+    $dParams = [];
+    if (!empty($_GET['year'])) { $dWhere[] = 'es.academic_year=?'; $dParams[] = trim($_GET['year']); }
+    if (!empty($_GET['month'])) { $dWhere[] = 'es.exam_month=?'; $dParams[] = trim($_GET['month']); }
+    if (!empty($_GET['designer'])) { $dWhere[] = 'ed.designer_name=?'; $dParams[] = trim($_GET['designer']); }
+    if (!empty($_GET['subject'])) { $dWhere[] = 'es.subject_name LIKE ?'; $dParams[] = '%' . trim($_GET['subject']) . '%'; }
+    $designRows = DB::fetchAll(
+        'SELECT ed.id AS design_id, ed.exam_id, ed.designer_name, ed.updated_at_jalali, es.subject_name, es.exam_month, es.academic_year, es.grade_level, es.class_name, es.question_file' .
+        ' FROM exam_designs ed JOIN exam_schedules es ON es.id=ed.exam_id WHERE ' . implode(' AND ', $dWhere) .
+        ' ORDER BY ed.id ASC LIMIT 400',
+        $dParams
+    );
+    $designCandidates = [];
+    $seenSrc = [];
+    foreach ($designRows as $row) {
+        $eid = (int)$row['exam_id'];
+        if ($eid === $examId) continue;
+        if ($curSubject !== '' && !exam_subject_matches($row['subject_name'] ?? '', $curSubject)) continue;
+        $cacheDir = __DIR__ . '/uploads/exams/pdf-pages/exam_' . $eid;
+        if (is_file($cacheDir . '/origin.txt')) continue;
+        $pages = [];
+        foreach (glob($cacheDir . '/page_*.jpg') ?: [] as $pageFile) $pages[] = str_replace(__DIR__ . '/', '', $pageFile);
+        sort($pages);
+        if (!$pages) {
+            $questionFile = (string)($row['question_file'] ?? '');
+            $extension = $questionFile !== '' ? strtolower(pathinfo($questionFile, PATHINFO_EXTENSION)) : '';
+            if (in_array($extension, ['jpg','jpeg','png','webp'], true) && is_file(__DIR__ . '/' . ltrim($questionFile, '/'))) $pages = [$questionFile];
+        }
+        if (!$pages) continue;
+        $signature = exam_page_signature_cached($pages[0]) . '|' . count($pages);
+        if (isset($seenSrc[$signature])) continue;
+        $seenSrc[$signature] = 1;
+        $designCandidates[] = [
+            '_source_id' => $eid, '_archived' => false,
+            'ref' => 'e' . $eid, 'exam_id' => $eid,
+            'subject' => (string)$row['subject_name'],
+            'designer' => teacher_respectful_name((string)$row['designer_name'] ?? ''),
+            'month' => (string)($row['exam_month'] ?? ''), 'year' => (string)($row['academic_year'] ?? ''),
+            'grade' => (string)($row['grade_level'] ?? ''), 'class' => (string)($row['class_name'] ?? ''),
+            'saved_at' => (string)($row['updated_at_jalali'] ?? ''),
+            'pages' => $pages,
+        ];
+    }
+    $archWhere = ['1=1']; $archParams = [];
+    if (!empty($_GET['year'])) { $archWhere[] = 'academic_year=?'; $archParams[] = trim($_GET['year']); }
+    if (!empty($_GET['month'])) { $archWhere[] = 'exam_month=?'; $archParams[] = trim($_GET['month']); }
+    if (!empty($_GET['designer'])) { $archWhere[] = 'designer_name=?'; $archParams[] = trim($_GET['designer']); }
+    foreach (DB::fetchAll(
+        'SELECT id, exam_id, designer_name, subject_name, exam_month, academic_year, grade_level, class_name, created_at_jalali' .
+        ' FROM exam_design_archive WHERE ' . implode(' AND ', $archWhere) . ' ORDER BY id ASC LIMIT 400',
+        $archParams
+    ) as $row) {
+        if ($curSubject !== '' && !exam_subject_matches($row['subject_name'] ?? '', $curSubject)) continue;
+        $pages = [];
+        foreach (glob(__DIR__ . '/uploads/exams/bank-archive/' . (int)$row['id'] . '/page_*.jpg') ?: [] as $pageFile) $pages[] = str_replace(__DIR__ . '/', '', $pageFile);
+        sort($pages);
+        if (!$pages) continue;
+        $signature = exam_page_signature_cached($pages[0]) . '|' . count($pages);
+        if (isset($seenSrc[$signature])) continue;
+        $seenSrc[$signature] = 1;
+        $designCandidates[] = [
+            '_source_id' => (int)$row['id'], '_archived' => true,
+            'ref' => 'a' . (int)$row['id'], 'exam_id' => (int)$row['exam_id'], 'archived' => true,
+            'subject' => (string)$row['subject_name'],
+            'designer' => teacher_respectful_name((string)$row['designer_name'] ?? ''),
+            'month' => (string)($row['exam_month'] ?? ''), 'year' => (string)($row['academic_year'] ?? ''),
+            'grade' => (string)($row['grade_level'] ?? ''), 'class' => (string)($row['class_name'] ?? ''),
+            'saved_at' => (string)($row['created_at_jalali'] ?? ''), 'pages' => $pages,
+        ];
+    }
+    $designCandidates = array_reverse($designCandidates);
+
+    $fYears = []; $fMonths = []; $fDesigners = [];
+    foreach (DB::fetchAll(
+        'SELECT academic_year, exam_month, designer_name, subject_name FROM exam_question_bank' .
+        ' UNION ALL SELECT es.academic_year, es.exam_month, ed.designer_name, es.subject_name' .
+        ' FROM exam_designs ed JOIN exam_schedules es ON es.id=ed.exam_id'
+    ) as $filterRow) {
+        if ($curSubject !== '' && !exam_subject_matches($filterRow['subject_name'] ?? '', $curSubject)) continue;
+        if (($filterRow['academic_year'] ?? '') !== '') $fYears[] = (string)$filterRow['academic_year'];
+        if (($filterRow['exam_month'] ?? '') !== '') $fMonths[] = (string)$filterRow['exam_month'];
+        if (($filterRow['designer_name'] ?? '') !== '') $fDesigners[] = (string)$filterRow['designer_name'];
+    }
+    $fYears = array_values(array_unique($fYears)); $fMonths = array_values(array_unique($fMonths)); $fDesigners = array_values(array_unique($fDesigners));
+    rsort($fYears);
+    $monthOrder = ['مهر'=>1,'آبان'=>2,'آذر'=>3,'دی'=>4,'بهمن'=>5,'اسفند'=>6,'فروردین'=>7,'اردیبهشت'=>8,'خرداد'=>9,'تیر'=>10,'مرداد'=>11,'شهریور'=>12];
+    usort($fMonths, function ($a, $b) use ($monthOrder) { return ($monthOrder[$a] ?? 99) <=> ($monthOrder[$b] ?? 99); });
+    sort($fDesigners);
+    $fDesigners = array_map(function ($designer) { return ['v'=>$designer, 'label'=>teacher_respectful_name($designer)]; }, $fDesigners);
+    return [
+        'bankMeta' => $bankMeta,
+        'designCandidates' => $designCandidates,
+        'filters' => ['years'=>$fYears, 'months'=>$fMonths, 'designers'=>$fDesigners],
+    ];
+}
+
 if ($action === 'load') {
     $catalogMode = strtolower(trim((string)($_GET['catalog'] ?? '')));
     $curSubject = trim((string)($exam['subject_name'] ?? ''));
@@ -94,46 +387,16 @@ if ($action === 'load') {
         $bankPage = exam_design_catalog_page('bank_page');
         $designBankPage = exam_design_catalog_page('design_page');
         $pageSize = 5;
-        $params = [];
-        $where = ['1=1'];
-        if (!empty($_GET['subject'])) {
-            $where[] = '(subject_name LIKE ? OR question_html LIKE ?)';
-            $params[] = '%' . trim($_GET['subject']) . '%';
-            $params[] = '%' . trim($_GET['subject']) . '%';
-        }
-        if (!empty($_GET['year'])) { $where[] = 'academic_year=?'; $params[] = trim($_GET['year']); }
-        if (!empty($_GET['month'])) { $where[] = 'exam_month=?'; $params[] = trim($_GET['month']); }
-        if (!empty($_GET['type'])) { $where[] = 'question_type=?'; $params[] = trim($_GET['type']); }
-        if (!empty($_GET['designer'])) { $where[] = 'designer_name=?'; $params[] = trim($_GET['designer']); }
-        $gradeColumn = exam_design_bank_has_grade_column();
-        $gradeSelect = $gradeColumn ? ', grade_level' : '';
-        $bankMeta = DB::fetchAll(
-            'SELECT id, source_exam_id, academic_year, exam_month, subject_name, teacher_id, designer_name, question_type, score, created_at_jalali, updated_at_jalali' . $gradeSelect .
-            ' FROM exam_question_bank WHERE ' . implode(' AND ', $where) . ' ORDER BY id DESC LIMIT 1000',
-            $params
-        );
-        if ($curSubject !== '') {
-            $bankMeta = array_values(array_filter($bankMeta, function ($row) use ($curSubject) {
-                return exam_subject_matches($row['subject_name'] ?? '', $curSubject);
-            }));
-        }
-        if ($curGrade !== '' && $gradeColumn) {
-            $bankMeta = array_values(array_filter($bankMeta, function ($row) use ($curGrade) {
-                $grade = trim((string)($row['grade_level'] ?? ''));
-                return $grade === '' || $grade === $curGrade;
-            }));
-        }
-        usort($bankMeta, function ($a, $b) {
-            $score = exam_design_score_value($a['score'] ?? '') <=> exam_design_score_value($b['score'] ?? '');
-            return $score !== 0 ? $score : ((int)($b['id'] ?? 0) <=> (int)($a['id'] ?? 0));
-        });
-        $bankMeta = array_slice($bankMeta, 0, 300);
+        /* v4.160.1: جاروی پرهزینه (متادیتا + اثرانگشت منابع + گزینه‌های فیلتر)
+           کش‌شده است؛ هر درخواست فقط ۵ ردیف نمایان را هیدریت می‌کند. */
+        $scan = exam_catalog_scan_cached($examId, $curSubject, $curGrade);
+        $bankMeta = $scan['bankMeta'];
         $bankTotal = count($bankMeta);
         $bankPageRows = array_slice($bankMeta, ($bankPage - 1) * $pageSize, $pageSize);
         $bank = [];
         if ($bankPageRows) {
             $ids = array_values(array_map(function ($row) { return (int)$row['id']; }, $bankPageRows));
-            $marks = implode(',', array_fill(0, count($ids), '?'));
+            $marks = implode(',', array_fill(0, count($ids), '?')) ;
             $bodyRows = DB::fetchAll("SELECT id, question_html FROM exam_question_bank WHERE id IN ($marks)", $ids);
             $bodies = [];
             foreach ($bodyRows as $body) $bodies[(int)$body['id']] = (string)$body['question_html'];
@@ -142,81 +405,7 @@ if ($action === 'load') {
                 $bank[] = $row;
             }
         }
-
-        /* Saved exams use the same source-deduplication rules as the legacy
-           catalog. Only metadata is selected for the scan; design_json is
-           decoded for the five records returned on this page. */
-        $dWhere = ["COALESCE(es.exam_kind,'official')<>'class_deleted'"];
-        $dParams = [];
-        if (!empty($_GET['year'])) { $dWhere[] = 'es.academic_year=?'; $dParams[] = trim($_GET['year']); }
-        if (!empty($_GET['month'])) { $dWhere[] = 'es.exam_month=?'; $dParams[] = trim($_GET['month']); }
-        if (!empty($_GET['designer'])) { $dWhere[] = 'ed.designer_name=?'; $dParams[] = trim($_GET['designer']); }
-        if (!empty($_GET['subject'])) { $dWhere[] = 'es.subject_name LIKE ?'; $dParams[] = '%' . trim($_GET['subject']) . '%'; }
-        $designRows = DB::fetchAll(
-            'SELECT ed.id AS design_id, ed.exam_id, ed.designer_name, ed.updated_at_jalali, es.subject_name, es.exam_month, es.academic_year, es.grade_level, es.class_name, es.question_file' .
-            ' FROM exam_designs ed JOIN exam_schedules es ON es.id=ed.exam_id WHERE ' . implode(' AND ', $dWhere) .
-            ' ORDER BY ed.id ASC LIMIT 400',
-            $dParams
-        );
-        $designCandidates = [];
-        $seenSrc = [];
-        foreach ($designRows as $row) {
-            $eid = (int)$row['exam_id'];
-            if ($eid === $examId) continue;
-            if ($curSubject !== '' && !exam_subject_matches($row['subject_name'] ?? '', $curSubject)) continue;
-            $cacheDir = __DIR__ . '/uploads/exams/pdf-pages/exam_' . $eid;
-            if (is_file($cacheDir . '/origin.txt')) continue;
-            $pages = [];
-            foreach (glob($cacheDir . '/page_*.jpg') ?: [] as $pageFile) $pages[] = str_replace(__DIR__ . '/', '', $pageFile);
-            sort($pages);
-            if (!$pages) {
-                $questionFile = (string)($row['question_file'] ?? '');
-                $extension = $questionFile !== '' ? strtolower(pathinfo($questionFile, PATHINFO_EXTENSION)) : '';
-                if (in_array($extension, ['jpg','jpeg','png','webp'], true) && is_file(__DIR__ . '/' . ltrim($questionFile, '/'))) $pages = [$questionFile];
-            }
-            if (!$pages) continue;
-            $signature = @md5_file(__DIR__ . '/' . $pages[0]) . '|' . count($pages);
-            if (isset($seenSrc[$signature])) continue;
-            $seenSrc[$signature] = 1;
-            $designCandidates[] = [
-                '_source_id' => $eid, '_archived' => false,
-                'ref' => 'e' . $eid, 'exam_id' => $eid,
-                'subject' => (string)$row['subject_name'],
-                'designer' => teacher_respectful_name((string)($row['designer_name'] ?? '')),
-                'month' => (string)($row['exam_month'] ?? ''), 'year' => (string)($row['academic_year'] ?? ''),
-                'grade' => (string)($row['grade_level'] ?? ''), 'class' => (string)($row['class_name'] ?? ''),
-                'saved_at' => (string)($row['updated_at_jalali'] ?? ''),
-                'pages' => array_map('exam_page_vurl', $pages),
-            ];
-        }
-        $archWhere = ['1=1']; $archParams = [];
-        if (!empty($_GET['year'])) { $archWhere[] = 'academic_year=?'; $archParams[] = trim($_GET['year']); }
-        if (!empty($_GET['month'])) { $archWhere[] = 'exam_month=?'; $archParams[] = trim($_GET['month']); }
-        if (!empty($_GET['designer'])) { $archWhere[] = 'designer_name=?'; $archParams[] = trim($_GET['designer']); }
-        foreach (DB::fetchAll(
-            'SELECT id, exam_id, designer_name, subject_name, exam_month, academic_year, grade_level, class_name, created_at_jalali' .
-            ' FROM exam_design_archive WHERE ' . implode(' AND ', $archWhere) . ' ORDER BY id ASC LIMIT 400',
-            $archParams
-        ) as $row) {
-            if ($curSubject !== '' && !exam_subject_matches($row['subject_name'] ?? '', $curSubject)) continue;
-            $pages = [];
-            foreach (glob(__DIR__ . '/uploads/exams/bank-archive/' . (int)$row['id'] . '/page_*.jpg') ?: [] as $pageFile) $pages[] = str_replace(__DIR__ . '/', '', $pageFile);
-            sort($pages);
-            if (!$pages) continue;
-            $signature = @md5_file(__DIR__ . '/' . $pages[0]) . '|' . count($pages);
-            if (isset($seenSrc[$signature])) continue;
-            $seenSrc[$signature] = 1;
-            $designCandidates[] = [
-                '_source_id' => (int)$row['id'], '_archived' => true,
-                'ref' => 'a' . (int)$row['id'], 'exam_id' => (int)$row['exam_id'], 'archived' => true,
-                'subject' => (string)$row['subject_name'],
-                'designer' => teacher_respectful_name((string)($row['designer_name'] ?? '')),
-                'month' => (string)($row['exam_month'] ?? ''), 'year' => (string)($row['academic_year'] ?? ''),
-                'grade' => (string)($row['grade_level'] ?? ''), 'class' => (string)($row['class_name'] ?? ''),
-                'saved_at' => (string)($row['created_at_jalali'] ?? ''), 'pages' => array_map('exam_page_vurl', $pages),
-            ];
-        }
-        $designCandidates = array_reverse($designCandidates);
+        $designCandidates = $scan['designCandidates'];
         $designBankTotal = count($designCandidates);
         $designPageRows = array_slice($designCandidates, ($designBankPage - 1) * $pageSize, $pageSize);
         $designBank = [];
@@ -227,33 +416,20 @@ if ($action === 'load') {
             $decoded = $design ? (json_decode((string)$design['design_json'], true) ?: []) : [];
             $candidate['crops'] = (isset($decoded['sourceCrops']) && is_array($decoded['sourceCrops']) && $decoded['sourceCrops']) ? $decoded['sourceCrops'] : new stdClass();
             $candidate['order'] = (isset($decoded['sourceOrder']) && is_array($decoded['sourceOrder'])) ? array_values($decoded['sourceOrder']) : [];
+            /* آدرس نسخه‌دار در زمان خروجی ساخته می‌شود تا ورودی کش‌شده بعد از
+               تعویض فایل هم درست بماند؛ thumbs موازی pages برای شبکهٔ موبایل است. */
+            $rawPages = array_values((array)($candidate['pages'] ?? []));
+            $candidate['thumbs'] = exam_page_thumbs_for($rawPages);
+            $candidate['pages'] = array_map('exam_page_vurl', $rawPages);
             unset($candidate['_source_id'], $candidate['_archived']);
             $designBank[] = $candidate;
         }
-
-        $fYears = []; $fMonths = []; $fDesigners = [];
-        foreach (DB::fetchAll(
-            'SELECT academic_year, exam_month, designer_name, subject_name FROM exam_question_bank' .
-            ' UNION ALL SELECT es.academic_year, es.exam_month, ed.designer_name, es.subject_name' .
-            ' FROM exam_designs ed JOIN exam_schedules es ON es.id=ed.exam_id'
-        ) as $filterRow) {
-            if ($curSubject !== '' && !exam_subject_matches($filterRow['subject_name'] ?? '', $curSubject)) continue;
-            if (($filterRow['academic_year'] ?? '') !== '') $fYears[] = (string)$filterRow['academic_year'];
-            if (($filterRow['exam_month'] ?? '') !== '') $fMonths[] = (string)$filterRow['exam_month'];
-            if (($filterRow['designer_name'] ?? '') !== '') $fDesigners[] = (string)$filterRow['designer_name'];
-        }
-        $fYears = array_values(array_unique($fYears)); $fMonths = array_values(array_unique($fMonths)); $fDesigners = array_values(array_unique($fDesigners));
-        rsort($fYears);
-        $monthOrder = ['مهر'=>1,'آبان'=>2,'آذر'=>3,'دی'=>4,'بهمن'=>5,'اسفند'=>6,'فروردین'=>7,'اردیبهشت'=>8,'خرداد'=>9,'تیر'=>10,'مرداد'=>11,'شهریور'=>12];
-        usort($fMonths, function ($a, $b) use ($monthOrder) { return ($monthOrder[$a] ?? 99) <=> ($monthOrder[$b] ?? 99); });
-        sort($fDesigners);
-        $fDesigners = array_map(function ($designer) { return ['v'=>$designer, 'label'=>teacher_respectful_name($designer)]; }, $fDesigners);
         json_out(true, [
             'bank' => $bank, 'designBank' => $designBank,
             'bankTotal' => $bankTotal, 'bankPage' => $bankPage,
             'designBankTotal' => $designBankTotal, 'designBankPage' => $designBankPage,
             'subject' => $curSubject, 'grade' => $curGrade,
-            'filters' => ['years'=>array_values(array_unique($fYears)), 'months'=>array_values(array_unique($fMonths)), 'designers'=>$fDesigners],
+            'filters' => $scan['filters'],
         ]);
     }
 
@@ -309,7 +485,7 @@ if ($action === 'load') {
             if (in_array($qext, ['jpg','jpeg','png','webp'], true) && is_file(__DIR__ . '/' . ltrim($qf, '/'))) $pages = [$qf];
         }
         if (!$pages) continue;                       // فقط آزمون‌های دارای منبع تصویری
-        $sig = @md5_file(__DIR__ . '/' . $pages[0]) . '|' . count($pages);
+        $sig = exam_page_signature_cached($pages[0]) . '|' . count($pages);
         $pagesV = array_map('exam_page_vurl', $pages);
         if (isset($seenSrc[$sig])) continue;         // همان منبع قبلاً (قدیمی‌تر) ثبت شده
         $seenSrc[$sig] = 1;
@@ -342,7 +518,7 @@ if ($action === 'load') {
         foreach (glob(__DIR__ . '/uploads/exams/bank-archive/' . (int)$ar['id'] . '/page_*.jpg') ?: [] as $pg) $aPages[] = str_replace(__DIR__ . '/', '', $pg);
         sort($aPages);
         if (!$aPages) continue;
-        $sig = @md5_file(__DIR__ . '/' . $aPages[0]) . '|' . count($aPages);
+        $sig = exam_page_signature_cached($aPages[0]) . '|' . count($aPages);
         if (isset($seenSrc[$sig])) continue;
         $seenSrc[$sig] = 1;
         $adj = json_decode((string)($ar['design_json'] ?? ''), true) ?: [];

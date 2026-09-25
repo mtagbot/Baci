@@ -39,6 +39,8 @@ for (const [name, source] of [['site', site], ['desktop', desktop]]) {
   ok(source.includes("document.execCommand('fontName'"), `${name}: selected text receives font changes without rewriting the whole editor`);
   ok(source.includes('q-direction-block'), `${name}: whole-question direction is persisted in question HTML`);
   ok(source.includes('mobile-range-preview'), `${name}: range drag can reveal the page preview`);
+  ok(source.includes('bankPageViews(x,x.thumbs)'), `${name}: design-bank grid uses the lightweight thumbnails`);
+  ok(source.includes('bankCatalogAbort'), `${name}: superseded catalog requests are aborted`);
   ok(!/designPayload\(\)[\s\S]{0,900}mobileEditorZoom/.test(source), `${name}: screen zoom is not saved into the exam design`);
 }
 

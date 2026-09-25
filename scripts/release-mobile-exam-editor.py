@@ -43,6 +43,11 @@ def validate_sources():
     assert 'SELECT id, question_html' in api_text
     assert 'design_json' in api_text
     assert 'ALTER TABLE exam_question_bank ADD COLUMN grade_level' not in api_text
+    # v4.160.1 catalog speed: fingerprint cache + cached scan + light thumbs
+    assert 'exam_page_signature_cached' in api_text
+    assert 'exam_catalog_scan_cached' in api_text
+    assert 'exam_page_thumbs_for' in api_text
+    assert "@md5_file(__DIR__ . '/' . $pages[0])" not in api_text
     for page in (SITE_FILES['site-update-v4.152.0/exam-print.php'], DESKTOP_FILES['SchoolDeskPro/www/exam-print.php']):
         text = page.read_text(encoding='utf-8')
         assert 'exam-designer-mobile.css?v=4.162.0' in text
@@ -63,6 +68,8 @@ def validate_sources():
         assert 'function deferBankCatalog' in text
         assert 'function gotoBankPage' in text
         assert 'bankTotal' in text and 'designBankTotal' in text
+        assert 'bankPageViews(x,x.thumbs)' in text
+        assert 'bankCatalogAbort' in text
         assert '@page{size:A4;margin:0}' in text
         assert 'width:210mm' in text and 'height:297mm' in text
         assert '@media print{' in text

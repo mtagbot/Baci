@@ -1190,7 +1190,7 @@ function loadDesignAndBank(){
     deferBankCatalog();
   }).catch(()=>{booting=false;});
 }
-let bankCatalogReady=false, bankCatalogLoading=false, bankCatalogRequest=0, bankTotal=0, designBankTotal=0;
+let bankCatalogReady=false, bankCatalogLoading=false, bankCatalogRequest=0, bankTotal=0, designBankTotal=0, bankCatalogAbort=null;
 function deferBankCatalog(){
   const run=()=>{if(!bankCatalogReady&&!bankCatalogLoading)loadBank();};
   if(window.requestIdleCallback) window.requestIdleCallback(run,{timeout:1200}); else setTimeout(run,350);
@@ -1201,9 +1201,13 @@ function loadBank(options){
   const requestedBankPage=Math.max(1,Number(options.bankPage||1)), requestedDesignPage=Math.max(1,Number(options.designPage||1));
   const url='exam-design-api.php?group_member='+classGroupMember+'&action=load&catalog=bank&exam_id='+examId+'&dt='+encodeURIComponent(designToken)+'&subject='+encodeURIComponent(q)+'&year='+encodeURIComponent(y)+'&month='+encodeURIComponent(m)+'&type='+encodeURIComponent(t)+'&designer='+encodeURIComponent(d)+'&bank_page='+requestedBankPage+'&design_page='+requestedDesignPage;
   const request=++bankCatalogRequest; bankCatalogLoading=true;
+  /* v4.160.1: درخواست کاتالوگ قبلی که هنوز در راه است لغو می‌شود — ورق‌زدن
+     سریع صفحه‌ها دیگر چند جاروی همزمان روی سرور نمی‌اندازد. */
+  if(bankCatalogAbort){try{bankCatalogAbort.abort();}catch(e){}}
+  let fetchOpts; if(window.AbortController){bankCatalogAbort=new AbortController(); fetchOpts={signal:bankCatalogAbort.signal};}
   const bankBox=document.getElementById('bankList'), designBox=document.getElementById('designBankList');
   if(!bankCatalogReady){if(bankBox)bankBox.innerHTML='<small>در حال آماده‌سازی بانک سوالات…</small>'; if(designBox)designBox.innerHTML='<small>در حال آماده‌سازی آزمون‌های ذخیره‌شده…</small>';}
-  return fetch(url).then(r=>r.json()).then(j=>{
+  return fetch(url,fetchOpts).then(r=>r.json()).then(j=>{
     if(request!==bankCatalogRequest||!j.ok)return j;
     showBankSubject(j.subject,j.grade); populateBankFilters(j.filters);
     renderBank(j.bank||[],j.bankTotal,j.bankPage); renderDesignBank(j.designBank||[],j.designBankTotal,j.designBankPage);
@@ -1259,7 +1263,7 @@ function showBankSubject(subj,grade){const el=document.getElementById('bankSubje
 /* v4.96.0: پرکردن لیست‌های بازشونده فیلتر بانک (سال/ماه/طراح) با حفظ انتخاب فعلی */
 function populateBankFilters(f){if(!f)return; const fill=(id,items,valKey,labKey)=>{const el=document.getElementById(id); if(!el)return; const cur=el.value; while(el.options.length>1)el.remove(1); (items||[]).forEach(it=>{const v=valKey?it[valKey]:it, lab=labKey?it[labKey]:it; const o=document.createElement('option'); o.value=v; o.textContent=lab; el.appendChild(o);}); el.value=cur; if(el.value!==cur)el.value='';}; fill('bankYear',f.years); fill('bankMonth',f.months); fill('bankDesigner',f.designers,'v','label');}
 /* v4.96.0: نمای صفحات آزمون ذخیره‌شده با تنظیمات اولین طراحی (چینش، برش، روشنایی، کنتراست، حذف پس‌زمینه، اندازه) — فایل اصلی دست نمی‌خورد، فقط نمایش/درج با تنظیمات است */
-function bankPageViews(x){const pages=x.pages||[]; const order=(x.order&&x.order.length)?x.order:pages.map((_,i)=>i+1); const out=[]; order.forEach((srcIdx,i)=>{const src=pages[srcIdx-1]; if(!src)return; const c=(x.crops&&x.crops[i+1])||{}; const t=+c.t||0,r=+c.r||0,b=+c.b||0,l=+c.l||0,w=+c.w||100,ct=+c.contrast||100,br=+c.brightness||100; const blend=(+ (c.bg||0)>0)?'multiply':'normal'; out.push({src,style:`width:${w}%;clip-path:inset(${t}% ${r}% ${b}% ${l}%);filter:contrast(${ct}%) brightness(${br}%);mix-blend-mode:${blend}`});}); return out;}
+function bankPageViews(x,thumbs){const pages=x.pages||[]; const th=(thumbs&&thumbs.length)?thumbs:null; const order=(x.order&&x.order.length)?x.order:pages.map((_,i)=>i+1); const out=[]; order.forEach((srcIdx,i)=>{const src=pages[srcIdx-1]; if(!src)return; const lite=(th&&th[srcIdx-1])?th[srcIdx-1]:src; const c=(x.crops&&x.crops[i+1])||{}; const t=+c.t||0,r=+c.r||0,b=+c.b||0,l=+c.l||0,w=+c.w||100,ct=+c.contrast||100,br=+c.brightness||100; const blend=(+ (c.bg||0)>0)?'multiply':'normal'; out.push({src:lite,style:`width:${w}%;clip-path:inset(${t}% ${r}% ${b}% ${l}%);filter:contrast(${ct}%) brightness(${br}%);mix-blend-mode:${blend}`});}); return out;}
 /* v4.95.0: آزمون‌های کامل ذخیره‌شده در بانک — بندانگشتی صفحات + نام طراح + ماه/سال، زوم شناور، درج در ویرایشگر، حذف */
 let designBankItems=[];
 function renderDesignBank(items,total,page){
@@ -1268,7 +1272,7 @@ function renderDesignBank(items,total,page){
 function renderDesignBankPage(){const box=document.getElementById('designBankList'); if(!box)return; box.innerHTML='';
   const dc=document.getElementById('designBankCount'); if(dc)dc.textContent=(designBankTotal||0).toLocaleString('fa-IR');
   if(!designBankItems.length){box.innerHTML='<small>آزمون ذخیره‌شده‌ای با فایل منبع یافت نشد.</small>'; return;}
-  designBankItems.forEach(x=>{const ref=x.ref||('e'+x.exam_id); const thumbs=bankPageViews(x).slice(0,6).map(p=>`<span style="display:inline-block;background:#fff;overflow:hidden;flex:none"><img src="${esc(p.src)}" loading="lazy" style="${p.style};height:86px;width:auto"></span>`).join(''); const archBadge=x.archived?` <small style="background:#fef3c7;color:#92400e;border-radius:5px;padding:1px 6px">نسخه قبلی (بایگانی)</small>`:''; box.insertAdjacentHTML('beforeend',`<div class="bank-exam"><b>${esc(x.subject||'')}</b> <small>${esc(x.grade||'')} ${esc(x.class||'')}</small>${archBadge}<br><small>طراح: ${esc(x.designer||'—')} | ماه: ${esc(x.month||'—')} | سال: ${esc(x.year||'—')}</small><div class="bank-exam-thumbs" onclick="openExamZoom('${ref}')" title="بزرگ‌نمایی صفحات">${thumbs}</div><div style="display:flex;gap:4px"><button onclick="importSavedExam('${ref}')">درج این آزمون در ویرایشگر</button>${canEditBank?`<button onclick="deleteSavedExam('${ref}')" style="background:#fee2e2">حذف از بانک</button>`:''}</div></div>`);});
+  designBankItems.forEach(x=>{const ref=x.ref||('e'+x.exam_id); const thumbs=bankPageViews(x,x.thumbs).slice(0,6).map(p=>`<span style="display:inline-block;background:#fff;overflow:hidden;flex:none"><img src="${esc(p.src)}" loading="lazy" decoding="async" style="${p.style};height:86px;width:auto"></span>`).join(''); const archBadge=x.archived?` <small style="background:#fef3c7;color:#92400e;border-radius:5px;padding:1px 6px">نسخه قبلی (بایگانی)</small>`:''; box.insertAdjacentHTML('beforeend',`<div class="bank-exam"><b>${esc(x.subject||'')}</b> <small>${esc(x.grade||'')} ${esc(x.class||'')}</small>${archBadge}<br><small>طراح: ${esc(x.designer||'—')} | ماه: ${esc(x.month||'—')} | سال: ${esc(x.year||'—')}</small><div class="bank-exam-thumbs" onclick="openExamZoom('${ref}')" title="بزرگ‌نمایی صفحات">${thumbs}</div><div style="display:flex;gap:4px"><button onclick="importSavedExam('${ref}')">درج این آزمون در ویرایشگر</button>${canEditBank?`<button onclick="deleteSavedExam('${ref}')" style="background:#fee2e2">حذف از بانک</button>`:''}</div></div>`);});
   box.insertAdjacentHTML('beforeend',bankPagerHtml(designBankTotal,designBankPage,'gotoDesignBankPage'));}
 function openExamZoom(ref){const x=designBankItems.find(e=>(e.ref||('e'+e.exam_id))===String(ref)); if(!x)return; /* v4.100.0: وسط‌چینی فلکس مثل صفحه اصلی — تصویر با عرض بیش از ۱۰۰٪ دیگر از یک طرف بریده نمی‌شود */ document.getElementById('examZoomPages').innerHTML=`<div style="margin-bottom:8px"><b>${esc(x.subject||'')}</b> — طراح: ${esc(x.designer||'—')} | ماه: ${esc(x.month||'—')} | سال: ${esc(x.year||'—')}</div>`+bankPageViews(x).map(p=>`<div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:8px;overflow:hidden;display:flex;justify-content:center;align-items:flex-start"><img src="${esc(p.src)}" style="${p.style};border:0;margin:0;flex:none"></div>`).join(''); document.getElementById('examZoomModal').style.display='flex';}
 function closeExamZoom(){document.getElementById('examZoomModal').style.display='none';}
