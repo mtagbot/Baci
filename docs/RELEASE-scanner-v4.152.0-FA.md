@@ -4,8 +4,7 @@
 
 > **نوبت دهم (۲۰۲۶-۰۹-۲۱) — صداهای ضبط‌شده:** به درخواست کاربر، سه اعلان صوتی به اسکنر اضافه شد
 > (`hzr.ogg` برای «حضور به موقع» و `tkhr.ogg` برای «تأخیر» **بعد از** buzzer، و `net.ogg` **به‌جای** buzzer
-> در خطای شبکه). همین نوبت، **بسته‌های اسکنر بازسازی شدند** و سه فایل صوتی هم داخلشان است؛ پس هش‌های
-> جدول زیر (نوبت نهم) به‌روز شده‌اند. راهنمای کامل: [`docs/RELEASE-scanner-sounds-v4.152.0-FA.md`](RELEASE-scanner-sounds-v4.152.0-FA.md).
+> در خطای شبکه). خروجی نهایی و مسیر قابل‌تعویض صدا در راهنمای کامل [`RELEASE-scanner-sounds-v4.152.0-FA.md`](RELEASE-scanner-sounds-v4.152.0-FA.md) ثبت شده است؛ جدول‌های تاریخی این سند مربوط به نوبت‌های قدیمی‌اند.
 
 ## اصلاح نهم: نردبان ترمیم خودکار تا خوانده‌شدن اولین تگ (`camera9`)
 
@@ -42,9 +41,9 @@
 
 | فایل | بایت | SHA256 |
 |---|---|---|
-| `SITE-FIX-v4.152.0-scanner.zip` | ۹۹٬۲۴۷ | `7f7f81dfd64d63d5bbd94efa7a257c758f3201c7eb2a42dee01161b390698a88` (شامل سه فایل صوتی) |
-| `SchoolDeskPro-FIX-v2.83.0-scanner.zip` | ۹۹٬۲۶۱ | `be7bccad278102b5c3e8d9188e8683081a07b631fa0c398b27b8cc9c752f7857` (شامل سه فایل صوتی) |
-| `SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip` (بستهٔ آنلاین) | ۱۰۰٬۲۱۷ | `63fed6f02b725a908c1bf2268be50a8e78ab9fd8ecde9d35fb7aa4e73d58ba6f` (شامل سه فایل صوتی) |
+| `SITE-FIX-v4.152.0-scanner.zip` | ۱۶۰٬۱۳۱ | `d94e27bbc0201c3cb0aad606318ffc80605d2c0a6a93cee31b5d6f930a744874` (سه صدا در `uploads/sounds/` و `assets/audio/`) |
+| `SchoolDeskPro-FIX-v2.83.0-scanner.zip` | ۱۶۰٬۱۵۱ | `3b1f1c93545578b849c1785c2729b0ef3d05bc42a9c64bd0693590754800acb6` (سه صدا در هر دو مسیر) |
+| `SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip` (بستهٔ آنلاین) | ۱۶۱٬۱۸۲ | `9847319cc2fe4984899ceb202a3473c5b624b6291d4e31d8d3aa50dff80b9a22` (سه صدا در هر دو مسیر) |
 | `SITE-FIX-v4.152.0-cumulative.zip` | 49566 | `961c95ead4f41a68bd649b831eaa01990dc69441cbc180c0fb28f4bd6b8a8a96` |
 | `SchoolDeskPro-FIX-v2.83.0-cumulative.zip` | 79009 | `7d5ad4d2701af876e758f7f6e4183bd0fab2c4d0181993cbac6994fe81215fc3` |
 | `Release_V1.0-Site.zip` | 3489192 | `23abf44470069bf30eb7f8868e5a5422c935e0453c8cbf308e50d2b2e6c3b4d0` |
@@ -264,8 +263,8 @@ LD_LIBRARY_PATH=.cache/chrome-libs/lib OPTICS_TEST=1 SCANNER_MOTION_FIXTURES=1 n
 
 ## دانلود و نصب
 
-- [اصلاح سایت](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SITE-FIX-v4.152.0-scanner.zip)
-- [اصلاح دسکتاپ](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SchoolDeskPro-FIX-v2.83.0-scanner.zip)
+- [اصلاح سایت](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0d74d-baci/SITE-FIX-v4.152.0-scanner.zip)
+- [اصلاح دسکتاپ](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0d74d-baci/SchoolDeskPro-FIX-v2.83.0-scanner.zip)
 
 هر ZIP فقط **چهار فایل اجرایی ضروری** دارد:
 
@@ -357,9 +356,9 @@ python3 tests/test-scanner-packaging.py
 
 | بسته | بایت | SHA256 |
 |---|---:|---|
-| `SITE-FIX-v4.152.0-scanner.zip` | ۹۹٬۲۴۷ | `7f7f81dfd64d63d5bbd94efa7a257c758f3201c7eb2a42dee01161b390698a88` (شامل سه فایل صوتی) |
-| `SchoolDeskPro-FIX-v2.83.0-scanner.zip` | ۹۹٬۲۶۱ | `be7bccad278102b5c3e8d9188e8683081a07b631fa0c398b27b8cc9c752f7857` (شامل سه فایل صوتی) |
-| `SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip` (بستهٔ آنلاین) | ۱۰۰٬۲۱۷ | `63fed6f02b725a908c1bf2268be50a8e78ab9fd8ecde9d35fb7aa4e73d58ba6f` (شامل سه فایل صوتی) |
+| `SITE-FIX-v4.152.0-scanner.zip` | ۱۶۰٬۱۳۱ | `d94e27bbc0201c3cb0aad606318ffc80605d2c0a6a93cee31b5d6f930a744874` (سه صدا در `uploads/sounds/` و `assets/audio/`) |
+| `SchoolDeskPro-FIX-v2.83.0-scanner.zip` | ۱۶۰٬۱۵۱ | `3b1f1c93545578b849c1785c2729b0ef3d05bc42a9c64bd0693590754800acb6` (سه صدا در هر دو مسیر) |
+| `SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip` (بستهٔ آنلاین) | ۱۶۱٬۱۸۲ | `9847319cc2fe4984899ceb202a3473c5b624b6291d4e31d8d3aa50dff80b9a22` (سه صدا در هر دو مسیر) |
 
 پیشوند فایل‌های وب در بستهٔ دسکتاپ از این نسخه `SchoolDeskPro/reports/` است (پوشهٔ وب نرم‌افزار دسکتاپ به `reports` تغییر نام داده). بستهٔ نصب کامل همچنان `SchoolDeskPro/www/` است، چون خودِ برنامه در اولین اجرا نام پوشه را به `reports` می‌برد.
 

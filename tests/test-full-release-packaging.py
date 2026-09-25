@@ -25,7 +25,9 @@ class FullRelease(unittest.TestCase):
                 if name.endswith('/'):continue
                 self.assertFalse(re.search(r'\.(sqlite(?:3|-wal|-shm)?|db|log|bak|env)$',name,re.I),name)
                 self.assertFalse('/profile/' in name or '/data/' in name,name)
-                if '/uploads/' in '/'+name:self.assertTrue(name.endswith(('.ttf','.woff','.woff2','/.htaccess')),name)
+                if '/uploads/' in '/'+name:
+                    self.assertTrue(name.endswith(('.ttf','.woff','.woff2','/.htaccess')) or
+                                    re.search(r'(?:^|/)uploads/sounds/(?:net|hzr|tkhr)\.ogg$', name), name)
     def test_03_structure_only_sqlite_and_live_triggers(self):
         for platform,(z,p,w) in self.bundles.items():
             statements=json.loads(z.read(p+w+'sql/install-sqlite.json'))

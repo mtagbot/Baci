@@ -112,6 +112,7 @@ $out['blocked_ext'] = du_plan('blocked_ext', ['SchoolDeskPro/www/tools/run.bat' 
 $out['blocked_dll'] = du_plan('blocked_dll', ['SchoolDeskPro/www/lib/evil.dll' => 'x']);
 $out['uploads_image'] = du_plan('uploads_image', ['SchoolDeskPro/www/uploads/logo.png' => 'x']);
 $out['uploads_font'] = du_plan('uploads_font', ['SchoolDeskPro/www/uploads/fonts/x.woff2' => 'x']);
+$out['uploads_sound'] = du_plan('uploads_sound', ['SchoolDeskPro/www/uploads/sounds/hzr.ogg' => 'OggS\0audio']);
 $out['router_plain'] = du_plan('router_plain', ['SchoolDeskPro/www/router.php' => "<?php echo 1;"]);
 $out['router_marked'] = du_plan('router_marked', ['SchoolDeskPro/www/router.php' => "<?php // SDP_REPORTS_ROOT_V1\n"]);
 $out['staged_router_bad'] = du_plan('staged_router_bad', ['SchoolDeskPro/reports-layout-update/router.php' => "<?php echo 1;"]);
@@ -217,7 +218,7 @@ ok('قطعهٔ «.» در مسیر رد می‌شود', R.dot_segment?.ok === fa
 ok('نوشتن در config/ ممنوع است', R.private_config?.ok === false, JSON.stringify(R.private_config));
 ok('نوشتن در data/ ممنوع است', R.private_data?.ok === false, JSON.stringify(R.private_data));
 ok('فایل اسکریپتی (.bat) ممنوع است', R.blocked_ext?.ok === false && R.blocked_dll?.ok === false);
-ok('در uploads/ فقط فونت مجاز است', R.uploads_image?.ok === false && R.uploads_font?.ok === true);
+ok('در uploads/ فقط فونت و سه صدای ثابت اسکنر مجاز است', R.uploads_image?.ok === false && R.uploads_font?.ok === true && R.uploads_sound?.ok === true);
 ok('router.php بدون نشانهٔ امنیتی رد می‌شود', R.router_plain?.ok === false && R.router_marked?.ok === true);
 ok('روتر مرحله‌ای (reports-layout-update) هم بررسی می‌شود',
   R.staged_router_bad?.ok === false && R.staged_router_ok?.router === true);

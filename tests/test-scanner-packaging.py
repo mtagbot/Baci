@@ -8,15 +8,16 @@ ROOT = Path(__file__).resolve().parent.parent
 WEB = 'reports/'   # desktop web root since the reports migration
 FILES = {'attendance-scanner.php', 'attendance-scanner-legacy.php',
          'assets/js/attendance-scanner-light.js', 'assets/js/attendance-decoder-worker.js',
-         # v4.152.0-camera9-sounds: the recorded voice alerts of the scanner
+         'uploads/sounds/net.ogg', 'uploads/sounds/hzr.ogg', 'uploads/sounds/tkhr.ogg',
          'assets/audio/net.ogg', 'assets/audio/hzr.ogg', 'assets/audio/tkhr.ogg'}
-SOUNDS = ('assets/audio/net.ogg', 'assets/audio/hzr.ogg', 'assets/audio/tkhr.ogg')
+SOUNDS = ('uploads/sounds/net.ogg', 'uploads/sounds/hzr.ogg', 'uploads/sounds/tkhr.ogg',
+          'assets/audio/net.ogg', 'assets/audio/hzr.ogg', 'assets/audio/tkhr.ogg')
 
 class ScannerPackages(unittest.TestCase):
     def check_archive(self, archive, prefix):
         with ZipFile(ROOT / archive) as z:
             self.assertIsNone(z.testzip())
-            self.assertEqual(len(z.infolist()), 7)
+            self.assertEqual(len(z.infolist()), len(FILES))
             self.assertEqual(set(z.namelist()), {prefix + name for name in FILES})
             for name in FILES:
                 self.assertEqual(z.read(prefix + name), (ROOT / 'update-v4.152.0' / name).read_bytes())

@@ -176,7 +176,7 @@ function desk_update_plan(string $zipPath, bool $forcePure = false): array {
             if (!desk_update_safe_rel($target)) throw new RuntimeException('مسیر ناایمن در بسته: ' . $name);
             if (desk_update_private_path($target)) throw new RuntimeException('بسته اجازهٔ تغییر پوشهٔ محافظت‌شده را ندارد: ' . $target);
             if (desk_update_blocked_extension($target)) throw new RuntimeException('فایل اجرایی/اسکریپتی در بسته مجاز نیست: ' . $target);
-            if (strpos($target, 'uploads/') === 0 && !preg_match('~\.(?:ttf|woff|woff2|otf)$~i', $target)) throw new RuntimeException('فقط فونت در پوشهٔ uploads مجاز است: ' . $target);
+            if (strpos($target, 'uploads/') === 0 && !preg_match('~\Auploads/(?:sounds/(?:net|hzr|tkhr)\.ogg|.*\.(?:ttf|woff|woff2|otf))\z~i', $target)) throw new RuntimeException('فقط فونت یا صدای ثابت اسکنر در پوشهٔ uploads مجاز است: ' . $target);
             if (basename($target) === 'router.php' && strpos($target, '/') === false) {
                 $router = $zip->read($name);
                 if (strpos($router, 'SDP_REPORTS_ROOT_V1') === false) throw new RuntimeException('روتر جدید نشانهٔ امنیتی SDP_REPORTS_ROOT_V1 را ندارد.');

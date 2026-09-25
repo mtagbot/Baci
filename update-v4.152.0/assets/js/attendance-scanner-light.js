@@ -109,7 +109,9 @@
   }
 
   /* ── Recorded voice alerts ─────────────────────────────────────────────
-   * Three recordings live next to the scanner (assets/audio/):
+   * Three recordings live in the install's upload area (uploads/sounds/).
+   * The full installer keeps a read-only copy in assets/audio/, so an update
+   * can still work on a clean install before the upload area is populated.
    *
    *   حضور به موقع  →  buzzer first, then hzr.ogg
    *   تأخیر         →  buzzer first, then tkhr.ogg
@@ -125,7 +127,7 @@
   var SOUND_FILES = { net: 'net.ogg', present: 'hzr.ogg', late: 'tkhr.ogg' };
   var SOUND_GAP = 0.06;                      /* silence between buzzer and voice */
   var BUZZ_END = { ok: 0.31, warn: 0.36, err: 0.70 };
-  var soundBase = 'assets/audio/', soundMap = null;
+  var soundBase = 'uploads/sounds/', soundMap = null;
   (function () {
     var cfg = config.sounds;                 /* page or config override, optional */
     if (typeof cfg === 'string' && cfg) soundBase = cfg.charAt(cfg.length - 1) === '/' ? cfg : cfg + '/';
@@ -137,24 +139,79 @@
   }
   var sounds = {};                           /* name → {loading|data|buffer|element|failed} */
 
+  /* The corrective ZIP carries both locations. The upload location is the
+   * primary one because it is the location an administrator can replace
+   * without rebuilding the application; assets/audio is the safe fallback
+   * used by a fresh/full install and by older deployments. Custom URL maps
+   * remain authoritative and are never silently rewritten. */
+  function alternateSoundUrl(name, url){
+    if (soundMap && soundMap[name]) return '';
+    if (!SOUND_FILES[name]) return '';
+    var current = String(url || ''), base = '';
+    if (current.indexOf('uploads/sounds/') !== -1) base = 'assets/audio/';
+    else if (current.indexOf('assets/audio/') !== -1) base = 'uploads/sounds/';
+    return base ? base + SOUND_FILES[name] : '';
+  }
+
   function soundElement(name, url, st){
     st.loading = false;
     if (st.element || st.failed || !url || typeof Audio === 'undefined') { st.failed = !st.element; return; }
-    try { var a = new Audio(url); if (a) { a.preload = 'auto'; st.element = a; } else st.failed = true; }
+    try {
+      var a = new Audio(url);
+      if (a) {
+        a.preload = 'auto';
+        st.element = a;
+        if (a.addEventListener) {
+          a.addEventListener('error', function () {
+            var altUrl = alternateSoundUrl(name, url);
+            if (st.elemFallback || !altUrl) { st.failed = true; return; }
+            st.elemFallback = true;
+            try {
+              var a2 = new Audio(altUrl); a2.preload = 'auto'; st.element = a2;
+              if (a2.addEventListener) a2.addEventListener('error', function () { st.failed = true; }, false);
+            } catch(e) { st.failed = true; }
+          }, false);
+        }
+      } else st.failed = true;
+    }
     catch (e) { st.failed = true; }
   }
   function decodeSound(name, st){
     if (!st || st.buffer || st.element || st.failed || !st.data || st.decoding) return;
     var c = audioCtx();
-    if (!c || !c.decodeAudioData) { soundElement(name, soundUrl(name), st); return; }
+    if (!c || !c.decodeAudioData) { soundElement(name, st.url || soundUrl(name), st); return; }
     st.decoding = true;
     var ok = function (buf) {
       st.decoding = false; st.data = null; st.buffer = buf;
       /* A scan asked for this voice while the file was still being prepared. */
       if (st.queued && now() - st.queuedAt < 1500) { st.queued = false; startVoice(st, 0); }
     };
-    var no = function () { st.decoding = false; st.data = null; soundElement(name, soundUrl(name), st); };
+    var no = function () { st.decoding = false; st.data = null; soundElement(name, st.url || soundUrl(name), st); };
     try { c.decodeAudioData(st.data, ok, no); } catch (e) { no(); }
+  }
+  function requestSound(name, st, url){
+    var retry = function () {
+      var altUrl = alternateSoundUrl(name, url);
+      if (!altUrl || st.triedFallback) return false;
+      st.triedFallback = true;
+      requestSound(name, st, altUrl);
+      return true;
+    };
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.responseType = 'arraybuffer';
+      xhr.onload = function () {
+        var body = xhr.response;
+        if (!body || (xhr.status && (xhr.status < 200 || xhr.status >= 300))) {
+          if (retry()) return;
+          st.loading = false; st.failed = true; return;
+        }
+        st.loading = false; st.url = url; st.data = body; decodeSound(name, st);
+      };
+      xhr.onerror = function () { if (retry()) return; st.loading = false; st.failed = true; };
+      xhr.send(null);
+    } catch (e) { st.loading = false; st.failed = true; }
   }
   function loadSound(name){
     var st = sounds[name];
@@ -162,20 +219,7 @@
     st = sounds[name] = { loading: true };
     var url = soundUrl(name);
     if (!url || typeof XMLHttpRequest === 'undefined') { st.loading = false; soundElement(name, url, st); return st; }
-    try {
-      var xhr = new XMLHttpRequest();
-      xhr.open('GET', url, true);
-      xhr.responseType = 'arraybuffer';
-      xhr.onload = function () {
-        var body = xhr.response;
-        /* A file the server does not have is over; only a file that arrived and
-           could not be DECODED falls back to an <audio> element. */
-        if (!body || (xhr.status && (xhr.status < 200 || xhr.status >= 300))) { st.loading = false; st.failed = true; return; }
-        st.loading = false; st.data = body; decodeSound(name, st);
-      };
-      xhr.onerror = function () { st.loading = false; st.failed = true; };
-      xhr.send(null);
-    } catch (e) { st.loading = false; st.failed = true; }
+    requestSound(name, st, url);
     return st;
   }
   function preloadSounds(){

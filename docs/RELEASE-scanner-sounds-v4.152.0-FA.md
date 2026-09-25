@@ -1,8 +1,8 @@
 # اعلان‌های صوتی اسکنر حضور و غیاب — buzzer + سه صدای ضبط‌شده
 
 نسخه: سایت **4.152.0** · دسکتاپ **2.83.0** (اصلاح هم‌نسخه، بدون انتشار جداگانه)
-تاریخ: ۲۰۲۶-۰۹-۲۰/۲۱ · شاخه: `arena/01a0b793-baci`
-سوئیت آزمون: `tests/test-scanner-sounds.mjs` (۱۵ بررسی) · شناسهٔ کش صفحه: `v=4.152.0-camera9-sounds`
+تاریخ: ۲۰۲۶-۰۹-۲۵ · شاخه: `arena/01a0d74d-baci`
+سوئیت آزمون: `tests/test-scanner-sounds.mjs` (۱۷ بررسی) · شناسهٔ کش صفحه: `v=4.152.0-camera9-sounds-upload-path`
 
 ## ۱) درخواست کاربر (عین متن)
 
@@ -30,16 +30,19 @@
 
 | فایل | بایت | SHA256 | مدت/فرمت |
 |---|---|---|---|
-| `assets/audio/net.ogg` | ۲۹٬۸۲۴ | `dd9a875162bec81ed4f7e569c6ec7848e6fff9f81a94b773a4d6c73fe217dce9` | Vorbis، ۴۴٫۱kHz، استریو، ۴٫۵۸ ثانیه |
-| `assets/audio/hzr.ogg` | ۱۴٬۳۳۷ | `fa7da2890c3d38b5b55e82d859e6425a28f1abe5aa6a06136fb35f09c359f291` | Vorbis، ۴۴٫۱kHz، استریو، ۱٫۸۱ ثانیه |
-| `assets/audio/tkhr.ogg` | ۲۰٬۲۸۵ | `99f62f2ae83143cd942d2a0c300845c2285c3393d02665d780f89d7b23d76c55` | Vorbis، ۴۴٫۱kHz، استریو، ۲٫۸۳ ثانیه |
+| `uploads/sounds/net.ogg` | ۲۹٬۸۲۴ | `dd9a875162bec81ed4f7e569c6ec7848e6fff9f81a94b773a4d6c73fe217dce9` | Vorbis، ۴۴٫۱kHz، استریو، ۴٫۵۸ ثانیه |
+| `uploads/sounds/hzr.ogg` | ۱۴٬۳۳۷ | `fa7da2890c3d38b5b55e82d859e6425a28f1abe5aa6a06136fb35f09c359f291` | Vorbis، ۴۴٫۱kHz، استریو، ۱٫۸۱ ثانیه |
+| `uploads/sounds/tkhr.ogg` | ۲۰٬۲۸۵ | `99f62f2ae83143cd942d2a0c300845c2285c3393d02665d780f89d7b23d76c55` | Vorbis، ۴۴٫۱kHz، استریو، ۲٫۸۳ ثانیه |
 
-- مسیر روی نصب: `<ریشهٔ وب>/assets/audio/…` (کنار `assets/js/` اسکنر). صفحه با
-  `sounds: 'assets/audio/'` در `ATT_SCANNER_CONFIG` به آن اشاره می‌کند؛ اگر روزی مسیر عوض شد، فقط همین یک
+- مسیر اصلی روی نصب: `<ریشهٔ وب>/uploads/sounds/…` (قابل تعویض توسط مدیر؛ کنار `assets/` اسکنر). صفحه با
+  `sounds: 'uploads/sounds/'` در `ATT_SCANNER_CONFIG` به آن اشاره می‌کند؛ اگر روزی مسیر عوض شد، فقط همین یک
   خط در `attendance-scanner.php` تغییر می‌کند.
 - بایت‌های داخل بسته‌ها **مو‌به‌مو همان فایل‌های ارسالی کاربر** هستند (آزمون بسته‌بندی این را می‌سنجد).
 - فایل‌های صوتی در ریشهٔ مخزن (`net.ogg`, `hzr.ogg`, `tkhr.ogg`) به‌عنوان منبع اصلی دست‌نخورده می‌مانند؛
-  نسخهٔ نصب‌شدنی همان‌هاست که در `update-v4.152.0/assets/audio/` قرار گرفته‌اند.
+  نسخهٔ نصب‌شدنی همان‌هاست که در `update-v4.152.0/uploads/sounds/` قرار گرفته‌اند.
+- `uploads/sounds/` مسیر اصلی قابل‌تعویض برای مدرسه است. نسخهٔ کامل و نصب‌های قدیمی، کپی همسان را در
+  `assets/audio/` دارند؛ اگر مسیر اصلی ۴۰۴ باشد، کنترلر به‌صورت خودکار به آن fallback می‌کند. مسیرهای دیگر
+  `uploads/` همچنان وارد بستهٔ اسکنر نمی‌شوند.
 
 ## ۴) چطور پخش می‌شود (و چرا این‌طور)
 
@@ -57,41 +60,40 @@
   3. اگر هیچ‌کدام نبود یا فایل ۴۰۴ بود → **بی‌صدا ولی سالم**: buzzer و اسکن بدون هیچ خطا و هیچ اختلالی کار می‌کنند.
 - هیچ‌کدام از این مسیرها روی نخِ اسکن/شبکه اثر ندارد؛ خطای صدا هرگز باعث از دست رفتن یک اسکن نمی‌شود.
 - نسخهٔ ES5 و XHR کنترلر حفظ شده است (بدون `fetch`/`Promise`/کتابخانه) تا گوشی‌های قدیمی هم همان فایل را اجرا کنند.
-- اسکنر قدیمی (`attendance-scanner-legacy.php`) و بستهٔ پشتیبانش دست‌نخورده است؛ صداها مخصوص اسکنر جدید (`camera9-sounds`) هستند.
+- اسکنر قدیمی (`attendance-scanner-legacy.php`) و بستهٔ پشتیبانش دست‌نخورده است؛ صداها مخصوص اسکنر جدید (`camera9-sounds-upload-path`) هستند.
 
 ## ۵) بسته‌های به‌روزشده (هر سه فایل صوتی داخل ZIPها)
 
 | بسته | بایت | SHA256 | جای فایل‌های صوتی |
 |---|---|---|---|
-| `SITE-FIX-v4.152.0-scanner.zip` | ۹۹٬۲۴۷ | `7f7f81dfd64d63d5bbd94efa7a257c758f3201c7eb2a42dee01161b390698a88` | `site-update-v4.152.0/assets/audio/…` |
-| `SchoolDeskPro-FIX-v2.83.0-scanner.zip` | ۹۹٬۲۶۱ | `be7bccad278102b5c3e8d9188e8683081a07b631fa0c398b27b8cc9c752f7857` | `SchoolDeskPro/reports/assets/audio/…` |
-| `SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip` (آنلاین) | ۱۰۰٬۲۱۷ | `63fed6f02b725a908c1bf2268be50a8e78ab9fd8ecde9d35fb7aa4e73d58ba6f` | `SchoolDeskPro/reports/assets/audio/…` |
-| `SITE-FIX-v4.152.0-cumulative.zip` | ۱۴۶٬۹۱۰ | `14346960b4da783c857980c718a98cab51effa99ea57d84c659bf6a794e45939` | `site-update-v4.152.0/assets/audio/…` |
-| `SchoolDeskPro-FIX-v2.83.0-cumulative.zip` | ۱۷۶٬۳۶۷ | `f705f87d405b7ff2c784d67d9f04f76d5251db8ab040bcbe36a5fa260b337c0e` | `SchoolDeskPro/reports/assets/audio/…` |
-| `Release_V1.0-Site.zip` (نصب کامل) | ۳٬۵۵۹٬۵۶۹ | `063ec08631e2b93481c86a61ea136fb38fa63883b3d7025835da80bd3b56c486` | `assets/audio/…` |
-| `Release_V1.0-Desktop.zip` (نصب کامل) | ۱۷٬۱۸۲٬۶۵۶ | `0da7a67be7a16863586e9442ba33dbee5531f066547bd9e30e443ec05587734b` | `SchoolDeskPro/www/assets/audio/…` |
+| `SITE-FIX-v4.152.0-scanner.zip` | ۱۶۰٬۱۳۱ | `d94e27bbc0201c3cb0aad606318ffc80605d2c0a6a93cee31b5d6f930a744874` | `site-update-v4.152.0/uploads/sounds/…` + fallback `assets/audio/…` |
+| `SchoolDeskPro-FIX-v2.83.0-scanner.zip` | ۱۶۰٬۱۵۱ | `3b1f1c93545578b849c1785c2729b0ef3d05bc42a9c64bd0693590754800acb6` | `SchoolDeskPro/reports/uploads/sounds/…` + fallback `assets/audio/…` |
+| `SchoolDeskPro-UPDATE-2.83.0-scanner-focus.zip` (آنلاین) | ۱۶۱٬۱۸۲ | `9847319cc2fe4984899ceb202a3473c5b624b6291d4e31d8d3aa50dff80b9a22` | `SchoolDeskPro/reports/uploads/sounds/…` + fallback `assets/audio/…` |
+| `SITE-FIX-v4.152.0-cumulative.zip` | ۲۰۷٬۸۴۱ | `0aa92bde54c45ba96b6524cd100d5ab5534115450a3fcbfb56676db177e4eca8` | `site-update-v4.152.0/uploads/sounds/…` + fallback `assets/audio/…` |
+| `SchoolDeskPro-FIX-v2.83.0-cumulative.zip` | ۲۳۷٬۳۰۸ | `998f5ee1438a29b02ebfa839116cc21ce6efe056fcf419e8f453d0769a8dfa27` | `SchoolDeskPro/reports/uploads/sounds/…` + fallback `assets/audio/…` |
+| `Release_V1.0-Site.zip` (نصب کامل) | ۳٬۶۲۰٬۵۱۸ | `2418e626d91af2f4f96e06de16b8d6a79a130a3e2325345ca5b84afefa112744` | `uploads/sounds/…` + fallback `assets/audio/…` |
+| `Release_V1.0-Desktop.zip` (نصب کامل) | ۱۷٬۲۴۲٬۱۲۹ | `ed4670828812bf243cb717992d089d894c9234f462376367d9821e7403a98285` | `SchoolDeskPro/www/uploads/sounds/…` + fallback `assets/audio/…` |
 | `SchoolDeskPro-UPDATE-2.83.0-bot-admin-login.zip` (نوبت قبل) | ۱۳٬۵۵۴ | `93b5fdcf83bce9ff1add25f380c4670676659dcb775f3f304f774aa93a202942` | — |
 
-**نکتهٔ مهم برای نصب:** بستهٔ اسکنر همین نوبت **هم** فایل‌های صوتی را دارد **هم** کنترلر/صفحهٔ تازه را؛ پس نصب
-فقط `SITE-FIX-v4.152.0-scanner.zip` + `SchoolDeskPro-FIX-v2.83.0-scanner.zip` کافی است (سه فایل صوتی هم داخلشان است).
+**نکتهٔ مهم برای نصب:** بستهٔ اسکنر همین نوبت **هم** فایل‌های صوتی را دارد **هم** کنترلر/صفحهٔ تازه را؛ پس برای نصب مستقیم، `SITE-FIX-v4.152.0-scanner.zip` یا `SchoolDeskPro-FIX-v2.83.0-scanner.zip` کافی است؛ هرکدام هر سه صدا را در مسیر اصلی و fallback دارد. بستهٔ آنلاین نیز همین payload شش‌صدایی را دارد.
 اگر بستهٔ جمعی یا Release را نصب کرده‌اید، صداها از قبل سر جایشان هستند.
 
 نصب:
 ```bash
 # سایت → ریشهٔ وب
 unzip -o SITE-FIX-v4.152.0-scanner.zip
-ls assets/audio/            # net.ogg  hzr.ogg  tkhr.ogg
+ls uploads/sounds/        # net.ogg  hzr.ogg  tkhr.ogg
 # دسکتاپ → پوشهٔ نصب (php8/reports)
 unzip -o SchoolDeskPro-FIX-v2.83.0-scanner.zip
 ```
-سپس صفحهٔ اسکنر را یک بار باز کنید (شناسهٔ کش `camera9-sounds` است؛ مرورگر کنترلر تازه را می‌گیرد) و برای
+سپس صفحهٔ اسکنر را یک بار باز کنید (شناسهٔ کش `camera9-sounds-upload-path` است؛ مرورگر کنترلر تازه را می‌گیرد) و برای
 صدای تأیید یک بار صفحه را لمس کنید (همان راهنمای کوچک پایین دوربین: «برای صدای تأیید، یک بار صفحه را لمس کنید»).
 
 ## ۶) آزمون‌ها
 
 ```bash
 cd tests
-node test-scanner-sounds.mjs                                          # ۱۵ بررسی تازه
+node test-scanner-sounds.mjs                                          # ۱۷ بررسی تازه
 SITE=.cache/site-full PATCH=update-v4.152.0 node test-scanner-lifecycle.mjs
 SITE=.cache/site-full PATCH=.cache/cumulative-site bash ../scripts/run-tests.sh   # ۳۵/۳۵ سوئیت
 python3 test-scanner-packaging.py                                     # ۶ بررسی بسته‌بندی
