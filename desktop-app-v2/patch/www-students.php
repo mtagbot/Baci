@@ -603,8 +603,8 @@ else:
                         <td><?php echo clean($st['class_name']); ?></td>
                         <td><?php echo clean($st['grade_level']); ?></td>
                         <td><?php echo $st['latest_gpa'] !== null ? format_score($st['latest_gpa']) : '---'; ?></td>
-                        <td><span class="badge <?php echo $st['discipline_count']>0?'badge-warning':'badge-success'; ?>"><?php echo tr_num($st['discipline_count'],'fa'); ?> مورد</span></td>
-                        <td><span class="badge <?php echo $st['unreviewed_count']>0?'badge-danger':'badge-success'; ?>"><?php echo tr_num($st['unreviewed_count'],'fa'); ?></span></td>
+                        <td data-role="disc"><span class="badge <?php echo $st['discipline_count']>0?'badge-warning':'badge-success'; ?>"><?php echo tr_num($st['discipline_count'],'fa'); ?> مورد</span></td>
+                        <td data-role="unrev"><span class="badge <?php echo $st['unreviewed_count']>0?'badge-danger':'badge-success'; ?>"><?php echo tr_num($st['unreviewed_count'],'fa'); ?></span></td>
                         <td><button type="button" class="badge <?php echo $st['unreviewed_reports']>0?'badge-danger':'badge-success'; ?>" onclick="openStudentModal('reports', <?php echo $st['id']; ?>)"><?php echo tr_num($st['unreviewed_reports'],'fa'); ?></button></td>
                         <td><?php echo $st['status'] === 'active' ? '<span class="badge badge-success">فعال</span>' : '<span class="badge badge-danger">غیرفعال</span>'; ?></td>
                         <td><div class="flex gap-1 justify-end flex-wrap items-center"><button type="button" onclick="openStudentModal('reports', <?php echo $st['id']; ?>)" class="btn btn-outline text-xs px-2 py-1 text-blue-600 row-act-main">کارنامه‌ها</button><button type="button" onclick="openStudentModal('discipline', <?php echo $st['id']; ?>)" class="btn btn-warning text-xs px-2 py-1 row-act-main">انضباط</button><button type="button" class="btn btn-outline text-xs px-2 py-1 row-menu-btn" onclick="openRowMenu(event, <?php echo $st['id']; ?>)" title="عملیات" aria-label="عملیات">&#8942;</button></div></td>

@@ -739,3 +739,120 @@ if (!function_exists('bot_link_student')) {
         }
     }
 }
+
+/* ═════════════ v4.169.0 — پروندهٔ مشاورهٔ هر دانش‌آموز ═════════════
+   دو جدول سبک و ایندکس‌دار برای مکانیزم مشاوره:
+     • counseling_messages — مکالمهٔ هر درخواست (ولی ↔ مشاور)، تاریخچه‌وار
+     • counselor_notes    — یادداشت‌های خصوصی مشاور برای هر دانش‌آموز
+   ساخت جدول idempotent و ارزان است و هیچ تغییری در جدول‌های موجود
+   یا در مکانیزم ارسال/صف ربات ایجاد نمی‌کند. */
+if (!function_exists('ensure_counseling_schema')) {
+    function ensure_counseling_schema() {
+        static $done = false;
+        if ($done) return;
+        $done = true;
+        try {
+            DB::execute("CREATE TABLE IF NOT EXISTS counseling_messages (
+                id int(11) NOT NULL AUTO_INCREMENT,
+                request_id int(11) NOT NULL,
+                sender enum('parent','counselor') NOT NULL,
+                sender_id int(11) DEFAULT NULL,
+                body text NOT NULL,
+                created_at_jalali varchar(30) NOT NULL,
+                PRIMARY KEY (id), KEY idx_cmsg_request (request_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            DB::execute("CREATE TABLE IF NOT EXISTS counselor_notes (
+                id int(11) NOT NULL AUTO_INCREMENT,
+                student_id int(11) NOT NULL,
+                teacher_id int(11) NOT NULL,
+                body text NOT NULL,
+                created_at_jalali varchar(30) NOT NULL,
+                PRIMARY KEY (id), KEY idx_cnote_student (student_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } catch (Throwable $e) { error_log('counseling schema: ' . $e->getMessage()); }
+    }
+}
+
+if (!function_exists('counseling_resolve_students')) {
+    /**
+     * دانش‌آموز(های) مرتبط با هر درخواست مشاوره را برمی‌گرداند.
+     * ترتیب اولویت: student_id ثبت‌شده → اتصال چت ولی در جدول همان
+     * پلتفرم → تطبیق نام آزادِ student_name با اسامی دانش‌آموزان فعال.
+     * ورودی: فهرست درخواست‌ها؛ خروجی: [request_id => student_row|null].
+     * کوئری‌ها دسته‌ای هستند (برای کل فهرست حداکثر سه کوئری) تا صفحه
+     * مشاور روی سرور ضعیف هم سریع بماند.
+     */
+    function counseling_resolve_students(array $reqs) {
+        $out = [];
+        if (!$reqs) return $out;
+        ensure_counseling_schema();
+        $ids = []; $chats = ['bale' => [], 'telegram' => []];
+        foreach ($reqs as $r) {
+            $rid = (int)$r['id'];
+            $out[$rid] = null;
+            $ids[] = $rid;
+            if (!empty($r['student_id'])) continue;
+            $p = $r['platform'] ?? '';
+            if (isset($chats[$p]) && trim((string)($r['chat_id'] ?? '')) !== '') $chats[$p][trim((string)$r['chat_id'])][] = $rid;
+        }
+        /* ۱) student_id مستقیم */
+        $directIds = [];
+        foreach ($reqs as $r) if (!empty($r['student_id'])) $directIds[(int)$r['student_id']][] = (int)$r['id'];
+        if ($directIds) {
+            $marks = implode(',', array_fill(0, count($directIds), '?'));
+            try {
+                $srows = DB::fetchAll("SELECT * FROM students WHERE id IN ($marks)", array_keys($directIds));
+                foreach ($srows as $s) foreach ($directIds[(int)$s['id']] as $rid) if ($out[$rid] === null) $out[$rid] = $s;
+            } catch (Throwable $e) {}
+        }
+        /* ۲) اتصال چت ولی در جدول لینک همان پلتفرم */
+        foreach (['bale', 'telegram'] as $p) {
+            if (!$chats[$p]) continue;
+            $table = bot_user_table($p);
+            $chatCol = $p === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
+            $marks = implode(',', array_fill(0, count($chats[$p]), '?'));
+            try {
+                ensure_bot_schema($p);
+                $lrows = DB::fetchAll("SELECT b.`$chatCol` AS chat_id, s.* FROM `$table` b JOIN students s ON s.id=b.student_id WHERE b.`$chatCol` IN ($marks)", array_keys($chats[$p]));
+                foreach ($lrows as $lr) {
+                    $c = (string)$lr['chat_id'];
+                    foreach (($chats[$p][$c] ?? []) as $rid) if ($out[$rid] === null) $out[$rid] = $lr;
+                }
+            } catch (Throwable $e) {}
+        }
+        /* ۳) تطبیق نام آزاد (فقط وقتی نام و نام خانوادگی کامل نوشته شده) */
+        foreach ($reqs as $r) {
+            $rid = (int)$r['id'];
+            if ($out[$rid] !== null) continue;
+            $nm = trim((string)($r['student_name'] ?? ''));
+            if ($nm === '' || mb_strlen($nm, 'UTF-8') < 5) continue;
+            $parts = preg_split('/\s+/u', $nm);
+            if (count($parts) < 2) continue;
+            $first = $parts[0]; $last = $parts[count($parts) - 1];
+            try {
+                $s = DB::fetch("SELECT * FROM students WHERE status='active' AND first_name=? AND last_name=? ORDER BY id DESC LIMIT 1", [$first, $last]);
+                if ($s) $out[$rid] = $s;
+            } catch (Throwable $e) {}
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('counseling_notify_counselors')) {
+    /** پیام کوتاه برای مشاوران فعال در ربات — از همان مسیر صف (bot_send_message). */
+    function counseling_notify_counselors($requestId, $text) {
+        try {
+            ensure_bot_schema('bale');
+            $counselors = DB::fetchAll("SELECT id FROM teachers WHERE is_counselor=1 AND status=1");
+            foreach ($counselors as $c) {
+                foreach (['bale', 'telegram'] as $platform) {
+                    try {
+                        ensure_bot_schema($platform);
+                        $sessions = DB::fetchAll("SELECT chat_id FROM bot_admin_sessions WHERE platform=? AND teacher_id=? AND role_type='teacher' AND is_active=1", [$platform, (int)$c['id']]);
+                        foreach ($sessions as $s) bot_send_message($platform, $s['chat_id'], $text);
+                    } catch (Throwable $e) {}
+                }
+            }
+        } catch (Throwable $e) {}
+    }
+}

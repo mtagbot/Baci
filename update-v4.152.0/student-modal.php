@@ -111,4 +111,11 @@ $records=DB::fetchAll("SELECT * FROM student_discipline_records WHERE student_id
 </tbody></table></div>
 <?php endif;
 $html = ob_get_clean();
-echo json_encode(['ok'=>true,'html'=>$html], JSON_UNESCAPED_UNICODE);
+/* v4.169.0: شمارشگرهای تازهٔ همان دانش‌آموز — لیست بدون رفرش صفحه،
+   ستون انضباط و بررسی‌نشدهٔ ردیف را با این مقادیر به‌روز می‌کند. */
+$rowStats = null;
+try {
+    $cnt = DB::fetch("SELECT COUNT(*) AS c, SUM(CASE WHEN COALESCE(review_status,'pending')='pending' THEN 1 ELSE 0 END) AS u FROM student_discipline_records WHERE student_id=?", [$studentId]);
+    $rowStats = ['student_id'=>$studentId, 'discipline_count'=>(int)($cnt['c']??0), 'unreviewed_count'=>(int)($cnt['u']??0)];
+} catch (Exception $e) {}
+echo json_encode(['ok'=>true,'html'=>$html,'stats'=>$rowStats], JSON_UNESCAPED_UNICODE);

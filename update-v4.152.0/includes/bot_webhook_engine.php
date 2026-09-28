@@ -144,6 +144,20 @@ if ($callbackQuery) {
         bot_webhook_safe_send($platform, $chatId, 'دانش‌آموز انتخاب‌شده از حساب ربات شما حذف شد.', bot_main_keyboard($platform));
     }
 
+    /* v4.169.0 — دکمهٔ شیشه‌ای «پاسخ» زیر پیام مشاور: مکالمه در همان
+       درخواست قبلی ادامه می‌یابد و درخواست جدید ساخته نمی‌شود. */
+    if ($chatId !== '' && strpos($data, 'counselreply_') === 0) {
+        $crid = (int)substr($data, 13);
+        $creq = null;
+        try { $creq = DB::fetch("SELECT id, chat_id FROM counseling_requests WHERE id=?", [$crid]); } catch (Throwable $e) {}
+        if ($creq && (string)($creq['chat_id'] ?? '') === $chatId && (string)($creq['chat_id'] ?? '') !== '') {
+            DB::execute("REPLACE INTO `$stateTable` (`$chatCol`, step, temp_nid, temp_payload) VALUES (?, 'counsel_reply_wait', ?, NULL)", [$chatId, (string)$crid]);
+            bot_webhook_safe_send($platform, $chatId, "✍️ پاسخ خود را برای مشاور بنویسید (در ادامهٔ درخواست #" . tr_num($crid, 'fa') . "):");
+        } else {
+            bot_webhook_safe_send($platform, $chatId, 'این مکالمه در دسترس نیست.', bot_main_keyboard($platform));
+        }
+    }
+
     if ($chatId !== '' && strpos($data, 'rep_') === 0) {
         $repId = (int)substr($data, 4);
         $report = DB::fetch("SELECT r.*, s.first_name, s.last_name FROM reports r JOIN students s ON r.student_id = s.id WHERE r.id = ? AND r.is_locked = 0", [$repId]);
@@ -481,6 +495,22 @@ if ($step === 'teacher_password') {
         if (!empty($teacher['is_counselor'])) $msg .= "\n🧭 نقش مشاور شما فعال است؛ پنل مشاوره نیز در دسترس است.";
         bot_webhook_safe_send($platform, $chatId, $msg, bot_main_keyboard($platform));
     } else bot_webhook_safe_send($platform, $chatId, 'کد ملی یا رمز دبیر نادرست است.');
+    http_response_code(200); exit;
+}
+
+/* v4.169.0 — پاسخ ولی به مشاور در همان مکالمهٔ قبلی. این بلوک باید
+   پیش از ماشین‌حالت counsel_* باشد چون نام گام با 'counsel_' شروع
+   می‌شود ولی منطقش کاملاً جداست. متن ولی در counseling_messages ثبت،
+   وضعیت درخواست «درحال پیگیری» و مشاور از طریق صف اعلان‌ها باخبر
+   می‌شود. درخواست تازه‌ای ساخته نمی‌شود. */
+if ($step === 'counsel_reply_wait') {
+    $crid = (int)($state['temp_nid'] ?? 0);
+    ensure_counseling_schema();
+    DB::execute("INSERT INTO counseling_messages (request_id, sender, body, created_at_jalali) VALUES (?, 'parent', ?, ?)", [$crid, $text, jalali_now()]);
+    DB::execute("UPDATE counseling_requests SET status='in_progress' WHERE id=? AND status<>'closed'", [$crid]);
+    counseling_notify_counselors($crid, "💬 پاسخ ولی در مکالمهٔ مشاوره #" . tr_num($crid, 'fa') . ":\n" . mb_substr($text, 0, 300, 'UTF-8'));
+    DB::execute("DELETE FROM `$stateTable` WHERE `$chatCol`=?", [$chatId]);
+    bot_webhook_safe_send($platform, $chatId, '✅ پیام شما برای مشاور ارسال شد. پاسخ بعدی ایشان در همین گفتگو می‌رسد.', bot_main_keyboard($platform));
     http_response_code(200); exit;
 }
 

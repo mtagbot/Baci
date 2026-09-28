@@ -287,7 +287,16 @@ $z = new ZipArchive(); $z->open('/tmp/long.docx');
 $xml = $z->getFromName('word/document.xml'); $z->close();
 preg_match_all('/<w:tbl>.*?<\\/w:tbl>/s', $xml, $tm);
 preg_match_all('/<w:tr[ >].*?<\\/w:tr>/s', $tm[0][0], $rm);
-$nc = function ($tr) { preg_match_all('/<w:tc>.*?<\\/w:tc>/s', $tr, $c); return count($c[0]); };
+/* v4.169.0: شمارش span-آگاه — ردیف‌های سرستون «جلسات/تاریخ» یک سلول
+   gridSpan=2 دارند، پس تعداد tc خام ۱۵ است ولی مجموع span باید ۱۶ بماند. */
+$nc = function ($tr) {
+    preg_match_all('/<w:tc>.*?<\\/w:tc>/s', $tr, $c);
+    $s = 0;
+    foreach ($c[0] as $cell) {
+        if (preg_match('/<w:gridSpan w:val="(\\d+)"/', $cell, $g)) $s += (int)$g[1]; else $s += 1;
+    }
+    return $s;
+};
 $ct = function ($tr, $i) {
     preg_match_all('/<w:tc>.*?<\\/w:tc>/s', $tr, $c);
     if (!isset($c[0][$i])) return 'MISSING';
@@ -307,9 +316,9 @@ const L = await j("<?php require '/harness/longname.php';");
 ok('نام خانوادگی سه‌کلمه‌ای کامل درج می‌شود',
    L.longLast === 'حسینی نژاد اصفهانی', String(L.longLast));
 ok('نام کنارش درست است', L.longFirst === 'محمدرضا', String(L.longFirst));
-ok('همهٔ ردیف‌ها تعداد سلول یکسان دارند (ساختار نشکسته)',
+ok('همهٔ ردیف‌ها مجموع span یکسان دارند (ساختار نشکسته)',
    L.allRowsSameCells === 1, JSON.stringify(L));
-ok('هر ردیف ۱۶ سلول دارد', L.cellCount === 16, String(L.cellCount));
+ok('مجموع span هر ردیف ۱۶ است', L.cellCount === 16, String(L.cellCount));
 ok('جدول همچنان ۳۵ ردیف و ۲ جدول است',
    L.rows === 35 && L.tables === 2, `${L.rows}/${L.tables}`);
 
@@ -714,6 +723,55 @@ ok('بیش از ۳۰ دانش‌آموز فایل را نمی‌شکند', E.man
 ok('جدول همچنان ۳۵ ردیف می‌ماند (سرریز نمی‌کند)', E.many_rows === 35, String(E.many_rows));
 ok('کلاس بدون دانش‌آموز هم فایل معتبر می‌دهد', E.empty_ok === 1);
 ok('صفحه به کاربر دربارهٔ بیش از ۳۰ نفر هشدار می‌دهد', pageC.includes('بیش از ۳۰'));
+
+/* ═══ v4.169.0 — ادغام «جلسات» و «تاریخ» با سلول سمت چپ (Word و PDF) ═══ */
+console.log('\n══ ادغام سرستون جلسات/تاریخ (v4.169.0) ══');
+php.writeFile('/harness/merge.php', `<?php
+ini_set('display_errors','0'); error_reporting(0);
+require_once '/www/includes/db.php';
+require_once '/www/includes/functions.php';
+require_once '/www/includes/school_sort.php';
+require_once '/www/includes/class_schedule_sync.php';
+require_once '/www/includes/docx_class_list.php';
+$names = [['last' => 'آبادی', 'first' => 'بهار']];
+$doc = dcl_generate('1/9', $names);
+file_put_contents('/tmp/merge.docx', $doc);
+$z = new ZipArchive(); $z->open('/tmp/merge.docx');
+$xml = $z->getFromName('word/document.xml'); $z->close();
+preg_match_all('/<w:tr(?:\\s[^>]*)?>.*?<\\\\/w:tr>/s', $xml, $rm);
+$jalsRow = ''; $tarRow = '';
+foreach ($rm[0] as $tr) {
+  if ($jalsRow === '' && strpos($tr, 'جلسات') !== false) $jalsRow = $tr;
+  if ($tarRow === '' && strpos($tr, 'تاریخ') !== false) $tarRow = $tr;
+}
+$spanSum = function ($tr) {
+  preg_match_all('/<w:tc>.*?<\\\\/w:tc>/s', $tr, $cm);
+  $s = 0;
+  foreach ($cm[0] as $c) {
+    if (preg_match('/<w:gridSpan w:val="(\\\\d+)"/', $c, $g)) $s += (int)$g[1]; else $s += 1;
+  }
+  return $s;
+};
+$html = dcl_render_print_html('1/9', $names, '', false);
+/* گارد: اگر سلول کنار برچسب خالی نباشد، ادغام نباید اتفاق بیفتد */
+$probe = '<w:tr><w:tc><w:tcPr><w:tcW w:w="900" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>س</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1563" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>جلسات</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1252" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>پر</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="900" w:type="dxa"/></w:tcPr><w:p/></w:tc></w:tr>';
+echo json_encode([
+  'jalSpan' => ($jalsRow !== '' && strpos($jalsRow, '<w:gridSpan w:val="2"/>') !== false) ? 1 : 0,
+  'tarSpan' => ($tarRow !== '' && strpos($tarRow, '<w:gridSpan w:val="2"/>') !== false) ? 1 : 0,
+  'jalSum'  => $spanSum($jalsRow),
+  'tarSum'  => $spanSum($tarRow),
+  'guard'   => (dcl_merge_header_label_pair($probe) === $probe) ? 1 : 0,
+  'htmlJal' => (strpos($html, 'colspan="2">جلسات') !== false) ? 1 : 0,
+  'htmlTar' => (strpos($html, 'colspan="2">تاریخ') !== false) ? 1 : 0,
+], JSON_UNESCAPED_UNICODE);`);
+const MG = await j("<?php require '/harness/merge.php';");
+ok('سرستون «جلسات» در Word با سلول چپش ادغام شده (gridSpan=2)', MG.jalSpan === 1, JSON.stringify(MG));
+ok('سرستون «تاریخ» در Word با سلول چپش ادغام شده (gridSpan=2)', MG.tarSpan === 1, JSON.stringify(MG));
+ok('مجموع span ردیف جلسات ۱۶ می‌ماند (جدول برای Word معتبر است)', MG.jalSum === 16, String(MG.jalSum));
+ok('مجموع span ردیف تاریخ ۱۶ می‌ماند', MG.tarSum === 16, String(MG.tarSum));
+ok('ادغام فقط وقتی سلول کنار برچسب خالی است انجام می‌شود', MG.guard === 1);
+ok('در نسخهٔ چاپی/PDF هم «جلسات» colspan=2 دارد', MG.htmlJal === 1, JSON.stringify(MG));
+ok('در نسخهٔ چاپی/PDF هم «تاریخ» colspan=2 دارد', MG.htmlTar === 1, JSON.stringify(MG));
 
 console.log(`\n  سوئیت لیست کلاسی Word: ${pass} PASS / ${fail} FAIL`);
 process.exit(fail ? 1 : 0);
