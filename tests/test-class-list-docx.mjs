@@ -773,5 +773,38 @@ ok('ادغام فقط وقتی سلول کنار برچسب خالی است ان
 ok('در نسخهٔ چاپی/PDF هم «جلسات» colspan=2 دارد', MG.htmlJal === 1, JSON.stringify(MG));
 ok('در نسخهٔ چاپی/PDF هم «تاریخ» colspan=2 دارد', MG.htmlTar === 1, JSON.stringify(MG));
 
+console.log('\n══ آلبوم عکس: امنیت و ساختار (v4.170.0) ══');
+php.writeFile('/harness/album.php', `<?php
+ini_set('display_errors','0'); error_reporting(0);
+require_once '/www/includes/db.php';
+require_once '/www/includes/functions.php';
+require_once '/www/includes/school_sort.php';
+require_once '/www/includes/photo_album.php';
+@mkdir('/www/uploads/photos', 0777, true);
+file_put_contents('/www/uploads/photos/ok.jpg', base64_decode('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q=='));
+$html = pab_render_print_html('۷/۱', 'هفتم', [
+  ['id'=>1,'first_name'=>'بهار','last_name'=>'آبادی','photo_url'=>'uploads/photos/ok.jpg'],
+  ['id'=>2,'first_name'=>'بدون','last_name'=>'عکس','photo_url'=>''],
+], 'مدرسهٔ نمونه', false);
+echo json_encode([
+  'traversal' => pab_photo_data_uri('../../etc/passwd') === '' ? 1 : 0,
+  'absUrl'    => pab_photo_data_uri('http://evil/x.jpg') === '' ? 1 : 0,
+  'missing'   => pab_photo_data_uri('uploads/photos/nope.jpg') === '' ? 1 : 0,
+  'embedded'  => strpos(pab_photo_data_uri('uploads/photos/ok.jpg'), 'data:image/jpeg;base64,') === 0 ? 1 : 0,
+  'a4'        => strpos($html, '@page{size:A4 portrait') !== false ? 1 : 0,
+  'card'      => substr_count($html, 'class="stu"'),
+  'note'      => substr_count($html, 'class="note"'),
+  'nameEsc'   => strpos($html, 'بهار آبادی') !== false ? 1 : 0,
+], JSON_UNESCAPED_UNICODE);`);
+const AL = await j("<?php require '/harness/album.php';");
+ok('مسیر .. برای عکس رد می‌شود (path traversal)', AL.traversal === 1, JSON.stringify(AL));
+ok('آدرس مطلق/پروتکل‌دار برای عکس رد می‌شود', AL.absUrl === 1);
+ok('عکسِ موجود data-URI می‌شود', AL.embedded === 1, JSON.stringify(AL));
+ok('عکسِ ناموجود به کادر خالی می‌افتد', AL.missing === 1);
+ok('صفحهٔ آلبوم A4 عمودی است', AL.a4 === 1);
+ok('به ازای هر دانش‌آموز یک کادر ساخته می‌شود', AL.card === 2, String(AL.card));
+ok('هر کادر فضای نوشتن دارد', AL.note === 2, String(AL.note));
+ok('نام دانش‌آموز در کادر درج می‌شود', AL.nameEsc === 1);
+
 console.log(`\n  سوئیت لیست کلاسی Word: ${pass} PASS / ${fail} FAIL`);
 process.exit(fail ? 1 : 0);

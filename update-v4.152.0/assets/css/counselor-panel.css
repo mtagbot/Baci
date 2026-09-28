@@ -1,0 +1,95 @@
+/* File: assets/css/counselor-panel.css (v4.170.0)
+   پنل مشاور: لیست دانش‌آموزان واکنش‌گرا (موبایل/تبلت)، درخواست‌های
+   بازشونده و حباب‌های گفتگو به سبک پیام‌رسان. فقط صفحه‌های مشاور این
+   برگه را بارگذاری می‌کنند ($pageCss). */
+
+/* ── ۱) لیست دانش‌آموزان — موبایل: هر ردیف یک کارت تمیز ─────────────── */
+.cns-actions{display:flex;gap:4px;flex-wrap:wrap}
+@media (max-width:767px){
+  .cns-students thead{display:none}
+  .cns-students,.cns-students tbody,.cns-students tr,.cns-students td{display:block;width:100%}
+  .cns-students tbody{display:block}
+  .cns-students tr{
+    border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;margin:0 0 10px;
+    background:#fff;box-shadow:0 1px 3px rgba(15,23,42,.06);
+  }
+  .cns-students tr:last-child{margin-bottom:0}
+  .cns-students td{
+    border:0;padding:4px 0;display:flex;align-items:center;
+    justify-content:space-between;gap:8px;text-align:right;
+  }
+  .cns-students td::before{
+    content:attr(data-label);font-size:.72rem;color:#64748b;flex-shrink:0;
+    font-weight:400;
+  }
+  .cns-students td[data-role="name"]{font-weight:700;font-size:.95rem;padding-bottom:6px}
+  .cns-students td[data-role="actions"]{
+    display:block;padding:8px 0 0;margin-top:6px;border-top:1px dashed #e2e8f0;
+  }
+  .cns-students td[data-role="actions"]::before{content:none}
+  .cns-students td[data-role="actions"] .cns-actions{
+    display:grid;grid-template-columns:1fr 1fr;gap:6px;
+  }
+  .cns-students td[data-role="actions"] .cns-actions .btn{
+    width:100%;justify-content:center;text-align:center;white-space:nowrap;
+  }
+}
+/* تبلت: جدول می‌ماند، فقط دکمه‌ها منظم دو ستونی می‌شوند تا ردیف دوسطری نشود */
+@media (min-width:768px) and (max-width:1100px){
+  .cns-students td[data-role="actions"] .cns-actions{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;
+  }
+  .cns-students td[data-role="actions"] .cns-actions .btn{width:100%;justify-content:center}
+}
+
+/* ── ۲) نوار فیلترهای تراز ──────────────────────────────────────────── */
+.cns-filters{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.cns-filters>div{display:flex;flex-direction:column;gap:4px;min-width:130px}
+.cns-filters .cns-grow{flex:1 1 200px}
+.cns-filters label{font-size:.72rem;color:#475569}
+
+/* ── ۳) کارت درخواست بازشونده ───────────────────────────────────────── */
+.cns-req{
+  border:1px solid #e2e8f0;border-radius:12px;background:#fff;overflow:hidden;
+  transition:box-shadow .15s ease;
+}
+.cns-req+.cns-req{margin-top:12px}
+.cns-req[open]{box-shadow:0 2px 10px rgba(15,23,42,.08)}
+.cns-req>summary{
+  list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;
+  padding:10px 12px;user-select:none;
+}
+.cns-req>summary::-webkit-details-marker{display:none}
+.cns-req>summary:hover{background:#f8fafc}
+.cns-req .cns-chev{flex-shrink:0;color:#94a3b8;transition:transform .18s ease}
+.cns-req[open] .cns-chev{transform:rotate(-90deg)}
+.cns-photo{
+  width:44px;height:58px;border-radius:6px;border:1px solid #cbd5e1;overflow:hidden;
+  background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.cns-photo img{width:100%;height:100%;object-fit:cover}
+.cns-req-main{flex:1;min-width:0}
+.cns-req-main .cns-sub{font-size:.72rem;color:#64748b;margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cns-req-body{padding:12px;border-top:1px solid #eef2f7;background:#fcfdff}
+
+/* ── ۴) حباب‌های گفتگو (ولی/مشاور) مثل پیام‌رسان ─────────────────────── */
+.cns-thread{display:flex;flex-direction:column;gap:8px;padding:6px 2px}
+.cns-bubble-row{display:flex}
+/* صفحه RTL است: flex-start یعنی راست. پیام مشاور (خودی) راست، ولی چپ. */
+.cns-bubble-row.counselor{justify-content:flex-start}
+.cns-bubble-row.parent{justify-content:flex-end}
+.cns-bubble{
+  max-width:82%;padding:8px 12px;border-radius:14px;font-size:.85rem;line-height:1.9;
+  box-shadow:0 1px 2px rgba(15,23,42,.06);word-break:break-word;
+}
+.cns-bubble.counselor{background:#f0fdf4;border:1px solid #dcfce7;border-top-right-radius:4px}
+.cns-bubble.parent{background:#eff6ff;border:1px solid #dbeafe;border-top-left-radius:4px}
+.cns-bubble .cns-meta{display:block;font-size:.68rem;color:#64748b;margin-top:4px}
+@media (max-width:640px){.cns-bubble{max-width:92%}}
+
+/* برچسب وضعیت درخواست‌ها */
+.cns-st-new{background:#fef3c7;color:#92400e}
+.cns-st-in_progress{background:#dbeafe;color:#1e40af}
+.cns-st-replied{background:#dcfce7;color:#166534}
+.cns-st-closed{background:#e2e8f0;color:#475569}

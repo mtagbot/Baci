@@ -16,6 +16,7 @@ require_once __DIR__ . '/includes/school_roles.php';
 require_once __DIR__ . '/includes/class_schedule_sync.php';
 require_once __DIR__ . '/includes/docx_class_list.php';
 require_once __DIR__ . '/includes/docx_school_list.php';
+require_once __DIR__ . '/includes/photo_album.php';
 require_once __DIR__ . '/includes/academic_year_helpers.php';
 
 /* v4.169.0: معاون اجرایی هم به «لیست‌ها و گزارشات» دسترسی کامل دارد
@@ -101,6 +102,26 @@ if ($action === 'class_list_pdf') {
     exit;
 }
 
+if ($action === 'photo_album_pdf') {
+    /* v4.170.0 — گزارش «آلبوم عکس»: نمای چاپی HTML (مثل class_list_pdf)؛
+       عکس‌ها data-URI جاسازی می‌شوند و کاربر با Save as PDF خروجی می‌گیرد. */
+    $className = trim($_GET['class'] ?? '');
+    if ($className === '') { set_flash_message('error', 'کلاس انتخاب نشده است.'); redirect('reports-lists.php?tab=album'); }
+
+    $grade = '';
+    foreach ($classes as $c) if ($c['class_name'] === $className) { $grade = $c['grade_level']; break; }
+
+    $autoPrint = (($_GET['auto'] ?? '0') === '1');
+    echo pab_render_print_html(
+        $className,
+        $grade,
+        pab_students_of_class($className, $year),
+        get_setting('school_name', ''),
+        $autoPrint
+    );
+    exit;
+}
+
 if ($action === 'class_list_all') {
     /* همهٔ کلاس‌ها در یک zip — برای وقتی دفتر می‌خواهد یک‌جا چاپ کند. */
     if (!class_exists('ZipArchive')) {
@@ -149,7 +170,17 @@ foreach ($classes as $c) {
 $templateOk = is_file(dcl_template_path());
 $zipOk      = class_exists('ZipArchive');
 
-$tab = (($_GET['tab'] ?? '') === 'school') ? 'school' : 'teacher';
+$tab = in_array($_GET['tab'] ?? '', ['school', 'album'], true) ? $_GET['tab'] : 'teacher';
+$photoCounts = [];
+if ($tab === 'album') {
+    /* فقط در تب آلبوم: شمار عکس‌دارها، با همان کوئری سبک هر کلاس */
+    foreach ($classes as $c) {
+        $rows = pab_students_of_class($c['class_name'], $year);
+        $with = 0;
+        foreach ($rows as $r) if (trim((string)($r['photo_url'] ?? '')) !== '') $with++;
+        $photoCounts[$c['class_name']] = ['total' => count($rows), 'with' => $with];
+    }
+}
 $schoolData = null; $schoolError = '';
 if ($tab === 'school') {
     try { $schoolData = srl_collect($year); }
@@ -170,6 +201,7 @@ require_once __DIR__ . '/includes/header.php';
     <nav class="flex gap-2 flex-wrap no-print" aria-label="نوع لیست">
         <a href="reports-lists.php?tab=teacher" class="btn <?php echo $tab === 'teacher' ? 'btn-primary' : 'btn-accent'; ?>" <?php if ($tab === 'teacher') echo 'aria-current="page"'; ?>>لیست کلاسی دبیر</a>
         <a href="reports-lists.php?tab=school" class="btn <?php echo $tab === 'school' ? 'btn-primary' : 'btn-accent'; ?>" <?php if ($tab === 'school') echo 'aria-current="page"'; ?>>لیست دانش‌آموزان کل مدرسه</a>
+        <a href="reports-lists.php?tab=album" class="btn <?php echo $tab === 'album' ? 'btn-primary' : 'btn-accent'; ?>" <?php if ($tab === 'album') echo 'aria-current="page"'; ?>>آلبوم عکس کلاس‌ها</a>
     </nav>
 
     <?php if ($tab === 'teacher'): ?>
@@ -251,6 +283,74 @@ require_once __DIR__ . '/includes/header.php';
         <p class="text-xs text-muted" style="margin-top:10px">
             جدول لیست ۳۰ ردیف دارد. اگر کلاسی بیش از ۳۰ دانش‌آموز داشته باشد، نام‌های بعدی در فایل جا نمی‌شوند
             و باید برای آن کلاس یک برگهٔ دوم جداگانه چاپ شود.
+        </p>
+        <?php endif; ?>
+    </div>
+
+    <?php elseif ($tab === 'album'): ?>
+    <!-- ═══ گزارش ۳: آلبوم عکس کلاس‌ها (v4.170.0) ═══ -->
+    <div class="card">
+        <div style="margin-bottom:12px">
+            <h3 class="font-bold text-sm">آلبوم عکس کلاس‌ها</h3>
+            <p class="text-xs text-muted">
+                عکس شناسنامه‌ای دانش‌آموزان هر کلاس در کادرهای شبکه‌ای روی صفحهٔ A4، همراه با نام دانش‌آموز
+                و یک فضای خالی زیر هر نام برای نوشتن متن کوتاه — مثل یک لیست کلاسی با عکس.
+                هر برگه ۳۰ کادر دارد؛ کلاس‌های بزرگ‌تر به برگهٔ بعدی سرریز می‌شوند.
+                عکس‌ها از پوشهٔ <code>uploads/photos</code> (نام‌فایل = کد ملی) خوانده می‌شوند.
+            </p>
+        </div>
+
+        <?php if (!$classes): ?>
+            <div class="text-center text-muted" style="font-size:13px;padding:16px">
+                هیچ کلاسی برای سال تحصیلی <?php echo clean(tr_num($year, 'fa')); ?> ثبت نشده است.
+            </div>
+        <?php else: ?>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>کلاس</th>
+                        <th>پایه</th>
+                        <th>تعداد دانش‌آموز</th>
+                        <th>عکس‌دار</th>
+                        <th>برگه</th>
+                        <th>دریافت</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($classes as $c):
+                    $cn = $c['class_name'];
+                    $pc = $photoCounts[$cn] ?? ['total' => 0, 'with' => 0];
+                ?>
+                    <tr>
+                        <td class="font-bold"><?php echo clean($cn); ?></td>
+                        <td><?php echo clean($c['grade_level'] ?: '—'); ?></td>
+                        <td><?php echo clean(tr_num($pc['total'], 'fa')); ?></td>
+                        <td>
+                            <?php echo clean(tr_num($pc['with'], 'fa')); ?>
+                            <?php if ($pc['total'] > 0 && $pc['with'] < $pc['total']): ?>
+                                <span class="badge" style="background:#fef3c7;color:#92400e;font-size:.65rem">بدون عکس: <?php echo clean(tr_num($pc['total'] - $pc['with'], 'fa')); ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td><?php echo clean(tr_num((string)max(1, (int)ceil($pc['total'] / 30)), 'fa')); ?></td>
+                        <td>
+                            <?php if ($pc['total'] === 0): ?>
+                                <span class="text-xs text-muted">دانش‌آموزی ندارد</span>
+                            <?php else: ?>
+                                <a class="btn btn-accent text-xs" target="_blank" rel="noopener"
+                                   href="reports-lists.php?action=photo_album_pdf&class=<?php echo urlencode($cn); ?>">پیش‌نمایش و PDF</a>
+                                <a class="btn btn-outline text-xs" target="_blank" rel="noopener"
+                                   href="reports-lists.php?action=photo_album_pdf&class=<?php echo urlencode($cn); ?>&auto=1">چاپ مستقیم</a>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <p class="text-xs text-muted" style="margin-top:10px">
+            دانش‌آموز بدون عکس هم کادر دارد؛ جای عکس خالی می‌ماند تا چاپ دستی کامل باشد.
+            در پنجرهٔ چاپ، کاغذ A4 و مقصد «Save as PDF» را انتخاب کنید.
         </p>
         <?php endif; ?>
     </div>

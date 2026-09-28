@@ -77,6 +77,7 @@ if($reqs){
 }
 $statusFa=['new'=>'جدید','in_progress'=>'درحال پیگیری','replied'=>'پاسخ داده شد','closed'=>'بسته شد'];
 
+$pageCss = 'assets/css/counselor-panel.css?v=4.170.0';
 require_once __DIR__ . '/includes/header.php';
 ?>
 <div class="space-y-6">
@@ -85,7 +86,15 @@ require_once __DIR__ . '/includes/header.php';
      <div style="width:52px;height:68px;border-radius:8px;border:1px solid #cbd5e1;overflow:hidden;background:#f1f5f9;display:flex;align-items:center;justify-content:center"><?php if(!empty($student['photo_url'])): ?><img src="<?php echo clean($student['photo_url']); ?>" alt="" style="width:100%;height:100%;object-fit:cover"><?php else: ?><span style="font-size:24px">👤</span><?php endif; ?></div>
      <div><h2 class="text-2xl font-bold">پروندهٔ مشاورهٔ <?php echo clean($student['first_name'].' '.$student['last_name']); ?></h2><p class="text-sm text-muted"><?php echo clean($student['class_name'].' — '.$student['grade_level']); ?> · کد ملی <?php echo tr_num($student['national_id'],'fa'); ?></p></div>
    </div>
-   <a class="btn btn-secondary" href="<?php echo clean($backUrl); ?>">بازگشت</a>
+   <?php /* v4.170.0: میان‌برهای پرونده — از یادداشت‌ها مستقیم به اطلاعات،
+          کارنامه‌ها و موارد انضباطی همان دانش‌آموز (و بازگشت به همین صفحه). */ ?>
+   <?php $fileBack=urlencode('counselor-file.php?id='.$sid.'&back='.urlencode($backUrl)); ?>
+   <div class="flex gap-2 flex-wrap">
+     <a class="btn btn-outline text-xs" href="staff-student-file.php?tab=info&id=<?php echo $sid; ?>&back=<?php echo $fileBack; ?>">اطلاعات</a>
+     <a class="btn btn-primary text-xs" href="staff-student-file.php?tab=reports&id=<?php echo $sid; ?>&back=<?php echo $fileBack; ?>">کارنامه‌ها</a>
+     <a class="btn btn-warning text-xs" href="staff-student-file.php?tab=discipline&id=<?php echo $sid; ?>&back=<?php echo $fileBack; ?>">موارد انضباطی</a>
+     <a class="btn btn-secondary" href="<?php echo clean($backUrl); ?>">بازگشت</a>
+   </div>
  </div>
 
  <div class="grid grid-cols-2 gap-6 responsive-grid">
@@ -103,7 +112,8 @@ require_once __DIR__ . '/includes/header.php';
      <div class="flex justify-between"><b>#<?php echo tr_num($r['id'],'fa'); ?> — <?php echo clean($r['topic']); ?></b><span class="badge badge-info"><?php echo clean($statusFa[$r['status']] ?? $r['status']); ?></span></div>
      <p class="text-xs text-muted">ولی: <?php echo clean($r['requester_name']); ?> · <?php echo tr_num($r['created_at_jalali'],'fa'); ?></p>
      <p class="text-sm"><?php echo nl2br(clean($r['description'])); ?></p>
-     <?php if($thread): ?><div class="space-y-2 mt-2" style="border-right:3px solid #c7d2fe;padding-right:10px"><?php foreach($thread as $m): ?><div class="text-xs p-2 rounded" style="background:<?php echo $m['sender']==='counselor'?'#f0fdf4':'#eff6ff'; ?>"><b><?php echo $m['sender']==='counselor'?'مشاور':'ولی'; ?></b> · <?php echo tr_num($m['created_at_jalali'],'fa'); ?><br><?php echo nl2br(clean($m['body'])); ?></div><?php endforeach; ?></div>
+     <?php /* v4.170.0: گفتگوی حبابی — یکدست با تب درخواست‌ها */ ?>
+     <?php if($thread): ?><div class="cns-thread mt-2"><?php foreach($thread as $m): $isC=$m['sender']==='counselor'; ?><div class="cns-bubble-row <?php echo $isC?'counselor':'parent'; ?>"><div class="cns-bubble <?php echo $isC?'counselor':'parent'; ?>"><?php echo nl2br(clean($m['body'])); ?><span class="cns-meta"><?php echo $isC?'مشاور':'ولی'; ?> · <?php echo tr_num($m['created_at_jalali'],'fa'); ?></span></div></div><?php endforeach; ?></div>
      <?php elseif($r['counselor_reply']): ?><div class="p-2 bg-green-50 rounded border text-xs mt-2"><b>پاسخ:</b> <?php echo nl2br(clean($r['counselor_reply'])); ?></div><?php endif; ?>
    </div><?php endforeach; if(!$reqs): ?><p class="text-center text-muted text-sm">درخواست مشاوره‌ای برای این دانش‌آموز ثبت نشده است.</p><?php endif; ?></div>
   </section>

@@ -83,8 +83,13 @@ const rq = await req('', { file: 'counselor-panel.php', sid, query: 'tab=request
 check(!rq.res.fatal, 'requests tab renders: ' + (rq.res.fatal || ''));
 check(rq.res.page.includes('counselor-file.php?id=7101&back='), 'the request shows the student badge linking to the file');
 check(rq.res.page.includes('سارا مشاوره‌ای'), 'the badge carries the student name');
-check(rq.res.page.includes('uploads/students/7101.jpg') && rq.res.page.includes('object-fit:cover'), 'the ID-style photo is rendered');
-check(rq.res.page.includes('badge badge-warning') && rq.res.page.includes('بی‌اتصال'), 'an unlinked request still shows its free-text student name');
+check(rq.res.page.includes('uploads/students/7101.jpg') && rq.res.page.includes('cns-photo'), 'the ID-style photo is rendered');
+check(rq.res.page.includes('بی‌اتصال'), 'an unlinked request still shows its free-text student name');
+/* v4.170.0: expandable cards, bubble thread, status/grade filters */
+check(rq.res.page.includes('<details class="cns-req"'), 'each request is a collapsible card');
+check(/<details class="cns-req"[^>]*open/.test(rq.res.page), 'a «new» request starts expanded');
+check(rq.res.page.includes('cns-bubble-row') && rq.res.page.includes('cns-bubble parent'), 'the parent message is shown as a bubble');
+check(rq.res.page.includes('name="rstatus"') && rq.res.page.includes('name="grade"'), 'status + grade filters exist');
 
 /* ── 3: counselor reply → conversation row + queued bot message w/ button ── */
 const rep = await req('', { file: 'counselor-panel.php', sid, method: 'POST', post: {
@@ -104,7 +109,12 @@ check(job.out.includes('counselreply_801'), 'the reply is enqueued to the parent
 check(job.out.includes('💬 پاسخ'), 'the queued message carries the glass reply button');
 check(!job.out.includes('STATE=sent'), 'the job is queued (delivery stays with the worker, never inline)');
 const rq2 = await req('', { file: 'counselor-panel.php', sid, query: 'tab=requests' });
-check(rq2.res.page.includes('تاریخچهٔ مکالمه') && rq2.res.page.includes('جلسهٔ مشاوره روز شنبه'), 'the thread history is visible on the request card');
+check(rq2.res.page.includes('cns-bubble counselor') && rq2.res.page.includes('جلسهٔ مشاوره روز شنبه'), 'the counselor reply shows as a bubble in the thread');
+/* v4.170.0: the status filter actually narrows the list server-side */
+const rqClosed = await req('', { file: 'counselor-panel.php', sid, query: 'tab=requests&rstatus=closed' });
+check(!rqClosed.res.page.includes('cns-req" open') && !rqClosed.res.page.includes('counselreply_801'), 'filtering by a status with no matches shows nothing: ' + (rqClosed.res.page.match(/درخواستی با این فیلترها/) ? 'ok' : 'unexpected'));
+const rqNew = await req('', { file: 'counselor-panel.php', sid, query: 'tab=requests&rstatus=new' });
+check(rqNew.res.page.includes('بی‌اتصال') && !rqNew.res.page.includes('جلسهٔ مشاوره روز شنبه'), 'the status=new filter keeps only new requests');
 
 /* ── 4: webhook — the glass button + the parent follow-up ────────────────── */
 const INPUT_LINE = "$input = file_get_contents('php://input');";
@@ -162,6 +172,13 @@ check(filePage.res.page.includes('بستهٔ درخواست‌ها و مکالم
 check(filePage.res.page.includes('افت تحصیلی') && filePage.res.page.includes('سلام، ساعت ۱۲ برای ما بهتر است.'), 'the bundle shows every request with the full parent/counselor thread');
 const asExec = await req('', { file: 'counselor-file.php', sid: execSid, query: 'id=7101' });
 check(asExec.res.redirect && asExec.res.redirect.includes('admin-login'), 'a non-counselor teacher (executive) cannot open the counseling file');
+/* v4.170.0: cross-navigation between the notes and the dossier tabs */
+check(filePage.res.page.includes('staff-student-file.php?tab=info&id=7101') && filePage.res.page.includes('staff-student-file.php?tab=discipline&id=7101'), 'the notes page links to the info/discipline dossier of the same student');
+check(/staff-student-file\.php\?tab=reports&id=7101[^"']*back=counselor-file/.test(filePage.res.page), 'the dossier links carry a return address back to the notes');
+const ssfC = await req('', { file: 'staff-student-file.php', sid, query: 'id=7101&tab=discipline' });
+check(!ssfC.res.fatal && ssfC.res.page.includes('counselor-file.php?id=7101'), 'a counselor sees the «یادداشت مشاور» button on the dossier');
+const ssfE = await req('', { file: 'staff-student-file.php', sid: execSid, query: 'id=7101&tab=discipline' });
+check(!ssfE.res.page.includes('counselor-file.php?id=7101'), 'a non-counselor deputy does NOT get the counselor-notes button');
 
 /* ── 6: reports-lists for the executive deputy ────────────────────────────── */
 const rlExec = await req('', { file: 'reports-lists.php', sid: execSid });
@@ -170,6 +187,32 @@ check(!rlExec.res.redirect && rlExec.res.page.includes('لیست‌ها و گز�
 check(rlExec.res.page.includes('لیست کلاسی دبیر') && rlExec.res.page.includes('لیست دانش‌آموزان کل مدرسه'), 'all report sections are present');
 const rlCounselor = await req('', { file: 'reports-lists.php', sid });
 check(rlCounselor.res.redirect && rlCounselor.res.redirect.includes('login'), 'other teachers are still refused: redirect=' + rlCounselor.res.redirect);
+
+/* ── 7: «آلبوم عکس» report (item 3, v4.170.0) ────────────────────────────── */
+check(rlExec.res.page.includes('آلبوم عکس کلاس‌ها'), 'the album report has a tab in the hub');
+/* 32 students in one class → overflow to a second A4 sheet; a few get real
+   photo files so the data-URI embedding is exercised end to end. */
+const JPEG = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==';
+const albumSetup = await run(`<?php require_once '/www/includes/functions.php';
+require_once '/www/includes/school_roles.php'; ensure_school_roles_schema();
+DB::execute("DELETE FROM students WHERE class_name='آلبوم ۱'");
+@mkdir('/www/uploads/photos', 0777, true);
+for ($i = 1; $i <= 32; $i++) {
+  $nid = '11000' . str_pad((string)(100 + $i), 5, '0', STR_PAD_LEFT);
+  $pu = ($i <= 3) ? 'uploads/photos/' . $nid . '.jpg' : '';
+  if ($pu !== '') file_put_contents('/www/' . $pu, base64_decode('${JPEG}'));
+  DB::execute("INSERT INTO students (national_id,first_name,last_name,class_name,grade_level,status,academic_year,photo_url) VALUES (?,'دانش','آموز{$i}','آلبوم ۱','هفتم','active','1404/1405',?)", [$nid, $pu]);
+}
+echo 'ALBUM_OK';`);
+check(albumSetup.out.includes('ALBUM_OK'), 'album class fixture ran: ' + albumSetup.out.slice(0, 120) + albumSetup.err.slice(0, 120));
+const albumTab = await req('', { file: 'reports-lists.php', sid: execSid, query: 'tab=album' });
+check(!albumTab.res.fatal && albumTab.res.page.includes('photo_album_pdf'), 'the album tab lists classes with a download action: ' + (albumTab.res.fatal || ''));
+const albumPdf = await req('', { file: 'reports-lists.php', sid: execSid, query: 'action=photo_album_pdf&class=' + encodeURIComponent('آلبوم ۱') });
+check(!albumPdf.res.fatal && albumPdf.res.page.includes('@page{size:A4 portrait'), 'the album prints on A4: ' + (albumPdf.res.fatal || ''));
+check((albumPdf.res.page.match(/class="sheet"/g) || []).length === 2, 'a 32-student class overflows to a second A4 sheet');
+check(albumPdf.res.page.includes('data:image/jpeg;base64,'), 'a student with a photo file is embedded as a data-URI');
+check(albumPdf.res.page.includes('جای عکس'), 'a student without a photo keeps an empty photo box');
+check(albumPdf.res.page.includes('دانش آموز1') && albumPdf.res.page.includes('class="note"'), 'each card shows the name and a writing space');
 
 /* ── 5b: student-modal returns live counters (item 5) ─────────────────────── */
 await run(`<?php require_once '/www/includes/functions.php';

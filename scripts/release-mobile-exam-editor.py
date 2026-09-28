@@ -13,10 +13,10 @@ import hashlib
 
 ROOT = Path(__file__).resolve().parent.parent
 STAMP = (2026, 9, 25, 0, 0, 0)
-# v4.169.0 / v2.91.0 — بستهٔ هشت‌موردی (پنل مشاور، لیست‌ها برای معاون اجرایی،
-# حافظهٔ فیلترها، جستجوی سریع، لیست کلاسی، PDF تمام‌صفحهٔ آزمون).
-SITE_ARCHIVE = 'MODIFIED-FILES-V4.169.0.zip'
-DESKTOP_ARCHIVE = 'SchoolDesk-FIX-v2.91.0.zip'
+# v4.170.0 / v2.92.0 — پنل مشاور واکنش‌گرا و بازشونده (حباب گفتگو، فیلتر
+# وضعیت/پایه)، میان‌برهای پرونده، گزارش «آلبوم عکس» A4 با جای یادداشت.
+SITE_ARCHIVE = 'MODIFIED-FILES-V4.170.0.zip'
+DESKTOP_ARCHIVE = 'SchoolDesk-FIX-v2.92.0.zip'
 SITE_FILES = {
     'site-update-v4.152.0/exam-design-api.php': ROOT / 'update-v4.152.0/exam-design-api.php',
     'site-update-v4.152.0/exam-print.php': ROOT / 'update-v4.152.0/exam-print.php',
@@ -39,6 +39,9 @@ SITE_FILES = {
     'site-update-v4.152.0/assets/js/main.js': ROOT / 'update-v4.152.0/assets/js/main.js',
     'site-update-v4.152.0/includes/docx_class_list.php': ROOT / 'update-v4.152.0/includes/docx_class_list.php',
     'site-update-v4.152.0/includes/bot_role_engine.php': ROOT / 'update-v4.152.0/includes/bot_role_engine.php',
+    # v4.170.0: پنل مشاور واکنش‌گرا + گزارش آلبوم عکس
+    'site-update-v4.152.0/assets/css/counselor-panel.css': ROOT / 'update-v4.152.0/assets/css/counselor-panel.css',
+    'site-update-v4.152.0/includes/photo_album.php': ROOT / 'update-v4.152.0/includes/photo_album.php',
 }
 DESKTOP_FILES = {
     'SchoolDeskPro/www/exam-design-api.php': ROOT / 'desktop-app-v2/patch/www-exam-design-api.php',
@@ -58,6 +61,9 @@ DESKTOP_FILES = {
     'SchoolDeskPro/www/assets/js/main.js': ROOT / 'desktop-app-v2/patch/www-assets-js-main.js',
     'SchoolDeskPro/www/includes/docx_class_list.php': ROOT / 'desktop-app-v2/patch/includes-docx_class_list.php',
     'SchoolDeskPro/www/includes/bot_role_engine.php': ROOT / 'desktop-app-v2/patch/includes-bot_role_engine.php',
+    # v4.170.0: آینهٔ واکنش‌گرایی پنل مشاور + آلبوم عکس
+    'SchoolDeskPro/www/assets/css/counselor-panel.css': ROOT / 'desktop-app-v2/patch/www-assets-css-counselor-panel.css',
+    'SchoolDeskPro/www/includes/photo_album.php': ROOT / 'desktop-app-v2/patch/includes-photo_album.php',
 }
 
 # v4.169.0: فایل‌هایی که عیناً بین سایت و دسکتاپ مشترک‌اند (کپی بایت‌به‌بایت).
@@ -72,6 +78,8 @@ PARITY_PAIRS = [
     ('site-update-v4.152.0/assets/js/main.js', 'SchoolDeskPro/www/assets/js/main.js'),
     ('site-update-v4.152.0/includes/docx_class_list.php', 'SchoolDeskPro/www/includes/docx_class_list.php'),
     ('site-update-v4.152.0/includes/bot_role_engine.php', 'SchoolDeskPro/www/includes/bot_role_engine.php'),
+    ('site-update-v4.152.0/assets/css/counselor-panel.css', 'SchoolDeskPro/www/assets/css/counselor-panel.css'),
+    ('site-update-v4.152.0/includes/photo_album.php', 'SchoolDeskPro/www/includes/photo_album.php'),
 ]
 
 
@@ -183,10 +191,10 @@ def validate_sources():
     # ═══ v4.169.0: بستهٔ هشت‌موردی ═══
     # ۰+۱+۲: پنل مشاور — فیلتر سال، دکمهٔ یادداشت، برچسب/عکس، مکالمهٔ ربات
     cp_text = SITE_FILES['site-update-v4.152.0/counselor-panel.php'].read_text(encoding='utf-8')
-    assert 'name="year"' in cp_text, 'year filter select'
+    assert "$cns_year_select('year'" in cp_text, 'year filter select (shared renderer)'
     assert 'یادداشت مشاور' in cp_text, 'counselor-note button first'
     assert 'counselor-file.php?id=' in cp_text, 'link to the per-student file'
-    assert 'object-fit:cover' in cp_text, 'ID-photo style portrait'
+    assert 'cns-photo' in cp_text, 'ID-photo frame class'
     assert "callback_data' => 'counselreply_'" in cp_text, 'glass reply button enqueued via outbox'
     assert 'bot_send_message($reqRow[\'platform\']' in cp_text, 'reply goes through the queue'
     cf_text = SITE_FILES['site-update-v4.152.0/counselor-file.php'].read_text(encoding='utf-8')
@@ -229,6 +237,33 @@ def validate_sources():
         etext = eng.read_text(encoding='utf-8')
         assert '$safeM = 0.0;' in etext, 'no forced 5mm print margin'
         assert '296 - $headerH - $qTopMm' in etext, 'question box bottom stays on the page'
+
+    # ═══ v4.170.0 ═══
+    # ۱: لیست واکنش‌گرا + میان‌برهای پرونده (یادداشت ↔ اطلاعات/کارنامه/انضباط)
+    assert 'class="cns-students"' in cp_text, 'responsive students table'
+    assert 'data-role="actions"' in cp_text, 'action cell tagged for mobile card layout'
+    assert "assets/css/counselor-panel.css" in cp_text, 'panel stylesheet hooked in'
+    cpcss_text = SITE_FILES['site-update-v4.152.0/assets/css/counselor-panel.css'].read_text(encoding='utf-8')
+    assert 'object-fit:cover' in cpcss_text, 'ID-photo style portrait'
+    assert '@media (max-width:767px)' in cpcss_text, 'mobile card rows'
+    assert 'attr(data-label)' in cpcss_text, 'row labels in card mode'
+    assert 'staff-student-file.php?tab=info' in cf_text and 'staff-student-file.php?tab=discipline' in cf_text, 'notes → dossier shortcuts'
+    assert 'counselor-file.php?id=' in ssf_text, 'dossier → notes shortcut'
+    # ۲: درخواست‌های بازشونده + حباب گفتگو + فیلترها
+    assert '<details class="cns-req"' in cp_text, 'collapsible request card'
+    assert 'cns-bubble-row' in cp_text, 'messenger-style bubbles'
+    assert 'name="rstatus"' in cp_text and 'name="grade"' in cp_text, 'status + grade filters'
+    assert "$cns_req_year" in cp_text, 'academic-year filter derived from the Jalali date'
+    assert '.cns-bubble.counselor' in cpcss_text and '.cns-bubble.parent' in cpcss_text, 'bubble styling'
+    # ۳: گزارش آلبوم عکس
+    pa_text = SITE_FILES['site-update-v4.152.0/includes/photo_album.php'].read_text(encoding='utf-8')
+    assert 'function pab_render_print_html' in pa_text
+    assert 'function pab_photo_data_uri' in pa_text
+    assert "strpos($rel, '..') !== false" in pa_text, 'photo path traversal guard'
+    assert '@page{size:A4 portrait;margin:0}' in pa_text, 'A4 print page'
+    assert "array_chunk($students, $perPage)" in pa_text, 'overflow to the next sheet'
+    assert 'photo_album_pdf' in rl_text and 'pab_render_print_html' in rl_text, 'album wired into the hub'
+    assert 'آلبوم عکس کلاس‌ها' in rl_text, 'album tab'
 
 
 def build(filename, payload):

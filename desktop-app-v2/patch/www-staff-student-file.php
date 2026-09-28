@@ -40,6 +40,10 @@ $discipline = DB::fetchAll("SELECT * FROM student_discipline_records WHERE stude
             <p class="text-sm text-muted">دسترسی کادر مجاز: <?php echo $canDeputy ? 'معاون/ناظم' : 'مشاور'; ?> — بدون نیاز به ورود دانش‌آموز</p>
         </div>
         <div class="flex gap-2 flex-wrap">
+            <?php /* v4.170.0: مشاور از هر سه تب پرونده می‌تواند مستقیم به
+               یادداشت‌های خصوصی خودش برای همین دانش‌آموز برود؛ بازگشتِ آن
+               صفحه دوباره به همین پرونده (همان تب) برمی‌گردد. */ ?>
+            <?php if ($canCounselor): ?><a class="btn btn-accent" href="counselor-file.php?id=<?php echo $studentId; ?>&back=<?php echo urlencode('staff-student-file.php?id=' . $studentId . '&tab=' . urlencode($tab) . ($backParam !== '' ? '&back=' . urlencode($backParam) : '')); ?>">یادداشت مشاور</a><?php endif; ?>
             <a class="btn <?php echo $tab === 'info' ? 'btn-primary' : 'btn-outline'; ?>" href="staff-student-file.php?id=<?php echo $studentId; ?>&tab=info<?php echo $backQs; ?>">اطلاعات</a>
             <a class="btn <?php echo $tab === 'reports' ? 'btn-primary' : 'btn-outline'; ?>" href="staff-student-file.php?id=<?php echo $studentId; ?>&tab=reports<?php echo $backQs; ?>">کارنامه‌ها</a>
             <a class="btn <?php echo $tab === 'discipline' ? 'btn-primary' : 'btn-outline'; ?>" href="staff-student-file.php?id=<?php echo $studentId; ?>&tab=discipline<?php echo $backQs; ?>">موارد انضباطی</a>
