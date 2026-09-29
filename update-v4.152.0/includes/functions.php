@@ -102,18 +102,105 @@ if (!function_exists('set_setting')) {
     }
 }
 
+if (!function_exists('csrf_secret')) {
+    /**
+     * v4.175.0: راز سرور برای توکن CSRF «امضاشده». در تنظیمات نگه داشته می‌شود
+     * تا بین چند worker/نود یکسان بماند و با دیپلوی فایل از بین نرود.
+     */
+    function csrf_secret() {
+        $s = (string)get_setting('csrf_secret', '');
+        if ($s === '' || strlen($s) < 32) {
+            $s = bin2hex(random_bytes(32));
+            set_setting('csrf_secret', $s);
+        }
+        return $s;
+    }
+}
+
+if (!function_exists('csrf_signed_token')) {
+    /**
+     * v4.175.0: توکن امضاشده که برای راستی‌آزمایی به نشست نیاز ندارد —
+     * salt تصادفی + HMAC با راز سرور. وقتی مرورگر کوکی نشست را نفرستد (مرورگر
+     * داخلی پیام‌رسان‌ها، حالت خصوصی، نخستین درخواست پس از باز شدن لینک) همین
+     * توکن اجازه می‌دهد فرم همچنان معتبر بماند.
+     */
+    function csrf_signed_token() {
+        $salt = bin2hex(random_bytes(12));
+        return $salt . '.' . hash_hmac('sha256', $salt, csrf_secret());
+    }
+}
+
+if (!function_exists('csrf_signed_valid')) {
+    /** راستی‌آزمایی توکن امضاشده، بدون هیچ نشستی. */
+    function csrf_signed_valid($token) {
+        if (!is_string($token)) return false;
+        $parts = explode('.', $token);
+        if (count($parts) !== 2) return false;
+        $salt = $parts[0]; $sig = $parts[1];
+        if (!preg_match('/^[a-f0-9]{24}$/', $salt) || !preg_match('/^[a-f0-9]{64}$/', $sig)) return false;
+        return hash_equals(hash_hmac('sha256', $salt, csrf_secret()), $sig);
+    }
+}
+
 if (!function_exists('csrf_token')) {
+    /**
+     * v4.175.0: توکن پایدارِ هر نشست، اما امضاشده. پایدار می‌ماند تا چند تب یا
+     * صفحهٔ بازگشتی مرورگر (bfcache) توکن کهنه نسازد.
+     */
     function csrf_token() {
         if (empty($_SESSION['csrf_token'])) {
-            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+            $_SESSION['csrf_token'] = csrf_signed_token();
         }
         return $_SESSION['csrf_token'];
     }
 }
 
 if (!function_exists('verify_csrf')) {
+    /**
+     * v4.175.0: سه مسیر پذیرش، به ترتیب قوت:
+     *   ۱) توکن فعلی نشست (رایج‌ترین حالت).
+     *   ۲) یکی از توکن‌های اخیرِ نشست (چند تب / توکن تازه‌شده).
+     *   ۳) توکن امضاشدهٔ خودمان، فقط وقتی مرورگر هیچ کوکی نشستی نفرستاده. این
+     *      همان حالتی است که مرورگر داخلی بله می‌سازد: کوکی نشست روی POST نرسیده،
+     *      پس نشستی برای سوءاستفاده وجود ندارد و فرم باید کار کند — نه اینکه کاربر
+     *      پیام «اعتبار فرم به پایان رسیده» بگیرد. اگر کوکی نشست آمده باشد، این
+     *      مسیر بسته می‌شود تا حملهٔ CSRF روی نشستِ کاربر باز نشود.
+     */
     function verify_csrf($token) {
-        return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+        if (!is_string($token) || $token === '') return false;
+        if (!empty($_SESSION['csrf_token']) && hash_equals((string)$_SESSION['csrf_token'], $token)) return true;
+        foreach ((array)($_SESSION['csrf_ring'] ?? []) as $old) {
+            if (is_string($old) && $old !== '' && hash_equals($old, $token)) return true;
+        }
+        $cookieSent = isset($_COOKIE[session_name()]);
+        if (!$cookieSent && empty($_SESSION['csrf_token']) && csrf_signed_valid($token)) return true;
+        return false;
+    }
+}
+
+if (!function_exists('csrf_remember_recent')) {
+    /** v4.175.0: توکن قبلی را در حلقهٔ «اخیر» نگه می‌دارد تا چند تب امن بماند. */
+    function csrf_remember_recent($token) {
+        if (!is_string($token) || $token === '') return;
+        $ring = array_values(array_filter((array)($_SESSION['csrf_ring'] ?? []), function ($t) use ($token) {
+            return is_string($t) && $t !== '' && !hash_equals($t, $token);
+        }));
+        array_unshift($ring, $token);
+        $_SESSION['csrf_ring'] = array_slice($ring, 0, 5);
+    }
+}
+
+if (!function_exists('csrf_rotate')) {
+    /**
+     * v4.175.0: توکن تازهٔ نشست. توکن قبلی در حلقهٔ «اخیر» می‌ماند، پس تب‌هایی که
+     * هنوز فرم قدیمی دارند هم رد نمی‌شوند (علت واقعی پیام «اعتبار فرم به پایان
+     * رسیده» در مرورگرهای داخلی پیام‌رسان).
+     */
+    function csrf_rotate() {
+        $old = isset($_SESSION['csrf_token']) ? (string)$_SESSION['csrf_token'] : '';
+        $_SESSION['csrf_token'] = csrf_signed_token();
+        if ($old !== '') csrf_remember_recent($old);
+        return $_SESSION['csrf_token'];
     }
 }
 

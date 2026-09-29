@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
 // Handle Student Login POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_POST['login_type'] === 'student') {
     if (!verify_csrf(login_post_string('csrf_token'))) {
-        login_error('student','اعتبار فرم به پایان رسیده است. همین صفحه تازه شده؛ اطلاعات را دوباره وارد و ارسال کنید.',[],'csrf');
+        login_error('student','این فرم ورود قدیمی شده بود (صفحه دوباره باز شده است). نگران نباشید — رمز شما ذخیره نشده و کسی آن را ندیده؛ فقط دکمهٔ ورود را یک بار دیگر بزنید.',[],'csrf');
     }
     login_require_fields('student');
     $nationalId = tr_num(clean(trim(login_post_string('national_id'))), 'en');
@@ -140,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
 // Handle Quick Inquiry POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_POST['login_type'] === 'inquiry') {
     if (!verify_csrf(login_post_string('csrf_token'))) {
-        login_error('inquiry','اعتبار فرم به پایان رسیده است. همین صفحه تازه شده؛ اطلاعات را دوباره وارد و ارسال کنید.',[],'csrf');
+        login_error('inquiry','این فرم ورود قدیمی شده بود (صفحه دوباره باز شده است). نگران نباشید — رمز شما ذخیره نشده و کسی آن را ندیده؛ فقط دکمهٔ ورود را یک بار دیگر بزنید.',[],'csrf');
     }
     login_require_fields('inquiry');
     $year       = trim(login_post_string('academic_year')) ?: get_setting('current_academic_year','1404/1405');
@@ -181,7 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
 // Handle Teacher Login POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_POST['login_type'] === 'teacher') {
     if (!verify_csrf(login_post_string('csrf_token'))) {
-        login_error('teacher','اعتبار فرم به پایان رسیده است. همین صفحه تازه شده؛ اطلاعات را دوباره وارد و ارسال کنید.',[],'csrf');
+        login_error('teacher','این فرم ورود قدیمی شده بود (صفحه دوباره باز شده است). نگران نباشید — رمز شما ذخیره نشده و کسی آن را ندیده؛ فقط دکمهٔ ورود را یک بار دیگر بزنید.',[],'csrf');
     }
     login_require_fields('teacher');
     $nid  = tr_num(clean(trim(login_post_string('national_id'))), 'en');
@@ -554,6 +554,31 @@ function togglePass(id, btn) {
     el.type = el.type === 'password' ? 'text' : 'password';
     btn.textContent = el.type === 'password' ? '👁' : '🙈';
 }
+</script>
+<script>
+/* v4.175.0: توکن تازه وقتی صفحه از حافظهٔ پنهان مرورگر (bfcache) برمی‌گردد یا
+   تب دوباره فعال می‌شود — همان حالتی که در مرورگر داخلی بله باعث پیام
+   «اعتبار فرم به پایان رسیده» می‌شد. حداکثر یک بار در ۳۰ ثانیه. */
+(function(){
+  if (!window.fetch) return;
+  var last = 0;
+  function refresh(force){
+    var now = Date.now();
+    if (!force && now - last < 30000) return;
+    last = now;
+    try {
+      fetch('csrf-refresh.php', {credentials:'same-origin', cache:'no-store'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (!d || !d.token) return;
+          var fields = document.getElementsByName('csrf_token');
+          for (var i = 0; i < fields.length; i++) fields[i].value = d.token;
+        }).catch(function(){});
+    } catch (e) {}
+  }
+  window.addEventListener('pageshow', function(e){ if (e.persisted) refresh(true); });
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) refresh(false); });
+})();
 </script>
 <script src="assets/js/login-captcha.js?v=20260917e"></script>
 <script src="assets/js/login-feedback.js?v=20260917e"></script>

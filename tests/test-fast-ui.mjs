@@ -29,7 +29,11 @@ for(const role of ['student','teacher','inquiry']){
  const captchaPage=await request('index.php',{sid,query:'view=login&tab='+role});writeFileSync(dir+'/'+role+'-captcha.html',captchaPage.page);
  const answer=await session(sid,'echo $_SESSION["captcha_ans"];');
  const ok=await request('index.php',{sid,post:{...post,[field]:secret,captcha:answer}});check(ok.flash?.type==='success','Correct credentials/captcha accepted: '+role);
- const csrfSid='csrf'+role,csrfBad=await request('index.php',{sid:csrfSid,post:{...post,csrf_token:'expired'}});check(csrfBad.flash.message.includes('اعتبار فرم'),'Actionable CSRF error');
+ const csrfSid='csrf'+role,csrfBad=await request('index.php',{sid:csrfSid,post:{...post,csrf_token:'expired'}});
+ /* v4.175.0: پیام قدیمی («اعتبار فرم به پایان رسیده») برای ولی/دبیر گنگ بود و
+    هیچ راهکاری نمی‌داد؛ حالا می‌گوید فرم قدیمی شده و دکمه را دوباره بزند. */
+ check(csrfBad.flash.message.includes('دکمهٔ ورود را یک بار دیگر بزنید'),'Actionable CSRF error: '+csrfBad.flash.message.slice(0,60));
+ check(!csrfBad.flash.message.includes('اعتبار فرم'),'the CSRF message no longer uses internal jargon');
  const csrfView=await request('index.php',{sid:csrfSid,query:'view=login'});check(csrfView.page.includes('id="'+role+'Feedback"'),'CSRF error visible');
  await session('throttle'+role,"$_SESSION['login_attempts']=6;$_SESSION['lockout_time']=time();");
  const blockedIP=await request('index.php',{sid:'throttle'+role,post});check(blockedIP.flash.message.includes('۱۰ دقیقه'),'Throttle guidance');

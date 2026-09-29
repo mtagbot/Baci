@@ -127,7 +127,7 @@ $captchaQ = generate_captcha();
            این هر دو تب یک پیام کلی می‌گرفتند و کاربر نمی‌فهمید کجای کارش غلط
            است. */
         $sdpMsgs = [
-            'csrf'    => 'اعتبار فرم به پایان رسیده بود (صفحه دوباره باز شده است). اطلاعات را همان‌طور وارد و ارسال کنید.',
+            'csrf'    => 'این فرم ورود قدیمی شده بود (صفحه دوباره باز شده است). نگران نباشید — رمز شما ذخیره نشده و کسی آن را ندیده؛ فقط دکمهٔ ورود را یک بار دیگر بزنید. اگر در مرورگر داخلی پیام‌رسان هستید و باز هم تکرار شد، لینک ورود را از ربات دوباره باز کنید.',
             'captcha' => 'پاسخ کد امنیتی نادرست بود؛ حاصل جمع نمایش‌داده‌شده را دوباره وارد کنید.',
             'badpass' => 'نام کاربری یا کلمهٔ عبور مدیریت نادرست است.',
             'throttle'=> 'تعداد تلاش‌های ناموفق زیاد است؛ ۱۰ دقیقه صبر کنید و بعد با نام کاربری و کلمهٔ عبور مدیریت تلاش کنید.',
@@ -229,6 +229,31 @@ function togglePass(id, btn) {
     el.type = el.type === 'password' ? 'text' : 'password';
     btn.textContent = el.type === 'password' ? '👁' : '🙈';
 }
+</script>
+<script>
+/* v4.175.0: توکن تازه وقتی صفحه از حافظهٔ پنهان مرورگر (bfcache) برمی‌گردد یا
+   تب دوباره فعال می‌شود — همان حالتی که در مرورگر داخلی بله باعث پیام
+   «اعتبار فرم به پایان رسیده» می‌شد. حداکثر یک بار در ۳۰ ثانیه. */
+(function(){
+  if (!window.fetch) return;
+  var last = 0;
+  function refresh(force){
+    var now = Date.now();
+    if (!force && now - last < 30000) return;
+    last = now;
+    try {
+      fetch('csrf-refresh.php', {credentials:'same-origin', cache:'no-store'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (!d || !d.token) return;
+          var fields = document.getElementsByName('csrf_token');
+          for (var i = 0; i < fields.length; i++) fields[i].value = d.token;
+        }).catch(function(){});
+    } catch (e) {}
+  }
+  window.addEventListener('pageshow', function(e){ if (e.persisted) refresh(true); });
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) refresh(false); });
+})();
 </script>
 <script src="assets/js/login-captcha.js"></script>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
