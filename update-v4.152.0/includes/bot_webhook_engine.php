@@ -266,6 +266,23 @@ if ($staffSession && $text === '🖨 آزمون‌های طراحی‌شده') {
     }
     http_response_code(200); exit;
 }
+/* v4.174.0: ورود دبیر به پنل از داخل پیام‌رسان (دکمهٔ «اپلیکیشن»/مرورگر داخلی).
+   لینک مستقیم تب دبیران صفحهٔ ورود فرستاده می‌شود تا دبیر نگذارد تب را پیدا کند؛
+   در همان پیام یادآوری می‌شود که «کد ملی + کد پرسنلی» پذیرفته می‌شود. */
+if ($staffSession && $text === '🌐 ورود به پنل دبیران') {
+    /* وابسته به هیچ فایل مشترک خاصی نیست: اگر includes/bot_helpers.php نسخهٔ قدیمی
+       بود (مثلاً نسخهٔ مستقل دسکتاپ)، همان مسیر نسبی صفحهٔ ورود فرستاده می‌شود. */
+    $panelUrl = function_exists('bot_panel_login_url') ? bot_panel_login_url('teacher')
+             : (function_exists('bot_site_base_url') ? bot_site_base_url() : '') . '/index.php?view=login&tab=teacher';
+    $tName = function_exists('teacher_respectful_name') ? teacher_respectful_name($staffSession) : $staffSession['full_name'];
+    bot_webhook_safe_send($platform, $chatId,
+        "🌐 ورود به پنل دبیران — {$tName}\n\n"
+      . "روی لینک زیر بزنید (در مرورگر داخلی همین پیام‌رسان یا هر مرورگر دیگر باز می‌شود):\n{$panelUrl}\n\n"
+      . "نام کاربری: کد ملی ده‌رقمی شما\nرمز ورود: «کد پرسنلی» (یا رمزی که مدرسه برای شما ثبت کرده)\n\n"
+      . "اگر پیام خطا دیدید، همان پیام می‌گوید کدام قسمت غلط است؛ در صورت تکرار با مدیر مدرسه تماس بگیرید.",
+        bot_staff_keyboard($staffSession));
+    http_response_code(200); exit;
+}
 if ($staffSession && $text === '🚪 خروج از حساب کارکنان') {
     DB::execute("UPDATE bot_admin_sessions SET is_active=0 WHERE platform=? AND chat_id=? AND role_type='teacher'", [$platform, $chatId]);
     DB::execute("DELETE FROM `$stateTable` WHERE `$chatCol`=?", [$chatId]);

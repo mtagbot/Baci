@@ -64,6 +64,8 @@ if (!function_exists('bot_staff_keyboard')) {
         // teacher row(s)
         $rows[] = [['text' => '🗓 برنامه هفتگی تدریس من'], ['text' => '📝 برنامه امتحانی من']];
         $rows[] = [['text' => '💬 اعتراضات نمرات']];
+        /* v4.174.0: ورود به پنل از داخل پیام‌رسان — لینک تب دبیران صفحهٔ ورود */
+        $rows[] = [['text' => '🌐 ورود به پنل دبیران']];
         if (!empty($teacher['is_deputy']))    $rows[] = [['text' => '🚫 غایبین امروز']];
         if (!empty($teacher['is_executive'])) $rows[] = [['text' => '🖨 آزمون‌های طراحی‌شده']];
         $rows[] = [['text' => '🚪 خروج از حساب کارکنان']];

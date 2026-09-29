@@ -254,5 +254,21 @@ w=await webhook('bale','700023',TEACHER_NID);
 w=await webhook('bale','700023','hash');       // رمز خام fixture
 check(said(w,'ورود دبیر تأیید شد'),'the teacher password still logs in: '+texts(w).slice(0,160));
 
+/* ── ۷) v4.174.0: دکمهٔ «ورود به پنل دبیران» در کیبورد کارکنان ─────────── */
+const staffKeyboard=(await run(`<?php require_once '/www/includes/functions.php';
+require_once '/www/includes/bot_helpers.php'; require_once '/www/includes/bot_role_engine.php';
+$t=DB::fetch("SELECT * FROM teachers WHERE id=9601");
+$k=bot_staff_keyboard($t); $flat=[];
+foreach($k['keyboard'] as $row) foreach($row as $b) $flat[]=$b['text'];
+echo 'BTN=' . (in_array('🌐 ورود به پنل دبیران',$flat)?'yes':'no') . ';';`)).out;
+check(staffKeyboard.includes('BTN=yes'),'the staff keyboard offers the panel-login button: '+staffKeyboard.slice(0,40));
+/* گفتگوی متصل‌شدهٔ دبیر (fixture 700020) دکمه را می‌زند و لینک تب دبیران می‌گیرد */
+w=await webhook('bale','700020','🌐 ورود به پنل دبیران');
+check(said(w,'view=login&tab=teacher'),'the button answers with the teacher login tab link: '+texts(w).slice(0,240));
+check(said(w,'کد پرسنلی'),'the same message reminds the teacher that the personnel code is the password');
+/* گفتگوی بدون نشست کارکنان این دکمه را ندارد */
+w=await webhook('bale','700030','🌐 ورود به پنل دبیران');
+check(!said(w,'view=login&tab=teacher'),'a chat without a staff session gets no panel link from that text');
+
 console.log(`PASS ${checks} bot admin-login cases (manager username → password → connected account)`);
 process.exit(0);

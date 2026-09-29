@@ -24,13 +24,13 @@ function sdp_fail($code, $tab = 'admin') {
 // Check Throttle
 $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !check_login_throttle($ip)) {
-    set_flash_message('error', 'تعداد تلاش‌های ناموفق شما بیش از حد مجاز است. لطفاً ۱۰ دقیقه دیگر مجدداً تلاش فرمایید.');
+    /* v4.174.0: دلیل فقط در آدرس می‌آید (sdp_fail) تا پیام حتی با از دست رفتن
+       نشست — مرورگر داخلی بله، حالت خصوصی — هم دیده شود. */
     sdp_fail('throttle');
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_POST['login_type'] === 'admin') {
     if (!verify_csrf($_POST['csrf_token'] ?? '')) {
-        set_flash_message('error', 'خطای امنیتی CSRF');
         sdp_fail('csrf');
     }
     /* v4.132.0: کد امنیتی فقط بعد از اولین تلاش ناموفقِ همین حساب */
@@ -39,7 +39,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
 
     require_once __DIR__ . '/includes/header_tiles.php';
     if (!login_captcha_gate('admin', $user, $_POST['captcha'] ?? '')) {
-        set_flash_message('error', 'کد امنیتی نادرست است.');
         sdp_fail('captcha');
     }
 
@@ -60,14 +59,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
     } else {
         login_guard_fail('admin', $user);
         record_failed_login();
-        set_flash_message('error', 'نام کاربری یا کلمه عبور مدیریت نادرست است.');
         sdp_fail('badpass');
     }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_POST['login_type'] === 'teacher') {
     if (!verify_csrf($_POST['csrf_token'] ?? '')) {
-        set_flash_message('error', 'خطای امنیتی CSRF');
         sdp_fail('csrf', 'teacher');
     }
     $nid  = tr_num(clean($_POST['national_id'] ?? ''), 'en');
@@ -75,7 +72,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
 
     require_once __DIR__ . '/includes/header_tiles.php';
     if (!login_captcha_gate('teacher', $nid, $_POST['captcha'] ?? '')) {
-        set_flash_message('error', 'کد امنیتی نادرست است.');
         sdp_fail('captcha', 'teacher');
     }
 
@@ -84,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
        می‌گفت ولی کد آن را رد می‌کرد، پس دبیرِ متصل‌شده در ربات (کد ملی + کد
        پرسنلی) در مرورگر وب نمی‌توانست وارد شود. رمز مدرسه اولویت دارد. */
     if ($t && ((!empty($t['password']) && verify_user_password($pass, $t['password'], ['table'=>'teachers','id'=>$t['id']]))
-            || staff_personnel_matches($t['personnel_code'] ?? '', $pass))) {
+            || (function_exists('staff_personnel_matches') && staff_personnel_matches($t['personnel_code'] ?? '', $pass)))) {
         login_guard_success('teacher', $nid);
         // v4.33.0: exclusive role session
         auth_login_as('teacher', [
@@ -98,7 +94,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
     } else {
         login_guard_fail('teacher', $nid);
         record_failed_login();
-        set_flash_message('error', 'کد ملی یا رمز ورود دبیر نادرست است. کد پرسنلی یا رمزی که مدرسه برای شما ثبت کرده را وارد کنید.');
         sdp_fail('badpass', 'teacher');
     }
 }
@@ -127,12 +122,20 @@ $captchaQ = generate_captcha();
         <div class="auth-form-sub">نام کاربری و رمز عبور اختصاصی خود را وارد کنید</div>
         <?php
         $sdpErr = $_GET['err'] ?? '';
+        /* v4.174.0: پیام‌ها «نقش‌آگاه» شدند — تب دبیر باید بداند کد پرسنلی هم
+           پذیرفته می‌شود و اینکه حساب غیرفعال هم همین پیام را می‌سازد. پیش از
+           این هر دو تب یک پیام کلی می‌گرفتند و کاربر نمی‌فهمید کجای کارش غلط
+           است. */
         $sdpMsgs = [
-            'csrf'    => 'نشست شما منقضی شده بود؛ صفحه نو شد — دوباره وارد شوید.',
-            'captcha' => 'پاسخ کد امنیتی نادرست بود؛ حاصل جمع را دوباره وارد کنید.',
-            'badpass' => 'نام کاربری یا کلمه عبور نادرست است.',
-            'throttle'=> 'تعداد تلاش‌های ناموفق زیاد است؛ ۱۰ دقیقه صبر کنید.',
+            'csrf'    => 'اعتبار فرم به پایان رسیده بود (صفحه دوباره باز شده است). اطلاعات را همان‌طور وارد و ارسال کنید.',
+            'captcha' => 'پاسخ کد امنیتی نادرست بود؛ حاصل جمع نمایش‌داده‌شده را دوباره وارد کنید.',
+            'badpass' => 'نام کاربری یا کلمهٔ عبور مدیریت نادرست است.',
+            'throttle'=> 'تعداد تلاش‌های ناموفق زیاد است؛ ۱۰ دقیقه صبر کنید و بعد با نام کاربری و کلمهٔ عبور مدیریت تلاش کنید.',
         ];
+        if ($tab === 'teacher') {
+            $sdpMsgs['badpass'] = 'کد ملی یا رمز/کد پرسنلی دبیر نادرست است. کد ملی ده‌رقمی خود را همراه «کد پرسنلی» (یا رمزی که مدرسه برای شما ثبت کرده) وارد کنید — هر دو پذیرفته می‌شوند. اگر این پیام تکرار شد یا حساب شما در مدرسه غیرفعال شده است، برای بررسی با مدیر مدرسه تماس بگیرید.';
+            $sdpMsgs['throttle'] = 'تعداد تلاش‌های ناموفق زیاد است؛ ۱۰ دقیقه صبر کنید و بعد با کد ملی و کد پرسنلی تلاش کنید.';
+        }
         if ($sdpErr && isset($sdpMsgs[$sdpErr])): ?>
         <div style="margin:10px 0;padding:12px 14px;border-radius:10px;border:2px solid #fca5a5;background:#fee2e2;color:#7f1d1d;font-size:13px;line-height:1.9;font-weight:bold;">
             <?php echo $sdpMsgs[$sdpErr]; ?>

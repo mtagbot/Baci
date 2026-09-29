@@ -188,6 +188,32 @@ if (!function_exists('bot_buttons_map')) {
     }
 }
 
+if (!function_exists('bot_site_base_url')) {
+    /**
+     * v4.174.0: آدرس پایهٔ سایت — همان منطقی که school_roles.php در
+     * bot_create_login_url() دارد. برای فرستادن لینک صفحهٔ ورود پنل از ربات.
+     */
+    function bot_site_base_url() {
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $base = rtrim(str_replace('\\', '/', dirname($_SERVER['PHP_SELF'] ?? '')), '/');
+        if ($base === '.') $base = '';
+        return $protocol . $host . $base;
+    }
+}
+
+if (!function_exists('bot_panel_login_url')) {
+    /**
+     * v4.174.0: لینک مستقیم صفحهٔ ورود پنل برای هر نقش. دبیری که در گفتگوی ربات
+     * این لینک را بگیرد، مستقیم روی «تب دبیران» می‌افتد و با «کد ملی + کد پرسنلی»
+     * وارد می‌شود — بدون گشتن در صفحه.
+     */
+    function bot_panel_login_url($role = 'student') {
+        $role = in_array($role, ['student', 'teacher', 'inquiry'], true) ? $role : 'student';
+        return bot_site_base_url() . '/index.php?view=login&tab=' . $role;
+    }
+}
+
 if (!function_exists('bot_main_keyboard')) {
     function bot_main_keyboard($platform) {
         ensure_bot_schema($platform);

@@ -165,14 +165,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_teacher_manual']
         $isExecutive = isset($_POST['is_executive']) ? 1 : 0;
 
         if ($tId > 0) {
-            $q = "UPDATE teachers SET national_id=?, personnel_code=?, full_name=?, first_name=?, last_name=?, mobile=?, status=?, is_deputy=?, is_counselor=?, is_executive=? WHERE id=?";
-            $p = [$nid, $code, $name, $firstName, $lastName, $mob, $st, $isDeputy, $isCounselor, $isExecutive, $tId];
-            if (!empty($_POST['password'])) {
-                $q = "UPDATE teachers SET national_id=?, personnel_code=?, full_name=?, first_name=?, last_name=?, mobile=?, status=?, is_deputy=?, is_counselor=?, is_executive=?, password=? WHERE id=?";
-                $p = [$nid, $code, $name, $firstName, $lastName, $mob, $st, $isDeputy, $isCounselor, $isExecutive, password_hash($_POST['password'], PASSWORD_DEFAULT), $tId];
+            /* v4.174.0: سیاست مدرسه — «رمز دبیر = کد پرسنلی». اگر مدیر کد پرسنلی
+               را عوض کرده و رمز تازه‌ای ننوشته، رمز خودش با کد تازه هم‌خوان می‌شود
+               تا دبیر در پنل/وب/ربات قفل نشود. اگر رمز نوشته شده باشد، همان رمز
+               نوشته‌شده معتبر است. */
+            $pwChangedByCode = false;
+            if (empty($_POST['password']) && $code !== '') {
+                $cur = DB::fetch("SELECT personnel_code, password FROM teachers WHERE id=?", [$tId]);
+                if ($cur && (string)$cur['personnel_code'] !== $code) {
+                    $pwChangedByCode = true;
+                    $q = "UPDATE teachers SET national_id=?, personnel_code=?, full_name=?, first_name=?, last_name=?, mobile=?, status=?, is_deputy=?, is_counselor=?, is_executive=?, password=? WHERE id=?";
+                    $p = [$nid, $code, $name, $firstName, $lastName, $mob, $st, $isDeputy, $isCounselor, $isExecutive, password_hash($code, PASSWORD_DEFAULT), $tId];
+                }
+            }
+            if (!$pwChangedByCode) {
+                $q = "UPDATE teachers SET national_id=?, personnel_code=?, full_name=?, first_name=?, last_name=?, mobile=?, status=?, is_deputy=?, is_counselor=?, is_executive=? WHERE id=?";
+                $p = [$nid, $code, $name, $firstName, $lastName, $mob, $st, $isDeputy, $isCounselor, $isExecutive, $tId];
+                if (!empty($_POST['password'])) {
+                    $q = "UPDATE teachers SET national_id=?, personnel_code=?, full_name=?, first_name=?, last_name=?, mobile=?, status=?, is_deputy=?, is_counselor=?, is_executive=?, password=? WHERE id=?";
+                    $p = [$nid, $code, $name, $firstName, $lastName, $mob, $st, $isDeputy, $isCounselor, $isExecutive, password_hash($_POST['password'], PASSWORD_DEFAULT), $tId];
+                }
             }
             DB::execute($q, $p);
-            set_flash_message('success', 'اطلاعات دبیر و نقش‌های معاون/مشاور بروزرسانی شد.');
+            set_flash_message('success', $pwChangedByCode
+                ? 'اطلاعات دبیر بروزرسانی شد و چون کد پرسنلی عوض شده بود، رمز ورود او هم با کد پرسنلی تازه هم‌خوان شد.'
+                : 'اطلاعات دبیر و نقش‌های معاون/مشاور بروزرسانی شد.');
         } else {
             $dupNid = DB::fetch("SELECT id, full_name FROM teachers WHERE national_id=?", [$nid]);
             if ($dupNid) {
@@ -186,6 +203,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_teacher_manual']
         }
     }
     redirect('import-teachers.php?tab=list');
+}
+
+/* ── v4.174.0: «رمز تمام دبیران = کد پرسنلی» ───────────────────────────────
+   دبیران با «کد ملی + کد پرسنلی» به ربات متصل می‌شوند و همان کد پرسنلی در پنل
+   هم پذیرفته می‌شود؛ ولی رکوردهای قدیمی رمز تصادفی یا خالی دارند و بعضی مدرسه‌ها
+   رمز دستی هم تعیین کرده‌اند. این ابزار رمز همهٔ دبیران را با کد پرسنلی یکسان
+   می‌کند تا «یک رمز» در تمام درگاه‌ها (پنل، مرورگرهای وب، ربات) کار کند.
+
+   ایمن‌سازی: ابتدا فقط فهرست و شمارش (بدون تغییر)، سپس اجرا با تأیید صریح؛
+   پیش از تغییر یک فایل بازگشت در backups/ نوشته می‌شود و عمل در activity_logs
+   ثبت می‌گردد. */
+if (isset($_POST['sync_teacher_passwords']) || isset($_POST['sync_teacher_passwords_apply'])) {
+    if (!verify_csrf($_POST['csrf_token'] ?? '')) { set_flash_message('error','اعتبار فرم به پایان رسیده است؛ دوباره تلاش کنید.'); redirect('import-teachers.php?tab=list'); }
+    $syncRows = DB::fetchAll("SELECT id, national_id, personnel_code, full_name, password FROM teachers ORDER BY id");
+    $need = [];
+    foreach ($syncRows as $r) {
+        $code = trim((string)($r['personnel_code'] ?? ''));
+        if ($code === '') continue;                                  // بدون کد پرسنلی، رمز عوض نمی‌شود
+        if (function_exists('staff_personnel_matches') ? staff_personnel_matches($code, $code) : true) {
+            /* آیا رمز فعلی همین کد است؟ */
+            if (!empty($r['password']) && verify_user_password($code, $r['password'])) continue;
+        }
+        $need[] = $r;
+    }
+    if (isset($_POST['sync_teacher_passwords_apply'])) {
+        $backupDir = __DIR__ . '/backups';
+        if (!is_dir($backupDir)) @mkdir($backupDir, 0777, true);
+        $stamp = date('Y-m-d_H-i-s');
+        $rollback = [];
+        $changed = 0;
+        foreach ($need as $r) {
+            $rollback[] = ['id' => (int)$r['id'], 'national_id' => (string)$r['national_id'],
+                           'full_name' => (string)$r['full_name'], 'old_password' => (string)$r['password']];
+            DB::execute("UPDATE teachers SET password=? WHERE id=?", [password_hash((string)$r['personnel_code'], PASSWORD_DEFAULT), (int)$r['id']]);
+            $changed++;
+        }
+        @file_put_contents($backupDir . '/teacher-passwords-before-sync-' . $stamp . '.json',
+            json_encode(['created_at' => jalali_now(), 'note' => 'رمز قبلی دبیران پیش از یکسان‌سازی با کد پرسنلی', 'teachers' => $rollback], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        if (function_exists('log_activity')) log_activity($_SESSION['admin_id'] ?? 0, 'یکسان‌سازی رمز دبیران', $changed . ' رمز دبیر با کد پرسنلی هم‌خوان شد.');
+        set_flash_message('success', "✅ رمز $changed دبیر با کد پرسنلی هم‌خوان شد. از این پس دبیر در پنل، در مرورگرهای وب و در ربات با «کد ملی + کد پرسنلی» وارد می‌شود. نسخهٔ بازگشت رمزهای قبلی در backups/teacher-passwords-before-sync-" . $stamp . ".json ذخیره شد.");
+        redirect('import-teachers.php?tab=list&synced=' . $changed);
+    }
+    $_SESSION['teacher_pw_sync_preview'] = ['count' => count($need), 'rows' => array_slice(array_map(function($r){ return ['id'=>(int)$r['id'],'name'=>(string)$r['full_name'],'nid'=>(string)$r['national_id'],'code'=>(string)$r['personnel_code'],'has_password'=>(string)$r['password']!=='']; }, $need), 0, 100)];
+    redirect('import-teachers.php?tab=list&sync_preview=1');
 }
 
 require_once __DIR__ . '/includes/header.php';
@@ -202,10 +263,59 @@ $filterQ    = trim($_GET['q'] ?? '');
         <div class="flex gap-2">
             <a href="import-teachers.php?tab=import" class="btn <?php echo $tab === 'import' ? 'btn-primary font-bold' : 'btn-outline'; ?> text-xs"><svg data-ui-icon="bolt" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m14 2-11 12h8l-1 8 11-12h-8Z"/></svg> ایمپورت از فایل CSV</a>
             <a href="import-teachers.php?tab=list" class="btn <?php echo $tab === 'list' || $tab === 'edit' ? 'btn-primary font-bold' : 'btn-outline'; ?> text-xs"><svg data-ui-icon="exam" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 2h6v4H9Zm0 8h6m-6 4h3m-3 4h6"/></svg> لیست و مدیریت دبیران</a>
+            <?php /* v4.174.0: ابزار «رمز همهٔ دبیران = کد پرسنلی» — فرم جداگانه پایین */ ?>
+            <button type="submit" form="syncTeacherPwForm" class="btn btn-outline text-xs border-amber-500 text-amber-700" title="رمز ورود همهٔ دبیران را با کد پرسنلی یکسان می‌کند تا در پنل، مرورگر و ربات یک رمز کار کند"><svg data-ui-icon="key" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-5-5 3-3m-6 0 3-3"/></svg> یکسان‌سازی رمز دبیران با کد پرسنلی</button>
             <a href="teacher.csv" download class="btn btn-outline text-xs border-blue-500 text-blue-600"><svg data-ui-icon="download" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 16v5h18v-5M12 3v13m-5-5 5 5 5-5"/></svg> دانلود نمونه فایل</a>
         </div>
     </div>
 
+    <?php /* v4.174.0: کارت «رمز همهٔ دبیران = کد پرسنلی» (پیش‌نمایش و اجرا) */ ?>
+    <?php if ($tab === 'list' || $tab === 'edit'): ?>
+    <div class="card shadow-lg border-2 border-amber-300 mb-6" dir="rtl">
+        <h3 class="font-bold mb-2 text-amber-700 border-b pb-2">🔑 رمز ورود دبیران = کد پرسنلی</h3>
+        <p class="text-xs text-muted leading-7 mb-3">
+            دبیر با «کد ملی + کد پرسنلی» به بازوی بله/تلگرام متصل می‌شود و همین دو در همهٔ درگاه‌ها کار می‌کنند:
+            پنل دبیر، صفحهٔ ورود وب (مرورگر داخلی پیام‌رسان یا هر مرورگر دیگر) و خود ربات.
+            این ابزار رمز همهٔ دبیران را با کد پرسنلی یکسان می‌کند تا یک رمز مشخص و قابل یادآوری داشته باشید.
+            دبیرانی که کد پرسنلی ندارند دست‌نخورده می‌مانند و پیش از تغییر، رمزهای قبلی در پوشهٔ
+            <code dir="ltr">backups/</code> ذخیره می‌شود.
+        </p>
+        <form id="syncTeacherPwForm" method="POST" action="import-teachers.php?tab=list" onsubmit="return confirm('رمز همهٔ دبیران با کد پرسنلی هم‌خوان شود؟ دبیران با رمز جدید وارد می‌شوند.');">
+            <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
+            <input type="hidden" name="sync_teacher_passwords" value="1">
+            <button type="submit" class="btn btn-secondary text-xs">بررسی فهرست (بدون تغییر)</button>
+        </form>
+        <?php
+            $syncPreview = $_SESSION['teacher_pw_sync_preview'] ?? null;
+            unset($_SESSION['teacher_pw_sync_preview']);
+            if (isset($_GET['sync_preview']) && $syncPreview):
+        ?>
+        <div class="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200">
+            <p class="text-sm font-bold mb-2"><?php echo tr_num((int)$syncPreview['count'], 'fa'); ?> دبیر رمز جدید می‌گیرند (<?php echo count($syncPreview['rows']) <= (int)$syncPreview['count'] ? 'نمایش ' . tr_num(count($syncPreview['rows']), 'fa') . ' مورد اول' : ''; ?>):</p>
+            <div class="max-h-56 overflow-auto text-xs leading-6">
+                <table class="w-full">
+                    <thead><tr class="text-muted"><th class="text-right">دبیر</th><th class="text-right">کد ملی</th><th class="text-right">کد پرسنلی</th><th class="text-right">وضعیت رمز فعلی</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($syncPreview['rows'] as $sr): ?>
+                        <tr class="border-t">
+                            <td><?php echo clean($sr['name']); ?></td>
+                            <td class="font-mono" dir="ltr"><?php echo clean($sr['nid']); ?></td>
+                            <td class="font-mono" dir="ltr"><?php echo clean($sr['code']); ?></td>
+                            <td><?php echo $sr['has_password'] ? 'رمز دلخواه دارد و جایگزین می‌شود' : 'بدون رمز'; ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <form method="POST" action="import-teachers.php?tab=list" class="mt-3" onsubmit="return confirm('اجرا شود؟ رمز قبلی در backups/ ذخیره می‌شود.');">
+                <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
+                <input type="hidden" name="sync_teacher_passwords_apply" value="1">
+                <button type="submit" class="btn btn-primary text-xs font-bold">✅ بله، رمز همه را با کد پرسنلی هم‌خوان کن</button>
+            </form>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
     <?php if ($tab === 'list' || $tab === 'edit'): 
         $editT = null;
         if ($tab === 'edit' && isset($_GET['id'])) {

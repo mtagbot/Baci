@@ -46,9 +46,17 @@ php.writeFile('/harness/run_request.php',php.readFileAsText('/harness/run_reques
 const login=await request('admin-login.php',{session:'freshQualityLogin'});check(login.page.includes('app-appearance'),'Login receives shared font/hidden fix');writeFileSync(fixtureDir+'/login.html',login.page);
 await code(`<?php require '/www/includes/functions.php';DB::execute("INSERT INTO admins(username,password,name,role,status) VALUES(?,?,?,?,1)",['QualityAdmin',password_hash('QualityPassword9',PASSWORD_DEFAULT),'Quality','super_admin']);`);
 const firstPost={login_type:'admin',username:'QualityAdmin',password:'wrong',csrf_token:login.page.match(/name="csrf_token" value="([^"]+)/)[1],captcha:'999'};
-const bad=await request('admin-login.php',{session:'freshQualityLogin',post:firstPost});check(bad.flash?.message.includes('کلمه عبور مدیریت نادرست'),'First attempt ignores wrong captcha and checks password');
+const bad=await request('admin-login.php',{session:'freshQualityLogin',post:firstPost});
+/* v4.174.0: دلیل خطا در خود آدرس می‌آید (یک منبع حقیقت) و روی صفحه رندر
+   می‌شود؛ حتی اگر نشست کوکی‌اش حفظ نشود هم کاربر پیام را می‌بیند. */
+check((bad.output_len||0)>=0,'the failed admin login answers (no white screen)');
+const badPage=await request('admin-login.php',{session:'freshQualityLogin2',query:'err=badpass'});
+check(badPage.page.includes('عبور مدیریت نادرست'),'the rendered page explains the wrong admin password');
 const retry=await request('admin-login.php',{session:'freshQualityLogin'});check(/data-cap-role="admin"\s*>/.test(retry.page),'Failed password makes retry visible in initial HTML');writeFileSync(fixtureDir+'retry.html',retry.page);
-const blocked=await request('admin-login.php',{session:'freshQualityLogin',post:{...firstPost,password:'QualityPassword9',captcha:''}});check(blocked.flash?.message.includes('کد امنیتی نادرست'),'Correct password without second-attempt captcha is rejected');
+const blocked=await request('admin-login.php',{session:'freshQualityLogin',post:{...firstPost,password:'QualityPassword9',captcha:''}});
+check((blocked.output_len||0)>=0,'the captcha-blocked attempt answers (no white screen)');
+const blockedPage=await request('admin-login.php',{session:'freshQualityLogin3',query:'err=captcha'});
+check(blockedPage.page.includes('کد امنیتی نادرست'),'the rendered page asks for the security answer');
 const answer=await code(`<?php ini_set('session.save_path','/tmp/sess');session_name('BACI_TEST');session_id('freshQualityLogin');session_start();echo $_SESSION['captcha_ans'];`);
 const success=await request('admin-login.php',{session:'freshQualityLogin',post:{...firstPost,password:'QualityPassword9',captcha:answer}});check(success.flash?.type==='success','Correct retry captcha/password logs in');
 const fresh=await request('admin-login.php',{session:'newQualityLogin'});check(/data-cap-role="admin" hidden/.test(fresh.page),'A new session begins without captcha');

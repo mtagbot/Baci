@@ -37,7 +37,7 @@ if ($action === 'logout') {
 $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !check_login_throttle($ip)) {
     $role=login_post_string('login_type');
-    if(in_array($role,['student','teacher','inquiry'],true))login_error($role,'تلاش‌های ناموفق زیاد بوده است. لطفاً ۱۰ دقیقه صبر کنید و دوباره تلاش کنید؛ در صورت تکرار، با مدرسه تماس بگیرید.');
+    if(in_array($role,['student','teacher','inquiry'],true))login_error($role,'تلاش‌های ناموفق زیاد بوده است. لطفاً ۱۰ دقیقه صبر کنید و دوباره تلاش کنید؛ در صورت تکرار، با مدرسه تماس بگیرید.',[],'throttle');
     set_flash_message('error','تلاش‌های ناموفق زیاد بوده است. لطفاً ۱۰ دقیقه دیگر تلاش کنید.');
     redirect('admin-login.php');
 }
@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
 // Handle Student Login POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_POST['login_type'] === 'student') {
     if (!verify_csrf(login_post_string('csrf_token'))) {
-        login_error('student','اعتبار فرم به پایان رسیده است. همین صفحه تازه شده؛ اطلاعات را دوباره وارد و ارسال کنید.');
+        login_error('student','اعتبار فرم به پایان رسیده است. همین صفحه تازه شده؛ اطلاعات را دوباره وارد و ارسال کنید.',[],'csrf');
     }
     login_require_fields('student');
     $nationalId = tr_num(clean(trim(login_post_string('national_id'))), 'en');
@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
 
     require_once __DIR__ . '/includes/header_tiles.php';
     if (!login_captcha_gate('student', $nationalId, login_post_string('captcha'))) {
-        login_error('student','پاسخ سؤال امنیتی درست نیست یا اعتبار آن تمام شده است. پاسخ سؤال نمایش‌داده‌شده را وارد کنید.',['captcha']);
+        login_error('student','پاسخ سؤال امنیتی درست نیست یا اعتبار آن تمام شده است. پاسخ سؤال نمایش‌داده‌شده را وارد کنید.',['captcha'],'captcha');
     }
 
     // Academic year coherence: prefer current default year if student exists in multiple years
@@ -114,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
         $valid = false;
         if (!empty($student['password']) && verify_user_password($password, $student['password'], ['table'=>'students','id'=>$student['id']])) {
             $valid = true;
-        } elseif (student_serial_matches($student['serial_number'] ?? '', $password)
+        } elseif ((function_exists('student_serial_matches') && student_serial_matches($student['serial_number'] ?? '', $password))
                || (string)$student['national_id'] !== '' && hash_equals((string)$student['national_id'], (string)$password)) {
             $valid = true;
         }
@@ -140,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
 // Handle Quick Inquiry POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_POST['login_type'] === 'inquiry') {
     if (!verify_csrf(login_post_string('csrf_token'))) {
-        login_error('inquiry','اعتبار فرم به پایان رسیده است. همین صفحه تازه شده؛ اطلاعات را دوباره وارد و ارسال کنید.');
+        login_error('inquiry','اعتبار فرم به پایان رسیده است. همین صفحه تازه شده؛ اطلاعات را دوباره وارد و ارسال کنید.',[],'csrf');
     }
     login_require_fields('inquiry');
     $year       = trim(login_post_string('academic_year')) ?: get_setting('current_academic_year','1404/1405');
@@ -149,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
 
     require_once __DIR__ . '/includes/header_tiles.php';
     if (!login_captcha_gate('inquiry', $nationalId, login_post_string('captcha'))) {
-        login_error('inquiry','پاسخ سؤال امنیتی درست نیست یا اعتبار آن تمام شده است. پاسخ سؤال نمایش‌داده‌شده را وارد کنید.',['captcha']);
+        login_error('inquiry','پاسخ سؤال امنیتی درست نیست یا اعتبار آن تمام شده است. پاسخ سؤال نمایش‌داده‌شده را وارد کنید.',['captcha'],'captcha');
     }
 
     // Prefer requested year, then current default
@@ -160,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
     if (!$student) {
         $student = DB::fetch("SELECT * FROM students WHERE national_id = ? AND status = 'active' ORDER BY academic_year DESC LIMIT 1", [$nationalId]);
     }
-    if ($student && (student_serial_matches($student['serial_number'] ?? '', $serial)
+    if ($student && ((function_exists('student_serial_matches') && student_serial_matches($student['serial_number'] ?? '', $serial))
                      || verify_user_password($serial, $student['password'], ['table'=>'students','id'=>$student['id']]))) {
         login_guard_success('inquiry', $nationalId);
         // v4.33.0: exclusive role session
@@ -181,7 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
 // Handle Teacher Login POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_POST['login_type'] === 'teacher') {
     if (!verify_csrf(login_post_string('csrf_token'))) {
-        login_error('teacher','اعتبار فرم به پایان رسیده است. همین صفحه تازه شده؛ اطلاعات را دوباره وارد و ارسال کنید.');
+        login_error('teacher','اعتبار فرم به پایان رسیده است. همین صفحه تازه شده؛ اطلاعات را دوباره وارد و ارسال کنید.',[],'csrf');
     }
     login_require_fields('teacher');
     $nid  = tr_num(clean(trim(login_post_string('national_id'))), 'en');
@@ -189,7 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
 
     require_once __DIR__ . '/includes/header_tiles.php';
     if (!login_captcha_gate('teacher', $nid, login_post_string('captcha'))) {
-        login_error('teacher','پاسخ سؤال امنیتی درست نیست یا اعتبار آن تمام شده است. پاسخ سؤال نمایش‌داده‌شده را وارد کنید.',['captcha']);
+        login_error('teacher','پاسخ سؤال امنیتی درست نیست یا اعتبار آن تمام شده است. پاسخ سؤال نمایش‌داده‌شده را وارد کنید.',['captcha'],'captcha');
     }
 
     $t = DB::fetch("SELECT * FROM teachers WHERE national_id = ? AND status = 1", [$nid]);
@@ -198,7 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
        در مرورگر وب (اپلیکیشن داخلی بله یا مرورگرهای دیگر) رد می‌شدند. حالا
        همان قرارداد ربات پذیرفته می‌شود: رمز مدرسه اول، کد پرسنلی دوم. */
     if ($t && ((!empty($t['password']) && verify_user_password($pass, $t['password'], ['table'=>'teachers','id'=>$t['id']]))
-            || staff_personnel_matches($t['personnel_code'] ?? '', $pass))) {
+            || (function_exists('staff_personnel_matches') && staff_personnel_matches($t['personnel_code'] ?? '', $pass)))) {
         login_guard_success('teacher', $nid);
         // v4.33.0: exclusive role session
         auth_login_as('teacher', [
@@ -390,6 +390,19 @@ elseif ($view === 'login'):
     $loginFlash=get_flash_message();
     $loginRetry=$_SESSION['login_retry']??[];unset($_SESSION['login_retry']);
     if($loginFlash && in_array($loginRetry['role']??'', ['student','inquiry','teacher'],true))$activeTab=$loginRetry['role'];
+    /* v4.174.0: پیام خطا از آدرس هم خوانده می‌شود. اگر نشست از دست رفته باشد
+       (مرورگر داخلی پیام‌رسان، حالت خصوصی، refresh) کاربر باید بداند چرا وارد
+       نشد؛ پیش از این صفحهٔ ورود بی‌هیچ پیامی نمایش داده می‌شد. */
+    if(!$loginFlash){
+        $errCode=preg_replace('/[^a-z_]/','',(string)($_GET['err']??''));
+        $errTab=in_array($_GET['tab']??'', ['student','inquiry','teacher'],true)?$_GET['tab']:'';
+        $errMsgs=$errTab!==''&&$errCode!==''?login_error_codes($errTab):[];
+        if(isset($errMsgs[$errCode])){
+            $loginFlash=['type'=>'error','message'=>$errMsgs[$errCode]];
+            $activeTab=$errTab;
+            $loginRetry=['role'=>$errTab,'identity'=>'','fields'=>[]];
+        }
+    }
     $captchaQ = generate_captcha();
     $logoUrl  = get_setting('logo_url', '');
 ?>

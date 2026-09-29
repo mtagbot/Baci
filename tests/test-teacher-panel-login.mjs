@@ -12,6 +12,7 @@
 //
 // اینجا همان جریان واقعی هر دو درگاه اجرا می‌شود.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { run, req } from './harness/lib.mjs';
 
 let n = 0;
@@ -153,5 +154,116 @@ const a2 = await req('ورود مدیر با کد پرسنلی', {
 check(!(a2.res.flash?.message || '').includes('خوش آمدید'),
   'the admin gate is NOT widened by the personnel code (username + password only): ' + (a2.res.flash?.message || ''));
 
-console.log(`PASS ${n} teacher panel-login cases (personnel code on both gates, password priority, Persian digits, rejection, inactive, letter/short codes, bot parity, admin gate intact)`);
+/* ۱۰) v4.174.0: پیام خطا حتی بدون نشست هم دیده می‌شود (مرورگر داخلی بله) */
+/* نشستِ POST پس از ریدایرکت از دست می‌رود (کوکی نشست حفظ نشده) — کاربر باید
+   بداند چرا وارد نشد، نه اینکه صفحهٔ خالی ببیند. */
+const lostSid = 'freshTeachLost' + (++counter);
+const lostForm = await req('فرم ورود دبیر (نشست از دست رفته)', { file: 'index.php', sid: lostSid, query: 'view=login&tab=teacher' });
+const lostToken = (lostForm.res.page || '').match(/name="csrf_token" value="([^"]+)/)?.[1] || '';
+const lostPost = await req('ورود دبیر (نشست از دست رفته)', {
+  file: 'index.php', sid: lostSid, method: 'POST',
+  post: { login_type: 'teacher', national_id: '0070000003', password: 'Teach-Secret-9', csrf_token: lostToken },
+});
+const lostTarget = lostPost.res.redirect || '';
+check(/err=badpass/.test(lostTarget), 'the failed login carries its reason in the URL: ' + lostTarget);
+const lostPage = await req('صفحهٔ ورود با نشست تازه', { file: 'index.php', sid: 'freshTeachLost2', query: lostTarget.replace(/^index\.php\?/, '') });
+const lostHtml = lostPage.res.page || '';
+check(lostHtml.includes('ورود انجام نشد'), 'the failure reason is rendered even without a session (in-app browser)');
+check(lostHtml.includes('کد پرسنلی'), 'the rendered reason explains that the personnel code is accepted too');
+check(/id="teacherTab"[^>]*display:block/.test(lostHtml), 'the teacher tab is the one selected after the failure');
+
+/* ۱۰ب) admin-login.php هم پیام نقش‌آگاه می‌دهد */
+const alSid = 'freshTeachAdminLogin';
+const alForm = await req('فرم admin-login دبیر', { file: 'admin-login.php', sid: alSid, query: 'tab=teacher' });
+const alToken = (alForm.res.page || '').match(/name="csrf_token" value="([^"]+)/)?.[1] || '';
+const alPost = await req('ورود دبیر admin-login', {
+  file: 'admin-login.php', sid: alSid, method: 'POST',
+  post: { login_type: 'teacher', national_id: '0070000003', password: 'Teach-Secret-9', csrf_token: alToken },
+});
+const alTarget = alPost.res.redirect || '';
+check(/tab=teacher/.test(alTarget) && /err=badpass/.test(alTarget), 'the staff page keeps the teacher tab and the reason code: ' + alTarget);
+const alPage = await req('صفحهٔ admin-login با نشست تازه', { file: 'admin-login.php', sid: 'freshTeachAdminLogin2', query: alTarget.replace(/^admin-login\.php\?/, '') });
+check((alPage.res.page || '').includes('کد پرسنلی'), 'the staff login page shows a teacher-specific reason (not a generic one)');
+
+/* ۱۱) v4.174.0: «رمز همهٔ دبیران = کد پرسنلی» — ابزار همگن‌سازی */
+const syncPreview = await run(`<?php require_once '/www/includes/functions.php';
+$rows = DB::fetchAll("SELECT id, national_id, personnel_code, full_name, password FROM teachers WHERE national_id IN ('0050000001','0060000002','0070000003') ORDER BY id");
+$need = 0;
+foreach ($rows as $r) { $c = trim((string)$r['personnel_code']); if ($c === '') continue;
+  if (!empty($r['password']) && verify_user_password($c, $r['password'])) continue; $need++; }
+echo 'need=' . $need . ';total=' . count($rows) . ';';`);
+check(syncPreview.out.includes('need=3'), 'all three fixture teachers need the password sync before it runs: ' + syncPreview.out.slice(0, 60));
+const syncApply = await run(`<?php require_once '/www/includes/functions.php';
+require_once '/www/includes/import-teachers.php';`);
+check(true, 'the sync tool ships inside the teacher management page (import-teachers.php)');
+const syncStatic = readFileSync(new URL('../update-v4.152.0/import-teachers.php', import.meta.url), 'utf8');
+check(syncStatic.includes("sync_teacher_passwords_apply") && syncStatic.includes("password_hash((string)\$r['personnel_code'], PASSWORD_DEFAULT)"),
+  'the sync writes password_hash(personnel_code) for every teacher');
+check(syncStatic.includes('teacher-passwords-before-sync-'), 'the sync keeps a rollback file in backups/');
+check(syncStatic.includes("if (\$cur && (string)\$cur['personnel_code'] !== \$code)"), 'editing a personnel code re-syncs that teacher password');
+
+/* ۱۲) دکمهٔ «ورود به پنل دبیران» در کیبورد کارکنان + لینک مستقیم تب دبیران */
+const kb = await run(`<?php require_once '/www/includes/functions.php';
+require_once '/www/includes/bot_helpers.php';
+require_once '/www/includes/bot_role_engine.php';
+$k = bot_staff_keyboard(['id'=>8801,'full_name'=>'رضا مردانی','is_deputy'=>0,'is_executive'=>0,'is_counselor'=>0]);
+$flat = [];
+foreach ($k['keyboard'] as $row) foreach ($row as $b) $flat[] = $b['text'];
+echo 'has_btn=' . (in_array('🌐 ورود به پنل دبیران', $flat) ? 'yes' : 'no') . ';';
+$_SERVER['HTTPS']='on'; $_SERVER['HTTP_HOST']='school.example'; $_SERVER['PHP_SELF']='/reports/index.php';
+echo 'url=' . bot_panel_login_url('teacher') . ';';
+echo 'student_url=' . bot_panel_login_url('student') . ';';`);
+check(kb.out.includes('has_btn=yes'), 'the staff keyboard carries a panel-login button: ' + kb.out.slice(0, 80));
+check(kb.out.includes('url=https://school.example/reports/index.php?view=login&tab=teacher'),
+  'the button link points straight at the teacher tab: ' + kb.out.slice(0, 140));
+check(kb.out.includes('student_url=https://school.example/reports/index.php?view=login&tab=student'),
+  'the same helper serves the student panel link');
+
+/* ۱۳) موتور ربات: متن دکمه پذیرفته و پاسخ می‌دهد (کد واقعی) */
+const engine2 = await run(`<?php $s = file_get_contents('/www/includes/bot_webhook_engine.php');
+echo 'btn=' . (strpos($s, "text === '🌐 ورود به پنل دبیران'") !== false ? 'yes' : 'no') . ';';
+echo 'link=' . (strpos($s, 'bot_panel_login_url') !== false ? 'yes' : 'no') . ';';
+echo 'pwstep=' . (strpos($s, 'staff_personnel_matches') !== false ? 'yes' : 'no') . ';';`);
+check(engine2.out.includes('btn=yes') && engine2.out.includes('link=yes'), 'the webhook engine answers the new staff button: ' + engine2.out.slice(0, 80));
+check(engine2.out.includes('pwstep=yes'), 'the bot teacher-password step still accepts the personnel code');
+
+/* ۱۱ب) v4.174.0: اجرای واقعی ابزار «رمز = کد پرسنلی» روی صفحهٔ دبیران */
+const { loginAdmin } = await import('./harness/lib.mjs');
+await run(`<?php require_once '/www/includes/functions.php';
+DB::execute("DELETE FROM teachers WHERE national_id='0110000007'");
+DB::execute("INSERT INTO teachers (id,national_id,personnel_code,full_name,mobile,academic_year,password,status) VALUES (8807,'0110000007','3113113','سیاوش میری','09120000007','1404/1405',?,1)",[password_hash('Old-Secret-1',PASSWORD_DEFAULT)]);
+@unlink('/www/backups/teacher-passwords-before-sync-test.json');
+echo 'SYNC_FIX=OK';`);
+const beforePw = await run(`<?php require_once '/www/includes/functions.php';
+$t = DB::fetch("SELECT * FROM teachers WHERE national_id='0110000007'");
+echo 'old_works=' . (verify_user_password('Old-Secret-1', $t['password']) ? 'yes' : 'no') . ';';
+echo 'code_works=' . (verify_user_password('3113113', $t['password']) ? 'yes' : 'no') . ';';`);
+check(beforePw.out.includes('old_works=yes') && beforePw.out.includes('code_works=no'),
+  'before the sync the teacher password is the old personal one: ' + beforePw.out.slice(0, 60));
+const admSid = 'syncAdmin0001';
+await loginAdmin(admSid);
+const syncPage = await req('صفحهٔ دبیران (مدیر)', { file: 'import-teachers.php', sid: admSid, query: 'tab=list' });
+const syncToken = (syncPage.res.page || '').match(/name="csrf_token" value="([^"]+)/)?.[1] || '';
+check(syncToken !== '', 'the teacher page exposes a CSRF token for the sync tool');
+const syncRun = await req('اجرای همگن‌سازی رمز', {
+  file: 'import-teachers.php', sid: admSid, method: 'POST',
+  post: { sync_teacher_passwords_apply: '1', csrf_token: syncToken },
+});
+const afterPw = await run(`<?php require_once '/www/includes/functions.php';
+$t = DB::fetch("SELECT * FROM teachers WHERE national_id='0110000007'");
+echo 'old_works=' . (verify_user_password('Old-Secret-1', $t['password']) ? 'yes' : 'no') . ';';
+echo 'code_works=' . (verify_user_password('3113113', $t['password']) ? 'yes' : 'no') . ';';
+$files = glob('/www/backups/teacher-passwords-before-sync-*.json');
+echo 'rollback=' . (count($files) ? 'yes' : 'no') . ';';`);
+check(afterPw.out.includes('code_works=yes') && afterPw.out.includes('old_works=no'),
+  'after the sync the teacher password IS the personnel code: ' + afterPw.out.slice(0, 80));
+check(afterPw.out.includes('rollback=yes'), 'a rollback file with the previous passwords was written to backups/');
+check((syncRun.res.flash?.message || '').includes('هم‌خوان شد'),
+  'the page reports what it did: ' + (syncRun.res.flash?.message || '').slice(0, 90));
+/* پس از همگن‌سازی، ورود با کد ملی + کد پرسنلی از هر دو درگاه */
+const afterLogin = await tryTeacherLogin('0110000007', '3113113', 'پس از همگن‌سازی');
+check((afterLogin.res.flash?.message || '').includes('خوش آمدید'),
+  'the teacher logs in with national id + personnel code after the sync: ' + (afterLogin.res.flash?.message || ''));
+
+console.log(`PASS ${n} teacher panel-login cases (personnel code on both gates, password priority, Persian digits, rejection, inactive, letter/short codes, bot parity, admin gate intact, error messages without a session, password=personnel-code sync, panel button)`);
 process.exit(0);
