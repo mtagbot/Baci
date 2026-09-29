@@ -147,5 +147,50 @@ check(!qhtml.includes('"error_code":403'), 'raw API JSON is never dumped into th
 check(!(qhtml.match(/مسدود \(بدون تلاش\)<\/b> —/g) || []).length, 'blocked jobs no longer appear as repeated rows in the compact list');
 check(qhtml.includes('ولی‌هایی که ربات را مسدود کرده‌اند'), 'the blocked-parent section still renders with names');
 
+/* ── v4.171.0: سقف بهداشت صف مسدود — بیدارباش محدود + سقف انباشت ───────── */
+const hygiene = await run(`<?php require_once '/www/includes/functions.php';
+require_once '/www/includes/bot_helpers.php';
+require_once '/www/includes/bot_outbox.php';
+bot_outbox_schema();
+DB::execute("DELETE FROM bot_outbox WHERE job_id LIKE 'hyg%' OR job_id LIKE 'cap%' OR job_id LIKE 'rlh%'");
+$mk = function ($pfx, $n, $chat, $owner) {
+    DB::execute("INSERT INTO bot_outbox (job_id,platform,payload,payload_hash,owner,state,attempts,created_at,last_error) VALUES (?,'bale',?,?,?,'blocked',3,?,'HTTP 403')",
+        [$pfx . str_pad((string)$n, 29, '0', STR_PAD_LEFT), json_encode(['chat_id' => $chat, 'text' => 'اعلان ' . $n], JSON_UNESCAPED_UNICODE), hash('sha256', $pfx . $n), $owner, 1700000000 + $n]);
+};
+for ($i = 1; $i <= 12; $i++) $mk('hyg', $i, '777010', 'local');
+$woke = bot_outbox_unblock_chat('bale', '777010');
+$still = DB::fetch("SELECT COUNT(*) AS c FROM bot_outbox WHERE job_id LIKE 'hyg%' AND state='blocked'")['c'];
+$pend  = DB::fetch("SELECT COUNT(*) AS c FROM bot_outbox WHERE job_id LIKE 'hyg%' AND state='pending'")['c'];
+$oldest = DB::fetch("SELECT state FROM bot_outbox WHERE job_id='hyg" . str_pad('1', 29, '0', STR_PAD_LEFT) . "'")['state'];
+$newest = DB::fetch("SELECT state FROM bot_outbox WHERE job_id='hyg" . str_pad('12', 29, '0', STR_PAD_LEFT) . "'")['state'];
+echo "WOKE=$woke;STILL=$still;PEND=$pend;OLDEST=$oldest;NEWEST=$newest;";
+for ($i = 1; $i <= 60; $i++) $mk('cap', $i, '777011', 'local');
+$mk('rlh', 1, '777011', 'relay');
+$del = bot_outbox_prune_blocked_chat('bale', '777011', 50);
+$left = DB::fetch("SELECT COUNT(*) AS c FROM bot_outbox WHERE job_id LIKE 'cap%'")['c'];
+$keptNewest = DB::fetch("SELECT state FROM bot_outbox WHERE job_id='cap" . str_pad('60', 29, '0', STR_PAD_LEFT) . "'")['state'];
+$droppedOldest = DB::fetch("SELECT COUNT(*) AS c FROM bot_outbox WHERE job_id='cap" . str_pad('1', 29, '0', STR_PAD_LEFT) . "'")['c'];
+bot_outbox_unblock_chat('bale', '777011');
+$relayStill = DB::fetch("SELECT state FROM bot_outbox WHERE job_id LIKE 'rlh%'")['state'];
+echo "DEL=$del;LEFT=$left;KEPT=$keptNewest;OLDGONE=$droppedOldest;RELAY=$relayStill;";
+file_put_contents('/harness/hygiene.txt', 'ok');`);
+const h = Object.fromEntries((hygiene.out.match(/([A-Z0-9]+)=([^;]*)/g) || []).map(kv => { const i = kv.indexOf('='); return [kv.slice(0, i), kv.slice(i + 1)]; }));
+check(hygiene.out.includes('WOKE='), 'the v4.171 hygiene fixture ran: ' + hygiene.out.slice(0, 200) + hygiene.err.slice(0, 200));
+check(h.WOKE === '10', 'unblocking wakes only the last N parked messages, not the whole backlog: ' + h.WOKE);
+check(h.STILL === '2', 'the older parked messages stay parked instead of flooding the parent: ' + h.STILL);
+check(h.PEND === '10', 'exactly the woken messages re-enter the retry cycle: ' + h.PEND);
+check(h.OLDEST === 'blocked' && h.NEWEST === 'pending', 'the NEWEST messages are woken and the oldest wait their turn');
+check(h.DEL === '10', 'pruning drops only the surplus beyond the cap: ' + h.DEL);
+check(h.LEFT === '50' && h.KEPT === 'blocked', 'the cap keeps the newest messages and parks them: ' + h.LEFT + '/' + h.KEPT);
+check(h.OLDGONE === '0', 'the oldest parked messages are the ones removed');
+check(h.RELAY === 'blocked', 'a relay (desktop) parked job is never woken or pruned');
+
+const ob = readFileSync(new URL('../update-v4.152.0/includes/bot_outbox.php', import.meta.url), 'utf8');
+check(ob.includes("define('BOT_OUTBOX_WAKE_LIMIT',10)"), 'the wake limit is a named constant, not a magic number');
+check(ob.includes("define('BOT_OUTBOX_BLOCKED_CAP',50)"), 'the blocked-queue cap is a named constant');
+check(ob.includes('function bot_outbox_prune_blocked_chat'), 'the prune helper exists');
+check(ob.includes("bot_outbox_prune_blocked_chat($platform,(string)($payload['chat_id']??''));"), 'a new parked message keeps its chat within the cap immediately');
+check(engine.includes("try { bot_outbox_unblock_chat($platform, $chatId); }"), 'the webhook flush is still wrapped in its own try/catch before the /start flow');
+
 console.log(`PASS ${checks} bot blocked-parent report cases (403 mapping, students, exclusions, admin UI)`);
 process.exit(0);

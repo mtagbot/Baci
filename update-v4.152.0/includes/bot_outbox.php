@@ -76,9 +76,12 @@ function bot_outbox_enqueue($platform,$payload) {
     }
     $id=bot_outbox_store(bin2hex(random_bytes(16)),$platform,$payload,$owner);
     /* v4.165.0: پیام تازه برای چتی که قبلاً مسدود شناخته شده، مستقیم با
-       state='blocked' ثبت می‌شود — صفر تلاش بی‌نتیجه؛ با رفع مسدودی بیدار می‌شود. */
+       state='blocked' ثبت می‌شود — صفر تلاش بی‌نتیجه؛ با رفع مسدودی بیدار می‌شود.
+       v4.171.0: در همان لحظه سقف صفِ آن چت اعمال می‌شود تا انباشت بی‌پایان
+       پیش نیاید (فقط jobهای محلیِ پارک‌شده). */
     if($owner==='local' && bot_outbox_chat_is_blocked($platform,(string)($payload['chat_id']??''))) {
         bot_outbox_sql("UPDATE bot_outbox SET state='blocked' WHERE job_id=? AND state='pending'",[$id]);
+        bot_outbox_prune_blocked_chat($platform,(string)($payload['chat_id']??''));
     }
     // Enqueue the ENTIRE recipient loop before any site network I/O. A single offline
     // recipient must never prevent later recipients from even entering the queue.
@@ -231,28 +234,77 @@ function bot_outbox_blocked_chats($platform) {
     return $out;
 }
 
+/* v4.171.0: سقف‌های بهداشت صفِ چت‌های مسدود. دو عدد عمداً کوچک نگه داشته شده
+   تا روی هاست ضعیف هم ارزان بماند:
+     BOT_OUTBOX_WAKE_LIMIT  → با رفع مسدودی فقط N پیام *آخر* بیدار می‌شود؛
+        چتی که ۲۰۰ پیام معوق داشته یک‌جا ۲۰۰ پیام نمی‌گیرد (جلوگیری از رگبار و
+        مسدودی/ریپورت دوبارهٔ کاربر). بقیه پارک می‌مانند و با پیام بعدیِ همان
+        کاربر یا اصلاح مسدودی، دوبارهٔ تازه‌ترین‌ها بیدار می‌شوند.
+     BOT_OUTBOX_BLOCKED_CAP → صف پارک‌شدهٔ هر چت بیشتر از این نمی‌شود؛ قدیمی‌ترها
+        حذف می‌شوند تا جدول صف برای یک چت مسدود قدیمی بی‌پایان رشد نکند. */
+if(!defined('BOT_OUTBOX_WAKE_LIMIT'))define('BOT_OUTBOX_WAKE_LIMIT',10);
+if(!defined('BOT_OUTBOX_BLOCKED_CAP'))define('BOT_OUTBOX_BLOCKED_CAP',50);
+
+/* v4.171.0: پیشوند پایدار payload برای تطبیق chat_id — ترتیب کلیدها همیشه
+   chat_id,text است (bot_outbox_payload) پس تطبیق prefix دقیق است. یک تعریف
+   مشترک برای blocked/unblock/prune تا هر سه دقیقاً یک زبان حرف بزنند. */
+function bot_outbox_chat_like($chatId) {
+    return '{"chat_id":' . json_encode(trim((string)$chatId), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ',%';
+}
+
 /* v4.165.0: آیا این چت قبلاً مسدود شناخته شده؟ (یک job با state='blocked'
-   برای همان chat_id کافی است). payload همیشه با {"chat_id":"…","text": شروع
-   می‌شود (bot_outbox_payload ترتیب پایدار می‌سازد) پس تطبیق prefix دقیق است. */
+   برای همان chat_id کافی است). */
 function bot_outbox_chat_is_blocked($platform, $chatId) {
     $chatId = trim((string)$chatId);
     if ($chatId === '' || !in_array($platform, ['telegram', 'bale'], true)) return false;
     try {
-        $like = '{"chat_id":' . json_encode($chatId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ',%';
-        $hit = bot_outbox_sql("SELECT job_id FROM bot_outbox WHERE platform=? AND owner='local' AND state='blocked' AND payload LIKE ? LIMIT 1", [$platform, $like])->fetch(PDO::FETCH_ASSOC);
+        $hit = bot_outbox_sql("SELECT job_id FROM bot_outbox WHERE platform=? AND owner='local' AND state='blocked' AND payload LIKE ? LIMIT 1", [$platform, bot_outbox_chat_like($chatId)])->fetch(PDO::FETCH_ASSOC);
         return (bool)$hit;
     } catch (Throwable $e) { return false; }
 }
 
-/* v4.165.0: کاربر پس از رفع مسدودی پیامی می‌فرستد (شامل /start) ← همهٔ
-   پیام‌های پارک‌شدهٔ او بدون دخالت مدیر به چرخهٔ ارسال برمی‌گردند.
-   این تابع از وب‌هوک داخل try/catch جدا صدا زده می‌شود و هرگز نباید روی
-   جریان اتصال اولیا اثر بگذارد. jobهای رله (دسکتاپ) دست‌نخورده می‌مانند. */
-function bot_outbox_unblock_chat($platform, $chatId) {
+/* v4.171.0: سقف صف پارک‌شدهٔ یک چت — قدیمی‌ترها حذف می‌شوند تا جدول صف برای
+   یک چت مسدود قدیمی بی‌سرانجام رشد نکند (ماجرای ۲۱۵ پیام معوق یک چت).
+   فقط jobهای محلی و پارک‌شده؛ jobهای رله (دسکتاپ) و ارسال‌شده هرگز حذف
+   یا تغییر نمی‌شوند. */
+function bot_outbox_prune_blocked_chat($platform, $chatId, $cap = BOT_OUTBOX_BLOCKED_CAP) {
     $chatId = trim((string)$chatId);
     if ($chatId === '' || !in_array($platform, ['telegram', 'bale'], true)) return 0;
     bot_outbox_schema();
-    $like = '{"chat_id":' . json_encode($chatId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ',%';
-    $n = bot_outbox_sql("UPDATE bot_outbox SET state='pending',next_try=0,attempts=0,last_error='' WHERE platform=? AND owner='local' AND state='blocked' AND payload LIKE ?", [$platform, $like])->rowCount();
+    $cap = max(1, (int)$cap);
+    $like = bot_outbox_chat_like($chatId);
+    try {
+        $total = (int)bot_outbox_sql("SELECT COUNT(*) FROM bot_outbox WHERE platform=? AND owner='local' AND state='blocked' AND payload LIKE ?", [$platform, $like])->fetchColumn();
+        if ($total <= $cap) return 0;
+        // تازه‌ترین‌ها می‌مانند؛ انتخاب با job_id قطعی می‌شود تا created_at برابر
+        // (ثانیه) نتیجه را نامعین نکند.
+        $keep = bot_outbox_sql("SELECT job_id FROM bot_outbox WHERE platform=? AND owner='local' AND state='blocked' AND payload LIKE ? ORDER BY created_at DESC, job_id DESC LIMIT $cap", [$platform, $like])->fetchAll(PDO::FETCH_COLUMN);
+        if (count($keep) >= $total) return 0;
+        $marks = implode(',', array_fill(0, count($keep), '?'));
+        $n = bot_outbox_sql("DELETE FROM bot_outbox WHERE platform=? AND owner='local' AND state='blocked' AND payload LIKE ? AND job_id NOT IN ($marks)", array_merge([$platform, $like], $keep))->rowCount();
+        return (int)$n;
+    } catch (Throwable $e) { return 0; }
+}
+
+/* v4.165.0: کاربر پس از رفع مسدودی پیامی می‌فرستد (شامل /start) ← پیام‌های
+   پارک‌شدهٔ او بدون دخالت مدیر به چرخهٔ ارسال برمی‌گردند.
+   v4.171.0: فقط BOT_OUTBOX_WAKE_LIMIT پیام آخر بیدار می‌شود تا رفع مسدودی
+   به رگبار پیام تبدیل نشود؛ بقیه پارک می‌مانند.
+   این تابع از وب‌هوک داخل try/catch جدا صدا زده می‌شود و هرگز نباید روی
+   جریان اتصال اولیا اثر بگذارد. jobهای رله (دسکتاپ) دست‌نخورده می‌مانند. */
+function bot_outbox_unblock_chat($platform, $chatId, $limit = BOT_OUTBOX_WAKE_LIMIT) {
+    $chatId = trim((string)$chatId);
+    if ($chatId === '' || !in_array($platform, ['telegram', 'bale'], true)) return 0;
+    bot_outbox_schema();
+    $limit = max(1, min(200, (int)$limit));
+    $like = bot_outbox_chat_like($chatId);
+    /* ابتدا تازه‌ترین‌ها انتخاب و بعد UPDATE با IN(...) می‌شود: UPDATE با
+       زیرپرومانهٔ LIMIT روی MySQL و SQLite یکسان کار نمی‌کند. */
+    try {
+        $ids = bot_outbox_sql("SELECT job_id FROM bot_outbox WHERE platform=? AND owner='local' AND state='blocked' AND payload LIKE ? ORDER BY created_at DESC, job_id DESC LIMIT $limit", [$platform, $like])->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Throwable $e) { return 0; }
+    if (!$ids) return 0;
+    $marks = implode(',', array_fill(0, count($ids), '?'));
+    $n = bot_outbox_sql("UPDATE bot_outbox SET state='pending',next_try=0,attempts=0,last_error='' WHERE platform=? AND owner='local' AND state='blocked' AND job_id IN ($marks)", array_merge([$platform], $ids))->rowCount();
     return (int)$n;
 }

@@ -201,6 +201,8 @@ if ($chatId === '') {
 
 /* v4.165.0: همین که کاربر توانست پیامی بفرستد یعنی کانال باز است؛ اگر قبلاً
    مسدود کرده بود، پیام‌های پارک‌شده‌اش خودکار به چرخهٔ ارسال برمی‌گردند.
+   v4.171.0: فقط BOT_OUTBOX_WAKE_LIMIT پیام آخر بیدار می‌شود (جلوگیری از رگبار)؛
+   بقیه پارک می‌مانند.
    کاملاً ایزوله: هر خطای صف فقط لاگ می‌شود و هرگز جریان اتصال را مختل نمی‌کند. */
 if (function_exists('bot_outbox_unblock_chat')) {
     try { bot_outbox_unblock_chat($platform, $chatId); } catch (Throwable $e) { error_log('bot_outbox_unblock_chat: ' . $e->getMessage()); }
