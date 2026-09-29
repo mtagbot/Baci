@@ -223,5 +223,36 @@ check(!recipients.includes('bale:700020'),
       'the connected deputy chat receives nothing (manager-only rule)');
 check(scan.out.includes('"ok":true')||scan.out.includes('"ok": true'),'the scan endpoint answered the test tag');
 
+/* ── ۶) v4.173.0: مسیر «دکمهٔ دبیر → کد ملی → کد پرسنلی» ─────────────────
+   دبیری که مدرسه برایش رمزی تعیین نکرده (ستون password خالی یا نامربوط) باید
+   با کد پرسنلی — همان عاملی که در ربات و در صفحهٔ ورود وب کار می‌کند — لینک
+   پنل کامل دبیران را بگیرد. پیش از این این مسیر فقط رمز را می‌پذیرفت. */
+const TEACHER_NID='9200000041';               // fixture: personnel_code = 424242
+const TEACHER_PC='424242';
+w=await webhook('bale','700021',btnTeacher);
+check(said(w,'کد ملی/نام کاربری دبیر'),'the teacher button still asks for the teacher id');
+w=await webhook('bale','700021',TEACHER_NID);
+check(said(w,'رمز عبور یا کد پرسنلی دبیر را ارسال کنید'),
+      'the teacher entry now asks for the password OR the personnel code');
+w=await webhook('bale','700021',TEACHER_PC);
+check(said(w,'ورود دبیر تأیید شد'),'the personnel code completes the teacher login: '+texts(w).slice(0,200));
+check(said(w,'bot-login.php?token='),'the teacher receives the secure full-panel link');
+const teacherSessions=(await sessions()).filter(r=>r.teacher_id===9601&&r.is_active===1);
+check(teacherSessions.length>0,'the teacher account is connected to the chat');
+/* کد پرسنلی غلط نباید رد شود و هیچ لینکی نباید صادر شود */
+const tokensBefore=(await db("SELECT COUNT(*) c FROM bot_login_tokens"))[0].c;
+w=await webhook('bale','700022',btnTeacher);
+w=await webhook('bale','700022',TEACHER_NID);
+w=await webhook('bale','700022','999999');
+check(said(w,'کد ملی یا رمز/کد پرسنلی دبیر نادرست است'),'a wrong personnel code is refused');
+check(!said(w,'bot-login.php?token='),'no panel link is issued for a wrong code');
+const tokensAfter=(await db("SELECT COUNT(*) c FROM bot_login_tokens"))[0].c;
+check(Number(tokensAfter)===Number(tokensBefore),'no extra login token was created');
+/* رمز دبیر هم مثل قبل کار می‌کند (کد پرسنلی جای رمز را نگرفته) */
+w=await webhook('bale','700023',btnTeacher);
+w=await webhook('bale','700023',TEACHER_NID);
+w=await webhook('bale','700023','hash');       // رمز خام fixture
+check(said(w,'ورود دبیر تأیید شد'),'the teacher password still logs in: '+texts(w).slice(0,160));
+
 console.log(`PASS ${checks} bot admin-login cases (manager username → password → connected account)`);
 process.exit(0);

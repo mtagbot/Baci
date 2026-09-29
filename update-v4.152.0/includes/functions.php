@@ -656,6 +656,40 @@ if (!function_exists('student_serial_matches')) {
     }
 }
 
+if (!function_exists('staff_personnel_matches')) {
+    /**
+     * v4.173.0: «کد پرسنلی» دبیر به‌عنوان عامل اتصال حساب در پنل هم پذیرفته
+     * شود — همان قراردادی که ربات (مرحلهٔ «کد پرسنلی» ورود کادر مدرسه) از قبل
+     * داشت و برچسب فرم («کد پرسنلی / رمز ورود») هم از قبل به آن قول داده بود.
+     *
+     * رمز ثبت‌شدهٔ مدرسه اولویت دارد و کد پرسنلی فقط جایگزینِ گزینهٔ دوم است؛
+     * هیچ رمزی «بازتیب» نمی‌شود و کد پرسنلی هرگز جای رمز را نمی‌گیرد.
+     *
+     * تطبیق: اول دقیقاً مثل ربات (hash_equals با مقدار خام)، بعد نرمال‌سازی برای
+     * کدهای کاملاً عددی (ارقام فارسی، فاصله/خط تیره، صفر ابتدایی). کد دارای حرف
+     * یا کوتاه‌تر از ۴ رقم فقط به‌صورت دقیق پذیرفته می‌شود تا این مسیر سطح حملهٔ
+     * جدید نسازد (ربات هم دقیق تطبیق می‌کند).
+     */
+    function staff_personnel_matches($stored, $given) {
+        $stored = trim((string)$stored);
+        $givenRaw = trim((string)$given);
+        if ($stored === '' || $givenRaw === '') return false;   // مدرسه کد پرسنلی ثبت نکرده
+        if (hash_equals($stored, $givenRaw)) return true;       // همان منطق ربات
+        if (preg_match('/\D/', $stored)) return false;          // کد غیرعددی: فقط دقیق
+        $norm = function ($v) {
+            $v = tr_num((string)$v, 'en');
+            $v = preg_replace('/\D+/', '', $v);
+            $v = ltrim($v, '0');
+            return $v === '' ? null : $v;
+        };
+        $a = $norm($stored);
+        $b = $norm($givenRaw);
+        if ($a === null || $b === null) return false;
+        if (strlen($a) < 4 || strlen($b) < 4) return false;     // کد خیلی کوتاه رمز نمی‌شود
+        return hash_equals($a, $b);
+    }
+}
+
 if (!function_exists('password_store_hash')) {
     /** رمز را هش و ذخیره می‌کند. نام جدول از فهرست سفید می‌آید. */
     function password_store_hash($table, $id, $plain) {

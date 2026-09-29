@@ -80,7 +80,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
     }
 
     $t = DB::fetch("SELECT * FROM teachers WHERE national_id = ? AND status = 1", [$nid]);
-    if ($t && verify_user_password($pass, $t['password'], ['table'=>'teachers','id'=>$t['id']])) {
+    /* v4.173.0: «کد پرسنلی» هم پذیرفته می‌شود — برچسب فرم از قبل همین را
+       می‌گفت ولی کد آن را رد می‌کرد، پس دبیرِ متصل‌شده در ربات (کد ملی + کد
+       پرسنلی) در مرورگر وب نمی‌توانست وارد شود. رمز مدرسه اولویت دارد. */
+    if ($t && ((!empty($t['password']) && verify_user_password($pass, $t['password'], ['table'=>'teachers','id'=>$t['id']]))
+            || staff_personnel_matches($t['personnel_code'] ?? '', $pass))) {
         login_guard_success('teacher', $nid);
         // v4.33.0: exclusive role session
         auth_login_as('teacher', [
@@ -94,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
     } else {
         login_guard_fail('teacher', $nid);
         record_failed_login();
-        set_flash_message('error', 'کد ملی یا رمز ورود دبیر نادرست است.');
+        set_flash_message('error', 'کد ملی یا رمز ورود دبیر نادرست است. کد پرسنلی یا رمزی که مدرسه برای شما ثبت کرده را وارد کنید.');
         sdp_fail('badpass', 'teacher');
     }
 }

@@ -481,13 +481,17 @@ if ($step === 'teacher_username') {
         http_response_code(200); exit;
     }
     DB::execute("REPLACE INTO `$stateTable` (`$chatCol`, step, temp_nid, temp_payload) VALUES (?, 'teacher_password', ?, NULL)", [$chatId, preg_replace('/\D+/', '', tr_num($text, 'en'))]);
-    bot_webhook_safe_send($platform, $chatId, 'رمز عبور دبیر را ارسال کنید:');
+    bot_webhook_safe_send($platform, $chatId, 'رمز عبور یا کد پرسنلی دبیر را ارسال کنید:');
     http_response_code(200); exit;
 }
 if ($step === 'teacher_password') {
     $nid = $state['temp_nid'] ?? '';
     $teacher = DB::fetch("SELECT * FROM teachers WHERE national_id=? AND status=1", [$nid]);
-    if ($teacher && verify_user_password($text, $teacher['password'], ['table'=>'teachers','id'=>$teacher['id']])) {
+    /* v4.173.0: کد پرسنلی اینجا هم پذیرفته می‌شود — همان قراردادی که مرحلهٔ
+       «کد پرسنلی» (staff_personnel_code) و صفحهٔ ورود وب از قبل دارند. تا اینجا
+       دبیری که مدرسه برایش رمزی تعیین نکرده بود هرگز لینک پنل کامل نمی‌گرفت. */
+    if ($teacher && (verify_user_password($text, $teacher['password'], ['table'=>'teachers','id'=>$teacher['id']])
+                     || staff_personnel_matches($teacher['personnel_code'] ?? '', $text))) {
         DB::execute("INSERT INTO bot_admin_sessions (platform, chat_id, teacher_id, role_type, created_at_jalali) VALUES (?, ?, ?, 'teacher', ?)", [$platform, $chatId, $teacher['id'], jalali_now()]);
         DB::execute("DELETE FROM `$stateTable` WHERE `$chatCol`=?", [$chatId]);
         $url = bot_create_login_url('teacher', $teacher['id']);
@@ -496,7 +500,7 @@ if ($step === 'teacher_password') {
         if (!empty($teacher['is_deputy'])) $msg .= "\n🛡️ نقش معاونت شما فعال است؛ پس از ورود، پنل معاونت نیز در دسترس است.";
         if (!empty($teacher['is_counselor'])) $msg .= "\n🧭 نقش مشاور شما فعال است؛ پنل مشاوره نیز در دسترس است.";
         bot_webhook_safe_send($platform, $chatId, $msg, bot_main_keyboard($platform));
-    } else bot_webhook_safe_send($platform, $chatId, 'کد ملی یا رمز دبیر نادرست است.');
+    } else bot_webhook_safe_send($platform, $chatId, 'کد ملی یا رمز/کد پرسنلی دبیر نادرست است.');
     http_response_code(200); exit;
 }
 

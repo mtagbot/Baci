@@ -193,7 +193,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
     }
 
     $t = DB::fetch("SELECT * FROM teachers WHERE national_id = ? AND status = 1", [$nid]);
-    if ($t && verify_user_password($pass, $t['password'], ['table'=>'teachers','id'=>$t['id']])) {
+    /* v4.173.0: برچسب فرم از قبل «کد پرسنلی / رمز ورود» بود ولی کد پرسنلی
+       پذیرفته نمی‌شد؛ دبیرانی که در ربات با کد ملی + کد پرسنلی متصل شده بودند
+       در مرورگر وب (اپلیکیشن داخلی بله یا مرورگرهای دیگر) رد می‌شدند. حالا
+       همان قرارداد ربات پذیرفته می‌شود: رمز مدرسه اول، کد پرسنلی دوم. */
+    if ($t && ((!empty($t['password']) && verify_user_password($pass, $t['password'], ['table'=>'teachers','id'=>$t['id']]))
+            || staff_personnel_matches($t['personnel_code'] ?? '', $pass))) {
         login_guard_success('teacher', $nid);
         // v4.33.0: exclusive role session
         auth_login_as('teacher', [
@@ -207,7 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
     } else {
         login_guard_fail('teacher', $nid);
         record_failed_login();
-        login_error('teacher','کد ملی یا رمز ورود دبیر درست نیست، یا ورود به این حساب امکان‌پذیر نیست. کد پرسنلی فقط در صورتی معتبر است که مدرسه آن را رمز ورود شما تعیین کرده باشد. برای بررسی دسترسی با مدرسه تماس بگیرید.',['national_id','password']);
+        login_error('teacher','کد ملی یا رمز ورود دبیر درست نیست، یا ورود به این حساب امکان‌پذیر نیست. کد پرسنلی یا رمزی که مدرسه برای شما ثبت کرده را وارد کنید (هر دو پذیرفته می‌شوند). اگر همچنان وارد نشدید، به مدرسه اطلاع دهید تا وضعیت حساب بررسی شود.',['national_id','password']);
     }
 }
 
