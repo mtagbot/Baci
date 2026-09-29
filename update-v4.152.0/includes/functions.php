@@ -615,6 +615,47 @@ if (!function_exists('verify_user_password')) {
     }
 }
 
+if (!function_exists('student_serial_matches')) {
+    /**
+     * v4.172.0: تطبیق «سریال شناسنامه» با تحمل خطاهای رایج واردکردن.
+     *
+     * چرا لازم شد: در ورود به پنل دانش‌آموز، تا امروز اگر ستون password پر
+     * بود فقط همان رمز پذیرفته می‌شد و سریال شناسنامه نادیده گرفته می‌شد —
+     * در حالی که ربات (اتصال حساب) و «استعلام» هر دو رمز *یا* سریال را
+     * می‌پذیرفتند. نتیجه: تعدادی از دانش‌آموزان که در ربات با کد ملی و سریال
+     * شناسنامه متصل شده بودند، در پنل پیام «اطلاعات نادرست» می‌گرفتند.
+     *
+     * این تابع فقط *تطبیق* را یکسان می‌کند (نه سیاست را): ارقام فارسی/عربی،
+     * فاصله، خط تیره و پرانتز حذف می‌شوند و صفرهای ابتدایی بی‌اثر می‌شوند تا
+     * سریال ذخیره‌شدهٔ «۰۱۲۳۴۵» با «۱۲۳۴۵» هم مطابقت کند. هیچ رمزی هرگز
+     * «بازتیب» نمی‌شود؛ رمز همچنان اول و سریال فقط جایگزینِ گزینهٔ دوم است.
+     */
+    function student_serial_matches($stored, $given) {
+        $norm = function ($v) {
+            $v = tr_num((string)$v, 'en');
+            $v = preg_replace('/\D+/', '', $v);            // فقط ارقام
+            $v = ltrim($v, '0');                            // صفر ابتدایی بی‌معنی است
+            return $v === '' ? null : $v;
+        };
+        $b = $norm($given);
+        if ($b === null || strlen($b) < 4) return false;    // ورودهای خیلی کوتاه پذیرفته نمی‌شوند
+        if (hash_equals((string)$norm($stored), $b)) return true;
+        /* سریال مرکب ثبت مدرسه («ب/۲۶/۲۶۵۴۸۶»): همان پارسر رسمی فرم — ربات
+           (اتصال حساب) هم همین بخش ۶ رقمی را می‌پذیرد، پس پنل هم باید بپذیرد
+           تا دانش‌آموز متصل‌شده در ربات در پنل رد نشود. */
+        if (is_file(__DIR__ . '/student_profile_fields.php')) {
+            require_once __DIR__ . '/student_profile_fields.php';
+            if (function_exists('student_serial_parts')) {
+                $sp = student_serial_parts((string)$stored);
+                if ($sp['recognized'] && $sp['number'] !== '' && $sp['letter'] !== '' && $sp['suffix'] !== '') {
+                    return hash_equals((string)$norm($sp['number']), $b);
+                }
+            }
+        }
+        return false;
+    }
+}
+
 if (!function_exists('password_store_hash')) {
     /** رمز را هش و ذخیره می‌کند. نام جدول از فهرست سفید می‌آید. */
     function password_store_hash($table, $id, $plain) {

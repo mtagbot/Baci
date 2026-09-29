@@ -67,6 +67,10 @@ $recommendedIndexes = [
     ['notifications', 'idx_target',  '`target_type`,`target_value`',         'اعلان‌های هدفمند کلاس/دانش‌آموز'],
     ['api_tokens',    'idx_expires', '`expires_at`',                         'پاکسازی توکن‌های منقضی'],
     ['student_discipline_records', 'idx_student_created', '`student_id`,`created_at`', 'پروندهٔ انضباطی دانش‌آموز به ترتیب زمان'],
+    ['bot_outbox', 'idx_platform_state', '`platform`,`state`',              'شمارش و فهرست صف ربات بر اساس پیام‌رسان و وضعیت'],
+    ['bot_outbox', 'idx_platform_sent',  '`platform`,`state`,`sent_at`',   'پاکسازی رسیدهای قدیمی صف ربات'],
+    ['desk_change_log', 'idx_ts',        '`ts`',                            'پاکسازی و بازیابی تغییرهای قدیمی همگام‌سازی دسکتاپ'],
+    ['student_attendance', 'idx_student_date', '`student_id`,`date_jalali`', 'حضور و غیاب یک دانش‌آموز به ترتیب تاریخ'],
 ];
 
 /* ---------------------------------------------------------------
@@ -115,6 +119,25 @@ function dbopt_expired_sql($head, $col) {
     global $DBOPT_SQLITE;
     $now = $DBOPT_SQLITE ? "datetime('now','localtime')" : "NOW()";
     return "$head WHERE $col IS NOT NULL AND $col < $now";
+}
+
+/* v4.172.0: «قدیمی‌تر از N روز» برای ستون‌های زمانِ یونیکس (bot_outbox.sent_at،
+   desk_change_log.ts). SQLite و MySQL هر کدام شکل خودشان را دارند. */
+function dbopt_age_sql($table, $col, $days, $extra = '1=1') {
+    global $DBOPT_SQLITE;
+    $days = max(1, (int)$days);
+    $cut = $DBOPT_SQLITE
+        ? "strftime('%s','now','-{$days} days')"
+        : "UNIX_TIMESTAMP(NOW() - INTERVAL {$days} DAY)";
+    return "$table WHERE $col > 0 AND $col < $cut AND ($extra)";
+}
+
+/* v4.172.0: نگهداشتِ رکوردهای صف ربات — چند روز از رسید/مسدود نگه داشته شود. */
+function dbopt_outbox_retention_days($kind) {
+    $key = $kind === 'blocked' ? 'dbopt_outbox_blocked_days' : 'dbopt_outbox_sent_days';
+    $fallback = $kind === 'blocked' ? 90 : 30;
+    $v = (int)get_setting($key, (string)$fallback);
+    return $v > 0 ? $v : $fallback;
 }
 
 /* تعریف اسکن رکوردهای یتیم: [کلید, برچسب, کوئری شمارش, کوئری حذف] */
@@ -191,6 +214,25 @@ function dbopt_orphan_defs() {
             'توکن‌های API منقضی‌شده',
             dbopt_expired_sql('SELECT COUNT(*) c FROM api_tokens', 'expires_at'),
             dbopt_expired_sql('DELETE FROM api_tokens', 'expires_at'),
+        ];
+    }
+    /* v4.172.0: نگهداشت صف ربات — تنها جدولی که بدون پاکسازی بی‌نهایت رشد
+       می‌کند (هر اعلانِ ارسال‌شده یک ردیف ماندگار می‌ساخت). فقط رسیدهای
+       ارسال‌شده و پیام‌های مسدودِ کهنه حذف می‌شوند؛ pending/relayed/sending
+       هرگز. jobهای رله (دسکتاپ) هم دست‌نخورده می‌مانند. */
+    if (dbopt_table_exists('bot_outbox')) {
+        $sentDays = dbopt_outbox_retention_days('sent');
+        $blockedDays = dbopt_outbox_retention_days('blocked');
+        $defs['bot_outbox_sent_old'] = [
+            "رسیدهای ارسال‌شدهٔ صف ربات قدیمی‌تر از $sentDays روز",
+            dbopt_age_sql('SELECT COUNT(*) c FROM bot_outbox', 'sent_at', $sentDays, "state='sent' AND owner='local'"),
+            dbopt_age_sql('DELETE FROM bot_outbox', 'sent_at', $sentDays, "state='sent' AND owner='local'"),
+        ];
+        // پیام مسدود هرگز ارسال نشده، پس سنش از created_at سنجیده می‌شود.
+        $defs['bot_outbox_blocked_old'] = [
+            "پیام‌های مسدودِ صف ربات قدیمی‌تر از $blockedDays روز",
+            dbopt_age_sql('SELECT COUNT(*) c FROM bot_outbox', 'created_at', $blockedDays, "state='blocked' AND owner='local'"),
+            dbopt_age_sql('DELETE FROM bot_outbox', 'created_at', $blockedDays, "state='blocked' AND owner='local'"),
         ];
     }
     if (dbopt_table_exists('bot_login_tokens') && dbopt_column_exists('bot_login_tokens', 'expires_at')) {

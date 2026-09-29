@@ -107,12 +107,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
         $student = DB::fetch("SELECT * FROM students WHERE national_id = ? AND status = 'active' ORDER BY academic_year DESC, id DESC LIMIT 1", [$nationalId]);
     }
     if ($student) {
+        /* v4.172.0: رمز ثبت‌شدهٔ مدرسه اولویت دارد؛ اگر رمز نخورد، «سریال
+           شناسنامه» یا «کد ملی» پذیرفته می‌شود — دقیقاً همان قراردادی که ربات
+           (اتصال حساب) و «استعلام» از قبل داشتند. تا پیش از این، پر بودن ستون
+           password سبب می‌شد دانش‌آموزهای متصل‌شده با سریال در پنل رد شوند. */
         $valid = false;
-        if (!empty($student['password'])) {
-            if (verify_user_password($password, $student['password'], ['table'=>'students','id'=>$student['id']])) {
-                $valid = true;
-            }
-        } elseif ($password === $student['serial_number'] || $password === $student['national_id']) {
+        if (!empty($student['password']) && verify_user_password($password, $student['password'], ['table'=>'students','id'=>$student['id']])) {
+            $valid = true;
+        } elseif (student_serial_matches($student['serial_number'] ?? '', $password)
+               || (string)$student['national_id'] !== '' && hash_equals((string)$student['national_id'], (string)$password)) {
             $valid = true;
         }
 
@@ -131,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
     }
     login_guard_fail('student', $nationalId);
     record_failed_login();
-    login_error('student','کد ملی یا رمز ورود درست نیست، یا ورود به این حساب امکان‌پذیر نیست. رمز ثبت‌شده در مدرسه را وارد کنید؛ اگر رمز تغییر کرده است، از رمز جدید استفاده کنید.',['national_id','password']);
+    login_error('student','کد ملی یا رمز ورود درست نیست، یا ورود به این حساب امکان‌پذیر نیست. رمزی که مدرسه برای شما ثبت کرده (یا شمارهٔ شناسنامهٔ شما) را وارد کنید؛ اگر رمز تغییر کرده است، از رمز جدید استفاده کنید. اگر همچنان وارد نشدید، به مدرسه اطلاع دهید تا وضعیت حساب بررسی شود.',['national_id','password']);
 }
 
 // Handle Quick Inquiry POST
@@ -157,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
     if (!$student) {
         $student = DB::fetch("SELECT * FROM students WHERE national_id = ? AND status = 'active' ORDER BY academic_year DESC LIMIT 1", [$nationalId]);
     }
-    if ($student && (($student['serial_number'] !== '' && $student['serial_number'] !== null && hash_equals((string)$student['serial_number'], (string)$serial))
+    if ($student && (student_serial_matches($student['serial_number'] ?? '', $serial)
                      || verify_user_password($serial, $student['password'], ['table'=>'students','id'=>$student['id']]))) {
         login_guard_success('inquiry', $nationalId);
         // v4.33.0: exclusive role session

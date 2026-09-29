@@ -112,8 +112,11 @@ const engine = readFileSync(new URL('../update-v4.152.0/includes/bot_webhook_eng
 check(engine.includes("try { bot_outbox_unblock_chat($platform, $chatId); }"), 'the webhook flush is wrapped in its own try/catch before the /start flow');
 
 /* ── the shipped admin page must render the section ──────────────────────── */
-const ui = readFileSync(new URL('../update-v4.152.0/includes/bot_admin_ui.php', import.meta.url), 'utf8');
-check(ui.includes('$blockedChats = bot_outbox_blocked_chats($platform);'), 'the bot admin page calls the report helper');
+/* v4.172.0: بخش صف از bot_admin_ui.php به فایل مستقل includes/bot_queue_ui.php رفت */
+const ui = readFileSync(new URL('../update-v4.152.0/includes/bot_queue_ui.php', import.meta.url), 'utf8');
+check(ui.includes('$blockedChats = bot_outbox_blocked_chats($platform);'), 'the shared queue section calls the report helper');
+check(ui.includes("function bot_admin_render_queue_section"), 'the queue section lives in its own include');
+check(!readFileSync(new URL('../update-v4.152.0/includes/bot_admin_ui.php', import.meta.url), 'utf8').includes('bot_admin_render_queue_section'), 'the bot admin page no longer renders the queue itself');
 check(ui.includes('ولی‌هایی که ربات را مسدود کرده‌اند'), 'the report has a parent-facing Persian heading');
 check(ui.includes("implode('، ', $bc['students'])") && ui.includes('چت ناشناس'), 'named students and anonymous chats are both rendered');
 
@@ -137,10 +140,23 @@ $mk('blk00000000000000000000000000b5','777001','blocked',$e403,10);
 $mk('blk00000000000000000000000000b6','777003','sent','',4);
 echo 'FX=OK';`);
 check(fx.out.includes('FX=OK'), 'the v4.168 fixture ran: ' + fx.out.slice(0, 200) + fx.err.slice(0, 200));
-const qpage = await req('', { file: 'bale-bot.php', sid });
+/* v4.172.0: صف از صفحهٔ ربات به «تنظیمات دیگر ← صف اعلان‌های ربات» رفت */
+const qpage = await req('صف اعلان‌ها', { file: 'bot-queue.php', sid, query: 'platform=bale' });
 const qhtml = qpage.res.page || '';
 check(!qpage.res.fatal, 'the bot admin page renders without fatals: ' + (qpage.res.fatal || ''));
-check(qhtml.includes('صف ماندگار اعلان‌ها'), 'the queue card is rendered');
+check(qhtml.includes('صف ماندگار اعلان‌ها'), 'the queue card is rendered on its own settings page');
+check(qhtml.includes('صف اعلان‌های ربات'), 'the page has its own queue heading');
+check(qhtml.includes('bot-queue.php?platform=telegram'), 'the other platform is reachable from the queue page');
+const botPage = await req('صفحهٔ ربات', { file: 'bale-bot.php', sid });
+check(!botPage.res.fatal, 'the bot page still renders without fatals: ' + (botPage.res.fatal || ''));
+check(!(botPage.res.page || '').includes('صف ماندگار اعلان‌ها'), 'the queue card is no longer on the bot page');
+check((botPage.res.page || '').includes('تنظیمات توکن و Webhook'), 'the bot page keeps its own token/webhook card');
+const hub = readFileSync(new URL('../update-v4.152.0/includes/management_hub.php', import.meta.url), 'utf8');
+check(hub.includes("'queue'=>['صف اعلان‌های ربات','bot-queue.php?embedded=1']"), 'the queue page is a tab of «تنظیمات دیگر»');
+check(hub.includes("'queue'=>'send_sms'"), 'the new tab honours the send_sms permission');
+const queuePage = readFileSync(new URL('../update-v4.152.0/bot-queue.php', import.meta.url), 'utf8');
+check(queuePage.includes('bot_admin_render_queue_section($queuePlatform)'), 'the queue page renders the shared section');
+check(queuePage.includes("bot_outbox_sql(\"UPDATE bot_outbox SET next_try=0 WHERE platform=? AND state IN ('pending','relayed')\"") && queuePage.includes('verify_csrf'), 'the retry button is CSRF-protected and only resets due times');
 check((qhtml.match(/کاربر ربات را مسدود کرده است/g) || []).length === 1, 'the three identical 403 rows collapse into ONE grouped line');
 check(qhtml.includes('۳ پیام'), 'the grouped line states how many messages it covers');
 check(!qhtml.includes('"error_code":403'), 'raw API JSON is never dumped into the page');
