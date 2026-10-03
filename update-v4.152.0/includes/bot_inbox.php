@@ -14,28 +14,47 @@
  *   • نگهداشت خودکار با قاعدهٔ bot_inbox (پیش‌فرض ۶۰ روز) در db_retention.php.
  */
 
+if (!function_exists('bot_inbox_is_mysql')) {
+    /**
+     * درایور جاری — MySQL و SQLite از نظر نحوی تاریخ/ایندکس تفاوت دارند و
+     * سایت زندهٔ مدرسه MySQL است، پس هر SQL اینجا باید روی هر دو کار کند.
+     */
+    function bot_inbox_is_mysql() {
+        static $m = null;
+        if ($m !== null) return $m;
+        $m = false;
+        try {
+            $m = (DB::getInstance()->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql');
+        } catch (Throwable $e) { $m = false; }
+        return $m;
+    }
+}
+
+if (!function_exists('bot_inbox_ensure_index')) {
+    /** ساخت ایندکس به‌صورت idempotent و مستقل از درایور (MySQL lacking IF NOT EXISTS). */
+    function bot_inbox_ensure_index($name, $cols) {
+        try {
+            if (!bot_inbox_is_mysql()) {
+                DB::execute('CREATE INDEX IF NOT EXISTS "' . $name . '" ON bot_inbox (' . $cols . ')');
+                return true;
+            }
+            $rows = DB::fetchAll('SHOW INDEX FROM bot_inbox');
+            foreach ($rows as $r) {
+                if ((string)($r['Key_name'] ?? '') === $name) return true;
+            }
+            DB::execute('ALTER TABLE bot_inbox ADD INDEX `' . $name . '` (' . $cols . ')');
+            return true;
+        } catch (Throwable $e) { return false; }
+    }
+}
+
 if (!function_exists('bot_inbox_schema')) {
     /** جدول صندوق ورودی — idempotent و سازگار با MySQL و SQLite. */
     function bot_inbox_schema() {
         static $done = false;
         if ($done) return true;
         try {
-            DB::execute(
-                "CREATE TABLE IF NOT EXISTS bot_inbox (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    platform VARCHAR(20) NOT NULL,
-                    chat_id VARCHAR(64) NOT NULL,
-                    username VARCHAR(190) DEFAULT NULL,
-                    student_id INT DEFAULT NULL,
-                    message TEXT,
-                    kind VARCHAR(40) DEFAULT 'text',
-                    handled VARCHAR(40) DEFAULT NULL,
-                    created_at TEXT
-                )"
-            );
-        } catch (Throwable $e) {
-            // MySQL: AUTOINCREMENT معتبر نیست
-            try {
+            if (bot_inbox_is_mysql()) {
                 DB::execute(
                     "CREATE TABLE IF NOT EXISTS bot_inbox (
                         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -46,14 +65,32 @@ if (!function_exists('bot_inbox_schema')) {
                         message TEXT,
                         kind VARCHAR(40) DEFAULT 'text',
                         handled VARCHAR(40) DEFAULT NULL,
-                        created_at DATETIME NULL
+                        created_at DATETIME NULL,
+                        KEY bot_inbox_platform_chat (platform, chat_id),
+                        KEY bot_inbox_created (created_at)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+                );
+            } else {
+                DB::execute(
+                    "CREATE TABLE IF NOT EXISTS bot_inbox (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        platform VARCHAR(20) NOT NULL,
+                        chat_id VARCHAR(64) NOT NULL,
+                        username VARCHAR(190) DEFAULT NULL,
+                        student_id INT DEFAULT NULL,
+                        message TEXT,
+                        kind VARCHAR(40) DEFAULT 'text',
+                        handled VARCHAR(40) DEFAULT NULL,
+                        created_at TEXT
                     )"
                 );
-            } catch (Throwable $e2) { return false; }
+            }
+        } catch (Throwable $e) {
+            return false;
         }
-        // ایندکس‌های لازم برای دیدن/پاک‌سازی ارزان (idempotent)
-        try { DB::execute("CREATE INDEX IF NOT EXISTS bot_inbox_platform_chat ON bot_inbox (platform, chat_id)"); } catch (Throwable $e) {}
-        try { DB::execute("CREATE INDEX IF NOT EXISTS bot_inbox_created ON bot_inbox (created_at)"); } catch (Throwable $e) {}
+        // ایندکس‌های لازم برای دیدن/پاک‌سازی ارزان (idempotent و مستقل از درایور)
+        bot_inbox_ensure_index('bot_inbox_platform_chat', 'platform, chat_id');
+        bot_inbox_ensure_index('bot_inbox_created', 'created_at');
         $done = true;
         return true;
     }
@@ -81,11 +118,17 @@ if (!function_exists('bot_inbox_log')) {
             if ($text !== '' && function_exists('mb_substr')) $text = mb_substr($text, 0, 4000, 'UTF-8');
             DB::execute(
                 "INSERT INTO bot_inbox (platform, chat_id, username, student_id, message, kind, handled, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))",
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 [$platform, $chatId, ($username !== '' ? (string)$username : null),
                  ($studentId !== null && (int)$studentId > 0 ? (int)$studentId : null),
                  $text, ($kind !== '' ? (string)$kind : 'text'),
-                 ($handled !== null ? (string)$handled : null)]
+                 ($handled !== null ? (string)$handled : null),
+                 /* v4.177.1: زمان از PHP می‌آید، نه از تابع تاریخِ درون‌خطیِ
+                    SQLite؛ آن شکل فقط روی SQLite کار می‌کند و روی سایت زندهٔ
+                    MySQL این INSERT را بی‌صدا می‌شکست. قالب
+                    YYYY-MM-DD HH:MM:SS همان قالبی است که قاعدهٔ نگهداشت
+                    با آن مقایسه می‌کند. */
+                 date('Y-m-d H:i:s')]
             );
             return true;
         } catch (Throwable $e) {

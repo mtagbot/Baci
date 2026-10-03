@@ -11,6 +11,7 @@ require_once __DIR__ . '/exams_helper.php';
 require_once __DIR__ . '/online_exam_helpers.php';
 require_once __DIR__ . '/bot_role_engine.php';   // v4.87.0: multi-role staff panels
 require_once __DIR__ . '/bot_login_flow.php';    // v4.152.0: the manager logs in from inside the bot
+require_once __DIR__ . '/bot_inbox.php';         // v4.177.1: log every incoming message (never throws)
 ensure_school_roles_schema();
 ensure_exams_schema();
 

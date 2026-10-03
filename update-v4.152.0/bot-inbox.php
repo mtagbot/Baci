@@ -27,6 +27,11 @@ $inboxRows     = bot_inbox_rows($inboxFilters, $inboxPage, $inboxPerPage);
 $inboxKinds    = bot_inbox_kind_counts($inboxPlatform);
 $inboxTitles   = ['bale' => 'بله', 'telegram' => 'تلگرام'];
 
+/* v4.177.1 — اگر برای این پیام‌رسان پیامی نیست ولی برای آن یکی هست، به مدیر
+   می‌گوییم پیام‌ها کجا هستند (تب پیش‌فرض «بله» است و تلگرام را نشان نمی‌دهد). */
+$inboxOtherKey  = $inboxPlatform === 'bale' ? 'telegram' : 'bale';
+$inboxOtherRows = bot_inbox_total(['platform' => $inboxOtherKey, 'q' => '', 'kind' => '', 'student' => '']);
+
 require_once __DIR__ . '/includes/header.php';
 ?>
 <div class="space-y-6">
@@ -75,6 +80,16 @@ require_once __DIR__ . '/includes/header.php';
                 صفحهٔ <?php echo clean(tr_num((string)$inboxPage, 'fa')); ?> از <?php echo clean(tr_num((string)$inboxPages, 'fa')); ?>
             </span>
         </div>
+        <?php if ($inboxTotal === 0 && $inboxOtherRows > 0): ?>
+        <div class="card p-3" style="margin-bottom:10px;border-right:3px solid var(--primary,#2563eb)">
+            <p class="text-xs" style="line-height:2">
+                برای «<?php echo clean($inboxTitles[$inboxPlatform]); ?>» پیامی ثبت نشده است، اما
+                <?php echo clean(tr_num((string)$inboxOtherRows, 'fa')); ?> پیام در
+                «<?php echo clean($inboxTitles[$inboxOtherKey]); ?>» هست —
+                <a href="bot-inbox.php?platform=<?php echo clean($inboxOtherKey); ?>" class="font-bold">دیدن <?php echo clean($inboxTitles[$inboxOtherKey]); ?></a>
+            </p>
+        </div>
+        <?php endif; ?>
         <?php if ($inboxPages > 1): ?>
         <nav class="flex gap-2 items-center flex-wrap" style="margin-bottom:10px" aria-label="صفحه‌های پیام‌ها">
             <?php for ($pg = 1; $pg <= $inboxPages; $pg++):
@@ -103,7 +118,7 @@ require_once __DIR__ . '/includes/header.php';
                         </td>
                         <td style="white-space:pre-wrap;line-height:1.9"><?php echo clean((string)$r['message']); ?></td>
                         <td class="text-xs"><?php echo clean($r['kind'] ?? 'text'); ?></td>
-                        <td class="text-xs text-muted" dir="ltr"><?php echo clean((string)$r['created_at']); ?></td>
+                        <td class="text-xs text-muted" dir="ltr"><?php echo clean(jdate('Y/m/d H:i:s', strtotime((string)$r['created_at']))); ?></td>
                     </tr>
                 <?php endforeach; if (!$inboxRows): ?>
                     <tr><td colspan="6" class="text-center text-muted py-6">هنوز پیامی دریافت نشده است.</td></tr>
@@ -111,6 +126,19 @@ require_once __DIR__ . '/includes/header.php';
                 </tbody>
             </table>
         </div>
+        <?php if (!$inboxRows && $inboxOtherRows <= 0): ?>
+        <div class="card p-4" style="margin-top:12px;border-right:3px solid var(--warning,#d97706)">
+            <h4 class="font-bold text-sm" style="margin-bottom:6px">چرا پیامی نمی‌بینم؟</h4>
+            <ul class="text-xs text-muted" style="line-height:2.2;list-style:disc;padding-inline-start:18px">
+                <li>این صفحه فقط پیام‌های <b>دریافتیِ بعد از نصب نسخهٔ ۴.۱۷۷.۱</b> را نشان می‌دهد؛ پیام‌های قدیمی‌تر هیچ‌گاه نگه داشته نمی‌شدند.</li>
+                <li>پیام باید به <b>ربات</b> فرستاده شود (مثلاً در گفتگوی خصوصی با ربات مدرسه)، نه به یک کانال یا گروه.</li>
+                <li>اگر ربات به پیام شما جواب داد ولی اینجا نیست، یعنی قلاب ثبت در
+                    <span dir="ltr">includes/bot_webhook_engine.php</span> و ماژول
+                    <span dir="ltr">includes/bot_inbox.php</span> نصب نشده‌اند — هر دو فایل باید روی سایت باشند.</li>
+                <li>پاک‌سازی خودکار (پیش‌فرض ۶۰ روز) پیام‌های کهنه‌تر را حذف می‌کند؛ مقدار را در «سلامت پایگاه داده ← قواعد نگهداشت» تغییر دهید یا خاموش کنید.</li>
+            </ul>
+        </div>
+        <?php endif; ?>
         <p class="text-muted text-xs" style="line-height:2;margin-top:10px">
             پیام‌های ورودی تا زمانی که لازم باشد نگه داشته می‌شوند؛ پاک‌سازی خودکارِ این جدول (پیش‌فرض ۶۰ روز) را می‌توانید در
             «سلامت پایگاه داده ← قواعد نگهداشت» تغییر دهید یا خاموش کنید. برای پیام‌های خروجی، «لاگ فعالیت» و صف اعلان‌ها را ببینید.
