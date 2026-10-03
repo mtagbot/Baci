@@ -159,12 +159,27 @@ if (!function_exists('dbm_retention_rules')) {
             'index' => ['student_attendance', 'dbopt_attendance_year', 'academic_year'],
         ];
 
+        /* v4.177.0: «بانک سوالات» نباید تاریخچه را از دست بدهد. تا وقتی خودِ
+           آزمون در exam_designs هست، همهٔ نسخه‌های آرشیوی آن آزمون نگه داشته
+           می‌شوند (نامحدود). فقط وقتی آزمون را کاربر خودش حذف کرده باشد،
+           نسخه‌های یتیمِ باقی‌مانده تا $keep نسخهٔ آخر هستند و بقیه پاک می‌شوند. */
         $rules['exam_design_archive'] = [
             'kind' => 'versions', 'table' => 'exam_design_archive', 'column' => 'exam_id',
             'days' => ['dbopt_exam_versions', 5],
-            'label' => 'نسخه‌های قدیمی طراحی آزمون',
-            'why' => 'هر بار که طراحی یک آزمون عوض شود، نسخهٔ کامل قبلی در آرشیو می‌ماند. نگهداشت ۵ نسخهٔ آخر هر آزمون کافی است؛ طراحی جاری در جدول exam_designs دست‌نخورده می‌ماند.',
+            'only_live_missing' => true,      // فقط ردیف‌هایی که آزمونشان حذف شده
+            'label' => 'نسخه‌های یتیم طراحی آزمون (آزمون حذف‌شده)',
+            'why' => 'طراحی و تاریخچهٔ هر آزمونِ موجود تا وقتی خودِ آزمون حذف نشده نگه داشته می‌شود (بانک سوالات). فقط اگر آزمون را دستی حذف کنید، نسخه‌های بی‌صاحبانش تا این تعداد نسخهٔ آخر باقی می‌مانند و بقیه پاک می‌شوند.',
             'index' => null,
+        ];
+
+        /* v4.177.0: صندوق ورودی ربات — لاگ عملیاتی، پس نگهداشت کوتاه */
+        $rules['bot_inbox'] = [
+            'kind' => 'datetime', 'table' => 'bot_inbox', 'column' => 'created_at',
+            'where' => "1=1",
+            'days' => ['dbopt_inbox_days', 60],
+            'label' => 'پیام‌های دریافتی ربات',
+            'why' => 'هر پیامی که کاربران به ربات می‌فرستند (از جمله پیام‌های بی‌هدف) برای پیگیری ذخیره می‌شود. ۶۰ روز برای بررسی کافی است؛ اگر می‌خواهید بیشتر بماند مقدار را بیشتر کنید یا ۰ بگذارید تا خاموش شود.',
+            'index' => ['bot_inbox', 'dbopt_inbox_created', 'created_at'],
         ];
 
         $rules['bot_outbox_blocked'] = [
@@ -276,9 +291,10 @@ if (!function_exists('dbm_rule_count_sql')) {
         if ($r['kind'] === 'versions') {
             if (!dbm_column_exists($r['table'], $r['column'])) return null;
             $keep = max(1, dbm_rule_days($key));
+            $orphan = dbm_versions_orphan_sql($r);
             // برای پایداری روی MySQL 5.7 و SQLite قدیمی، از «جمعِ اضافی» شمرده
             // می‌شود: مجموع ردیف‌ها منهای سهم هر آزمون که نگه داشته می‌شود.
-            return "SELECT COALESCE(SUM(extra),0) c FROM (SELECT MAX(COUNT(*) - $keep, 0) extra FROM $t GROUP BY {$r['column']}) y";
+            return "SELECT COALESCE(SUM(extra),0) c FROM (SELECT MAX(COUNT(*) - $keep, 0) extra FROM $t" . $orphan . " GROUP BY {$r['column']}) y";
         }
         return null;
     }
@@ -331,6 +347,21 @@ if (!function_exists('dbm_rule_delete_sql')) {
     }
 }
 
+if (!function_exists('dbm_versions_orphan_sql')) {
+    /**
+     * شرط «فقط آزمون‌های حذف‌شده» برای قالب آرشیو طراحی آزمون.
+     * اگر قاعده only_live_missing نباشد یا جدول exam_designs نباشد، رشتهٔ خالی.
+     */
+    function dbm_versions_orphan_sql($rule) {
+        if (empty($rule['only_live_missing'])) return '';
+        $mothers = 'exam_designs';
+        if (!dbm_table_exists($mothers)) return '';
+        if (!dbm_column_exists($mothers, 'exam_id')) return '';
+        $mt = dbm_qi($mothers);
+        return " WHERE {$rule['column']} NOT IN (SELECT exam_id FROM $mt)";
+    }
+}
+
 if (!function_exists('dbm_version_ids_to_drop')) {
     /**
      * شناسهٔ نسخه‌های قدیمیِ هر رکورد مادر: برای هر مادر، شناسهٔ نسخهٔ Nام
@@ -339,14 +370,17 @@ if (!function_exists('dbm_version_ids_to_drop')) {
      *
      * @return int[] حداکثر $chunk شناسه
      */
-    function dbm_version_ids_to_drop($table, $motherColumn, $keep, $chunk = 500) {
+    function dbm_version_ids_to_drop($table, $motherColumn, $keep, $chunk = 500, $onlyOrphans = false) {
         $keep = max(1, (int)$keep);
         $t = dbm_qi($table);
         $pk = dbm_qi(dbm_pk_column($table));
+        /* v4.177.0: برای بانک سوالات، نسخه‌های آزمون‌های موجود هرگز حذف
+           نمی‌شوند؛ فقط مادرهایی که خودشان حذف شده‌اند. */
+        $orphan = $onlyOrphans ? dbm_versions_orphan_sql(['table' => $table, 'column' => $motherColumn, 'only_live_missing' => true]) : '';
         /* مقدار keep همیشه عدد صحیحِ کنترل‌شده است، پس مستقیم در متن کوئری
            می‌آید (پارامتر در HAVING در SQLite درست بسته نمی‌شود). */
         $mothers = DB::fetchAll(
-            "SELECT $motherColumn AS mid FROM $t GROUP BY $motherColumn HAVING COUNT(*) > $keep"
+            "SELECT $motherColumn AS mid FROM $t" . $orphan . " GROUP BY $motherColumn HAVING COUNT(*) > $keep"
         );
         $out = [];
         foreach ($mothers as $m) {
@@ -385,7 +419,7 @@ if (!function_exists('dbm_sweep_rule')) {
             try {
                 $sql = $job['sql']; $params = $job['params'];
                 if ($rules[$key]['kind'] === 'versions') {
-                    $ids = dbm_version_ids_to_drop($rules[$key]['table'], $rules[$key]['column'], $days, $chunk);
+                    $ids = dbm_version_ids_to_drop($rules[$key]['table'], $rules[$key]['column'], $days, $chunk, !empty($rules[$key]['only_live_missing']));
                     if (!$ids) break;
                     $sql = str_replace('__DBM_IDS__', implode(',', array_map('intval', $ids)), $sql);
                 }

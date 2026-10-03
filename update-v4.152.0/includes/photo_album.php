@@ -75,21 +75,25 @@ if (!function_exists('pab_render_print_html')) {
         $fontUrl = 'uploads/B-Titr/B-Titr.ttf';
         $year    = function_exists('get_setting') ? get_setting('current_academic_year', '') : '';
         $today   = function_exists('jalali_now') ? jalali_now() : '';
-        /* v4.176.0: هر کلاس دقیقاً یک برگه. ارتفاع ردیف از فضای موجود و
-           تعداد دانش‌آموز حساب می‌شود تا صفحه پر و خوانا بماند. */
+        /* v4.177.0: چیدمان دوستونه — صفحه به دو نیمه تقسیم می‌شود، پس هر ردیف
+           دو برابر بلندتر از چیدمان تک‌ستونه می‌شود و عکس‌ها بزرگتر می‌شوند.
+           همچنان هر کلاس روی یک برگهٔ A4 است. */
         $total   = count($students);
+        $rows    = $total > 0 ? (int)ceil($total / 2) : 1;   /* ردیف در هر نیمه */
         $sheetH  = 281;   /* میلی‌متر */
         $pad     = 8;     /* حاشیهٔ صفحه در CSS */
         $headerH = 16;    /* سربرگ */
-        $footH   = 8;     /* پابرگ */
         $thH     = 6;     /* ردیف عنوان جدول */
-        $avail   = max(40, $sheetH - 2 * $pad - $headerH - $footH - $thH);
+        $avail   = max(40, $sheetH - 2 * $pad - $headerH - $thH);
         $minRow  = 4.6;   /* کمتر از این خوانا نیست */
-        $maxRow  = 13;
-        $rowH    = $total > 0 ? min($maxRow, max($minRow, $avail / $total)) : $maxRow;
-        $photoH  = max(9.5, min(14.6, $rowH - 2.6));
-        $over    = $total > 0 && ($rowH <= $minRow + 0.001) && ($total * $minRow > $avail);
-        $fontSm  = $total > 34 ? 7.2 : ($total > 26 ? 8 : 8.6);
+        $maxRow  = 26;    /* بیش از این عکس بی‌نهایت بزرگ می‌شود */
+        $rowH    = $total > 0 ? min($maxRow, max($minRow, $avail / $rows)) : $maxRow;
+        /* عکس نسبت ۳ به ۴ (عکس شناسنامه‌ای) و همیشه کوچکتر از ارتفاع ردیف */
+        $photoH  = min(30, max(9.5, $rowH - 2.4));
+        $photoW  = round($photoH * 0.75, 2);
+        $over    = $total > 0 && ($rowH <= $minRow + 0.001) && ($rows * $minRow > $avail);
+        $fontSm  = $total > 68 ? 7 : ($total > 52 ? 7.6 : ($total > 36 ? 8.2 : 9));
+        $fontMeta = $total > 68 ? 6.8 : ($total > 52 ? 7.4 : 8);
         $pageN   = 1;     /* یک برگه برای هر کلاس */
 
         ob_start();
@@ -114,6 +118,8 @@ body{font-family:'BTitr',Tahoma,sans-serif}
      border:0.4mm solid #000;border-radius:2mm;padding:2mm 3mm;margin-bottom:3mm}
 .hdr .side{font-size:9pt;line-height:1.8}
 .hdr .ttl{font-size:12pt;font-weight:700;text-align:center}
+.cols{display:flex;gap:4mm;align-items:flex-start}
+.half{flex:1;min-width:0}
 .list{width:100%;border-collapse:collapse;table-layout:fixed}
 .list th,.list td{border:0.3mm solid #334155;padding:0 1mm;vertical-align:middle;overflow:hidden}
 .list th{background:#eef2f7;font-size:8pt;font-weight:700;text-align:center;height:6mm}
@@ -123,8 +129,9 @@ body{font-family:'BTitr',Tahoma,sans-serif}
   repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--row) - 0.4mm), #cbd5e1 calc(var(--row) - 0.4mm), #cbd5e1 var(--row))}
 .list tr{break-inside:avoid;page-break-inside:avoid}
 .list .seq{font-size:7.5pt;color:#475569}
-.list .nm-txt{font-size:8.5pt;line-height:1.25}
-.list .meta{font-size:7.5pt;color:#334155}
+.list .nm-txt{font-size:9pt;line-height:1.3}
+.list .meta{font-size:8pt;color:#334155}
+.half .list th{font-size:7.6pt}
 .ph{width:11mm;height:14.6mm;border:0.25mm solid #94a3b8;border-radius:.8mm;overflow:hidden;
     background:#f1f5f9;margin:0 auto;display:flex;align-items:center;justify-content:center}
 .ph img{width:100%;height:100%;object-fit:cover}
@@ -155,37 +162,45 @@ body{font-family:'BTitr',Tahoma,sans-serif}
     <div class="ttl">آلبوم عکس — کلاس <?php echo htmlspecialchars($className, ENT_QUOTES, 'UTF-8'); ?></div>
     <div class="side"><?php if ($grade !== ''): ?>پایهٔ <?php echo htmlspecialchars($grade, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?><br>تاریخ تهیه: <?php echo htmlspecialchars(function_exists('tr_num') ? tr_num($today, 'fa') : $today, ENT_QUOTES, 'UTF-8'); ?></div>
   </div>
-  <table class="list">
-    <colgroup>
-      <col style="width:9mm"><col style="width:14mm"><col style="width:auto">
-      <col style="width:30mm"><col style="width:28mm"><col style="width:auto">
-    </colgroup>
-    <thead><tr>
-      <th>ردیف</th><th>عکس</th><th>نام و نام خانوادگی</th><th>نام پدر</th><th>کد ملی</th><th>یادداشت</th>
-    </tr></thead>
-    <tbody>
-    <?php foreach ($students as $idx => $s):
-        $seq  = $idx + 1;
-        $name = trim(($s['first_name'] ?? '') . ' ' . ($s['last_name'] ?? ''));
-        $uri  = pab_photo_data_uri($s['photo_url'] ?? '');
-        $father = trim((string)($s['father_name'] ?? ''));
-        $nid  = trim((string)($s['national_id'] ?? ''));
-    ?>
-      <tr style="height:<?php echo number_format($rowH, 2, '.', ''); ?>mm">
-        <td class="seq"><?php echo function_exists('tr_num') ? tr_num((string)$seq, 'fa') : $seq; ?></td>
-        <td><div class="ph" style="height:<?php echo number_format($photoH, 2, '.', ''); ?>mm;width:<?php echo number_format($photoH * 0.75, 2, '.', ''); ?>mm"><?php if ($uri !== ''): ?><img src="<?php echo $uri; ?>" alt=""><?php else: ?><span class="no">جای عکس</span><?php endif; ?></div></td>
-        <td class="nm"><span class="nm-txt" style="font-size:<?php echo number_format($fontSm, 1, '.', ''); ?>pt"><?php echo htmlspecialchars($name !== '' ? $name : '—', ENT_QUOTES, 'UTF-8'); ?></span></td>
-        <td class="meta"><?php echo htmlspecialchars($father !== '' ? $father : '—', ENT_QUOTES, 'UTF-8'); ?></td>
-        <td class="meta" dir="ltr"><?php echo htmlspecialchars($nid !== '' ? (function_exists('tr_num') ? tr_num($nid, 'fa') : $nid) : '—', ENT_QUOTES, 'UTF-8'); ?></td>
-        <td class="note"></td>
-      </tr>
-    <?php endforeach; if (!$students): ?>
-      <tr><td colspan="6" style="height:<?php echo number_format($rowH, 2, '.', ''); ?>mm">دانش‌آموزی در این کلاس ثبت نشده است.</td></tr>
-    <?php endif; ?>
-    </tbody>
-  </table>
+  <div class="cols">
+  <?php
+  /* v4.177.0: دانش‌آموزان به دو نیمه تقسیم می‌شوند (نیمهٔ راست و نیمهٔ چپ صفحه). */
+  $perHalf = max(1, (int)ceil(count($students) / 2));
+  $halves  = $students ? array_chunk($students, $perHalf) : [[]];
+  if ($students && count($halves) === 1) $halves[] = [];
+  foreach ($halves as $hi => $half):
+      $start = $hi * (int)ceil(count($students) / 2);
+  ?>
+    <div class="half">
+      <table class="list">
+        <colgroup>
+          <col style="width:7mm"><col style="width:<?php echo number_format($photoW + 3, 2, '.', ''); ?>mm">
+          <col style="width:26mm"><col>
+        </colgroup>
+        <thead><tr>
+          <th>ردیف</th><th>عکس</th><th>نام و نام خانوادگی</th><th>یادداشت</th>
+        </tr></thead>
+        <tbody>
+        <?php foreach ($half as $j => $s):
+            $seq  = $start + $j + 1;
+            $name = trim(($s['first_name'] ?? '') . ' ' . ($s['last_name'] ?? ''));
+            $uri  = pab_photo_data_uri($s['photo_url'] ?? '');
+        ?>
+          <tr style="height:<?php echo number_format($rowH, 2, '.', ''); ?>mm">
+            <td class="seq"><?php echo function_exists('tr_num') ? tr_num((string)$seq, 'fa') : $seq; ?></td>
+            <td><div class="ph" style="height:<?php echo number_format($photoH, 2, '.', ''); ?>mm;width:<?php echo number_format($photoW, 2, '.', ''); ?>mm"><?php if ($uri !== ''): ?><img src="<?php echo $uri; ?>" alt=""><?php else: ?><span class="no">جای عکس</span><?php endif; ?></div></td>
+            <td class="nm"><span class="nm-txt" style="font-size:<?php echo number_format($fontSm, 1, '.', ''); ?>pt"><?php echo htmlspecialchars($name !== '' ? $name : '—', ENT_QUOTES, 'UTF-8'); ?></span></td>
+            <td class="note"></td>
+          </tr>
+        <?php endforeach; if (!$half): ?>
+          <tr><td colspan="4" style="height:<?php echo number_format($rowH, 2, '.', ''); ?>mm">دانش‌آموزی در این کلاس ثبت نشده است.</td></tr>
+        <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  <?php endforeach; ?>
+  </div>
   <?php if ($over): ?><div class="warn">این کلاس بیش از حد پر است؛ برای خوانایی بهتر، عکس‌ها را در «مدیریت دانش‌آموزان» بررسی و در صورت امکان کلاس را تقسیم کنید.</div><?php endif; ?>
-  <div class="ftr"><span>تعداد دانش‌آموزان این کلاس: <?php echo function_exists('tr_num') ? tr_num((string)count($students), 'fa') : count($students); ?> — یک برگه برای هر کلاس</span><span>ستون یادداشت برای نوشتن توضیح کوتاه کنار هر نام است.</span></div>
 </div>
 <script>
 /* اندازهٔ برگه‌ها روی نمایشگر کوچک‌تر از عرض A4 است؛ مثل لیست کلاسی،

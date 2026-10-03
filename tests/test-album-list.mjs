@@ -26,14 +26,34 @@ $html = pab_render_print_html('۷/۱','هفتم',$students,'مدرسهٔ آزم�
 echo 'sheets=' . substr_count($html, 'class="sheet"') . ';';
 echo 'table=' . (strpos($html, 'class="list"') !== false ? 'yes' : 'no') . ';';
 echo 'grid=' . (strpos($html, 'class="grid"') !== false ? 'yes' : 'no') . ';';
+echo 'halves=' . substr_count($html, 'class="half"') . ';';
+echo 'thead=' . substr_count($html, '<thead>') . ';';
 echo 'cols=' . substr_count($html, '<th>') . ';';
-echo 'rows=' . substr_count($html, '<tr style="height:') . ';';`);
+echo 'rows=' . substr_count($html, '<tr style="height:') . ';';
+echo 'nid=' . (strpos($html, 'کد ملی') !== false ? 'present' : 'gone') . ';';
+echo 'father=' . (strpos($html, 'نام پدر') !== false ? 'present' : 'gone') . ';';
+echo 'note=' . (strpos($html, 'یادداشت') !== false ? 'yes' : 'no') . ';';
+echo 'footer1=' . (strpos($html, 'یک برگه برای هر کلاس') !== false ? 'present' : 'gone') . ';';
+echo 'footer2=' . (strpos($html, 'توضیح کوتاه کنار هر نام') !== false ? 'present' : 'gone') . ';';
+preg_match('/<tr style="height:([\d.]+)mm/U', $html, $m1); echo 'rowH=' . $m1[1] . ';';
+preg_match('/class="ph" style="height:([\d.]+)mm;width:([\d.]+)mm"/', $html, $m2); echo 'photo=' . $m2[1] . 'x' . $m2[2] . ';';`);
 check(album.out.includes('count=9'), 'the class students are found: ' + album.out.slice(0, 60));
 check(album.out.includes('has_father=yes') && album.out.includes('has_nid=yes'), 'father name and national id are available for the list');
 check(album.out.includes('sheets=1'), 'ONE sheet per class: ' + album.out.match(/sheets=\d+/)[0]);
 check(album.out.includes('table=yes') && album.out.includes('grid=no'), 'the album is a list now, not a grid');
-check(album.out.includes('cols=6'), 'six columns (ردیف، عکس، نام، پدر، کد ملی، یادداشت): ' + album.out.match(/cols=\d+/)[0]);
+/* v4.177.0: چیدمان دوستونه — دو جدول کنار هم، بدون کد ملی و نام پدر */
+check(album.out.includes('halves=2'), 'two columns side by side: ' + album.out.match(/halves=\d+/)[0]);
+check(album.out.includes('thead=2'), 'each half has its own header row: ' + album.out.match(/thead=\d+/)[0]);
+check(album.out.includes('cols=8'), 'four columns per half (ردیف، عکس، نام، یادداشت): ' + album.out.match(/cols=\d+/)[0]);
 check(album.out.includes('rows=9'), 'one row per student: ' + album.out.match(/rows=\d+/)[0]);
+check(album.out.includes('nid=gone'), 'national id is no longer printed');
+check(album.out.includes('father=gone'), 'father name is no longer printed');
+check(album.out.includes('note=yes'), 'the note column is still there');
+check(album.out.includes('footer1=gone') && album.out.includes('footer2=gone'), 'the two footer sentences are removed');
+const albumRowH = Number(album.out.match(/rowH=([\d.]+)/)[1]);
+check(albumRowH >= 10, 'two columns make every row twice as tall: ' + albumRowH + 'mm');
+const photo1 = album.out.match(/photo=([\d.]+)x([\d.]+)/);
+check(photo1 && Number(photo1[1]) >= 14, 'photos are bigger than the old 14.6mm: ' + (photo1 ? photo1[0] : '?'));
 
 /* ── ۲) کلاس ۴۰ نفره هم فقط یک برگه می‌شود ─────────────────────────── */
 const big = await run(String.raw`<?php require_once '/www/includes/functions.php';
@@ -48,7 +68,7 @@ check(big.out.includes('count=40'), 'a 40-student class exists in the fixture');
 check(big.out.includes('sheets=1'), 'a 40-student class is STILL one sheet: ' + big.out.match(/sheets=\d+/)[0]);
 check(big.out.includes('rows=40'), 'all 40 rows are on that one sheet');
 const rowH = Number(big.out.match(/rowH=([\d.]+)/)[1]);
-check(rowH >= 4.5 && rowH <= 13, 'row height adapts but stays readable: ' + rowH + 'mm');
+check(rowH >= 4.5 && rowH <= 26, 'row height adapts but stays readable: ' + rowH + 'mm');
 
 /* ── ۳) کلاس خالی هم یک برگه با پیام ───────────────────────────────── */
 const empty = await run(String.raw`<?php require_once '/www/includes/functions.php';

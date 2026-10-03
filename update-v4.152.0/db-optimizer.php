@@ -605,7 +605,13 @@ require_once __DIR__ . '/includes/header.php';
         اجرای خودکار از طریق کرونِ ورکر ربات (که از قبل هر دقیقه اجرا می‌شود) انجام می‌گیرد؛ اینجا می‌توانید
         مقادیر را تنظیم یا همان حالا اجرا کنید. مقدار <b>۰</b> یعنی قاعده خاموش است.
     </p>
-    <div class="table-container">
+    <?php /* v4.177.0: Inputهای عددی باید داخل فرم باشند؛ قبلاً بیرون فرم
+       بودند و مرورگر فقط csrf و do را می‌فرستاد، پس هیچ مقداری ذخیره
+       نمی‌شد و صفحه با مقدار قبلی برمی‌گشت. */ ?>
+    <form method="POST" id="retentionSettingsForm" onsubmit="return confirm('مقادیر نگهداشت ذخیره شوند؟');">
+        <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
+        <input type="hidden" name="do" value="retention_settings">
+        <div class="table-container">
         <table class="w-full text-xs">
             <thead><tr><th>جدول / قاعده</th><th style="width:210px">نگهداشت</th><th style="width:110px">قابل حذف</th><th style="width:90px">وضعیت</th></tr></thead>
             <tbody>
@@ -629,23 +635,23 @@ require_once __DIR__ . '/includes/header.php';
             <?php endforeach; ?>
             </tbody>
         </table>
-    </div>
-    <div class="flex gap-2 flex-wrap" style="margin-top:12px">
-        <form method="POST" onsubmit="return confirm('مقادیر نگهداشت ذخیره شود؟');">
-            <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
-            <input type="hidden" name="do" value="retention_settings">
+        </div>
+        <div class="flex gap-2 flex-wrap" style="margin-top:12px">
             <button type="submit" class="btn btn-primary btn-sm">ذخیرهٔ قواعد نگهداشت</button>
-        </form>
-        <form method="POST" onsubmit="return confirm('همین حالا پاکسازی قواعد فعال اجرا شود؟ رکوردهای قدیمی حذف می‌شوند (پیش‌نیاز: پشتیبان تازه).');">
-            <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
-            <input type="hidden" name="do" value="retention_now">
-            <button type="submit" class="btn btn-warning btn-sm">اجرای دستی پاکسازی</button>
-        </form>
-    </div>
+        </div>
+    </form>
+    <form method="POST" onsubmit="return confirm('همین حالا پاکسازی قواعد فعال اجرا شود؟ رکوردهای قدیمی حذف می‌شوند (پیش‌نیاز: پشتیبان تازه).');">
+        <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
+        <input type="hidden" name="do" value="retention_now">
+        <button type="submit" class="btn btn-warning btn-sm">اجرای دستی پاکسازی</button>
+    </form>
     <p class="text-muted text-xs" style="line-height:2;margin-top:10px">
-        فرمول رشد: اگر ماهانه ۱۴ آزمون طراحی شود، هر نسخهٔ آرشیو حدود ۱۰۰ تا ۴۰۰ کیلوبایت است؛ با نگهداشت ۵ نسخهٔ آخر هر آزمون،
-        جدول به جای رشد بی‌نهایت، سقف ثابتی برابر «۵ × تعداد آزمون‌ها» دارد. برای حضور و غیاب، نگهداشت ۲ سال تحصیلی به‌طور پیش‌فرض
-        کافی است اما چون تاریخچهٔ روزانهٔ سال‌های گذشته ممکن است لازم شود، این قاعده پیش‌فرض خاموش است و فقط با انتخاب شما فعال می‌شود.
+        <b>بانک سوالات و طراحی آزمون:</b> تا وقتی خودِ آزمون در سیستم باشد، هیچ نسخهٔ آرشیوی‌اش حذف نمی‌شود — تاریخچهٔ
+        طراحی هر آزمون کامل می‌ماند. فقط وقتی آزمون را دستی حذف کنید، نسخه‌های بی‌صاحبانش تا همین تعداد نسخهٔ آخر باقی
+        می‌مانند و بقیه پاک می‌شوند (تا جدول از رکوردهای یتیم پر نشود).
+        <br><b>حضور و غیاب:</b> نگهداشت ۲ سال تحصیلی به‌طور پیش‌فرض کافی است، اما چون تاریخچهٔ روزانهٔ سال‌های گذشته ممکن است
+        لازم شود، این قاعده پیش‌فرض خاموش است و فقط با انتخاب شما فعال می‌شود.
+        <br><b>مقدار ۰</b> یعنی آن قاعده خاموش است.
     </p>
 </div>
 

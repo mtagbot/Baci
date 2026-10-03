@@ -123,21 +123,60 @@ if ($action === 'photo_album_pdf') {
     exit;
 }
 
-/* ═══ v4.176.0: فرم‌های اداری (بازشناسی قالب‌های .mrt مدرسه) ═══
-   هر چهار فرم خروجی HTML چاپ‌محور دارند؛ کاربر با Save as PDF فایل می‌گیرد. */
+/* ═══ v4.176.0: فرم‌های اداری (بازسازی قالب‌های .mrt مدرسه) ═══
+   هر چهار فرم خروجی HTML چاپ‌محور دارند؛ کاربر با Save as PDF فایل می‌گیرد.
+
+   v4.177.0: دو حالت چاپ —
+     mode=blank    → «چاپ پایه»: برگهٔ خالی (بدون نام دانش‌آموز)
+     mode=students → «چاپ کل دانش‌آموزان»: نام دانش‌آموزان روی برگه
+   و دو گستره:
+     class=… → یک کلاس   |   grade=… → یک پایه   |   scope=all → کل مدرسه */
 if (in_array($action, ['absents_form', 'amanat_form', 'anjoman_letter', 'camp_consent'], true)) {
+    $mode    = (trim($_GET['mode'] ?? 'students') === 'blank') ? 'blank' : 'students';
+    $scope   = trim($_GET['scope'] ?? '');
+    $gradeQ  = trim($_GET['grade'] ?? '');
     $className = trim($_GET['class'] ?? '');
+    $ctx = sf_context();
+    $autoPrint = (($_GET['auto'] ?? '0') === '1');
+    $blank = ($mode === 'blank');
+
+    /* گسترهٔ کل مدرسه یا یک پایه → برای فرم‌های نامه‌ای یک برگه برای هر دانش‌آموز */
+    if ($scope === 'all' || $gradeQ !== '') {
+        $students = $scope === 'all' ? sf_all_students($year) : sf_students_of_grade($gradeQ, $year);
+        if (!$students) {
+            set_flash_message('error', 'دانش‌آموز فعالی برای این گستره پیدا نشد.');
+            redirect('reports-lists.php?tab=forms');
+        }
+        if ($action === 'absents_form') {
+            /* برگهٔ حضور و غیاب برای هر کلاس یک برگه است */
+            $byClass = [];
+            foreach ($students as $st) $byClass[(string)$st['class_name']][] = $st;
+            $out = '';
+            foreach ($byClass as $cn => $list) {
+                $g = '';
+                foreach ($classes as $c) if ($c['class_name'] === $cn) { $g = $c['grade_level']; break; }
+                $out .= sf_render_absents_form($cn, $g, $list, $ctx, $autoPrint, $blank);
+            }
+            echo $out;
+        } elseif ($action === 'amanat_form') {
+            echo sf_render_amanat_form($students, $ctx, $autoPrint, $blank, '');
+        } elseif ($action === 'anjoman_letter') {
+            echo sf_render_anjoman_letter($students, $ctx, $autoPrint, $blank);
+        } else {
+            echo sf_render_camp_consent($students, $ctx, $autoPrint, $blank);
+        }
+        exit;
+    }
+
     if ($className === '') { set_flash_message('error', 'کلاس انتخاب نشده است.'); redirect('reports-lists.php?tab=forms'); }
     $grade = '';
     foreach ($classes as $c) if ($c['class_name'] === $className) { $grade = $c['grade_level']; break; }
     $students = sf_students_of_class($className, $year);
-    if (!$students) { set_flash_message('error', 'برای کلاس ' . $className . ' دانش‌آموز فعالی ثبت نشده است.'); redirect('reports-lists.php?tab=forms'); }
-    $ctx = sf_context();
-    $autoPrint = (($_GET['auto'] ?? '0') === '1');
-    if ($action === 'absents_form')       echo sf_render_absents_form($className, $grade, $students, $ctx, $autoPrint);
-    elseif ($action === 'amanat_form')    echo sf_render_amanat_form($students, $ctx, $autoPrint);
-    elseif ($action === 'anjoman_letter') echo sf_render_anjoman_letter($students, $ctx, $autoPrint);
-    else                                  echo sf_render_camp_consent($students, $ctx, $autoPrint);
+    if (!$students && !$blank) { set_flash_message('error', 'برای کلاس ' . $className . ' دانش‌آموز فعالی ثبت نشده است.'); redirect('reports-lists.php?tab=forms'); }
+    if ($action === 'absents_form')       echo sf_render_absents_form($className, $grade, $students, $ctx, $autoPrint, $blank);
+    elseif ($action === 'amanat_form')    echo sf_render_amanat_form($students, $ctx, $autoPrint, $blank, $className);
+    elseif ($action === 'anjoman_letter') echo sf_render_anjoman_letter($students, $ctx, $autoPrint, $blank);
+    else                                  echo sf_render_camp_consent($students, $ctx, $autoPrint, $blank);
     exit;
 }
 
@@ -377,16 +416,49 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 
     <?php elseif ($tab === 'forms'): ?>
-    <!-- ═══ v4.176.0: فرم‌های اداری — بازسازی چهار قالب .mrt مدرسه ═══ -->
+    <!-- ═══ v4.176.0/v4.177.0: فرم‌های اداری — بازسازی چهار قالب .mrt مدرسه ═══ -->
     <div class="card">
         <div style="margin-bottom:12px">
             <h3 class="font-bold text-sm">فرم‌های اداری مدرسه</h3>
             <p class="text-xs text-muted">
                 چهار فرم پرکاربرد، بازسازی‌شده از قالب‌های اصلی مدرسه (پوشهٔ <code>school-reports-raw-files</code>) با دادهٔ
-                دانش‌آموزان، کلاس و نام مدرسهٔ خودمان: برگهٔ حضور و غیاب، فرم تحویل و دریافت کتاب، دعوتنامهٔ انجمن اولیاء و
-                مربیان و رضایت‌نامهٔ اردو. خروجی هر فرم HTML چاپ‌محور است؛ با «Save as PDF» به PDF تبدیل می‌شود.
+                دانش‌آموزان، کلاس و نام مدرسهٔ خودمان. هر فرم دو حالت دارد:
+                <b>«پایه»</b> یعنی برگهٔ خالی برای نوشتن با دست، و
+                <b>«کل دانش‌آموزان»</b> یعنی نام دانش‌آموزان روی برگه چاپ می‌شود.
+                خروجی HTML چاپ‌محور است؛ با «Save as PDF» به PDF تبدیل می‌شود.
             </p>
         </div>
+
+        <!-- ═══ چاپ دسته‌جمعی: یک پایه یا کل مدرسه ═══ -->
+        <?php if ($classes): ?>
+        <div style="border:0.3mm solid #cbd5e1;border-radius:2mm;padding:10px;margin-bottom:14px">
+            <div class="text-xs font-bold" style="margin-bottom:8px">چاپ دسته‌جمعی</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <select id="bulkGrade" class="form-select" style="max-width:180px">
+                    <?php foreach (array_unique(array_filter(array_column($classes, 'grade_level'))) as $g): ?>
+                        <option value="<?php echo clean($g); ?>">پایهٔ <?php echo clean($g); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <a class="btn btn-outline text-xs" target="_blank" rel="noopener" id="bulkGradeBtn" href="#">چاپ پایهٔ انتخابی</a>
+                <?php foreach ([
+                    'absents_form'   => 'حضور و غیاب',
+                    'amanat_form'    => 'فرم کتاب',
+                    'anjoman_letter' => 'دعوتنامهٔ انجمن',
+                    'camp_consent'   => 'رضایت‌نامهٔ اردو',
+                ] as $act => $lbl): ?>
+                    <a class="btn btn-accent text-xs" target="_blank" rel="noopener"
+                       href="reports-lists.php?action=<?php echo $act; ?>&amp;scope=all&amp;mode=students"
+                       title="یک برگه برای هر دانش‌آموز مدرسه"><?php echo $lbl; ?> — کل مدرسه</a>
+                <?php endforeach; ?>
+            </div>
+            <div class="text-xs text-muted" style="margin-top:6px;line-height:2">
+                «کل مدرسه» برای هر دانش‌آموز یک برگه می‌سازد (دعوتنامه دو تا و رضایت‌نامه چهار تا در هر برگه).
+                برای یک پایهٔ مشخص، پایه را انتخاب و دکمهٔ «چاپ پایهٔ انتخابی» را بزنید؛ برگهٔ حضور و غیاب برای
+                هر کلاس آن پایه یک برگه است.
+            </div>
+        </div>
+        <?php endif; ?>
+
         <?php if (!$classes): ?>
             <div class="text-center text-muted" style="font-size:13px;padding:16px">هیچ کلاسی برای سال تحصیلی <?php echo clean(tr_num($year, 'fa')); ?> ثبت نشده است.</div>
         <?php else: ?>
@@ -398,6 +470,7 @@ require_once __DIR__ . '/includes/header.php';
                         $cn = $c['class_name'];
                         $n = 0;
                         try { $n = (int)(DB::fetch("SELECT COUNT(*) c FROM students s WHERE s.status='active' AND s.class_name = ? AND (s.academic_year = ? OR s.academic_year IS NULL OR s.academic_year = '')", [$cn, $year])['c'] ?? 0); } catch (Throwable $e) { $n = 0; }
+                        $link = function ($act) use ($cn) { return 'reports-lists.php?action=' . $act . '&amp;class=' . urlencode($cn); };
                     ?>
                         <tr>
                             <td class="font-bold"><?php echo clean($cn); ?></td>
@@ -406,10 +479,22 @@ require_once __DIR__ . '/includes/header.php';
                             <?php if ($n === 0): ?>
                                 <td colspan="4" class="text-xs text-muted">دانش‌آموزی ندارد</td>
                             <?php else: ?>
-                                <td><a class="btn btn-accent text-xs" target="_blank" rel="noopener" href="reports-lists.php?action=absents_form&amp;class=<?php echo urlencode($cn); ?>">چاپ</a></td>
-                                <td><a class="btn btn-accent text-xs" target="_blank" rel="noopener" href="reports-lists.php?action=amanat_form&amp;class=<?php echo urlencode($cn); ?>">چاپ</a></td>
-                                <td><a class="btn btn-accent text-xs" target="_blank" rel="noopener" href="reports-lists.php?action=anjoman_letter&amp;class=<?php echo urlencode($cn); ?>">چاپ</a></td>
-                                <td><a class="btn btn-accent text-xs" target="_blank" rel="noopener" href="reports-lists.php?action=camp_consent&amp;class=<?php echo urlencode($cn); ?>">چاپ</a></td>
+                                <td>
+                                    <a class="btn btn-outline text-xs" target="_blank" rel="noopener" href="<?php echo $link('absents_form'); ?>&amp;mode=blank" title="برگهٔ خالی برای نوشتن با دست">پایه</a>
+                                    <a class="btn btn-accent text-xs" target="_blank" rel="noopener" href="<?php echo $link('absents_form'); ?>&amp;mode=students" title="با نام دانش‌آموزان">کل دانش‌آموزان</a>
+                                </td>
+                                <td>
+                                    <a class="btn btn-outline text-xs" target="_blank" rel="noopener" href="<?php echo $link('amanat_form'); ?>&amp;mode=blank">پایه</a>
+                                    <a class="btn btn-accent text-xs" target="_blank" rel="noopener" href="<?php echo $link('amanat_form'); ?>&amp;mode=students">کل دانش‌آموزان</a>
+                                </td>
+                                <td>
+                                    <a class="btn btn-outline text-xs" target="_blank" rel="noopener" href="<?php echo $link('anjoman_letter'); ?>&amp;mode=blank">پایه</a>
+                                    <a class="btn btn-accent text-xs" target="_blank" rel="noopener" href="<?php echo $link('anjoman_letter'); ?>&amp;mode=students">کل دانش‌آموزان</a>
+                                </td>
+                                <td>
+                                    <a class="btn btn-outline text-xs" target="_blank" rel="noopener" href="<?php echo $link('camp_consent'); ?>&amp;mode=blank">پایه</a>
+                                    <a class="btn btn-accent text-xs" target="_blank" rel="noopener" href="<?php echo $link('camp_consent'); ?>&amp;mode=students">کل دانش‌آموزان</a>
+                                </td>
                             <?php endif; ?>
                         </tr>
                     <?php endforeach; ?>
@@ -417,12 +502,22 @@ require_once __DIR__ . '/includes/header.php';
                 </table>
             </div>
             <p class="text-xs text-muted" style="margin-top:10px;line-height:2">
-                «برگهٔ حضور و غیاب» برای هر کلاس یک برگه است (چهار ستون زنگ، هر ستون ۶ ردیف خالی برای نوشتن نام).
-                «فرم کتاب»، «دعوتنامهٔ انجمن» و «رضایت‌نامهٔ اردو» برای هر دانش‌آموز یک برگه می‌سازند؛ کلاس ۳۰ نفره
-                یعنی ۳۰ برگه که با «Save as PDF» در یک فایل ذخیره می‌شود.
+                «برگهٔ حضور و غیاب» یک هفته کامل است: شنبه تا پنجشنبه، هر روز سه زنگ. «دعوتنامهٔ انجمن» دو تا و
+                «رضایت‌نامهٔ اردو» چهار تا در هر برگه A4 چاپ می‌شود. «فرم کتاب» یک برگهٔ خالی با ستون
+                «نام دریافت کننده» است.
             </p>
         <?php endif; ?>
     </div>
+    <script>
+    /* پایهٔ انتخابی را به لینک چاپ پایه‌ای اضافه می‌کند */
+    (function(){
+      var sel = document.getElementById('bulkGrade'), btn = document.getElementById('bulkGradeBtn');
+      if(!sel || !btn) return;
+      var base = 'reports-lists.php?action=absents_form&mode=blank&grade=';
+      function sync(){ btn.href = base + encodeURIComponent(sel.value || ''); }
+      sel.addEventListener('change', sync); sync();
+    })();
+    </script>
 
     <?php else: ?>
     <section class="card" aria-labelledby="school-list-title">

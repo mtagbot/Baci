@@ -199,6 +199,18 @@ if ($chatId === '') {
     exit;
 }
 
+/* v4.177.0: هر پیام ورودی در «صندوق ورودی» ثبت می‌شود تا مدیر بتواند متن‌های
+   بی‌هدف یا اشتباهیِ کاربران را هم ببیند. کاملاً ایزوله: هیچ خطایی نباید
+   جریان ورود و پیوند ولی را مختل کند. */
+if (function_exists('bot_inbox_log')) {
+    $inboxKind = 'text';
+    foreach (['photo', 'document', 'voice', 'video', 'sticker', 'contact', 'location'] as $ik) {
+        if (!empty($message[$ik])) { $inboxKind = $ik; break; }
+    }
+    try { bot_inbox_log($platform, $chatId, $username, $text !== '' ? $text : '[' . $inboxKind . ']', $inboxKind, bot_inbox_student_id($platform, $chatId), 'received'); }
+    catch (Throwable $e) { error_log('bot_inbox_log: ' . $e->getMessage()); }
+}
+
 /* v4.165.0: همین که کاربر توانست پیامی بفرستد یعنی کانال باز است؛ اگر قبلاً
    مسدود کرده بود، پیام‌های پارک‌شده‌اش خودکار به چرخهٔ ارسال برمی‌گردند.
    v4.171.0: فقط BOT_OUTBOX_WAKE_LIMIT پیام آخر بیدار می‌شود (جلوگیری از رگبار)؛

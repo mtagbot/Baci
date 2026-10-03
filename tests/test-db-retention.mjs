@@ -11,11 +11,6 @@ DB::execute("CREATE TABLE IF NOT EXISTS bot_message_logs (id INTEGER PRIMARY KEY
 DB::execute("DELETE FROM bot_message_logs");
 DB::execute("INSERT INTO bot_message_logs (platform,chat_id,student_id,message_type,message,status,response,created_at) VALUES ('bale','1',1,'text','سلام','sent','ok',datetime($old,'unixepoch','localtime'))");
 DB::execute("INSERT INTO bot_message_logs (platform,chat_id,student_id,message_type,message,status,response,created_at) VALUES ('bale','1',1,'text','سلام','sent','ok',datetime($recent,'unixepoch','localtime'))");
-/* ۲) تغییرهای دسکتاپ */
-DB::execute("CREATE TABLE IF NOT EXISTS desk_change_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tbl TEXT, rid TEXT, op TEXT, ts INTEGER)");
-DB::execute("DELETE FROM desk_change_log");
-DB::execute("INSERT INTO desk_change_log (tbl,rid,op,ts) VALUES ('students','1','i',$old)");
-DB::execute("INSERT INTO desk_change_log (tbl,rid,op,ts) VALUES ('students','2','i',$recent)");
 /* ۳) حضور و غیاب — دو سال قدیمی و یک سال جاری */
 DB::execute("CREATE TABLE IF NOT EXISTS student_attendance (id INTEGER PRIMARY KEY AUTOINCREMENT, student_id INTEGER, academic_year TEXT, date_jalali TEXT, status TEXT, minutes_late INTEGER DEFAULT 0, note TEXT, notified_chats INTEGER DEFAULT 0, review_status TEXT DEFAULT 'pending', created_by_admin_id INTEGER, created_by_teacher_id INTEGER, created_at_jalali TEXT, updated_at_jalali TEXT)");
 DB::execute("DELETE FROM student_attendance");
@@ -25,12 +20,23 @@ DB::execute("CREATE TABLE IF NOT EXISTS exam_design_archive (id INTEGER PRIMARY 
 DB::execute("DELETE FROM exam_design_archive");
 for ($i=1;$i<=8;$i++) DB::execute("INSERT INTO exam_design_archive (exam_id,design_json,created_at_jalali) VALUES (?,?,'1403/1404')",[77, str_repeat('x',$i)]);
 DB::execute("INSERT INTO exam_design_archive (exam_id,design_json,created_at_jalali) VALUES (88,'y','1403/1404')",[]);
+/* v4.177.0: آزمون ۹۹ هنوز در exam_designs هست → تاریخچه‌اش هرگز پاک نمی‌شود */
+DB::execute("CREATE TABLE IF NOT EXISTS exam_designs (id INTEGER PRIMARY KEY AUTOINCREMENT, exam_id INTEGER, design_json TEXT, updated_at_jalali TEXT)");
+DB::execute("DELETE FROM exam_designs");
+DB::execute("INSERT INTO exam_designs (exam_id,design_json,updated_at_jalali) VALUES (99,'{}','1403/1404')");
+for ($i=1;$i<=8;$i++) DB::execute("INSERT INTO exam_design_archive (exam_id,design_json,created_at_jalali) VALUES (99,?,'1403/1404')",[str_repeat('z',$i)]);
 /* ۵) صف ربات: blocked کهنه و pending تازه */
 DB::execute("CREATE TABLE IF NOT EXISTS bot_outbox (job_id TEXT PRIMARY KEY, platform TEXT, payload TEXT, payload_hash TEXT, owner TEXT, state TEXT, attempts INTEGER DEFAULT 0, next_try INTEGER DEFAULT 0, lease_until INTEGER DEFAULT 0, claim_token TEXT DEFAULT '', created_at INTEGER, sent_at INTEGER DEFAULT 0, message_id TEXT DEFAULT '', last_error TEXT DEFAULT '')");
 DB::execute("DELETE FROM bot_outbox");
 DB::execute("INSERT INTO bot_outbox (job_id,platform,payload,payload_hash,owner,state,created_at,last_error) VALUES ('a1','bale','{}','h','local','blocked',$old,'x')");
 DB::execute("INSERT INTO bot_outbox (job_id,platform,payload,payload_hash,owner,state,created_at,last_error) VALUES ('a2','bale','{}','h','local','pending',$recent,'')");
 DB::execute("INSERT INTO bot_outbox (job_id,platform,payload,payload_hash,owner,state,created_at,last_error) VALUES ('a3','bale','{}','h','relay','blocked',$old,'x')");
+/* ۲) تغییرهای دسکتاپ — آخر از همه ساخته می‌شود، چون تریگرهای همگام‌سازی
+      جدول‌های آزمون ردیف تازه‌ای به desk_change_log اضافه می‌کنند. */
+DB::execute("CREATE TABLE IF NOT EXISTS desk_change_log (id INTEGER PRIMARY KEY AUTOINCREMENT, tbl TEXT, rid TEXT, op TEXT, ts INTEGER)");
+DB::execute("DELETE FROM desk_change_log");
+DB::execute("INSERT INTO desk_change_log (tbl,rid,op,ts) VALUES ('students','1','i',?)", [$old]);
+DB::execute("INSERT INTO desk_change_log (tbl,rid,op,ts) VALUES ('students','2','i',?)", [$recent]);
 echo 'SEEDED';`);
 check(seed.out.includes('SEEDED'), 'fixtures seeded');
 
@@ -53,7 +59,7 @@ echo json_encode(dbm_rule_counts(), JSON_UNESCAPED_UNICODE);`);
 const bc = JSON.parse(before.out.match(/\{.*\}/s)[0]);
 check(bc.bot_message_logs === 1, 'one old bot log counted: ' + JSON.stringify(bc));
 check(bc.desk_change_log === 1, 'one old desk change counted');
-check(bc.exam_design_archive === 3, '3 surplus exam design versions counted (8 kept 5 → 3, exam 88 has 1): ' + bc.exam_design_archive);
+check(bc.exam_design_archive === 3, '3 surplus ORPHAN exam design versions counted (live exams are never counted): ' + bc.exam_design_archive);
 check(bc.bot_outbox_blocked === 1, 'only the LOCAL blocked row is counted (relay/desktop jobs are never pruned): ' + bc.bot_outbox_blocked);
 
 /* ── ۳) اجرای پاکسازی ────────────────────────────────────────────────── */
@@ -65,24 +71,30 @@ echo 'versions=' . dbm_sweep_rule('exam_design_archive', microtime(true)+5) . ';
 echo 'blocked=' . dbm_sweep_rule('bot_outbox_blocked', microtime(true)+5) . ';';`);
 check(swept.out.includes('logs=1'), 'old bot log removed: ' + swept.out);
 check(swept.out.includes('desk=1'), 'old desk change removed');
-check(swept.out.includes('versions=3'), '3 surplus versions removed: ' + swept.out);
+check(swept.out.includes('versions=3'), '3 surplus orphan versions removed: ' + swept.out);
 check(swept.out.includes('blocked=1'), 'the local blocked row is removed: ' + swept.out);
 
 /* ── ۴) آنچه باید بماند، مانده است ───────────────────────────────────── */
 const after = await run(String.raw`<?php require_once '/www/includes/functions.php';
 require_once '/www/includes/db_retention.php';
 echo 'logs=' . DB::fetch("SELECT COUNT(*) c FROM bot_message_logs")['c'] . ';';
-echo 'desk=' . DB::fetch("SELECT COUNT(*) c FROM desk_change_log")['c'] . ';';
+echo 'desk=' . DB::fetch("SELECT COUNT(*) c FROM desk_change_log WHERE tbl='students'")['c'] . ';';
 echo 'arch=' . DB::fetch("SELECT COUNT(*) c FROM exam_design_archive")['c'] . ';';
 echo 'arch77=' . DB::fetch("SELECT COUNT(*) c FROM exam_design_archive WHERE exam_id=77")['c'] . ';';
 echo 'arch88=' . DB::fetch("SELECT COUNT(*) c FROM exam_design_archive WHERE exam_id=88")['c'] . ';';
+echo 'arch99=' . DB::fetch("SELECT COUNT(*) c FROM exam_design_archive WHERE exam_id=99")['c'] . ';';
 echo 'pending=' . DB::fetch("SELECT COUNT(*) c FROM bot_outbox WHERE state='pending'")['c'] . ';';
 echo 'arch_newest_kept=' . (DB::fetch("SELECT id FROM exam_design_archive WHERE exam_id=77 ORDER BY id DESC")['id'] ?? 0) . ';';`);
 check(after.out.includes('logs=1'), 'the fresh bot log stays');
 check(after.out.includes('desk=1'), 'the fresh desk change stays');
-check(after.out.includes('arch=6') && after.out.includes('arch77=5') && after.out.includes('arch88=1'),
-  'only the newest 5 versions per exam survive: ' + after.out.slice(0, 120));
+check(after.out.includes('arch=14') && after.out.includes('arch77=5') && after.out.includes('arch88=1'),
+  'only the newest 5 versions of a DELETED exam survive (5+1+8=14): ' + after.out.slice(0, 120));
+check(after.out.includes('arch99=8'),
+  'v4.177.0: a live exam keeps its whole design history (8/8) — the question bank is never trimmed: ' + after.out.match(/arch99=\d+/)[0]);
 check(after.out.includes('pending=1'), 'a pending queue row is never touched');
+const deskLogged = await run(`<?php require_once '/www/includes/functions.php';
+echo 'arch_del=' . DB::fetch("SELECT COUNT(*) c FROM desk_change_log WHERE tbl='exam_design_archive' AND op='D'")['c'] . ';';`);
+check(deskLogged.out.includes('arch_del=3'), 'the sweep itself is recorded in the desk change log (3 archive deletions): ' + deskLogged.out);
 const relay = await run(String.raw`<?php require_once '/www/includes/functions.php';
 echo 'relay=' . DB::fetch("SELECT COUNT(*) c FROM bot_outbox WHERE owner='relay'")['c'] . ';';`);
 check(relay.out.includes('relay=1'), 'a relay (desktop) blocked row survives the sweep');
