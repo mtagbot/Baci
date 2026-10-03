@@ -17,6 +17,7 @@ require_once __DIR__ . '/includes/class_schedule_sync.php';
 require_once __DIR__ . '/includes/docx_class_list.php';
 require_once __DIR__ . '/includes/docx_school_list.php';
 require_once __DIR__ . '/includes/photo_album.php';
+require_once __DIR__ . '/includes/school_forms.php';   /* v4.176.0: فرم‌های اداری از قالب‌های .mrt */
 require_once __DIR__ . '/includes/academic_year_helpers.php';
 
 /* v4.169.0: معاون اجرایی هم به «لیست‌ها و گزارشات» دسترسی کامل دارد
@@ -122,6 +123,24 @@ if ($action === 'photo_album_pdf') {
     exit;
 }
 
+/* ═══ v4.176.0: فرم‌های اداری (بازشناسی قالب‌های .mrt مدرسه) ═══
+   هر چهار فرم خروجی HTML چاپ‌محور دارند؛ کاربر با Save as PDF فایل می‌گیرد. */
+if (in_array($action, ['absents_form', 'amanat_form', 'anjoman_letter', 'camp_consent'], true)) {
+    $className = trim($_GET['class'] ?? '');
+    if ($className === '') { set_flash_message('error', 'کلاس انتخاب نشده است.'); redirect('reports-lists.php?tab=forms'); }
+    $grade = '';
+    foreach ($classes as $c) if ($c['class_name'] === $className) { $grade = $c['grade_level']; break; }
+    $students = sf_students_of_class($className, $year);
+    if (!$students) { set_flash_message('error', 'برای کلاس ' . $className . ' دانش‌آموز فعالی ثبت نشده است.'); redirect('reports-lists.php?tab=forms'); }
+    $ctx = sf_context();
+    $autoPrint = (($_GET['auto'] ?? '0') === '1');
+    if ($action === 'absents_form')       echo sf_render_absents_form($className, $grade, $students, $ctx, $autoPrint);
+    elseif ($action === 'amanat_form')    echo sf_render_amanat_form($students, $ctx, $autoPrint);
+    elseif ($action === 'anjoman_letter') echo sf_render_anjoman_letter($students, $ctx, $autoPrint);
+    else                                  echo sf_render_camp_consent($students, $ctx, $autoPrint);
+    exit;
+}
+
 if ($action === 'class_list_all') {
     /* همهٔ کلاس‌ها در یک zip — برای وقتی دفتر می‌خواهد یک‌جا چاپ کند. */
     if (!class_exists('ZipArchive')) {
@@ -170,7 +189,8 @@ foreach ($classes as $c) {
 $templateOk = is_file(dcl_template_path());
 $zipOk      = class_exists('ZipArchive');
 
-$tab = in_array($_GET['tab'] ?? '', ['school', 'album'], true) ? $_GET['tab'] : 'teacher';
+/* v4.176.0: تب «فرم‌های اداری» هم به فهرست تب‌ها اضافه شد. */
+$tab = in_array($_GET['tab'] ?? '', ['school', 'album', 'forms'], true) ? $_GET['tab'] : 'teacher';
 $photoCounts = [];
 if ($tab === 'album') {
     /* فقط در تب آلبوم: شمار عکس‌دارها، با همان کوئری سبک هر کلاس */
@@ -202,6 +222,7 @@ require_once __DIR__ . '/includes/header.php';
         <a href="reports-lists.php?tab=teacher" class="btn <?php echo $tab === 'teacher' ? 'btn-primary' : 'btn-accent'; ?>" <?php if ($tab === 'teacher') echo 'aria-current="page"'; ?>>لیست کلاسی دبیر</a>
         <a href="reports-lists.php?tab=school" class="btn <?php echo $tab === 'school' ? 'btn-primary' : 'btn-accent'; ?>" <?php if ($tab === 'school') echo 'aria-current="page"'; ?>>لیست دانش‌آموزان کل مدرسه</a>
         <a href="reports-lists.php?tab=album" class="btn <?php echo $tab === 'album' ? 'btn-primary' : 'btn-accent'; ?>" <?php if ($tab === 'album') echo 'aria-current="page"'; ?>>آلبوم عکس کلاس‌ها</a>
+        <a href="reports-lists.php?tab=forms" class="btn <?php echo $tab === 'forms' ? 'btn-primary' : 'btn-accent'; ?>" <?php if ($tab === 'forms') echo 'aria-current="page"'; ?>>فرم‌های اداری</a>
     </nav>
 
     <?php if ($tab === 'teacher'): ?>
@@ -293,10 +314,10 @@ require_once __DIR__ . '/includes/header.php';
         <div style="margin-bottom:12px">
             <h3 class="font-bold text-sm">آلبوم عکس کلاس‌ها</h3>
             <p class="text-xs text-muted">
-                عکس شناسنامه‌ای دانش‌آموزان هر کلاس در کادرهای شبکه‌ای روی صفحهٔ A4، همراه با نام دانش‌آموز
-                و یک فضای خالی زیر هر نام برای نوشتن متن کوتاه — مثل یک لیست کلاسی با عکس.
-                هر برگه ۳۰ کادر دارد؛ کلاس‌های بزرگ‌تر به برگهٔ بعدی سرریز می‌شوند.
-                عکس‌ها از پوشهٔ <code>uploads/photos</code> (نام‌فایل = کد ملی) خوانده می‌شوند.
+                v4.176.0 — آلبوم به شکل <b>لیست</b> (نه شبکه) و <b>هر کلاس روی یک صفحهٔ A4</b>:
+                ردیف | عکس | نام و نام خانوادگی | نام پدر | کد ملی | یادداشت.
+                ارتفاع ردیف‌ها خودکار با تعداد دانش‌آموز تنظیم می‌شود تا کلاس همیشه در یک برگه جا شود
+                (کلاس کم‌جمع‌تر ردیف بلندتر و خوانا، کلاس پُرجمع‌تر ردیف کوتاه‌تر).
             </p>
         </div>
 
@@ -332,7 +353,7 @@ require_once __DIR__ . '/includes/header.php';
                                 <span class="badge" style="background:#fef3c7;color:#92400e;font-size:.65rem">بدون عکس: <?php echo clean(tr_num($pc['total'] - $pc['with'], 'fa')); ?></span>
                             <?php endif; ?>
                         </td>
-                        <td><?php echo clean(tr_num((string)max(1, (int)ceil($pc['total'] / 30)), 'fa')); ?></td>
+                        <td><?php echo clean(tr_num('1', 'fa')); ?><span class="text-muted" style="font-size:.65rem"> (یک برگه برای هر کلاس)</span></td>
                         <td>
                             <?php if ($pc['total'] === 0): ?>
                                 <span class="text-xs text-muted">دانش‌آموزی ندارد</span>
@@ -349,9 +370,57 @@ require_once __DIR__ . '/includes/header.php';
             </table>
         </div>
         <p class="text-xs text-muted" style="margin-top:10px">
-            دانش‌آموز بدون عکس هم کادر دارد؛ جای عکس خالی می‌ماند تا چاپ دستی کامل باشد.
+            هر کلاس روی یک برگه A4 چاپ می‌شود؛ کلاسی که در یک برگه جا نشود (بسیار پُرجمع‌تر از ظرفیت خوانا) با یک هشدار روی برگه مشخص می‌شود. دانش‌آموز بدون عکس هم ردیف دارد و جای عکس خالی می‌ماند تا چاپ دستی کامل باشد.
             در پنجرهٔ چاپ، کاغذ A4 و مقصد «Save as PDF» را انتخاب کنید.
-        </p>
+            </p>
+        <?php endif; ?>
+    </div>
+
+    <?php elseif ($tab === 'forms'): ?>
+    <!-- ═══ v4.176.0: فرم‌های اداری — بازسازی چهار قالب .mrt مدرسه ═══ -->
+    <div class="card">
+        <div style="margin-bottom:12px">
+            <h3 class="font-bold text-sm">فرم‌های اداری مدرسه</h3>
+            <p class="text-xs text-muted">
+                چهار فرم پرکاربرد، بازسازی‌شده از قالب‌های اصلی مدرسه (پوشهٔ <code>school-reports-raw-files</code>) با دادهٔ
+                دانش‌آموزان، کلاس و نام مدرسهٔ خودمان: برگهٔ حضور و غیاب، فرم تحویل و دریافت کتاب، دعوتنامهٔ انجمن اولیاء و
+                مربیان و رضایت‌نامهٔ اردو. خروجی هر فرم HTML چاپ‌محور است؛ با «Save as PDF» به PDF تبدیل می‌شود.
+            </p>
+        </div>
+        <?php if (!$classes): ?>
+            <div class="text-center text-muted" style="font-size:13px;padding:16px">هیچ کلاسی برای سال تحصیلی <?php echo clean(tr_num($year, 'fa')); ?> ثبت نشده است.</div>
+        <?php else: ?>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>کلاس</th><th>پایه</th><th>تعداد دانش‌آموز</th><th>برگهٔ حضور و غیاب</th><th>فرم کتاب</th><th>دعوتنامهٔ انجمن</th><th>رضایت‌نامهٔ اردو</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($classes as $c):
+                        $cn = $c['class_name'];
+                        $n = 0;
+                        try { $n = (int)(DB::fetch("SELECT COUNT(*) c FROM students s WHERE s.status='active' AND s.class_name = ? AND (s.academic_year = ? OR s.academic_year IS NULL OR s.academic_year = '')", [$cn, $year])['c'] ?? 0); } catch (Throwable $e) { $n = 0; }
+                    ?>
+                        <tr>
+                            <td class="font-bold"><?php echo clean($cn); ?></td>
+                            <td><?php echo clean($c['grade_level'] ?: '—'); ?></td>
+                            <td><?php echo clean(tr_num($n, 'fa')); ?></td>
+                            <?php if ($n === 0): ?>
+                                <td colspan="4" class="text-xs text-muted">دانش‌آموزی ندارد</td>
+                            <?php else: ?>
+                                <td><a class="btn btn-accent text-xs" target="_blank" rel="noopener" href="reports-lists.php?action=absents_form&amp;class=<?php echo urlencode($cn); ?>">چاپ</a></td>
+                                <td><a class="btn btn-accent text-xs" target="_blank" rel="noopener" href="reports-lists.php?action=amanat_form&amp;class=<?php echo urlencode($cn); ?>">چاپ</a></td>
+                                <td><a class="btn btn-accent text-xs" target="_blank" rel="noopener" href="reports-lists.php?action=anjoman_letter&amp;class=<?php echo urlencode($cn); ?>">چاپ</a></td>
+                                <td><a class="btn btn-accent text-xs" target="_blank" rel="noopener" href="reports-lists.php?action=camp_consent&amp;class=<?php echo urlencode($cn); ?>">چاپ</a></td>
+                            <?php endif; ?>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-xs text-muted" style="margin-top:10px;line-height:2">
+                «برگهٔ حضور و غیاب» برای هر کلاس یک برگه است (چهار ستون زنگ، هر ستون ۶ ردیف خالی برای نوشتن نام).
+                «فرم کتاب»، «دعوتنامهٔ انجمن» و «رضایت‌نامهٔ اردو» برای هر دانش‌آموز یک برگه می‌سازند؛ کلاس ۳۰ نفره
+                یعنی ۳۰ برگه که با «Save as PDF» در یک فایل ذخیره می‌شود.
+            </p>
         <?php endif; ?>
     </div>
 
