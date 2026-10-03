@@ -8,6 +8,12 @@ ensure_school_roles_schema();
 function student_report_error($text){http_response_code(400);echo '<!doctype html><html lang="fa" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>گزارش دانش‌آموزان</title><body><p>'.clean($text).'</p></body></html>';exit;}
 if($_SERVER['REQUEST_METHOD']!=='POST'||!verify_csrf($_POST['csrf_token']??''))student_report_error('درخواست نامعتبر است؛ گزارش را از فهرست دانش‌آموزان انتخاب کنید.');
 $ids=array_values(array_unique(array_filter(array_map('intval',is_array($_POST['student_ids']??null)?$_POST['student_ids']:[]),fn($i)=>$i>0)));
+/* v4.176.0: ترتیبِ ارسالی = ترتیبِ نمایش در فهرست دانش‌آموزان (پس از فیلتر و
+   چینشِ صعودی/نزولیِ کاربر). پیش‌تر گزارش همیشه با الفبای نام خانوادگی چیده
+   می‌شد و انتخاب «به ترتیب کلاسی» کاربر را نادیده می‌گرفت. اگر مرورگری
+   ترتیب را نفرستد، به الفبای نام خانوادگی برمی‌گردیم (رفتار قدیمی). */
+$orderMap=[];
+if(is_array($_POST['student_order']??null)) foreach($_POST['student_order'] as $pos=>$sid)$orderMap[(int)$sid]=(int)$pos;
 if(!$ids)student_report_error('دانش‌آموزی انتخاب نشده است.');
 $type=in_array($_POST['report_type']??'',['info','discipline','grades'],true)?$_POST['report_type']:'info';
 $format=in_array($_POST['format']??'',['html','doc','xls'],true)?$_POST['format']:'html';
@@ -15,7 +21,11 @@ $columns=student_report_columns($_POST['fields']??(isset($_POST['fields_version'
 if(!$columns)student_report_error('حداقل یک ستون گزارش را انتخاب کنید.');
 $students=[]; // Chunk IN clauses for older SQLite variable limits; never truncate selection.
 foreach(array_chunk($ids,400) as $chunk)$students=array_merge($students,DB::fetchAll('SELECT * FROM students WHERE id IN ('.implode(',',array_fill(0,count($chunk),'?')).')',$chunk));
-usort($students,fn($a,$b)=>persian_compare($a['last_name'],$b['last_name'])?:persian_compare($a['first_name'],$b['first_name']));
+if($orderMap){
+    usort($students,fn($a,$b)=>($orderMap[(int)$a['id']]??PHP_INT_MAX)<=>($orderMap[(int)$b['id']]??PHP_INT_MAX));
+} else {
+    usort($students,fn($a,$b)=>persian_compare($a['last_name'],$b['last_name'])?:persian_compare($a['first_name'],$b['first_name']));
+}
 $rows=[];$academic=(bool)array_intersect(array_keys($columns),['latest_gpa','latest_report','failed_grades']);
 $discipline=(bool)array_intersect(array_keys($columns),['discipline_count','discipline_details']);
 foreach($students as $s){

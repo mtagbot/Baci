@@ -209,7 +209,8 @@ const albumTab = await req('', { file: 'reports-lists.php', sid: execSid, query:
 check(!albumTab.res.fatal && albumTab.res.page.includes('photo_album_pdf'), 'the album tab lists classes with a download action: ' + (albumTab.res.fatal || ''));
 const albumPdf = await req('', { file: 'reports-lists.php', sid: execSid, query: 'action=photo_album_pdf&class=' + encodeURIComponent('آلبوم ۱') });
 check(!albumPdf.res.fatal && albumPdf.res.page.includes('@page{size:A4 portrait'), 'the album prints on A4: ' + (albumPdf.res.fatal || ''));
-check((albumPdf.res.page.match(/class="sheet"/g) || []).length === 2, 'a 32-student class overflows to a second A4 sheet');
+/* v4.176.0: آلبوم «یک کلاس روی یک برگه» شد — دیگر سرریز به برگهٔ دوم نداریم. */
+check((albumPdf.res.page.match(/class="sheet"/g) || []).length === 1, 'a 32-student class now fits a single A4 sheet (one page per class): ' + ((albumPdf.res.page.match(/class="sheet"/g) || []).length));
 check(albumPdf.res.page.includes('data:image/jpeg;base64,'), 'a student with a photo file is embedded as a data-URI');
 check(albumPdf.res.page.includes('جای عکس'), 'a student without a photo keeps an empty photo box');
 check(albumPdf.res.page.includes('دانش آموز1') && albumPdf.res.page.includes('class="note"'), 'each card shows the name and a writing space');

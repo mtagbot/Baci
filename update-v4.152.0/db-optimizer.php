@@ -17,6 +17,7 @@ require_once __DIR__ . '/includes/auth.php';
 require_permission('system_settings');
 
 require_once __DIR__.'/includes/db_health.php';
+require_once __DIR__.'/includes/db_retention.php';   /* v4.176.0: قواعد نگهداشت جدول‌های پرشونده */
 $pdo = DB::getInstance()->getPdo();
 $dboptErrors=[]; $dboptIndexCache=[];
 $detailedScan=(($_GET['scan']??'')==='1');
@@ -354,6 +355,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('db-optimizer.php?'.(!empty($_GET['embedded'])?'embedded=1&':'').'scan=1');
     }
 
+    /* v4.176.0 — ۳-الف) ذخیرهٔ روزهای نگهداشت */
+    if ($act === 'retention_settings') {
+        $saved = 0;
+        foreach (dbm_retention_rules() as $key => $rule) {
+            $field = 'retention_' . $key;
+            if (!array_key_exists($field, $_POST)) continue;
+            $raw = trim((string)$_POST[$field]);
+            $val = $raw === '' ? 0 : max(0, (int)$raw);
+            if ($key === 'student_attendance') $val = min(10, $val);          // سال نگهداشت
+            elseif ($key === 'exam_design_archive') $val = min(50, max(1, $val ?: 1));
+            else $val = min(3650, $val);                                      // روز نگهداشت
+            set_setting($rule['days'][0], (string)$val);
+            $saved++;
+        }
+        log_activity($_SESSION['admin_id'] ?? null, 'تنظیم نگهداشت دیتابیس', "$saved قاعده به‌روز شد");
+        set_flash_message('success', 'قواعد نگهداشت ذخیره شد. اجرای خودکار یک بار در روز توسط کرون انجام می‌شود.');
+        redirect('db-optimizer.php?'.(!empty($_GET['embedded'])?'embedded=1&':'').'scan=1');
+    }
+
+    /* v4.176.0 — ۳-ب) اجرای دستی همان قواعد (بدون انتظار برای کرون) */
+    if ($act === 'retention_now') {
+        $report = [];
+        foreach (array_keys(dbm_retention_rules()) as $key) {
+            if (dbm_rule_days($key) <= 0) continue;
+            set_setting('dbopt_retention_last_' . $key, '0');   // قفل «یک بار در روز» را باز کن
+            $report[$key] = dbm_sweep_rule($key, microtime(true) + 5);
+            set_setting('dbopt_retention_last_' . $key, (string)time());
+        }
+        $parts = [];
+        foreach (dbm_retention_rules() as $key => $rule) {
+            if (!isset($report[$key])) { $parts[] = $rule['label'] . ': خاموش'; continue; }
+            $parts[] = $rule['label'] . ': ' . tr_num((string)$report[$key], 'fa') . ' رکورد';
+        }
+        log_activity($_SESSION['admin_id'] ?? null, 'پاکسازی نگهداشت دیتابیس', implode(' | ', $parts));
+        set_flash_message('success', "پاکسازی نگهداشت انجام شد — " . implode(' · ', $parts));
+        redirect('db-optimizer.php?'.(!empty($_GET['embedded'])?'embedded=1&':'').'scan=1');
+    }
+
     /* 4) ANALYZE + OPTIMIZE همهٔ جداول */
     if ($act === 'optimize_tables') {
         $ok = 0; $fail = 0;
@@ -551,6 +590,63 @@ require_once __DIR__ . '/includes/header.php';
             </tbody>
         </table>
     </div>
+</div>
+
+<?php /* ═══ v4.176.0: قواعد نگهداشت — رشد پایدار جدول‌های پرشونده ═══ */ ?>
+<?php $retentionRules = dbm_retention_rules(); $retentionCounts = dbm_rule_counts(); ?>
+<div class="card p-4 mb-4">
+    <h3 class="font-bold mb-3"><svg data-ui-icon="chart" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3v18h18M7 17v-4m5 4V8m5 9V4"/></svg> قواعد نگهداشت — رشد پایدار بانک اطلاعاتی</h3>
+    <p class="text-muted text-xs" style="line-height:2;margin-bottom:10px">
+        چهار جدول زیر بدون قاعده بی‌نهایت رشد می‌کنند و کل بانک اطلاعاتی را سنگین می‌سازند:
+        <b>bot_message_logs</b> (هر پیام ربات)، <b>desk_change_log</b> (هر تغییر برای همگام‌سازی دسکتاپ)،
+        <b>student_attendance</b> (هر روزِ هر دانش‌آموز) و <b>exam_design_archive</b> (هر نسخهٔ طراحی آزمون).
+        قواعد زیر محافظه‌کارند: هیچ رکورد در جریانی (صف pending/sending و کارهای relay دسکتاپ) حذف نمی‌شود،
+        حذف تکه‌تکه و ایندکس‌دار است، و هر قاعده حداکثر یک بار در روز اجرا می‌شود.
+        اجرای خودکار از طریق کرونِ ورکر ربات (که از قبل هر دقیقه اجرا می‌شود) انجام می‌گیرد؛ اینجا می‌توانید
+        مقادیر را تنظیم یا همان حالا اجرا کنید. مقدار <b>۰</b> یعنی قاعده خاموش است.
+    </p>
+    <div class="table-container">
+        <table class="w-full text-xs">
+            <thead><tr><th>جدول / قاعده</th><th style="width:210px">نگهداشت</th><th style="width:110px">قابل حذف</th><th style="width:90px">وضعیت</th></tr></thead>
+            <tbody>
+            <?php foreach ($retentionRules as $key => $rule):
+                $days = dbm_rule_days($key); $cnt = $retentionCounts[$key]; ?>
+                <tr>
+                    <td>
+                        <span class="font-mono font-bold"><?php echo clean($rule['table']); ?></span>
+                        <div class="text-muted" style="font-size:11px;line-height:1.9"><?php echo clean($rule['label']); ?> — <?php echo clean($rule['why']); ?></div>
+                    </td>
+                    <td>
+                        <div class="flex items-center gap-2">
+                            <input type="number" min="0" max="<?php echo $key === 'student_attendance' ? 10 : 3650; ?>" step="1"
+                                   name="retention_<?php echo clean($key); ?>" value="<?php echo (int)$days; ?>" class="form-input" style="width:90px">
+                            <span class="text-muted"><?php echo $key === 'student_attendance' ? 'سال' : 'روز'; ?></span>
+                        </div>
+                    </td>
+                    <td class="font-mono font-bold"><?php echo $cnt < 0 ? '—' : tr_num((string)$cnt, 'fa'); ?></td>
+                    <td><?php if ($days <= 0): ?><span class="badge">خاموش</span><?php elseif ($cnt > 0): ?><span class="badge badge-warning">نیاز به پاکسازی</span><?php else: ?><span class="badge badge-success">پایدار</span><?php endif; ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <div class="flex gap-2 flex-wrap" style="margin-top:12px">
+        <form method="POST" onsubmit="return confirm('مقادیر نگهداشت ذخیره شود؟');">
+            <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
+            <input type="hidden" name="do" value="retention_settings">
+            <button type="submit" class="btn btn-primary btn-sm">ذخیرهٔ قواعد نگهداشت</button>
+        </form>
+        <form method="POST" onsubmit="return confirm('همین حالا پاکسازی قواعد فعال اجرا شود؟ رکوردهای قدیمی حذف می‌شوند (پیش‌نیاز: پشتیبان تازه).');">
+            <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
+            <input type="hidden" name="do" value="retention_now">
+            <button type="submit" class="btn btn-warning btn-sm">اجرای دستی پاکسازی</button>
+        </form>
+    </div>
+    <p class="text-muted text-xs" style="line-height:2;margin-top:10px">
+        فرمول رشد: اگر ماهانه ۱۴ آزمون طراحی شود، هر نسخهٔ آرشیو حدود ۱۰۰ تا ۴۰۰ کیلوبایت است؛ با نگهداشت ۵ نسخهٔ آخر هر آزمون،
+        جدول به جای رشد بی‌نهایت، سقف ثابتی برابر «۵ × تعداد آزمون‌ها» دارد. برای حضور و غیاب، نگهداشت ۲ سال تحصیلی به‌طور پیش‌فرض
+        کافی است اما چون تاریخچهٔ روزانهٔ سال‌های گذشته ممکن است لازم شود، این قاعده پیش‌فرض خاموش است و فقط با انتخاب شما فعال می‌شود.
+    </p>
 </div>
 
 <?php if (!empty($badEngine) || !empty($badCollation)): ?>

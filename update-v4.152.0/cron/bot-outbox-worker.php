@@ -47,5 +47,11 @@ try {
     echo 'sent='.bot_outbox_drain(100,40).PHP_EOL;
     $pruned = bot_outbox_retention_sweep();
     if ($pruned) echo 'retention='.$pruned.PHP_EOL;
+    /* v4.176.0: نگهداشت جدول‌های پرشونده (لاگ پیام ربات، تغییرهای دسکتاپ،
+       نسخه‌های طراحی آزمون، حضور و غیاب). هر قاعده یک بار در روز و با سقف
+       زمانی چند ثانیه‌ای اجرا می‌شود تا هاست کم‌قدرت زیر بار نرود. */
+    require_once dirname(__DIR__).'/includes/db_retention.php';
+    $dbm = dbm_sweep_all(3.0);
+    foreach ($dbm as $k => $v) if (is_int($v) && $v > 0) echo 'dbretention['.$k.']='.$v.PHP_EOL;
 }
 catch(Throwable $e){fwrite(STDERR,"Notification queue unavailable; messages retained.\n");exit(1);}

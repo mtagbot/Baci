@@ -3,10 +3,14 @@
 /**
  * گزارش «آلبوم عکس» — مثل لیست کلاسی، ولی با عکس.
  *
- * هر کلاس روی صفحهٔ A4: دانش‌آموزان در کادرهای شبکه‌ای (۵ ستون × ۶ ردیف =
- * ۳۰ کادر در هر برگه)، هر کادر شامل عکس شناسنامه‌ای، نام دانش‌آموز و یک
- * فضای خالی خط‌کشی‌شده برای نوشتن یک متن کوتاه. کلاس‌های بزرگ‌تر از ۳۰
- * نفر به برگهٔ بعدی سرریز می‌شوند.
+ * v4.176.0 — بازطراحی از «شبکه» به «لیست»:
+ *   • هر کلاس روی **یک** صفحهٔ A4 است؛ هیچ کلاسی به برگهٔ دوم نمی‌رود.
+ *   • چیدمان لیستی: ستون‌های ردیف | عکس | نام و نام خانوادگی | نام پدر |
+ *     کد ملی | یادداشت — همان چیزی که دبیر برای شناختن کلاس لازم دارد.
+ *   • ارتفاع ردیف‌ها متناسب با تعداد دانش‌آموز حساب می‌شود (کلاس ۲۰ نفره
+ *     ردیف بلندتر و خوانا، کلاس ۴۵ نفره ردیف کوتاه‌تر) تا همیشه یک صفحه
+ *     شود. سقف پایین برای خوانایی رعایت می‌شود و اگر کلاسی بسیار بزرگ
+ *     باشد، هشدار روی برگه چاپ می‌شود.
  *
  * خروجی HTML چاپ‌محور است (مانند class_list_pdf) و کاربر با «Save as PDF»
  * مرورگر فایل PDF می‌گیرد؛ عکس‌ها به‌صورت data-URI داخل صفحه جاسازی
@@ -26,7 +30,7 @@ if (!function_exists('pab_students_of_class')) {
             $params[] = $year;
         }
         $rows = DB::fetchAll(
-            "SELECT s.id, s.first_name, s.last_name, s.photo_url FROM students s WHERE " . implode(' AND ', $where),
+            "SELECT s.id, s.first_name, s.last_name, s.father_name, s.national_id, s.photo_url FROM students s WHERE " . implode(' AND ', $where),
             $params
         );
         if (function_exists('persian_usort_students')) persian_usort_students($rows);
@@ -71,9 +75,22 @@ if (!function_exists('pab_render_print_html')) {
         $fontUrl = 'uploads/B-Titr/B-Titr.ttf';
         $year    = function_exists('get_setting') ? get_setting('current_academic_year', '') : '';
         $today   = function_exists('jalali_now') ? jalali_now() : '';
-        $perPage = 30;                       /* ۵ ستون × ۶ ردیف */
-        $pages   = $students ? array_chunk($students, $perPage) : [[]];
-        $pageN   = count($pages);
+        /* v4.176.0: هر کلاس دقیقاً یک برگه. ارتفاع ردیف از فضای موجود و
+           تعداد دانش‌آموز حساب می‌شود تا صفحه پر و خوانا بماند. */
+        $total   = count($students);
+        $sheetH  = 281;   /* میلی‌متر */
+        $pad     = 8;     /* حاشیهٔ صفحه در CSS */
+        $headerH = 16;    /* سربرگ */
+        $footH   = 8;     /* پابرگ */
+        $thH     = 6;     /* ردیف عنوان جدول */
+        $avail   = max(40, $sheetH - 2 * $pad - $headerH - $footH - $thH);
+        $minRow  = 4.6;   /* کمتر از این خوانا نیست */
+        $maxRow  = 13;
+        $rowH    = $total > 0 ? min($maxRow, max($minRow, $avail / $total)) : $maxRow;
+        $photoH  = max(9.5, min(14.6, $rowH - 2.6));
+        $over    = $total > 0 && ($rowH <= $minRow + 0.001) && ($total * $minRow > $avail);
+        $fontSm  = $total > 34 ? 7.2 : ($total > 26 ? 8 : 8.6);
+        $pageN   = 1;     /* یک برگه برای هر کلاس */
 
         ob_start();
         ?><!DOCTYPE html>
@@ -97,17 +114,23 @@ body{font-family:'BTitr',Tahoma,sans-serif}
      border:0.4mm solid #000;border-radius:2mm;padding:2mm 3mm;margin-bottom:3mm}
 .hdr .side{font-size:9pt;line-height:1.8}
 .hdr .ttl{font-size:12pt;font-weight:700;text-align:center}
-.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:2.6mm}
-.stu{border:0.35mm solid #000;border-radius:1.6mm;padding:1.4mm;position:relative;
-     display:flex;flex-direction:column;align-items:center;gap:1mm;height:40.4mm}
-.stu .seq{position:absolute;top:.6mm;right:1.2mm;font-size:6.5pt;color:#64748b}
-.ph{width:17mm;height:22mm;border:0.25mm solid #94a3b8;border-radius:1mm;overflow:hidden;
-    background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.list{width:100%;border-collapse:collapse;table-layout:fixed}
+.list th,.list td{border:0.3mm solid #334155;padding:0 1mm;vertical-align:middle;overflow:hidden}
+.list th{background:#eef2f7;font-size:8pt;font-weight:700;text-align:center;height:6mm}
+.list td{text-align:center}
+.list td.nm{text-align:right;font-weight:700;padding-right:2mm}
+.list td.note{background:
+  repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--row) - 0.4mm), #cbd5e1 calc(var(--row) - 0.4mm), #cbd5e1 var(--row))}
+.list tr{break-inside:avoid;page-break-inside:avoid}
+.list .seq{font-size:7.5pt;color:#475569}
+.list .nm-txt{font-size:8.5pt;line-height:1.25}
+.list .meta{font-size:7.5pt;color:#334155}
+.ph{width:11mm;height:14.6mm;border:0.25mm solid #94a3b8;border-radius:.8mm;overflow:hidden;
+    background:#f1f5f9;margin:0 auto;display:flex;align-items:center;justify-content:center}
 .ph img{width:100%;height:100%;object-fit:cover}
-.ph .no{font-size:6.5pt;color:#94a3b8}
-.nm{font-size:7.5pt;font-weight:700;text-align:center;line-height:1.35;max-height:6.6mm;
-    overflow:hidden;word-break:break-word}
-.note{width:100%;flex:1;border:0.25mm dashed #94a3b8;border-radius:1mm;min-height:7mm}
+.ph .no{font-size:6pt;color:#94a3b8}
+.warn{font-size:7.5pt;color:#b45309;background:#fffbeb;border:0.3mm solid #f59e0b;
+      border-radius:1mm;padding:1mm 2mm;margin-top:2mm}
 .ftr{margin-top:2.5mm;display:flex;justify-content:space-between;font-size:8pt;color:#334155}
 .noprint{max-width:210mm;margin:10px auto;padding:0 8px;font-family:Tahoma;
          display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -126,30 +149,44 @@ body{font-family:'BTitr',Tahoma,sans-serif}
   <button type="button" onclick="printAlbum()">چاپ / ذخیرهٔ PDF</button>
   <span class="hint">در پنجرهٔ چاپ، مقصد را «Save as PDF» و اندازهٔ کاغذ را A4 انتخاب کنید.</span>
 </div>
-<?php foreach ($pages as $pi => $chunk): ?>
-<div class="sheet">
+<div class="sheet" style="--row:<?php echo number_format($rowH, 2, '.', ''); ?>mm">
   <div class="hdr">
     <div class="side"><?php echo htmlspecialchars($schoolName, ENT_QUOTES, 'UTF-8'); ?><?php if ($year !== ''): ?><br>سال تحصیلی <?php echo htmlspecialchars(function_exists('tr_num') ? tr_num($year, 'fa') : $year, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?></div>
-    <div class="ttl">آلبوم عکس<?php if ($pageN > 1): ?> — برگهٔ <?php echo function_exists('tr_num') ? tr_num((string)($pi + 1), 'fa') : ($pi + 1); ?> از <?php echo function_exists('tr_num') ? tr_num((string)$pageN, 'fa') : $pageN; ?><?php endif; ?></div>
-    <div class="side">کلاس <?php echo htmlspecialchars($className, ENT_QUOTES, 'UTF-8'); ?><?php if ($grade !== ''): ?> — پایهٔ <?php echo htmlspecialchars($grade, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?><br>تاریخ تهیه: <?php echo htmlspecialchars(function_exists('tr_num') ? tr_num($today, 'fa') : $today, ENT_QUOTES, 'UTF-8'); ?></div>
+    <div class="ttl">آلبوم عکس — کلاس <?php echo htmlspecialchars($className, ENT_QUOTES, 'UTF-8'); ?></div>
+    <div class="side"><?php if ($grade !== ''): ?>پایهٔ <?php echo htmlspecialchars($grade, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?><br>تاریخ تهیه: <?php echo htmlspecialchars(function_exists('tr_num') ? tr_num($today, 'fa') : $today, ENT_QUOTES, 'UTF-8'); ?></div>
   </div>
-  <div class="grid">
-    <?php foreach ($chunk as $idx => $s):
-        $seq  = $pi * $perPage + $idx + 1;
+  <table class="list">
+    <colgroup>
+      <col style="width:9mm"><col style="width:14mm"><col style="width:auto">
+      <col style="width:30mm"><col style="width:28mm"><col style="width:auto">
+    </colgroup>
+    <thead><tr>
+      <th>ردیف</th><th>عکس</th><th>نام و نام خانوادگی</th><th>نام پدر</th><th>کد ملی</th><th>یادداشت</th>
+    </tr></thead>
+    <tbody>
+    <?php foreach ($students as $idx => $s):
+        $seq  = $idx + 1;
         $name = trim(($s['first_name'] ?? '') . ' ' . ($s['last_name'] ?? ''));
         $uri  = pab_photo_data_uri($s['photo_url'] ?? '');
+        $father = trim((string)($s['father_name'] ?? ''));
+        $nid  = trim((string)($s['national_id'] ?? ''));
     ?>
-    <div class="stu">
-      <span class="seq"><?php echo function_exists('tr_num') ? tr_num((string)$seq, 'fa') : $seq; ?></span>
-      <div class="ph"><?php if ($uri !== ''): ?><img src="<?php echo $uri; ?>" alt=""><?php else: ?><span class="no">جای عکس</span><?php endif; ?></div>
-      <div class="nm"><?php echo htmlspecialchars($name !== '' ? $name : '—', ENT_QUOTES, 'UTF-8'); ?></div>
-      <div class="note"></div>
-    </div>
-    <?php endforeach; ?>
-  </div>
-  <div class="ftr"><span>تعداد دانش‌آموزان این کلاس: <?php echo function_exists('tr_num') ? tr_num((string)count($students), 'fa') : count($students); ?></span><span>فضای خالی زیر هر نام، برای یادداشت کوتاه است.</span></div>
+      <tr style="height:<?php echo number_format($rowH, 2, '.', ''); ?>mm">
+        <td class="seq"><?php echo function_exists('tr_num') ? tr_num((string)$seq, 'fa') : $seq; ?></td>
+        <td><div class="ph" style="height:<?php echo number_format($photoH, 2, '.', ''); ?>mm;width:<?php echo number_format($photoH * 0.75, 2, '.', ''); ?>mm"><?php if ($uri !== ''): ?><img src="<?php echo $uri; ?>" alt=""><?php else: ?><span class="no">جای عکس</span><?php endif; ?></div></td>
+        <td class="nm"><span class="nm-txt" style="font-size:<?php echo number_format($fontSm, 1, '.', ''); ?>pt"><?php echo htmlspecialchars($name !== '' ? $name : '—', ENT_QUOTES, 'UTF-8'); ?></span></td>
+        <td class="meta"><?php echo htmlspecialchars($father !== '' ? $father : '—', ENT_QUOTES, 'UTF-8'); ?></td>
+        <td class="meta" dir="ltr"><?php echo htmlspecialchars($nid !== '' ? (function_exists('tr_num') ? tr_num($nid, 'fa') : $nid) : '—', ENT_QUOTES, 'UTF-8'); ?></td>
+        <td class="note"></td>
+      </tr>
+    <?php endforeach; if (!$students): ?>
+      <tr><td colspan="6" style="height:<?php echo number_format($rowH, 2, '.', ''); ?>mm">دانش‌آموزی در این کلاس ثبت نشده است.</td></tr>
+    <?php endif; ?>
+    </tbody>
+  </table>
+  <?php if ($over): ?><div class="warn">این کلاس بیش از حد پر است؛ برای خوانایی بهتر، عکس‌ها را در «مدیریت دانش‌آموزان» بررسی و در صورت امکان کلاس را تقسیم کنید.</div><?php endif; ?>
+  <div class="ftr"><span>تعداد دانش‌آموزان این کلاس: <?php echo function_exists('tr_num') ? tr_num((string)count($students), 'fa') : count($students); ?> — یک برگه برای هر کلاس</span><span>ستون یادداشت برای نوشتن توضیح کوتاه کنار هر نام است.</span></div>
 </div>
-<?php endforeach; ?>
 <script>
 /* اندازهٔ برگه‌ها روی نمایشگر کوچک‌تر از عرض A4 است؛ مثل لیست کلاسی،
    برگه را به نسبت عرض موجود کوچک می‌کنیم (فقط روی صفحه، نه در چاپ). */

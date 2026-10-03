@@ -314,6 +314,11 @@ else:
     $minGpa = trim($_GET['min_gpa'] ?? '');
     $maxGpa = trim($_GET['max_gpa'] ?? '');
     $subjectFilter = trim($_GET['subject_name'] ?? '');
+    /* v4.176.0: چینش فهرست — همان چیزی که در «گزارش دانش‌آموزان
+       انتخاب‌شده» باید حفظ شود. مقدارها محدود و امن‌اند. */
+    $sortKey = trim($_GET['sort'] ?? '');
+    if (!in_array($sortKey, ['class', 'name', 'first', 'grade', 'nid', 'gpa', 'disc'], true)) $sortKey = 'name';
+    $sortDir = (trim($_GET['dir'] ?? 'asc') === 'desc') ? 'desc' : 'asc';
 
     $where = ["s.status IN ('active','inactive')"];
     $params = [];
@@ -349,7 +354,20 @@ else:
         $allParams[] = $filterYear; $allParams[] = $filterYear; $allParams[] = $filterYear; $allParams[] = $filterYear;
     }
     $studentsList = DB::fetchAll($sql, $allParams);
-    persian_usort_students($studentsList);
+    /* v4.176.0: چینش انتخابی کاربر به‌جای همیشه «نام خانوادگی، سپس نام» */
+    $gw = function ($a, $b) { return grade_sort_weight($a['grade_level'] ?? '') <=> grade_sort_weight($b['grade_level'] ?? ''); };
+    $cw = function ($a, $b) {
+        $ga = infer_grade_from_class_name($a['class_name'] ?? ''); $gb = infer_grade_from_class_name($b['class_name'] ?? '');
+        return (grade_sort_weight($ga) <=> grade_sort_weight($gb)) ?: (class_number_weight($a['class_name'] ?? '') <=> class_number_weight($b['class_name'] ?? '')) ?: persian_compare($a['class_name'] ?? '', $b['class_name'] ?? '');
+    };
+    if ($sortKey === 'class')      usort($studentsList, fn($a,$b) => $cw($a,$b) ?: persian_compare($a['last_name']??'', $b['last_name']??'') ?: persian_compare($a['first_name']??'', $b['first_name']??''));
+    elseif ($sortKey === 'grade')  usort($studentsList, fn($a,$b) => $gw($a,$b) ?: $cw($a,$b) ?: persian_compare($a['last_name']??'', $b['last_name']??''));
+    elseif ($sortKey === 'first')  usort($studentsList, fn($a,$b) => persian_compare($a['first_name']??'', $b['first_name']??'') ?: persian_compare($a['last_name']??'', $b['last_name']??''));
+    elseif ($sortKey === 'nid')    usort($studentsList, fn($a,$b) => strcasecmp((string)($a['national_id']??''), (string)($b['national_id']??'')));
+    elseif ($sortKey === 'gpa')    usort($studentsList, fn($a,$b) => ((float)($b['latest_gpa']??0) <=> (float)($a['latest_gpa']??0)) ?: persian_compare($a['last_name']??'', $b['last_name']??''));
+    elseif ($sortKey === 'disc')   usort($studentsList, fn($a,$b) => ((int)($b['discipline_count']??0) <=> (int)($a['discipline_count']??0)) ?: persian_compare($a['last_name']??'', $b['last_name']??''));
+    else                           persian_usort_students($studentsList);
+    if ($sortDir === 'desc') $studentsList = array_reverse($studentsList);
     $studentsList = array_slice($studentsList, 0, 500);
 
     $yearOptions = get_academic_years_for_filter();
@@ -373,6 +391,23 @@ else:
             <div class="filter-primary"><label class="text-xs font-bold">جستجو</label><input type="text" name="q" class="form-input" placeholder="نام، نام خانوادگی، کد ملی، نام پدر..." value="<?php echo clean($search); ?>"></div>
             <div class="filter-primary"><label class="text-xs font-bold">سال تحصیلی</label><select name="academic_year" class="form-select"><option value="">همه</option><?php foreach($yearOptions as $yo): ?><option value="<?php echo clean($yo['academic_year']); ?>" <?php echo $filterYear===$yo['academic_year']?'selected':''; ?>><?php echo clean($yo['academic_year']); ?></option><?php endforeach; ?></select></div>
             <div class="filter-primary"><label class="text-xs font-bold">پایه</label><select name="grade_level" class="form-select"><option value="">همه</option><?php foreach($gradeOptions as $go): ?><option value="<?php echo clean($go['grade_level']); ?>" <?php echo $filterGrade===$go['grade_level']?'selected':''; ?>><?php echo clean($go['grade_level']); ?></option><?php endforeach; ?></select></div>
+            <div class="filter-primary"><label class="text-xs font-bold">چینش فهرست</label>
+                <select name="sort" class="form-select">
+                    <option value="name"  <?php echo $sortKey === 'name'  ? 'selected' : ''; ?>>نام خانوادگی، سپس نام</option>
+                    <option value="first" <?php echo $sortKey === 'first' ? 'selected' : ''; ?>>نام</option>
+                    <option value="class" <?php echo $sortKey === 'class' ? 'selected' : ''; ?>>کلاس، سپس نام خانوادگی</option>
+                    <option value="grade" <?php echo $sortKey === 'grade' ? 'selected' : ''; ?>>پایه، سپس کلاس</option>
+                    <option value="nid"   <?php echo $sortKey === 'nid'   ? 'selected' : ''; ?>>کد ملی</option>
+                    <option value="gpa"   <?php echo $sortKey === 'gpa'   ? 'selected' : ''; ?>>آخرین معدل (بیشترین)</option>
+                    <option value="disc"  <?php echo $sortKey === 'disc'  ? 'selected' : ''; ?>>موارد انضباطی (بیشترین)</option>
+                </select>
+            </div>
+            <div class="filter-primary"><label class="text-xs font-bold">ترتیب</label>
+                <select name="dir" class="form-select">
+                    <option value="asc"  <?php echo $sortDir === 'asc'  ? 'selected' : ''; ?>>صعودی</option>
+                    <option value="desc" <?php echo $sortDir === 'desc' ? 'selected' : ''; ?>>نزولی</option>
+                </select>
+            </div>
             <div class="flex gap-2"><button class="btn btn-primary">فیلتر</button><a href="students.php" class="btn btn-secondary">حذف</a></div>
             <details class="filter-more" <?php echo ($filterClass||$disciplineFilter||$academicFilter||$subjectFilter||$minGpa||$maxGpa)?'open':''; ?>><summary>گزینه‌های بیشتر</summary>
                 <div class="grid grid-cols-5 gap-2 mt-2">
@@ -386,8 +421,12 @@ else:
         </form>
     </div>
 
-    <form method="POST" action="student-bulk-report.php" id="bulkStudentsForm" class="card">
+    <form method="POST" action="student-bulk-report.php" id="bulkStudentsForm" class="card"
+          onsubmit="(function(f){var box=f.querySelector('#studentOrderBox');if(box){box.value=Array.prototype.map.call(f.querySelectorAll('.st-check'),function(c){return c.value;}).join(',');}})(this)">
         <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
+        <?php /* v4.176.0: ترتیبِ فعلیِ فهرست (پس از فیلتر و چینشِ صعودی/نزولی) را
+              همراه گزارش می‌فرستیم تا خروجی دقیقاً به همان ترتیب چیده شود. */ ?>
+        <input type="hidden" name="student_order" id="studentOrderBox" value="">
         <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
             <h3 class="font-bold">نتایج: <?php echo tr_num(count($studentsList),'fa'); ?> دانش‌آموز</h3>
             <div class="flex gap-2 flex-wrap student-list-actions">
@@ -399,10 +438,27 @@ else:
                 <button type="submit" formaction="students.php" formmethod="POST" name="bulk_delete_students" value="1" class="btn btn-danger text-xs" onclick="return confirm('⚠️ آیا از حذف دسته‌جمعی دانش‌آموزان انتخاب شده اطمینان دارید؟\n\nاین عملیات حذف می‌کند:\n- پرونده دانش‌آموز\n- کارنامه‌ها\n- موارد انضباطی\n- اتصالات ربات\n- آزمون‌ها\n\nقابل بازگشت نیست!');" style="background:#dc2626;color:white;">حذف انتخاب شده‌ها</button>
             </div>
         </div>
+        <?php /* v4.176.0: لینک سرستون‌ها — فیلترهای فعلی را حفظ و جهت را برعکس می‌کند */
+        $stuSortLink = function ($key, $label) use ($search, $filterYear, $filterGrade, $filterClass, $disciplineFilter, $academicFilter, $subjectFilter, $minGpa, $maxGpa, $sortKey, $sortDir) {
+            $dir = ($sortKey === $key && $sortDir === 'asc') ? 'desc' : 'asc';
+            $qs = ['sort=' . $key, 'dir=' . $dir];
+            if ($search !== '') $qs[] = 'q=' . urlencode($search);
+            if ($filterYear !== '') $qs[] = 'academic_year=' . urlencode($filterYear);
+            if ($filterGrade !== '') $qs[] = 'grade_level=' . urlencode($filterGrade);
+            if ($filterClass !== '') $qs[] = 'class_name=' . urlencode($filterClass);
+            if ($disciplineFilter !== '') $qs[] = 'discipline_filter=' . urlencode($disciplineFilter);
+            if ($academicFilter !== '') $qs[] = 'academic_filter=' . urlencode($academicFilter);
+            if ($subjectFilter !== '') $qs[] = 'subject_name=' . urlencode($subjectFilter);
+            if ($minGpa !== '') $qs[] = 'min_gpa=' . urlencode($minGpa);
+            if ($maxGpa !== '') $qs[] = 'max_gpa=' . urlencode($maxGpa);
+            $arrow = $sortKey === $key ? ($sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+            return '<th><a href="students.php?' . implode('&amp;', $qs) . '" style="color:inherit;text-decoration:none" title="چینش بر اساس این ستون">' . $label . $arrow . '</a></th>';
+        };
+        ?>
         <div class="table-container">
             <table id="studentsTable">
                 <colgroup><col style="width:44px"><col style="width:108px"><col style="width:124px"><col style="width:118px"><col style="width:68px"><col style="width:72px"><col style="width:86px"><col style="width:76px"><col style="width:90px"><col style="width:98px"><col style="width:80px"><col style="width:180px"></colgroup>
-                <thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.st-check').forEach(c=>c.checked=this.checked)"></th><th>کد ملی</th><th>نام خانوادگی</th><th>نام</th><th>کلاس</th><th>پایه</th><th>آخرین معدل</th><th>انضباط</th><th>بررسی نشده</th><th>بررسی کارنامه</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+                <thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.st-check').forEach(c=>c.checked=this.checked)"></th><th>کد ملی</th><?php echo $stuSortLink('name', 'نام خانوادگی'); ?><?php echo $stuSortLink('first', 'نام'); ?><?php echo $stuSortLink('class', 'کلاس'); ?><th>پایه</th><?php echo $stuSortLink('gpa', 'آخرین معدل'); ?><?php echo $stuSortLink('disc', 'انضباط'); ?><th>بررسی نشده</th><th>بررسی کارنامه</th><th>وضعیت</th><th>عملیات</th></tr></thead>
                 <tbody>
                 <?php foreach ($studentsList as $st): ?>
                     <tr class="student-row" data-student-id="<?php echo (int)$st['id']; ?>">

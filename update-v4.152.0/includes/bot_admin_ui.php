@@ -242,7 +242,18 @@ if (!function_exists('bot_admin_render_page')) {
         $token = get_setting(bot_token_key($platform), '');
         $adminSecret = get_setting('admin_bot_login_secret', '');
         if ($adminSecret === '') { $adminSecret = bin2hex(random_bytes(8)); set_setting('admin_bot_login_secret', $adminSecret); }
-        $connectedUsers = DB::fetchAll("SELECT b.*, b.`$chatCol` AS chat_id, b.`$usernameCol` AS username, s.first_name, s.last_name, s.national_id, s.grade_level, s.class_name FROM `$userTable` b JOIN students s ON b.student_id = s.id ORDER BY b.id DESC LIMIT 200");
+        /* v4.176.0: عدد «کاربران متصل» قبلاً از تعدادِ ردیف‌های برگشتیِ یک
+           کوئری با LIMIT 200 حساب می‌شد، پس هرچه کاربران از ۲۰۰ بیشتر می‌شدند
+           عدد روی ۲۰۰ می‌ماند. حالا شمارش واقعی (سبک و ایندکس‌دار) جدا از
+           فهرست نمایشی انجام می‌شود و فهرست صفحه‌بندی می‌شود. */
+        $connectedTotal = 0;
+        try { $connectedTotal = (int)(DB::fetch("SELECT COUNT(*) AS c FROM `$userTable` b JOIN students s ON b.student_id = s.id")['c'] ?? 0); }
+        catch (Throwable $e) { $connectedTotal = 0; }
+        $usersPerPage = 200;
+        $usersPages = max(1, (int)ceil($connectedTotal / $usersPerPage));
+        $usersPage = max(1, min($usersPages, (int)($_GET['users_page'] ?? 1)));
+        $usersOffset = ($usersPage - 1) * $usersPerPage;
+        $connectedUsers = DB::fetchAll("SELECT b.*, b.`$chatCol` AS chat_id, b.`$usernameCol` AS username, s.first_name, s.last_name, s.national_id, s.grade_level, s.class_name FROM `$userTable` b JOIN students s ON b.student_id = s.id ORDER BY b.id DESC LIMIT $usersPerPage OFFSET $usersOffset");
         // Target options are unified with students, manual classes and imported weekly schedules.
         $grades = get_unified_grade_options($_GET['year'] ?? get_setting('current_academic_year', '1404/1405'));
         $classes = get_unified_class_options($_GET['year'] ?? get_setting('current_academic_year', '1404/1405'));
@@ -355,7 +366,7 @@ if (!function_exists('bot_admin_render_page')) {
             </div>
             <div class="stats-mini">
                 <span>کاربران متصل</span>
-                <b><?php echo tr_num(count($connectedUsers), 'fa'); ?></b>
+                <b><?php echo tr_num($connectedTotal, 'fa'); ?></b>
             </div>
         </section>
 
@@ -485,7 +496,21 @@ if (!function_exists('bot_admin_render_page')) {
     </section>
 
     <section class="card shadow-lg">
-        <h3 class="font-bold text-primary mb-3"><svg data-ui-icon="users" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="7" r="3"/><path d="M2 21v-3c0-6 14-6 14 0v3M16 4c5 0 5 6 1 6M19 14c3 1 3 4 3 7"/></svg> کاربران متصل به ربات <?php echo clean($title); ?></h3>
+        <h3 class="font-bold text-primary mb-3"><svg data-ui-icon="users" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="7" r="3"/><path d="M2 21v-3c0-6 14-6 14 0v3M16 4c5 0 5 6 1 6M19 14c3 1 3 4 3 7"/></svg> کاربران متصل به ربات <?php echo clean($title); ?>
+            <span class="text-muted" style="font-size:.75rem;font-weight:400">
+                — مجموع <?php echo tr_num($connectedTotal, 'fa'); ?> کاربر ·
+                این صفحه <?php echo tr_num(($usersOffset + 1) . '-' . min($connectedTotal, $usersOffset + $usersPerPage), 'fa'); ?>
+                از <?php echo tr_num((string)$usersPages, 'fa'); ?> صفحه
+            </span>
+        </h3>
+        <?php if ($usersPages > 1): ?>
+        <nav class="flex gap-2 items-center flex-wrap" style="margin-bottom:10px" aria-label="صفحه‌های فهرست کاربران">
+            <?php for ($pg = 1; $pg <= $usersPages; $pg++): ?>
+                <a class="btn <?php echo $pg === $usersPage ? 'btn-primary' : 'btn-outline'; ?> text-xs"
+                   href="<?php echo clean($page); ?>?platform=<?php echo urlencode($platform); ?>&amp;users_page=<?php echo $pg; ?>"><?php echo tr_num((string)$pg, 'fa'); ?></a>
+            <?php endfor; ?>
+        </nav>
+        <?php endif; ?>
         <div class="table-container max-h-[420px]">
             <table>
                 <thead><tr><th>#</th><th>Chat ID</th><th>Username</th><th>دانش‌آموز</th><th>کد ملی</th><th>پایه</th><th>کلاس</th><th>زمان اتصال</th></tr></thead>
