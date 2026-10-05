@@ -220,22 +220,51 @@ body.school-app{height:auto!important;max-height:none!important;min-height:100vh
 /* v4.179.0 — ردیف فیلترهای «مدیریت دانش‌آموزان».
    عمداً با .students-filters محدود شده: .filters-line و .filter-primary با
    bot-inbox.php مشترک‌اند و نباید آن صفحه عوض شود.
-   دو dropdown «چینش فهرست» و «ترتیب» از ردیف اصلی برداشته شدند (چینش با
-   سرستون‌های جدول انجام می‌شود) و «کلاس» جای آن‌ها آمد. */
+
+   اندازه‌ها بر پایهٔ طولِ واقعیِ مقدارِ هر فیلد تنظیم شده‌اند:
+   «سال تحصیلی» و «پایه» مقدارشان کوتاه است («۱۴۰۴-۱۴۰۵» و «هفتم») پس نصف
+   شدند؛ «کلاس» بلندتر است و ۲٫۵ برابر شد تا مقدارش بریده نشود؛ جستجو هم نصف
+   شد چون placeholder‌اش کوتاه شد و متن کامل در title هست. */
 .school-app .students-filters{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 12px}
-.school-app .students-filters .filter-primary{flex:1 1 160px;min-width:0;display:flex;flex-direction:column;gap:4px}
-.school-app .students-filters .filter-primary:first-child{flex:2 1 240px}
+.school-app .students-filters .filter-primary{display:flex;flex-direction:column;gap:4px;min-width:0}
 .school-app .students-filters .filter-primary>label{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.school-app .students-filters .filter-primary .form-select,.school-app .students-filters .filter-primary .form-input{width:100%;min-width:0}
-.school-app .students-filters .filter-actions{display:flex;gap:8px;align-items:flex-end;flex:0 0 auto;margin-inline-start:auto}
-.school-app .students-filters .filter-more{flex:1 1 100%;margin-top:2px}
-/* ویژگی این قاعده (۰٬۳٬۱) از .school-app .grid-cols-4 (۰٬۲٬۰) بیشتر است، پس
-   جای آن را می‌گیرد و «گزینه‌های بیشتر» واقعاً واکنش‌گرا می‌شود. */
-.school-app .students-filters .filter-more>div{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(165px,1fr))}
+.school-app .students-filters .filter-primary .form-select,
+.school-app .students-filters .filter-primary .form-input{width:100%;min-width:0}
+/* جستجو: نصفِ پیشین (۲۴۰ → ۱۲۰) اما تا ۲۸۰ می‌تواند باز شود */
+.school-app .students-filters .f-search{flex:1 1 120px;max-width:280px}
+/* سال تحصیلی و پایه: نصفِ پیشین (۱۶۰ → ۸۰)، تقریباً ثابت */
+.school-app .students-filters .f-year,
+.school-app .students-filters .f-grade{flex:0 1 80px;max-width:118px}
+/* کلاس: ۲٫۵ برابرِ پایه تا نام کلاس کامل دیده شود */
+.school-app .students-filters .f-class{flex:2 1 200px;max-width:300px}
+/* نوار پایین: کلید «گزینه‌های بیشتر» یک سو، دکمه‌ها سوی دیگر */
+.school-app .students-filters .filter-bar{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 14px;margin-top:2px}
+.school-app .students-filters .filter-more{flex:0 1 auto;min-width:0;margin-top:0}
+.school-app .students-filters .filter-actions{display:flex;gap:8px;align-items:center;flex:0 0 auto}
+/* شبکهٔ «گزینه‌های بیشتر»: هر خانه به اندازهٔ طولِ مقدارهای خودش.
+   انضباطی و تحصیلی بلندترین option‌ها را دارند («۳۰ روز اخیر»، «نمره زیر ۱۰»)،
+   درس خاص متوسط، و معدل دو عدد کوتاه است ولی دو ورودی کنار هم دارد.
+   ویژگی این قاعده (۰٬۳٬۱) از .school-app .grid-cols-4 (۰٬۲٬۰) بیشتر است. */
+.school-app .students-filters .filter-more>div{
+  display:grid;gap:8px;
+  grid-template-columns:minmax(148px,1.15fr) minmax(148px,1.15fr) minmax(126px,1fr) minmax(158px,0.85fr);
+}
+.school-app .students-filters .filter-more label{margin:0;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.school-app .students-filters .filter-more .form-select,
+.school-app .students-filters .filter-more .form-input{width:100%;min-width:0}
+.school-app .students-filters .fm-gpa{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+@media(max-width:900px){
+.school-app .students-filters .filter-more>div{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 @media(max-width:640px){
 .school-app .students-filters{gap:8px}
-.school-app .students-filters .filter-primary,.school-app .students-filters .filter-primary:first-child{flex:1 1 100%}
-.school-app .students-filters .filter-actions{width:100%;margin-inline-start:0}
+.school-app .students-filters .filter-primary,
+.school-app .students-filters .f-search,
+.school-app .students-filters .f-year,
+.school-app .students-filters .f-grade,
+.school-app .students-filters .f-class{flex:1 1 100%;max-width:none}
+.school-app .students-filters .filter-bar{gap:8px}
+.school-app .students-filters .filter-actions{width:100%}
 .school-app .students-filters .filter-actions .btn{flex:1 1 auto}
-.school-app .students-filters .filter-more>div{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.school-app .students-filters .filter-more>div{grid-template-columns:1fr}
 }

@@ -52,7 +52,7 @@ ok('فیلد name="dir" در فرم نیست', !form.includes('name="dir"'));
 
 console.log('\n── چیزهایی که باید آمده/مانده باشند ──');
 ok('«کلاس» در ردیف اصلی است', form.includes('name="class_name"'));
-ok('برچسب «کلاس» در ردیف اصلی دیده می‌شود', /<div class="filter-primary"><label[^>]*>کلاس<\/label>/.test(form));
+ok('برچسب «کلاس» در ردیف اصلی دیده می‌شود', /<div class="filter-primary[^"]*"><label[^>]*>کلاس<\/label>/.test(form));
 ok('کلاس فقط یک بار در فرم هست (از «گزینه‌های بیشتر» برداشته شد)',
    (form.match(/name="class_name"/g) || []).length === 1);
 ok('«کلاس» پیش از «گزینه‌های بیشتر» آمده',
@@ -93,10 +93,85 @@ const css = readFileSync(resolveFile('assets/css/school-ui.css'), 'utf8');
 ok('قاعدهٔ واکنش‌گرای .students-filters اضافه شده', css.includes('.school-app .students-filters{display:flex'));
 ok('قاعده‌ها به .students-filters محدودند (bot-inbox آسیب نمی‌بیند)',
    !/\.filters-line\s*\{[^}]*display:flex/.test(css) || css.includes('.students-filters'));
-ok('گرید «گزینه‌های بیشتر» واکنش‌گرا شد', css.includes('.students-filters .filter-more>div'));
-ok('کش‌شکن school-ui.css جلو رفته است', page.includes('school-ui.css?v20261005a'),
+/* ═══════ اندازهٔ فیلدها — خواستهٔ کاربر ═══════ */
+console.log('\n── اندازهٔ فیلدها ──');
+/* عددِ flex-basis یک قاعده را از CSS بیرون می‌کشد */
+const basisOf = (sel) => {
+  const m = css.match(new RegExp('\\.students-filters\\s+' + sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^{}]*\\{([^}]*)\\}'));
+  if (!m) return null;
+  const f = m[1].match(/flex:\s*[\d.]+\s+[\d.]+\s+([\d.]+)px/);
+  return f ? Number(f[1]) : null;
+};
+const maxOf = (sel) => {
+  const m = css.match(new RegExp('\\.students-filters\\s+' + sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^{}]*\\{([^}]*)\\}'));
+  if (!m) return null;
+  const w = m[1].match(/max-width:\s*([\d.]+)px/);
+  return w ? Number(w[1]) : null;
+};
+
+const bSearch = basisOf('.f-search'), bYear = basisOf('.f-year'),
+      bGrade = basisOf('.f-grade'), bClass = basisOf('.f-class');
+ok('هر چهار فیلد ردیف اصلی کلاس اندازهٔ خودشان را دارند',
+   ['.f-search', '.f-year', '.f-grade', '.f-class'].every((s) => css.includes('.students-filters ' + s)),
+   'یافت‌شده: ' + [bSearch, bYear, bGrade, bClass].join(','));
+
+/* پایهٔ پیشین: جستجو ۲۴۰ و بقیه ۱۶۰ */
+ok('جستجو نصف شد (۲۴۰ → ' + bSearch + ')', bSearch === 120, 'basis=' + bSearch);
+ok('سال تحصیلی نصف شد (۱۶۰ → ' + bYear + ')', bYear === 80, 'basis=' + bYear);
+ok('پایه نصف شد (۱۶۰ → ' + bGrade + ')', bGrade === 80, 'basis=' + bGrade);
+ok('کلاس بزرگ‌تر شد (۱۶۰ → ' + bClass + ')', bClass > bYear * 2, 'basis=' + bClass);
+ok('کلاس حدود ۲٫۵ برابرِ پایه است', Math.abs(bClass / bYear - 2.5) < 0.01,
+   (bClass / bYear).toFixed(2) + ' برابر');
+ok('عرض بیشینهٔ کلاس هم ≥۲٫۵ برابرِ سال تحصیلی است',
+   maxOf('.f-class') >= maxOf('.f-year') * 2.5,
+   maxOf('.f-class') + ' در برابر ' + maxOf('.f-year'));
+ok('قاعدهٔ یک‌اندازه‌برای‌همه (flex:1 1 160px) دیگر نیست',
+   !/\.students-filters \.filter-primary\{[^}]*flex:1 1 160px/.test(css));
+ok('فیلدها در HTML هم کلاس اندازه‌شان را دارند',
+   ['.f-search', '.f-year', '.f-grade', '.f-class'].every((s) => form.includes('class="filter-primary ' + s.slice(1) + '"')));
+
+/* placeholder جستجو کوتاه شد تا در عرضِ نصفه جا شود؛ متن کامل در title */
+ok('placeholder جستجو کوتاه شد تا در عرض نصفه جا شود',
+   form.includes('placeholder="نام یا کد ملی"') && !form.includes('نام، نام خانوادگی، کد ملی، نام پدر'));
+ok('متن کامل جستجو در title باقی ماند',
+   /name="q"[^>]*title="[^"]*کد ملی[^"]*"/.test(form) || /title="[^"]*کد ملی[^"]*"[^>]*name="q"/.test(form));
+ok('فیلدهای معدل inputmode="decimal" گرفتند',
+   (form.match(/inputmode="decimal"/g) || []).length === 2);
+
+/* ═══════ نوار «گزینه‌های بیشتر» و دکمه‌ها ═══════ */
+console.log('\n── نوار پایین: گزینه‌های بیشتر + دکمه‌ها ──');
+ok('نوار filter-bar در HTML هست', form.includes('<div class="filter-bar">'));
+ok('دکمه‌ها طرف دیگر «گزینه‌های بیشتر» نشستند (پس از آن در DOM)',
+   form.indexOf('class="filter-more"') > -1 &&
+   form.indexOf('class="filter-actions"') > form.indexOf('class="filter-more"'));
+ok('filter-bar در CSS space-between است',
+   /\.students-filters \.filter-bar\{[^}]*justify-content:space-between/.test(css));
+ok('filter-bar تمام‌عرض است تا دکمه واقعاً به آن سو برود',
+   /\.students-filters \.filter-bar\{[^}]*flex:1 1 100%/.test(css));
+ok('«گزینه‌های بیشتر» دیگر تمام‌عرض نیست (وگرنه دکمه به سطر بعد می‌رفت)',
+   !/\.students-filters \.filter-more\{[^}]*flex:1 1 100%/.test(css));
+
+/* ═══════ اندازهٔ خانه‌های «گزینه‌های بیشتر» ═══════ */
+console.log('\n── خانه‌های «گزینه‌های بیشتر» ──');
+ok('هر چهار خانه کلاس خودش را دارد',
+   ['fm-disc', 'fm-acad', 'fm-subject', 'fm-gpa'].every((c) => form.includes('class="' + c) || form.includes(' ' + c + ' ')));
+const gridCols = (css.match(/\.students-filters \.filter-more>div\{([^}]*)\}/) || [, ''])[1];
+const mins = Array.from(gridCols.matchAll(/minmax\((\d+)px/g)).map((m) => Number(m[1]));
+ok('گرید چهار ستون با اندازهٔ متفاوت دارد (نه یک‌اندازه)',
+   mins.length === 4 && new Set(mins).size > 1, 'minmax ها: [' + mins.join('، ') + ']');
+ok('ستون معدل از درس خاص پهن‌تر است (دو ورودی کنار هم دارد)',
+   mins[3] > mins[2], mins[3] + ' > ' + mins[2]);
+ok('گرید یک‌اندازهٔ قبلی (auto-fit/minmax 165) برداشته شد',
+   !/filter-more>div\{[^}]*repeat\(auto-fit,minmax\(165px/.test(css));
+ok('برچسب‌های «گزینه‌های بیشتر» با ellipsis می‌شکنند نه اینکه ردیف را باز کنند',
+   /\.students-filters \.filter-more label\{[^}]*text-overflow:ellipsis/.test(css));
+ok('در موبایل همهٔ فیلدها تمام‌عرض می‌شوند',
+   /@media\(max-width:640px\)\{[\s\S]{0,800}?\.f-class\{flex:1 1 100%/.test(css));
+
+ok('کش‌شکن school-ui.css جلو رفته است', page.includes('school-ui.css?v20261006a'),
    'کش‌شکن قدیمی یعنی CSS تازه به کلاینت نمی‌رسد');
-ok('کش‌شکن قدیمی school-ui.css نمانده', !page.includes('school-ui.css?v20260917e'));
+ok('کش‌شکن قدیمی school-ui.css نمانده',
+   !page.includes('school-ui.css?v20260917e') && !page.includes('school-ui.css?v20261005a'));
 
 const hdr = readFileSync(resolveFile('includes/header.php'), 'utf8');
 ok('skip-link دسترسی‌پذیری در هدر باقی است', hdr.includes('href="#main-content"'));
