@@ -15,15 +15,10 @@ $footerLogged=is_admin_logged_in()||is_student_logged_in()||(function_exists('is
 $footerRelease=is_file(dirname(__DIR__).'/config/release.php')?require dirname(__DIR__).'/config/release.php':[];
 $footerDesk=($footerRelease['distribution']??(PHP_SAPI==='cli-server'?'desktop':'site'))==='desktop';
 $showConnection=$footerDesk&&empty($isEmbedded);
-/* v4.178.0: شمارهٔ نسخه از config/version.php — نه از release.php، تا بستهٔ
-   اصلاحی مجبور نباشد فایلی را بازنویسی کند که درایور بانک را انتخاب می‌کند. */
-$footerVersionFile=dirname(__DIR__).'/config/version.php';
-$footerVersion=is_file($footerVersionFile)?(require $footerVersionFile):[];
-$footerVersionLabel=(string)($footerDesk?($footerVersion['desktop_version']??''):($footerVersion['site_version']??''));
 ?>
 <footer class="school-footer<?php echo $showConnection?' has-desk-state':''; ?>" aria-label="اطلاعات سامانه مدرسه">
 <div class="school-footer-inner">
-<div class="school-footer-brand"><span class="school-footer-mark"><svg data-ui-icon="school" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m3 9 9-6 9 6v12H3Z"/><path d="M9 21v-6h6v6M7 11h.01M17 11h.01M12 7v3M10.5 8.5h3"/></svg></span><div><strong><?php echo clean(get_setting('school_name','سامانه مدیریت مدرسه')); ?></strong><small>آموزش، ارزشیابی و ارتباطات مدرسه</small></div><?php if($footerVersionLabel!==''): ?><span class="school-footer-version" title="نسخهٔ کد نصب‌شده">نسخهٔ <?php echo clean($footerVersionLabel); ?></span><?php endif; ?></div>
+<div class="school-footer-brand"><span class="school-footer-mark"><svg data-ui-icon="school" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m3 9 9-6 9 6v12H3Z"/><path d="M9 21v-6h6v6M7 11h.01M17 11h.01M12 7v3M10.5 8.5h3"/></svg></span><strong><?php echo clean(get_setting('school_name','سامانه مدیریت مدرسه')); ?></strong></div>
 <div class="school-footer-credit">طراحی و توسعه : معاونت فناوری متوسطه اول</div>
 <nav class="school-footer-links" aria-label="پیوندهای پایین صفحه"><a href="#main-content">بازگشت به محتوا</a><?php if($footerLogged): ?><a href="my-sessions.php">نشست‌های من</a><?php endif; ?></nav>
 <?php if($showConnection): ?>

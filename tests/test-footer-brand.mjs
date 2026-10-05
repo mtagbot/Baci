@@ -1,18 +1,20 @@
 /**
  * test-footer-brand.mjs — سوئیت ۵۳ (v4.179.0)
  *
- * نگهبانِ طراحی فوتر. در کامیت 1ad7148 فوتر از ۷۳۷۲ بایت به ۳۴۸۰ بایت
- * کوچک شد و آیکون SVG مدرسه، زیرعنوان و پیوند «بازگشت به محتوا» از آن
- * حذف گردید؛ v4.178.0 همان نسخهٔ کوچک‌شده را بسته‌بندی کرد، پس نصب آن
- * روی سایتی که طراحی تازه داشت، فوتر را به حالت قبلی برمی‌گرداند.
- * این سوئیت همان رگرسیون را می‌گیرد.
+ * دو چیز را نگهبانی می‌کند:
  *
- * هر دو توزیع سنجیده می‌شود، چون فایل یکی است و با config/release.php
- * رفتار عوض می‌کند:
- *   · سایت   — آیکون/زیرعنوان/پیوندها هست، پنل اتصال و همگام‌سازی نیست
- *   · دسکتاپ — همان‌ها هست، به‌علاوهٔ پنل اتصال و اسکریپت همگام‌سازی خودکار
+ * ۱) طراحی فوتر که در کامیت 1ad7148 از دست رفته بود (فوتر از ۷۳۷۲ به ۳۴۸۰
+ *    بایت کوچک شد) در v4.179.0 برگردانده شد: کادر آیکون SVG مدرسه و پیوند
+ *    «بازگشت به محتوا». v4.178.0 همان نسخهٔ کوچک‌شده را بسته‌بندی کرده بود،
+ *    پس نصبش فوتر را به حالت قبلی برمی‌گرداند.
  *
- * قاعدهٔ پروژه: «تستی که نتواند شکست بخورد، نگهبان نیست.»
+ * ۲) سه عنصری که بنا به درخواست کاربر نباید در فوتر باشند:
+ *      · زیرعنوان «آموزش، ارزشیابی و ارتباطات مدرسه»
+ *      · بج «نسخهٔ …» (config/version.php همچنان metadata نصب است، فقط رندر نمی‌شود)
+ *      · دکمهٔ شناور «بازگشت به بالا» (در assets/js/ui-modern.js ساخته می‌شد)
+ *
+ * هر دو توزیع سنجیده می‌شود، چون فایل یکی است و با config/release.php رفتار
+ * عوض می‌کند. قاعدهٔ پروژه: «تستی که نتواند شکست بخورد، نگهبان نیست.»
  */
 import { php, req, loginAdmin } from './harness/lib.mjs';
 import { resolveFile } from './harness/site.mjs';
@@ -24,11 +26,12 @@ const ok = (n, c, d = '') => c ? (pass++, console.log(`  ✅ ${n}`))
 
 const RELEASE = '/www/config/release.php';
 const SID = 'footerAdmin0001';   // req() پیش‌فرض نشست دانش‌آموز دارد؛ مدیر باید صریح باشد
-const SVG_PATHS = 'm3 9 9-6 9 6v12H3Z';              // آیکون مدرسه
-const SUBTITLE = 'آموزش، ارزشیابی و ارتباطات مدرسه';
-const BACKLINK = 'بازگشت به محتوا';
+const SVG_PATHS = 'm3 9 9-6 9 6v12H3Z';                 // آیکون مدرسه
+const SUBTITLE = 'آموزش، ارزشیابی و ارتباطات مدرسه';    // نباید باشد
+const BACKTOP = 'بازگشت به بالا';                       // نباید باشد
+const BACKCONTENT = 'بازگشت به محتوا';                  // باید باشد
 
-/* نسخهٔ واقعیِ روی دیسک — نه عدد سخت‌کدشده */
+/* نسخهٔ واقعیِ روی دیسک — برای اثباتِ نبودنِ بج در خروجی */
 const versionSrc = readFileSync(resolveFile('config/version.php'), 'utf8');
 const siteVersion = (versionSrc.match(/'site_version'\s*=>\s*'([^']+)'/) || [])[1];
 const deskVersion = (versionSrc.match(/'desktop_version'\s*=>\s*'([^']+)'/) || [])[1];
@@ -45,27 +48,24 @@ await loginAdmin(SID);
 const site = (await req('صفحهٔ اصلی با ورود مدیر', { file: 'index.php', sid: SID })).res.page;
 
 ok('صفحه رندر شد', site.length > 2000, `${site.length} بایت`);
+ok('بدون خطای PHP', !/Fatal error|Parse error/.test(site));
+ok('فوتر رندر می‌شود', site.includes('school-footer'));
 ok('کادر آیکون فوتر رندر می‌شود', site.includes('class="school-footer-mark"'));
 ok('آیکون SVG مدرسه داخل فوتر است', site.includes(SVG_PATHS));
-ok('زیرعنوان فوتر برگشته است', site.includes(SUBTITLE));
-ok('پیوند «بازگشت به محتوا» هست', site.includes(BACKLINK));
+ok('نام مدرسه در فوتر هست', /school-footer-brand[\s\S]{0,600}?<strong>/.test(site));
+ok('پیوند «بازگشت به محتوا» هست', site.includes(BACKCONTENT));
 ok('لنگر #main-content واقعاً در صفحه وجود دارد', site.includes('id="main-content"'));
 ok('اعتبارنامهٔ «معاونت فناوری» سر جایش است', site.includes('طراحی و توسعه : معاونت فناوری متوسطه اول'));
 ok('«نشست‌های من» برای مدیر واردشده هست', site.includes('نشست‌های من'));
-ok('بج نسخه چاپ می‌شود',
-   site.includes('school-footer-version') && site.includes(`نسخهٔ ${siteVersion}`),
-   siteVersion ? `انتظار «نسخهٔ ${siteVersion}»` : 'site_version در config/version.php پیدا نشد');
+
+console.log('\n── سه عنصری که نباید باشند (سایت) ──');
+ok('زیرعنوان حذف شده است', !site.includes(SUBTITLE));
+ok('بج نسخه حذف شده است', !site.includes('school-footer-version'));
+ok('شمارهٔ نسخهٔ سایت در صفحه چاپ نمی‌شود', !site.includes(`نسخهٔ ${siteVersion}`));
+ok('دکمهٔ «بازگشت به بالا» در صفحه نیست', !site.includes(BACKTOP) && !site.includes('ui-backtop'));
 
 ok('روی سایت پنل اتصال دسکتاپ چاپ نمی‌شود', !site.includes('id="deskConnection"'));
-ok('روی سایت پنل اتصال چاپ نمی‌شود (دوباره)', !site.includes('desk-connection.js'));
-
-/* رگرسیون اصلی: برندِ بدون آیکون */
-const bStart = site.indexOf('<div class="school-footer-brand">');
-const bEnd = site.indexOf('<div class="school-footer-credit">', bStart);
-const brandBlock = bStart >= 0 && bEnd > bStart ? site.slice(bStart, bEnd) : '';
-ok('برند فوتر دیگر «فقط نام» نیست',
-   brandBlock.includes('school-footer-mark') && brandBlock.includes(SUBTITLE),
-   brandBlock ? brandBlock.slice(0, 160) : 'بلوک برند در خروجی پیدا نشد');
+ok('روی سایت desk-connection.js بارگذاری نمی‌شود', !site.includes('desk-connection.js'));
 
 /* ═══════════════ ب) حالت دسکتاپ ═══════════════ */
 console.log('\n══ فوتر در حالت دسکتاپ ══');
@@ -74,31 +74,37 @@ const desk = (await req('همان صفحه با توزیع دسکتاپ', { file
 
 ok('صفحهٔ دسکتاپ رندر شد', desk.length > 2000, `${desk.length} بایت`);
 ok('آیکون SVG در دسکتاپ هم هست', desk.includes(SVG_PATHS) && desk.includes('class="school-footer-mark"'));
-ok('زیرعنوان در دسکتاپ هم هست', desk.includes(SUBTITLE));
 ok('کلاس has-desk-state روی فوتر می‌نشیند', desk.includes('school-footer has-desk-state'));
 ok('پنل اتصال و همگام‌سازی رندر می‌شود', desk.includes('id="deskConnection"'));
-ok('desk-connection.js بارگذاری می‌شود', desk.includes('desk-connection.js'));
-/* تیک قدیمی در 1ad7148 عمداً بازنشسته شد: endpoint آن (`desk-sync.php?ajax=tick`)
-   دیگر وجود ندارد و همگام‌سازی را مانیتور desk-connection.js + سرویس پس‌زمینه
-   انجام می‌دهند. برگرداندن طراحی فوتر نباید آن کد مرده را هم برگرداند.
-   همان نگهبان در test-fast-ui.mjs:130 هم هست. */
-ok('تیک قدیمی همگام‌سازی برنگشته است', !desk.includes('ajax=tick'),
-   'desk-sync.php دیگر ajax=tick ندارد؛ این کد مرده است');
+ok('مانیتور desk-connection.js فعال است', desk.includes('desk-connection.js'));
+ok('زیرعنوان در دسکتاپ هم نیست', !desk.includes(SUBTITLE));
+ok('بج نسخه در دسکتاپ هم نیست', !desk.includes('school-footer-version'));
+ok('شمارهٔ نسخهٔ دسکتاپ چاپ نمی‌شود', !desk.includes(`نسخهٔ ${deskVersion}`));
+ok('دکمهٔ «بازگشت به بالا» در دسکتاپ هم نیست', !desk.includes(BACKTOP) && !desk.includes('ui-backtop'));
+
+/* تیک قدیمی همگام‌سازی در 1ad7148 بازنشسته شد و endpoint آن
+   (`desk-sync.php?ajax=tick`) دیگر وجود ندارد. همان نگهبان در
+   test-fast-ui.mjs:130 هم هست. */
+ok('تیک قدیمی همگام‌سازی برنگشته است', !desk.includes('ajax=tick'));
 ok('بنر قدیمی sdpSyncBanner برنگشته است', !desk.includes('sdpSyncBanner'));
-ok('مانیتور تازه desk-connection.js در دسکتاپ فعال است', desk.includes('desk-connection.js'));
-ok('بج نسخه در دسکتاپ شمارهٔ دسکتاپ را نشان می‌دهد', desk.includes(`نسخهٔ ${deskVersion}`),
-   deskVersion ? `انتظار «نسخهٔ ${deskVersion}»` : 'desktop_version در config/version.php پیدا نشد');
 
 /* ═══════════════ ج) منبع روی دیسک ═══════════════ */
-console.log('\n══ منبع فوتر ══');
+console.log('\n══ منبع فوتر و ui-modern.js ══');
 const src = readFileSync(resolveFile('includes/footer.php'), 'utf8');
-ok('فوتر منبع دیگر تیک قدیمی را ندارد', !src.includes('ajax=tick') && !src.includes('sdpSyncBanner'));
-ok('هر require از release.php پشت is_file() محافظت شده',
-   src.includes("is_file(dirname(__DIR__).'/config/release.php')?require dirname(__DIR__).'/config/release.php'")
-   && !/(^|[^\)\?])\brequire\s+dirname\(__DIR__\)\.'\/config\/release\.php'/.test(src),
-   'require بی‌قید release.php روی نصبی که آن فایل را ندارد fatal می‌دهد');
-ok('فوتر منبع release.php را با is_file() می‌سنجد',
-   /is_file\(dirname\(__DIR__\)\.'\/config\/release\.php'\)/.test(src));
+ok('فوتر منبع دیگر config/version.php را نمی‌خواند', !src.includes('config/version.php'),
+   'بج حذف شده، پس خواندنش هم بی‌فایده است');
+ok('فوتر منبع زیرعنوان ندارد', !src.includes(SUBTITLE));
+ok('فوتر منبع release.php را پشت is_file() می‌خواند',
+   src.includes("is_file(dirname(__DIR__).'/config/release.php')?require dirname(__DIR__).'/config/release.php'"));
+ok('فوتر منبع تیک قدیمی همگام‌سازی را ندارد', !src.includes('ajax=tick') && !src.includes('sdpSyncBanner'));
+
+const js = readFileSync(resolveFile('assets/js/ui-modern.js'), 'utf8');
+ok('ui-modern.js دیگر initBackTop ندارد', !js.includes('initBackTop'));
+ok('ui-modern.js دیگر کلاس ui-backtop نمی‌سازد', !js.includes('ui-backtop'));
+ok('ui-modern.js دیگر عنوان «بازگشت به بالا» ندارد', !js.includes(BACKTOP));
+ok('ui-modern.js هنوز DOMContentLoaded و ensureBar را دارد',
+   js.includes('DOMContentLoaded') && js.includes('ensureBar()'),
+   'حذف دکمه نباید بقیهٔ راه‌اندازی را ببرد');
 
 if (savedRelease !== null) php.writeFile(RELEASE, savedRelease);
 

@@ -1,10 +1,12 @@
-// v4.178.0 — شمارهٔ نسخهٔ کد در فوتر + بهداشت مخزن (۵ اصلاح نشست ۱۰-۰۵)
+// v4.178.0 — شمارهٔ نسخهٔ کد + بهداشت مخزن (۵ اصلاح نشست ۱۰-۰۵)
+// v4.179.0 — بج نسخه بنا به درخواست کاربر از فوتر حذف شد.
 //
 // چه چیزی اینجا «اجرا» می‌شود، نه ادعا:
-//   ۱) config/version.php واقعاً با PHP خوانده می‌شود و شماره‌ها را برمی‌گرداند.
-//   ۲) فوتر سایت در یک درخواست واقعی صفحه، شمارهٔ نسخهٔ سایت را رندر می‌کند.
-//   ۳) با distribution=desktop همان فوتر شمارهٔ دسکتاپ را نشان می‌دهد.
-//   ۴) اگر config/version.php نباشد، فوتر بدون خطا و بدون بج رندر می‌شود.
+//   ۱) config/version.php واقعاً با PHP خوانده می‌شود و شماره‌ها را برمی‌گرداند
+//      (metadata نصب — همچنان بخشی از هویت Release_V1.1 است).
+//   ۲) فوتر سایت در یک درخواست واقعی صفحه، دیگر شمارهٔ نسخه را رندر نمی‌کند.
+//   ۳) با distribution=desktop هم چیزی چاپ نمی‌شود.
+//   ۴) اگر config/version.php نباشد، فوتر بدون خطا رندر می‌شود.
 //   ۵) بستهٔ اصلاحی config/release.php را شامل نمی‌شود (آن فایل درایور بانک را
 //      انتخاب می‌کند؛ بازنویسی‌اش با بستهٔ اصلاحی یعنی ریسک عوض‌شدن MySQL↔SQLite).
 //   ۶) test-bot-outbox.mjs در run-tests.sh ثبت است و دو آرایه هم‌اندازه‌اند.
@@ -54,19 +56,21 @@ php.writeFile('/www/config/release.php',
 await loginAdmin('verstamp01');
 const sitePage = await req('فوتر سایت', { file: 'other-settings.php', sid: 'verstamp01' });
 check(!sitePage.res.fatal, 'the page renders with no fatal error: ' + (sitePage.res.fatal || ''));
-check(sitePage.res.page.includes('school-footer-version'), 'the version badge element is present');
-check(sitePage.res.page.includes('نسخهٔ ' + SITE_VERSION),
-  'the SITE version is shown in the footer: ' + SITE_VERSION);
-check(!sitePage.res.page.includes('نسخهٔ ' + DESKTOP_VERSION),
-  'a site install must not show the desktop version');
+check(!sitePage.res.page.includes('school-footer-version'),
+  'the version badge element is gone from the footer (removed in v4.179.0)');
+check(!sitePage.res.page.includes('نسخهٔ ' + SITE_VERSION),
+  'the SITE version is NOT printed in the footer any more: ' + SITE_VERSION);
+check(sitePage.res.page.includes('school-footer'), 'the footer itself still renders');
+check(sitePage.res.page.includes('school-footer-mark'), 'the restored footer mark survives the badge removal');
 
 /* ═══════ ۳) همان فوتر، توزیع دسکتاپ ═══════ */
 php.writeFile('/www/config/release.php',
   "<?php\nreturn ['release'=>'Release_V1.0','distribution'=>'desktop','site_version'=>'4.152.0','desktop_version'=>'2.83.0'];\n");
 const deskPage = await req('فوتر دسکتاپ', { file: 'other-settings.php', sid: 'verstamp01' });
 check(!deskPage.res.fatal, 'the desktop-distribution page renders: ' + (deskPage.res.fatal || ''));
-check(deskPage.res.page.includes('نسخهٔ ' + DESKTOP_VERSION),
-  'a desktop install shows the DESKTOP version ' + DESKTOP_VERSION);
+check(!deskPage.res.page.includes('نسخهٔ ' + DESKTOP_VERSION),
+  'a desktop install no longer prints the DESKTOP version ' + DESKTOP_VERSION);
+check(!deskPage.res.page.includes('school-footer-version'), 'no badge on the desktop footer either');
 check(!deskPage.res.page.includes('نسخهٔ ' + SITE_VERSION),
   'a desktop install must not show the site version');
 php.writeFile('/www/config/release.php', originalRelease);
@@ -76,7 +80,7 @@ const versionBackup = php.readFileAsText('/www/config/version.php');
 php.unlink('/www/config/version.php');
 const noVer = await req('فوتر بدون فایل نسخه', { file: 'other-settings.php', sid: 'verstamp01' });
 check(!noVer.res.fatal, 'the footer survives a missing config/version.php: ' + (noVer.res.fatal || ''));
-check(!noVer.res.page.includes('school-footer-version'), 'no empty badge is rendered without the file');
+check(!noVer.res.page.includes('school-footer-version'), 'no badge with the file absent (now true either way)');
 check(noVer.res.page.includes('school-footer'), 'the footer itself still renders');
 php.writeFile('/www/config/version.php', versionBackup);
 

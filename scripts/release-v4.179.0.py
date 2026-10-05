@@ -13,6 +13,9 @@
                           در دسکتاپ هم همین فایل سایت است — `desktop-app-v2/patch/`
                           نسخهٔ جداگانه‌ای از آن ندارد.
 
+  `assets/js/ui-modern.js` حذف دکمهٔ شناور «بازگشت به بالا». در دسکتاپ هم
+                          همین فایل سایت است.
+
   `includes/footer.php`   بازگرداندن طراحی فوتری که در کامیت 1ad7148 از دست
                           رفته بود (آیکون SVG مدرسه + زیرعنوان + «بازگشت به
                           محتوا»). v4.178.0 همان نسخهٔ کوچک‌شده را بسته‌بندی
@@ -22,6 +25,9 @@
                           `$footerDesk` حفظ شده و روی سایت چاپ نمی‌شود.
                           منبع سایت: `update-v4.152.0/includes/footer.php`
                           منبع دسکتاپ: `desktop-app-v2/patch/includes-footer.php`
+                          بنا به درخواست کاربر، زیرعنوان و بج «نسخهٔ …» از فوتر
+                          حذف شدند؛ `config/version.php` به‌عنوان metadata نصب
+                          می‌ماند ولی دیگر رندر نمی‌شود.
 
 **هیچ تغییر پایگاه‌داده‌ای و هیچ مهاجرت داده‌ای لازم نیست:** ستون
 `is_justified` از v4.31.0 در `student_discipline_records` وجود دارد (در MySQL با
@@ -45,10 +51,12 @@ SUMS = 'V4.179.0-SHA256SUMS.txt'
 # (مسیر داخل بسته، مسیر منبع نسبت به ریشهٔ مخزن)
 SITE_PAIRS = [
     ('attendance.php', 'update-v4.152.0/attendance.php'),
+    ('assets/js/ui-modern.js', 'update-v4.152.0/assets/js/ui-modern.js'),
     ('includes/footer.php', 'update-v4.152.0/includes/footer.php'),
 ]
 DESKTOP_PAIRS = [
     ('attendance.php', 'update-v4.152.0/attendance.php'),
+    ('assets/js/ui-modern.js', 'update-v4.152.0/assets/js/ui-modern.js'),
     ('includes/footer.php', 'desktop-app-v2/patch/includes-footer.php'),
 ]
 

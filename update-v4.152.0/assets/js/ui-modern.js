@@ -62,24 +62,6 @@
         }
     }, true);
 
-    /* ---------- 3) Back-to-top inside the scrolling <main> pane ---------- */
-    function initBackTop() {
-        var main = document.querySelector('main.flex-1');
-        if (!main) return;
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'ui-backtop';
-        btn.title = 'بازگشت به بالا';
-        btn.setAttribute('aria-label', 'بازگشت به بالا');
-        btn.textContent = '↑';
-        document.body.appendChild(btn);
-        var scroller = main; // desktop-app shell scrolls inside <main>
-        function onScroll() { btn.classList.toggle('show', scroller.scrollTop > 350); }
-        scroller.addEventListener('scroll', onScroll, { passive: true });
-        btn.addEventListener('click', function () {
-            scroller.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
-        });
-    }
 
     /* ---------- 4) Keyboard shortcut: "/" focuses first search input ---------- */
     document.addEventListener('keydown', function (e) {
@@ -129,6 +111,5 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         ensureBar();
-        initBackTop();
     });
 })();
