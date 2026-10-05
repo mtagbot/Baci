@@ -98,6 +98,13 @@ ok('فوتر منبع release.php را پشت is_file() می‌خواند',
    src.includes("is_file(dirname(__DIR__).'/config/release.php')?require dirname(__DIR__).'/config/release.php'"));
 ok('فوتر منبع تیک قدیمی همگام‌سازی را ندارد', !src.includes('ajax=tick') && !src.includes('sdpSyncBanner'));
 
+/* محتوای ui-modern.js عوض شد، پس رشتهٔ کش‌شکنِ ?v= هم باید عوض شود؛
+   وگرنه مرورگر همان نسخهٔ کش‌شدهٔ قدیمی را سرو می‌کند و دکمهٔ حذف‌شده
+   سر جایش می‌ماند. */
+const ver = (src.match(/assets\/js\/ui-modern\.js\?v=([0-9a-z]+)/) || [])[1] || '';
+ok('رشتهٔ کش‌شکن ui-modern.js جلو رفته است', ver !== '' && ver !== '20260917e',
+   'v=20260917e همان نسخهٔ کش‌شده‌ای است که initBackTop داشت');
+
 const js = readFileSync(resolveFile('assets/js/ui-modern.js'), 'utf8');
 ok('ui-modern.js دیگر initBackTop ندارد', !js.includes('initBackTop'));
 ok('ui-modern.js دیگر کلاس ui-backtop نمی‌سازد', !js.includes('ui-backtop'));

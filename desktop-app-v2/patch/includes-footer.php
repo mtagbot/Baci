@@ -35,7 +35,7 @@ $showConnection=$footerDesk&&empty($isEmbedded);
 <script defer src="assets/vendor/chart.umd.min.js"></script>
 <?php endif; ?>
 <script defer src="assets/js/main.js"></script>
-<script defer src="assets/js/ui-modern.js?v=20260917e"></script>
+<script defer src="assets/js/ui-modern.js?v=20261005a"></script>
 <script defer src="assets/js/searchable-select.js?v=20260917e"></script>
 <?php if (PHP_SAPI === 'cli-server'): ?><script defer src="assets/js/desk-shell.js"></script><?php endif; ?>
 <?php if($showConnection): ?><script defer src="assets/js/desk-connection.js?v=20260917f"></script><?php endif; ?>

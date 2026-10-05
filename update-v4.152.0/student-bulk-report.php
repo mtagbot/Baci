@@ -13,7 +13,20 @@ $ids=array_values(array_unique(array_filter(array_map('intval',is_array($_POST['
    می‌شد و انتخاب «به ترتیب کلاسی» کاربر را نادیده می‌گرفت. اگر مرورگری
    ترتیب را نفرستد، به الفبای نام خانوادگی برمی‌گردیم (رفتار قدیمی). */
 $orderMap=[];
-if(is_array($_POST['student_order']??null)) foreach($_POST['student_order'] as $pos=>$sid)$orderMap[(int)$sid]=(int)$pos;
+/* students.php این فهرست را با یک <input type=hidden name="student_order"> می‌فرستد،
+   پس مقدارش «رشتهٔ جدا‌شده با کاما» است نه آرایه. پیش‌تر فقط شاخهٔ is_array()
+   وجود داشت و رشته بی‌صدا رد می‌شد؛ در نتیجه $orderMap خالی می‌ماند و گزارش
+   همیشه به الفبای نام خانوادگی برمی‌گشت. هر دو شکل پذیرفته می‌شود. */
+$orderRaw=$_POST['student_order']??null;
+if(is_array($orderRaw)){
+    foreach($orderRaw as $pos=>$sid)if((int)$sid>0&&!isset($orderMap[(int)$sid]))$orderMap[(int)$sid]=(int)$pos;
+}elseif(is_string($orderRaw)){
+    $pos=0;
+    foreach(explode(',',$orderRaw) as $sid){
+        $sid=(int)trim($sid);
+        if($sid>0&&!isset($orderMap[$sid]))$orderMap[$sid]=$pos++;
+    }
+}
 if(!$ids)student_report_error('دانش‌آموزی انتخاب نشده است.');
 $type=in_array($_POST['report_type']??'',['info','discipline','grades'],true)?$_POST['report_type']:'info';
 $format=in_array($_POST['format']??'',['html','doc','xls'],true)?$_POST['format']:'html';

@@ -53,11 +53,13 @@ SITE_PAIRS = [
     ('attendance.php', 'update-v4.152.0/attendance.php'),
     ('assets/js/ui-modern.js', 'update-v4.152.0/assets/js/ui-modern.js'),
     ('includes/footer.php', 'update-v4.152.0/includes/footer.php'),
+    ('student-bulk-report.php', 'update-v4.152.0/student-bulk-report.php'),
 ]
 DESKTOP_PAIRS = [
     ('attendance.php', 'update-v4.152.0/attendance.php'),
     ('assets/js/ui-modern.js', 'update-v4.152.0/assets/js/ui-modern.js'),
     ('includes/footer.php', 'desktop-app-v2/patch/includes-footer.php'),
+    ('student-bulk-report.php', 'update-v4.152.0/student-bulk-report.php'),
 ]
 
 PACKAGES = [
