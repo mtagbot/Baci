@@ -23,9 +23,9 @@ $footerVersionLabel=(string)($footerDesk?($footerVersion['desktop_version']??'')
 ?>
 <footer class="school-footer<?php echo $showConnection?' has-desk-state':''; ?>" aria-label="اطلاعات سامانه مدرسه">
 <div class="school-footer-inner">
-<div class="school-footer-brand"><strong><?php echo clean(get_setting('school_name','سامانه مدیریت مدرسه')); ?></strong><?php if($footerVersionLabel!==''): ?><span class="school-footer-version" title="نسخهٔ کد نصب‌شده">نسخهٔ <?php echo clean($footerVersionLabel); ?></span><?php endif; ?></div>
+<div class="school-footer-brand"><span class="school-footer-mark"><svg data-ui-icon="school" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m3 9 9-6 9 6v12H3Z"/><path d="M9 21v-6h6v6M7 11h.01M17 11h.01M12 7v3M10.5 8.5h3"/></svg></span><div><strong><?php echo clean(get_setting('school_name','سامانه مدیریت مدرسه')); ?></strong><small>آموزش، ارزشیابی و ارتباطات مدرسه</small></div><?php if($footerVersionLabel!==''): ?><span class="school-footer-version" title="نسخهٔ کد نصب‌شده">نسخهٔ <?php echo clean($footerVersionLabel); ?></span><?php endif; ?></div>
 <div class="school-footer-credit">طراحی و توسعه : معاونت فناوری متوسطه اول</div>
-<?php if($footerLogged): ?><nav class="school-footer-links" aria-label="نشست کاربری"><a href="my-sessions.php">نشست‌های من</a></nav><?php endif; ?>
+<nav class="school-footer-links" aria-label="پیوندهای پایین صفحه"><a href="#main-content">بازگشت به محتوا</a><?php if($footerLogged): ?><a href="my-sessions.php">نشست‌های من</a><?php endif; ?></nav>
 <?php if($showConnection): ?>
 <details id="deskConnection" class="desk-connection" data-state="<?php echo $footerLogged?'checking':'signed-out'; ?>" data-monitor="<?php echo $footerLogged?'1':'0'; ?>">
 <summary aria-controls="deskConnectionPanel"><span class="desk-connection-ring" aria-hidden="true"></span><span id="deskConnectionLabel" role="status" aria-live="polite" aria-atomic="true"><?php echo $footerLogged?'در حال بررسی اتصال':'برای بررسی وضعیت وارد شوید'; ?></span><span aria-hidden="true" class="desk-connection-more">⌃</span></summary>

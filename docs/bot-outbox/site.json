@@ -4,19 +4,19 @@
   "runtime": "PHP 8.3 WASM + real SQLite",
   "finalJobs": [
     {
+      "platform": "telegram",
+      "owner": "local",
+      "state": "sent",
+      "attempts": 2
+    },
+    {
       "platform": "bale",
       "owner": "local",
       "state": "sent",
       "attempts": 1
     },
     {
-      "platform": "telegram",
-      "owner": "local",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "telegram",
+      "platform": "bale",
       "owner": "local",
       "state": "sent",
       "attempts": 2
@@ -34,18 +34,6 @@
       "attempts": 1
     },
     {
-      "platform": "telegram",
-      "owner": "local",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "bale",
-      "owner": "local",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
       "platform": "bale",
       "owner": "local",
       "state": "sent",
@@ -53,18 +41,6 @@
     },
     {
       "platform": "telegram",
-      "owner": "local",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "bale",
-      "owner": "local",
-      "state": "sent",
-      "attempts": 2
-    },
-    {
-      "platform": "bale",
       "owner": "local",
       "state": "sent",
       "attempts": 1
@@ -98,6 +74,30 @@
       "owner": "local",
       "state": "sent",
       "attempts": 4
+    },
+    {
+      "platform": "bale",
+      "owner": "local",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "telegram",
+      "owner": "local",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "telegram",
+      "owner": "local",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "bale",
+      "owner": "local",
+      "state": "sent",
+      "attempts": 1
     },
     {
       "platform": "telegram",

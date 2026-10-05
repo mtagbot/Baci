@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""v4.179.0 / v2.102.0 — ستون «موجه» در سوابق حضور و غیاب.
+"""v4.179.0 / v2.102.0 — ستون «موجه» در سوابق حضور و غیاب + بازگرداندن طراحی فوتر.
 
     python3 scripts/release-v4.179.0.py
 
@@ -7,9 +7,21 @@
   MODIFIED-FILES-V4.179.0.zip   → سایت   (site-update-v4.152.0/…)
   SchoolDesk-FIX-v2.102.0.zip   → دسکتاپ (SchoolDeskPro/www/…)
 
-هر دو بسته فقط یک فایل دارند: `attendance.php`. در دسکتاپ هم همین فایل سایت
-استراب — `desktop-app-v2/patch/` نسخهٔ جداگانه‌ای از `attendance.php` ندارد، پس
-یک تغییر هر دو توزیع را پوشش می‌دهد.
+محتوای بسته‌ها (دو فایل در هر بسته):
+
+  `attendance.php`        ستون «موجه» در جدول سوابق و ثبت آن در پرونده.
+                          در دسکتاپ هم همین فایل سایت است — `desktop-app-v2/patch/`
+                          نسخهٔ جداگانه‌ای از آن ندارد.
+
+  `includes/footer.php`   بازگرداندن طراحی فوتری که در کامیت 1ad7148 از دست
+                          رفته بود (آیکون SVG مدرسه + زیرعنوان + «بازگشت به
+                          محتوا»). v4.178.0 همان نسخهٔ کوچک‌شده را بسته‌بندی
+                          کرده بود، پس نصبش فوتر را به حالت قبلی برمی‌گرداند.
+                          فایل یکی است و با `config/release.php` رفتار عوض
+                          می‌کند؛ اسکریپت همگام‌سازی خودکار دسکتاپ با شرط
+                          `$footerDesk` حفظ شده و روی سایت چاپ نمی‌شود.
+                          منبع سایت: `update-v4.152.0/includes/footer.php`
+                          منبع دسکتاپ: `desktop-app-v2/patch/includes-footer.php`
 
 **هیچ تغییر پایگاه‌داده‌ای و هیچ مهاجرت داده‌ای لازم نیست:** ستون
 `is_justified` از v4.31.0 در `student_discipline_records` وجود دارد (در MySQL با
@@ -33,9 +45,11 @@ SUMS = 'V4.179.0-SHA256SUMS.txt'
 # (مسیر داخل بسته، مسیر منبع نسبت به ریشهٔ مخزن)
 SITE_PAIRS = [
     ('attendance.php', 'update-v4.152.0/attendance.php'),
+    ('includes/footer.php', 'update-v4.152.0/includes/footer.php'),
 ]
 DESKTOP_PAIRS = [
     ('attendance.php', 'update-v4.152.0/attendance.php'),
+    ('includes/footer.php', 'desktop-app-v2/patch/includes-footer.php'),
 ]
 
 PACKAGES = [

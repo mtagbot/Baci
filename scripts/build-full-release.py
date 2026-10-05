@@ -231,8 +231,17 @@ def assemble():
         functions=web/'includes/functions.php'
         text=functions.read_text();text=text.replace('<?php',"<?php\nrequire_once __DIR__.'/install_guard.php';",1);functions.write_text(text)
         footer=web/'includes/footer.php'
-        text=footer.read_text().replace('<script>\n/* SchoolDesk Pro: real-time auto-sync.', "<?php if ((require dirname(__DIR__).'/config/release.php')['distribution'] === 'desktop'): ?>\n<script>\n/* SchoolDesk Pro: real-time auto-sync.")
-        text=text.replace('</script>\n</body>', '</script>\n<?php endif; ?>\n</body>');footer.write_text(text)
+        text=footer.read_text()
+        # v4.179.0: the footer now self-guards the desktop auto-sync script with
+        # `<?php if($footerDesk): ?>`, which is the safer test because it probes
+        # release.php with is_file() instead of requiring it. Wrapping it again
+        # here would emit an unbalanced `<?php endif; ?>` (the script is no
+        # longer immediately followed by </body>), so only wrap a footer that
+        # still ships the script unguarded.
+        if '/* SchoolDesk Pro: real-time auto-sync.' in text and "<?php if($footerDesk): ?>\n<script>" not in text:
+            text=text.replace('<script>\n/* SchoolDesk Pro: real-time auto-sync.', "<?php if ((require dirname(__DIR__).'/config/release.php')['distribution'] === 'desktop'): ?>\n<script>\n/* SchoolDesk Pro: real-time auto-sync.")
+            text=text.replace('</script>\n</body>', '</script>\n<?php endif; ?>\n</body>')
+        footer.write_text(text)
         # Both endpoints consume the NEW per-install key, never a literal shared historical key.
         text=sync_source
         text=re.sub(r"define\('DESK_SYNC_KEY',\s*'[^']+'\);", "require_once __DIR__.'/config/config.php';\ndefine('DESK_SYNC_KEY', require __DIR__.'/config/desk-sync-key.php');",text,count=1)

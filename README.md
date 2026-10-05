@@ -32,7 +32,7 @@ Word/PDF.
 
 اگر نصبِ فعال دارید، این بسته‌ها را جایگزین کنید (نه بستهٔ کامل). به ترتیب نصب شوند:
 
-### v4.179.0 — غیبت و تأخیر موجه (جدیدترین)
+### v4.179.0 — غیبت و تأخیر موجه + بازگرداندن طراحی فوتر (جدیدترین)
 
 - [MODIFIED-FILES-V4.179.0.zip](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a10d10-baci/MODIFIED-FILES-V4.179.0.zip) — سایت
 - [SchoolDesk-FIX-v2.102.0.zip](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a10d10-baci/SchoolDesk-FIX-v2.102.0.zip) — دسکتاپ
