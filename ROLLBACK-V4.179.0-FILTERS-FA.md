@@ -173,3 +173,39 @@ cp -r site-update-v4.152.0/. /path/to/site/
 > ⚠️ اگر این بسته را برگردانید، `tests/test-students-filters.mjs` **۲۴ بررسی
 > قرمز** می‌دهد — چون آن تست دقیقاً همین اندازه‌ها و چیدمان را می‌سنجد. این
 > عمدی است: نگهبان باید با کد قدیمی قرمز شود.
+
+---
+
+## ۶) بستهٔ بازگشت سوم — پیش از تنظیم ریتم فاصله‌ها
+
+اندازهٔ فیلدها درست شد، اما **ارتفاع و فاصله‌ها** دست‌نخورده مانده بودند.
+پیش از آن مرحله هم یک بستهٔ بازگشت ساخته شد.
+
+**`ROLLBACK-V4.179.0-BEFORE-FILTER-SPACING.zip`** — ۴۸٬۵۱۰ بایت
+sha256 `49ce7b0894af9af0db2e1d01c9dceccd85e8ecb5b6a3e139bb511caedd4ea4bd`
+
+در این حالت:
+
+| | مقدار |
+|---|---|
+| ارتفاع ورودی | ≈۴۱ پیکسل (`padding:.65rem .9rem` + `min-height:34px`) |
+| ارتفاع دکمه | ≈۳۶ پیکسل (`padding:.6rem 1.25rem`) |
+| ارتفاع `summary` | ۴۴ پیکسل (`school-ui.css:115`، داخل `@media screen`) |
+| `gap` ردیف | `10px 12px` |
+| جعبهٔ `.filter-more` | خط‌چین + `padding:.5rem` + `margin-top:.5rem` |
+| `filter-bar` | `align-items:center`، بدون خط جداکننده |
+| کارت فیلتر | بدون کلاس اختصاصی، پدینگ ۲۴ پیکسلِ `.card` |
+| کش‌شکن | `v20261006a` |
+
+### بازگرداندن
+
+```bash
+unzip -o ROLLBACK-V4.179.0-BEFORE-FILTER-SPACING.zip
+cp -r site-update-v4.152.0/. /path/to/site/
+```
+
+فقط `students.php`، `assets/css/school-ui.css` و `includes/header.php` فرق
+می‌کنند.
+
+> ⚠️ با این بسته، `tests/test-students-filters.mjs` **۱۹ بررسی قرمز** می‌دهد
+> و پیام تشخیصی‌اش `gap فعلی: gap:10px 12px` است.

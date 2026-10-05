@@ -31,11 +31,22 @@ const students = readFileSync(resolveFile('students.php'), 'utf8');
 const stripPhpComments = (src) => src.replace(/<\?php\s*\/\*[\s\S]*?\*\/\s*\?>/g, '')
                                      .replace(/\/\*[\s\S]*?\*\//g, '');
 
-/* سربرگ صفحه = بلوکی که <h2>مدیریت پرونده دانش‌آموزان</h2> در آن است */
-const headerBlock = stripPhpComments(students.slice(
-    students.indexOf('<h2 class="text-2xl font-bold">مدیریت پرونده دانش‌آموزان</h2>'),
-    students.indexOf('<div class="card p-4">')
-));
+/* سربرگ صفحه = بلوکی که <h2>مدیریت پرونده دانش‌آموزان</h2> در آن است.
+   پایانِ سربرگ = نخستین نشانهٔ ممکن از شروعِ کارتِ فیلتر. چند لنگر می‌گذاریم
+   چون کلاسِ آن کارت در v4.179.0 از «card p-4» به «card p-4 students-filters-card»
+   عوض شد و indexOfِ تک‌لنگری -1 برمی‌گرداند؛ slice(start,-1) تا آخر فایل می‌رفت
+   و نوار عملیات هم به‌اشتباه داخل «سربرگ» می‌افتاد. */
+const headerStart = students.indexOf('<h2 class="text-2xl font-bold">مدیریت پرونده دانش‌آموزان</h2>');
+const headerEndCandidates = [
+    students.indexOf('<div class="card p-4">'),
+    students.search(/<div class="card[^"]*students-filters/),
+    students.indexOf('<form method="GET" class="filters-line'),
+].filter((i) => i > -1);
+const headerEnd = headerEndCandidates.length ? Math.min(...headerEndCandidates) : students.length;
+const headerBlock = stripPhpComments(students.slice(headerStart, headerEnd));
+ok('لنگرِ پایانِ سربرگ پیدا شد (وگرنه این دو بررسی بی‌معنا می‌شوند)',
+   headerStart > -1 && headerEndCandidates.length > 0,
+   `start=${headerStart} end=${headerEnd} len=${headerBlock.length}`);
 /* نوار عملیات = بلوکی که دکمهٔ «گزارش» در آن است */
 const actionBar = students.slice(
     students.indexOf('<h3 class="font-bold">نتایج:'),

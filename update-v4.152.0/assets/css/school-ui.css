@@ -221,50 +221,100 @@ body.school-app{height:auto!important;max-height:none!important;min-height:100vh
    عمداً با .students-filters محدود شده: .filters-line و .filter-primary با
    bot-inbox.php مشترک‌اند و نباید آن صفحه عوض شود.
 
-   اندازه‌ها بر پایهٔ طولِ واقعیِ مقدارِ هر فیلد تنظیم شده‌اند:
-   «سال تحصیلی» و «پایه» مقدارشان کوتاه است («۱۴۰۴-۱۴۰۵» و «هفتم») پس نصف
-   شدند؛ «کلاس» بلندتر است و ۲٫۵ برابر شد تا مقدارش بریده نشود؛ جستجو هم نصف
-   شد چون placeholder‌اش کوتاه شد و متن کامل در title هست. */
-.school-app .students-filters{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 12px}
-.school-app .students-filters .filter-primary{display:flex;flex-direction:column;gap:4px;min-width:0}
-.school-app .students-filters .filter-primary>label{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+   ── چرا این بلوک یک «مقیاس» است نه چند قاعدهٔ پراکنده ──
+   اندازهٔ پیشینِ واقعیِ کنترل‌ها این بود:
+     .form-input  padding .65rem .9rem + min-height 34px  → ≈۴۱ پیکسل
+     .btn         padding .6rem 1.25rem                    → ≈۳۶ پیکسل
+     summary      min-height/line-height 44px (@media screen) → ۴۴ پیکسل
+     .filter-more border dashed + padding .5rem + margin-top .5rem
+   یعنی سه ارتفاعِ متفاوت کنار هم، به‌علاوهٔ ۸ پیکسل پدینگِ جعبهٔ خط‌چین.
+   min-height سقف نیست، پس صرفاً کوچک‌کردنش ارتفاع را کم نمی‌کرد.
+   اینجا همه‌چیز از یک ارتفاعِ مشترک (--sf-h) و یک فاصلهٔ مشترک می‌آید. */
+.school-app .students-filters-card{padding:14px 16px}
+.school-app .students-filters{
+  --sf-h:34px;        /* ارتفاع مشترک همهٔ کنترل‌ها */
+  --sf-fs:13px;       /* اندازهٔ متن کنترل‌ها */
+  --sf-lfs:11px;      /* اندازهٔ برچسب‌ها */
+  --sf-pad:10px;      /* پدینگ افقی ورودی‌ها */
+  --sf-r:9px;         /* شعاع گوشه */
+  --sf-lbl:#64748b;
+  --sf-line:#e2e8f0;
+  display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 8px;
+}
+/* ── فیلدهای ردیف اصلی ── */
+.school-app .students-filters .filter-primary{display:flex;flex-direction:column;gap:3px;min-width:0}
+.school-app .students-filters .filter-primary>label,
+.school-app .students-filters .filter-more label{
+  margin:0;display:block;font-size:var(--sf-lfs);line-height:1.35;font-weight:700;
+  color:var(--sf-lbl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
 .school-app .students-filters .filter-primary .form-select,
-.school-app .students-filters .filter-primary .form-input{width:100%;min-width:0}
-/* جستجو: نصفِ پیشین (۲۴۰ → ۱۲۰) اما تا ۲۸۰ می‌تواند باز شود */
-.school-app .students-filters .f-search{flex:1 1 120px;max-width:280px}
-/* سال تحصیلی و پایه: نصفِ پیشین (۱۶۰ → ۸۰)، تقریباً ثابت */
+.school-app .students-filters .filter-primary .form-input,
+.school-app .students-filters .filter-more .form-select,
+.school-app .students-filters .filter-more .form-input{
+  width:100%;min-width:0;height:var(--sf-h);min-height:var(--sf-h);
+  padding:0 var(--sf-pad);font-size:var(--sf-fs);line-height:calc(var(--sf-h) - 2px);
+  border-radius:var(--sf-r);box-sizing:border-box;
+}
+/* نسبتِ عرض فیلدها — از طولِ واقعیِ مقدارِ هر فیلد */
+.school-app .students-filters .f-search{flex:1 1 120px;max-width:300px}
 .school-app .students-filters .f-year,
-.school-app .students-filters .f-grade{flex:0 1 80px;max-width:118px}
-/* کلاس: ۲٫۵ برابرِ پایه تا نام کلاس کامل دیده شود */
-.school-app .students-filters .f-class{flex:2 1 200px;max-width:300px}
-/* نوار پایین: کلید «گزینه‌های بیشتر» یک سو، دکمه‌ها سوی دیگر */
-.school-app .students-filters .filter-bar{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 14px;margin-top:2px}
-.school-app .students-filters .filter-more{flex:0 1 auto;min-width:0;margin-top:0}
-.school-app .students-filters .filter-actions{display:flex;gap:8px;align-items:center;flex:0 0 auto}
-/* شبکهٔ «گزینه‌های بیشتر»: هر خانه به اندازهٔ طولِ مقدارهای خودش.
-   انضباطی و تحصیلی بلندترین option‌ها را دارند («۳۰ روز اخیر»، «نمره زیر ۱۰»)،
-   درس خاص متوسط، و معدل دو عدد کوتاه است ولی دو ورودی کنار هم دارد.
+.school-app .students-filters .f-grade{flex:0 1 80px;max-width:124px}
+.school-app .students-filters .f-class{flex:2 1 200px;max-width:340px}
+/* ── نوار پایین: «گزینه‌های بیشتر» یک سو، دکمه‌ها سوی دیگر ──
+   align-items:flex-start عمدی است: وقتی «گزینه‌های بیشتر» باز می‌شود، جعبهٔ
+   details بلند می‌شود و با center دکمه‌ها وسطِ ارتفاع معلق می‌ماندند. */
+.school-app .students-filters .filter-bar{
+  flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:flex-start;
+  justify-content:space-between;gap:8px 14px;
+  margin-top:8px;padding-top:9px;border-top:1px solid var(--sf-line);
+}
+.school-app .students-filters .filter-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto}
+.school-app .students-filters .filter-actions .btn{
+  height:var(--sf-h);min-height:var(--sf-h);padding:0 14px;font-size:var(--sf-fs);
+  line-height:1;border-radius:var(--sf-r);white-space:nowrap;
+}
+/* ── کلید «گزینه‌های بیشتر» ──
+   .filter-more در style.css یک جعبهٔ خط‌چین با ۸ پیکسل پدینگ و margin-top است
+   و summary‌اش در school-ui.css:115 (داخل @media screen) همیشه ۴۴ پیکسل.
+   هر دو اینجا خنثی می‌شوند تا هم‌ارتفاعِ ورودی‌ها و دکمه‌ها بنشیند. */
+.school-app .students-filters .filter-more{
+  flex:0 1 auto;min-width:0;margin-top:0;padding:0;border:0;background:transparent;
+}
+.school-app .students-filters .filter-more>summary{
+  height:var(--sf-h);min-height:var(--sf-h);line-height:calc(var(--sf-h) - 2px);
+  padding:0 12px;border:1px solid #cbd5e1;border-radius:var(--sf-r);background:#f8fafc;
+  font-size:var(--sf-fs);font-weight:700;cursor:pointer;white-space:nowrap;
+  display:inline-flex;align-items:center;
+}
+.school-app .students-filters .filter-more>summary:hover{background:#f1f5f9;border-color:#94a3b8}
+/* ── خانه‌های «گزینه‌های بیشتر»: هر خانه به اندازهٔ مقدارهای خودش ──
    ویژگی این قاعده (۰٬۳٬۱) از .school-app .grid-cols-4 (۰٬۲٬۰) بیشتر است. */
 .school-app .students-filters .filter-more>div{
   display:grid;gap:8px;
   grid-template-columns:minmax(148px,1.15fr) minmax(148px,1.15fr) minmax(126px,1fr) minmax(158px,0.85fr);
 }
-.school-app .students-filters .filter-more label{margin:0;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.school-app .students-filters .filter-more .form-select,
-.school-app .students-filters .filter-more .form-input{width:100%;min-width:0}
-.school-app .students-filters .fm-gpa{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.school-app .students-filters .fm-gpa{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+/* صفحهٔ خیلی پهن: جستجو و کلاس کمی بازتر می‌شوند تا ردیف خالی نماند */
+@media(min-width:1600px){
+.school-app .students-filters .f-search{max-width:420px}
+.school-app .students-filters .f-class{max-width:460px}
+}
 @media(max-width:900px){
 .school-app .students-filters .filter-more>div{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:640px){
-.school-app .students-filters{gap:8px}
+/* هدفِ لمسی ۴۴ پیکسل روی موبایل برمی‌گردد */
+.school-app .students-filters{--sf-h:44px;--sf-fs:14px;--sf-lfs:12px;gap:8px}
 .school-app .students-filters .filter-primary,
 .school-app .students-filters .f-search,
 .school-app .students-filters .f-year,
 .school-app .students-filters .f-grade,
 .school-app .students-filters .f-class{flex:1 1 100%;max-width:none}
-.school-app .students-filters .filter-bar{gap:8px}
+.school-app .students-filters .filter-bar{gap:8px;margin-top:6px;padding-top:8px}
 .school-app .students-filters .filter-actions{width:100%}
 .school-app .students-filters .filter-actions .btn{flex:1 1 auto}
+.school-app .students-filters .filter-more{width:100%}
+.school-app .students-filters .filter-more>summary{width:100%;justify-content:center}
 .school-app .students-filters .filter-more>div{grid-template-columns:1fr}
 }

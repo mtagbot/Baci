@@ -90,7 +90,8 @@ ok('sort=class بر پایهٔ کلاس می‌چیند نه نام',
 /* ═══════ CSS و کش‌شکن ═══════ */
 console.log('\n── CSS ──');
 const css = readFileSync(resolveFile('assets/css/school-ui.css'), 'utf8');
-ok('قاعدهٔ واکنش‌گرای .students-filters اضافه شده', css.includes('.school-app .students-filters{display:flex'));
+ok('قاعدهٔ واکنش‌گرای .students-filters اضافه شده',
+   /\.school-app \.students-filters\{\s*[^}]*display:flex/.test(css));
 ok('قاعده‌ها به .students-filters محدودند (bot-inbox آسیب نمی‌بیند)',
    !/\.filters-line\s*\{[^}]*display:flex/.test(css) || css.includes('.students-filters'));
 /* ═══════ اندازهٔ فیلدها — خواستهٔ کاربر ═══════ */
@@ -168,10 +169,77 @@ ok('برچسب‌های «گزینه‌های بیشتر» با ellipsis می‌
 ok('در موبایل همهٔ فیلدها تمام‌عرض می‌شوند',
    /@media\(max-width:640px\)\{[\s\S]{0,800}?\.f-class\{flex:1 1 100%/.test(css));
 
-ok('کش‌شکن school-ui.css جلو رفته است', page.includes('school-ui.css?v20261006a'),
+/* ═══════ ریتم فاصله‌ها — خواستهٔ کاربر ═══════ */
+console.log('\n── ریتم فاصله‌ها ──');
+/* همهٔ قواعدِ .students-filters را با بدنه‌شان بیرون می‌کشد */
+const sfRules = Array.from(css.matchAll(/\.students-filters[^{}]*\{([^}]*)\}/g))
+  .map((m) => ({ sel: m[0].slice(0, m[0].indexOf('{')), body: m[1] }));
+/* sel را بدون «{» نگه داشته‌ایم، پس با endsWith جست‌وجو می‌کنیم نه includes */
+const sfBody = (frag) => (sfRules.find((r) => r.sel.trim().endsWith(frag)) || {}).body || '';
+const sfHas  = (frag) => sfRules.some((r) => r.sel.trim().endsWith(frag));
+/* برای قواعدی که selector چندتایی با کاما دارند */
+const sfBodyAny = (frag) => (sfRules.find((r) => r.sel.includes(frag)) || {}).body || '';
+
+/* ۱) یک ارتفاعِ مشترک برای همهٔ کنترل‌ها — این همان چیزی است که قبلاً نبود */
+ok('یک متغیر ارتفاعِ مشترک تعریف شده', /--sf-h:34px/.test(css));
+const heightRules = sfRules.filter((r) => /(^|;|\s)height:/.test(r.body) || /min-height:/.test(r.body));
+const strays = heightRules.filter((r) => !/var\(--sf-h\)/.test(r.body) && !/--sf-h:/.test(r.body));
+ok('هر قاعده‌ای که ارتفاع می‌دهد از var(--sf-h) می‌آید (بدون ارتفاعِ سرخود)',
+   strays.length === 0, strays.map((r) => r.sel.trim()).join(' | ') || heightRules.length + ' قاعده، همه var(--sf-h)');
+for (const [frag, lbl] of [['.filter-primary .form-input', 'ورودی ردیف اصلی'],
+                           ['.filter-more .form-input', 'ورودی «گزینه‌های بیشتر»'],
+                           ['.filter-actions .btn', 'دکمه'],
+                           ['.filter-more>summary', 'کلید «گزینه‌های بیشتر»']]) {
+  const body = sfBodyAny(frag) || sfBody(frag);
+  ok(lbl + ' هم‌ارتفاعِ بقیه است (height و min-height هر دو var(--sf-h))',
+     /height:var\(--sf-h\)/.test(body) && /min-height:var\(--sf-h\)/.test(body),
+     body.slice(0, 70) || 'قاعده پیدا نشد');
+}
+ok('summary دیگر ۴۴ پیکسلیِ school-ui.css:115 را نگه نمی‌دارد',
+   /\.students-filters \.filter-more>summary\{[^}]*min-height:var\(--sf-h\)/.test(css) &&
+   !/\.students-filters[^{}]*summary[^{}]*\{[^}]*44px/.test(css));
+
+/* ۲) فاصله‌ها کوچک شدند، نه همان قبلی */
+const formRule = sfRules.find((r) => r.sel.trim().endsWith('.students-filters')) || { body: '' };
+ok('فاصلهٔ ردیف اصلی از 10px 12px به 6px 8px کم شد',
+   /gap:6px 8px/.test(formRule.body), 'gap فعلی: ' + ((formRule.body.match(/gap:[^;]*/) || ['—'])[0]));
+ok('فاصلهٔ برچسب تا کنترل از 4px به 3px کم شد',
+   /\.students-filters \.filter-primary\{[^}]*gap:3px/.test(css));
+ok('فاصلهٔ دکمه‌ها از 8px به 6px کم شد',
+   /\.students-filters \.filter-actions\{[^}]*gap:6px/.test(css));
+ok('پدینگ افقی ورودی‌ها از .9rem (۱۴px) به var(--sf-pad)=10px کم شد',
+   /padding:0 var\(--sf-pad\)/.test(css) && /--sf-pad:10px/.test(css));
+ok('برچسب‌ها اندازهٔ مشخص گرفتند (نه text-xs پیش‌فرض)',
+   /font-size:var\(--sf-lfs\)/.test(css) && /--sf-lfs:11px/.test(css));
+
+/* ۳) جعبهٔ خط‌چینِ .filter-more خنثی شد */
+const moreBody = sfBody('.filter-more');
+ok('قاعدهٔ .filter-more در بلوک هست', sfHas('.filter-more'));
+ok('جعبهٔ خط‌چین «گزینه‌های بیشتر» خنثی شد (border/padding/background/margin)',
+   /padding:0/.test(moreBody) && /border:0/.test(moreBody) &&
+   /background:transparent/.test(moreBody) && /margin-top:0/.test(moreBody), moreBody.slice(0, 80));
+
+/* ۴) نوار پایین: جداکننده و تراز درست */
+const barBody = sfBody('.filter-bar');
+ok('قاعدهٔ .filter-bar در بلوک هست', sfHas('.filter-bar'));
+ok('filter-bar خط جداکننده و فاصلهٔ بالا دارد',
+   /border-top:1px solid/.test(barBody) && /padding-top:9px/.test(barBody) && /margin-top:8px/.test(barBody),
+   barBody.slice(0, 90));
+ok('filter-bar با flex-start تراز است تا دکمه‌ها وسطِ ارتفاع معلق نمانند',
+   /align-items:flex-start/.test(barBody));
+
+/* ۵) پدینگ کارت فیلتر */
+ok('کارت فیلتر کلاس اختصاصی دارد', page.includes('students-filters-card'));
+ok('پدینگ کارت فیلتر از ۲۴ پیکسلِ .card به 14px 16px کم شد',
+   /\.students-filters-card\{padding:14px 16px\}/.test(css));
+
+/* ۶) موبایل: هدف لمسی ۴۴ برمی‌گردد */
+ok('در موبایل ارتفاع به ۴۴ پیکسل برمی‌گردد', /--sf-h:44px/.test(css));
+
+ok('کش‌شکن school-ui.css جلو رفته است', page.includes('school-ui.css?v20261006b'),
    'کش‌شکن قدیمی یعنی CSS تازه به کلاینت نمی‌رسد');
 ok('کش‌شکن قدیمی school-ui.css نمانده',
-   !page.includes('school-ui.css?v20260917e') && !page.includes('school-ui.css?v20261005a'));
+   ['v20260917e', 'v20261005a', 'v20261006a'].every((v) => !page.includes('school-ui.css?' + v)));
 
 const hdr = readFileSync(resolveFile('includes/header.php'), 'utf8');
 ok('skip-link دسترسی‌پذیری در هدر باقی است', hdr.includes('href="#main-content"'));

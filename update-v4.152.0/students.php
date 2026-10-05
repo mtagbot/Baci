@@ -386,7 +386,7 @@ else:
               دانش‌آموزان یک‌جا باشند. اینجا دیگر دکمه‌ای نیست. */ ?>
     </div>
 
-    <div class="card p-4">
+    <div class="card p-4 students-filters-card">
         <form method="GET" class="filters-line students-filters">
             <div class="filter-primary f-search"><label class="text-xs font-bold">جستجو</label><input type="text" name="q" class="form-input" placeholder="نام یا کد ملی" title="جستجو در نام، نام خانوادگی، کد ملی و نام پدر" value="<?php echo clean($search); ?>"></div>
             <div class="filter-primary f-year"><label class="text-xs font-bold">سال تحصیلی</label><select name="academic_year" class="form-select"><option value="">همه</option><?php foreach($yearOptions as $yo): ?><option value="<?php echo clean($yo['academic_year']); ?>" <?php echo $filterYear===$yo['academic_year']?'selected':''; ?>><?php echo clean($yo['academic_year']); ?></option><?php endforeach; ?></select></div>

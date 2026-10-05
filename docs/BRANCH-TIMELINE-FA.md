@@ -292,7 +292,7 @@ csrf-refresh.php                  ۲۳ خط  تازه‌سازی توکن فرم
 **۵۳/۵۳ سوئیت سبز** (`exit=0`)؛ سوئیت‌های تازهٔ `test-attendance-justified.mjs`
 (**۲۷ بررسی**)، `test-footer-brand.mjs` (**۴۳ بررسی**)،
 `test-student-report-order.mjs` (**۱۵ بررسی**) و
-`test-students-filters.mjs` (**۳۳ بررسی**).
+`test-students-filters.mjs` (**۷۵ بررسی**).
 لینت: `COUNT=217 BAD=0` (بدون پروندهٔ PHP تازه).
 
 ### فوتر: بازیابی طراحیِ ازدست‌رفته
@@ -340,9 +340,19 @@ v4.176.0 بود ولی دو سرش نمی‌خواندند: `students.php` رش�
 `flex:1 1 100%` روی `filter-more` بود)، و خانه‌های «گزینه‌های بیشتر» چهار
 ستون با اندازهٔ متفاوت شدند.
 
+**پس از آن، ریتم فاصله‌ها:** تنظیم `flex-basis` کافی نبود چون ارتفاعِ واقعیِ
+کنترل‌ها هیچ‌وقت ۳۴ پیکسل نبود — ورودی ≈۴۱، دکمه ≈۳۶ و `summary` ۴۴ پیکسل
+(آن قاعده داخل `@media screen` است نه یک media query موبایل). `min-height` هم
+سقف نیست، پس کوچک‌کردنش کاری نمی‌کرد. حالا همه از `--sf-h:34px` می‌آیند،
+`gap` ردیف از `10px 12px` به `6px 8px` رسید، جعبهٔ خط‌چین `.filter-more`
+خنثی شد، و کارت فیلتر کلاس `students-filters-card` با پدینگ `14px 16px` گرفت
+(`.card{padding:1.5rem}` بر `.p-4{padding:1rem}` غلبه می‌کرد و `.p-3` هم
+وجود نداشت).
+
 پیش از هر مرحله یک بستهٔ بازگشت ساخته و ثبت شد:
-`ROLLBACK-V4.179.0-BEFORE-FILTER-REDRAW.zip` و
-`ROLLBACK-V4.179.0-BEFORE-FILTER-SIZING.zip`.
+`ROLLBACK-V4.179.0-BEFORE-FILTER-REDRAW.zip`،
+`ROLLBACK-V4.179.0-BEFORE-FILTER-SIZING.zip` و
+`ROLLBACK-V4.179.0-BEFORE-FILTER-SPACING.zip`.
 
 `scripts/build-full-release.py` هم اصلاح شد: تبدیل فوتر حالا فقط وقتی اعمال
 می‌شود که فوتر هنوز بی‌محافظ باشد، وگرنه `<?php endif; ?>` نابرابر تولید می‌کرد.
