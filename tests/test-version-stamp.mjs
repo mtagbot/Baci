@@ -61,7 +61,8 @@ check(!sitePage.res.page.includes('school-footer-version'),
 check(!sitePage.res.page.includes('نسخهٔ ' + SITE_VERSION),
   'the SITE version is NOT printed in the footer any more: ' + SITE_VERSION);
 check(sitePage.res.page.includes('school-footer'), 'the footer itself still renders');
-check(sitePage.res.page.includes('school-footer-mark'), 'the restored footer mark survives the badge removal');
+check(!sitePage.res.page.includes('school-footer-mark'),
+  'the footer mark is gone as well (removed in v4.179.0 at the user’s request)');
 
 /* ═══════ ۳) همان فوتر، توزیع دسکتاپ ═══════ */
 php.writeFile('/www/config/release.php',

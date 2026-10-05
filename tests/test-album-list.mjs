@@ -163,14 +163,21 @@ const alpha = chosen.map((r) => r).sort((a, b) => (a.name < b.name ? -1 : a.name
 check(JSON.stringify(legacyNids) !== JSON.stringify(expected) && JSON.stringify(legacyNids) === JSON.stringify(alpha),
   'without an explicit order the report falls back to the old alphabetical behaviour');
 
-/* فهرست دانش‌آموزان: چینش بر اساس کلاس کار می‌کند */
+/* فهرست دانش‌آموزان: چینش بر اساس کلاس کار می‌کند.
+   v4.179.0: دو dropdown «چینش فهرست» (name="sort") و «ترتیب» (name="dir") از
+   ردیف فیلتر برداشته شدند؛ چینش حالا با سرستون‌های جدول انجام می‌شود که همان
+   ?sort=X&dir=Y را می‌سازند. پس نگهبان باید «سرستون کار می‌کند» را بسنجد،
+   نه «dropdown هست» را. */
 const sorted = await req('فهرست چیده‌شده بر اساس کلاس', { file: 'students.php', sid: 'repOrder001', query: 'sort=class&dir=asc' });
-check(sorted.res.page.includes('name="sort"') && sorted.res.page.includes('sort=class') && sorted.res.page.includes('name="dir"'),
-  'the sort control is on the students page | len=' + sorted.res.page.length + ' | has_filter_form=' + (sorted.res.page.includes('filters-line') ? 'yes' : 'no') + ' | has_sort_select=' + (sorted.res.page.includes('name="sort"') ? 'yes' : 'no') + ' | redirect=' + (sorted.res.redirect || '-'));
-check(/value="class"/.test(sorted.res.page) && /value="grade"/.test(sorted.res.page), 'the class and grade sort options exist');
+check(!sorted.res.page.includes('name="sort"') && !sorted.res.page.includes('name="dir"'),
+  'the two sort dropdowns are gone from the filter row (v4.179.0)');
+check(/sort=class/.test(sorted.res.page) && /sort=gpa/.test(sorted.res.page) && /sort=disc/.test(sorted.res.page),
+  'the column headers still carry sort links');
+check(/title="چینش بر اساس این ستون"[^>]*>کلاس ▲/.test(sorted.res.page),
+  'sort=class is read from the URL and shown with the ascending arrow | len=' + sorted.res.page.length + ' | redirect=' + (sorted.res.redirect || '-'));
 const sortedDesc = await req('فهرست نزولی بر اساس کلاس', { file: 'students.php', sid: 'repOrder001', query: 'sort=class&dir=desc' });
-check(/value="desc"\s+selected/.test(sortedDesc.res.page) && /value="class"\s+selected/.test(sortedDesc.res.page),
-  'descending order is selectable and remembered: ' + (sortedDesc.res.redirect || sortedDesc.res.page.length));
+check(/title="چینش بر اساس این ستون"[^>]*>کلاس ▼/.test(sortedDesc.res.page),
+  'dir=desc is read from the URL and shown with the descending arrow');
 
 console.log('PASS ' + n + ' checks (album as a one-page list, real connected-user count, report order preserved)');
 process.exit(0);

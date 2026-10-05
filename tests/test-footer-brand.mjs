@@ -26,10 +26,9 @@ const ok = (n, c, d = '') => c ? (pass++, console.log(`  ✅ ${n}`))
 
 const RELEASE = '/www/config/release.php';
 const SID = 'footerAdmin0001';   // req() پیش‌فرض نشست دانش‌آموز دارد؛ مدیر باید صریح باشد
-const SVG_PATHS = 'm3 9 9-6 9 6v12H3Z';                 // آیکون مدرسه
 const SUBTITLE = 'آموزش، ارزشیابی و ارتباطات مدرسه';    // نباید باشد
 const BACKTOP = 'بازگشت به بالا';                       // نباید باشد
-const BACKCONTENT = 'بازگشت به محتوا';                  // باید باشد
+const BACKCONTENT = 'بازگشت به محتوا';                  // نباید باشد
 
 /* نسخهٔ واقعیِ روی دیسک — برای اثباتِ نبودنِ بج در خروجی */
 const versionSrc = readFileSync(resolveFile('config/version.php'), 'utf8');
@@ -50,12 +49,25 @@ const site = (await req('صفحهٔ اصلی با ورود مدیر', { file: 'i
 ok('صفحه رندر شد', site.length > 2000, `${site.length} بایت`);
 ok('بدون خطای PHP', !/Fatal error|Parse error/.test(site));
 ok('فوتر رندر می‌شود', site.includes('school-footer'));
-ok('کادر آیکون فوتر رندر می‌شود', site.includes('class="school-footer-mark"'));
-ok('آیکون SVG مدرسه داخل فوتر است', site.includes(SVG_PATHS));
-ok('نام مدرسه در فوتر هست', /school-footer-brand[\s\S]{0,600}?<strong>/.test(site));
-ok('پیوند «بازگشت به محتوا» هست', site.includes(BACKCONTENT));
-ok('لنگر #main-content واقعاً در صفحه وجود دارد', site.includes('id="main-content"'));
-ok('اعتبارنامهٔ «معاونت فناوری» سر جایش است', site.includes('طراحی و توسعه : معاونت فناوری متوسطه اول'));
+/* بررسی‌های فوتر باید روی «ناحیهٔ فوتر» انجام شوند، نه کل صفحه:
+   skip-link در header.php:122 هم href="#main-content" دارد و آیکون مدرسه در
+   index.php و school-icons.js هم هست. */
+const footerOf = (html) => {
+  const a = html.indexOf('<footer class="school-footer');
+  const b = a >= 0 ? html.indexOf('</footer>', a) : -1;
+  return a >= 0 && b > a ? html.slice(a, b) : '';
+};
+const fSite = footerOf(site);
+ok('ناحیهٔ فوتر در خروجی پیدا شد', fSite.length > 0, `${fSite.length} نویسه`);
+ok('نام مدرسه در فوتر هست', /school-footer-brand[\s\S]{0,300}?<strong>/.test(fSite));
+ok('آیکون خانه/مدرسه از فوتر حذف شده است', !fSite.includes('school-footer-mark'),
+   'کادر .school-footer-mark باید رفته باشد');
+ok('هیچ <svg> در فوتر نمانده است', !fSite.includes('<svg'));
+ok('پیوند «بازگشت به محتوا» از فوتر حذف شده است', !fSite.includes(BACKCONTENT));
+ok('لنگر #main-content هم از فوتر رفته', !fSite.includes('href="#main-content"'));
+ok('ولی skip-link دسترسی‌پذیری در هدر باقی است', site.includes('href="#main-content"'),
+   'header.php:122 «رفتن به محتوای اصلی» نباید حذف شود');
+ok('اعتبارنامهٔ «معاونت فناوری» سر جایش است', fSite.includes('طراحی و توسعه : معاونت فناوری متوسطه اول'));
 ok('«نشست‌های من» برای مدیر واردشده هست', site.includes('نشست‌های من'));
 
 console.log('\n── سه عنصری که نباید باشند (سایت) ──');
@@ -73,7 +85,10 @@ php.writeFile(RELEASE, "<?php return ['distribution'=>'desktop'];");
 const desk = (await req('همان صفحه با توزیع دسکتاپ', { file: 'index.php', sid: SID })).res.page;
 
 ok('صفحهٔ دسکتاپ رندر شد', desk.length > 2000, `${desk.length} بایت`);
-ok('آیکون SVG در دسکتاپ هم هست', desk.includes(SVG_PATHS) && desk.includes('class="school-footer-mark"'));
+const fDesk = footerOf(desk);
+ok('آیکون در فوتر دسکتاپ هم نیست', !fDesk.includes('school-footer-mark') && !fDesk.includes('<svg'));
+ok('«بازگشت به محتوا» در فوتر دسکتاپ هم نیست', !fDesk.includes(BACKCONTENT));
+ok('اعتبارنامهٔ «معاونت فناوری» در فوتر دسکتاپ هست', fDesk.includes('طراحی و توسعه : معاونت فناوری متوسطه اول'));
 ok('کلاس has-desk-state روی فوتر می‌نشیند', desk.includes('school-footer has-desk-state'));
 ok('پنل اتصال و همگام‌سازی رندر می‌شود', desk.includes('id="deskConnection"'));
 ok('مانیتور desk-connection.js فعال است', desk.includes('desk-connection.js'));
@@ -94,6 +109,10 @@ const src = readFileSync(resolveFile('includes/footer.php'), 'utf8');
 ok('فوتر منبع دیگر config/version.php را نمی‌خواند', !src.includes('config/version.php'),
    'بج حذف شده، پس خواندنش هم بی‌فایده است');
 ok('فوتر منبع زیرعنوان ندارد', !src.includes(SUBTITLE));
+ok('فوتر منبع آیکون ندارد', !src.includes('school-footer-mark') && !src.includes('data-ui-icon'));
+ok('فوتر منبع «بازگشت به محتوا» ندارد', !src.includes(BACKCONTENT));
+ok('«نشست‌های من» در منبع باقی است', src.includes('نشست‌های من'),
+   'در فهرست حذف نبود؛ فقط برای کاربر واردشده رندر می‌شود');
 ok('فوتر منبع release.php را پشت is_file() می‌خواند',
    src.includes("is_file(dirname(__DIR__).'/config/release.php')?require dirname(__DIR__).'/config/release.php'"));
 ok('فوتر منبع تیک قدیمی همگام‌سازی را ندارد', !src.includes('ajax=tick') && !src.includes('sdpSyncBanner'));

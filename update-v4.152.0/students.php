@@ -387,31 +387,18 @@ else:
     </div>
 
     <div class="card p-4">
-        <form method="GET" class="filters-line">
+        <form method="GET" class="filters-line students-filters">
             <div class="filter-primary"><label class="text-xs font-bold">جستجو</label><input type="text" name="q" class="form-input" placeholder="نام، نام خانوادگی، کد ملی، نام پدر..." value="<?php echo clean($search); ?>"></div>
             <div class="filter-primary"><label class="text-xs font-bold">سال تحصیلی</label><select name="academic_year" class="form-select"><option value="">همه</option><?php foreach($yearOptions as $yo): ?><option value="<?php echo clean($yo['academic_year']); ?>" <?php echo $filterYear===$yo['academic_year']?'selected':''; ?>><?php echo clean($yo['academic_year']); ?></option><?php endforeach; ?></select></div>
             <div class="filter-primary"><label class="text-xs font-bold">پایه</label><select name="grade_level" class="form-select"><option value="">همه</option><?php foreach($gradeOptions as $go): ?><option value="<?php echo clean($go['grade_level']); ?>" <?php echo $filterGrade===$go['grade_level']?'selected':''; ?>><?php echo clean($go['grade_level']); ?></option><?php endforeach; ?></select></div>
-            <div class="filter-primary"><label class="text-xs font-bold">چینش فهرست</label>
-                <select name="sort" class="form-select">
-                    <option value="name"  <?php echo $sortKey === 'name'  ? 'selected' : ''; ?>>نام خانوادگی، سپس نام</option>
-                    <option value="first" <?php echo $sortKey === 'first' ? 'selected' : ''; ?>>نام</option>
-                    <option value="class" <?php echo $sortKey === 'class' ? 'selected' : ''; ?>>کلاس، سپس نام خانوادگی</option>
-                    <option value="grade" <?php echo $sortKey === 'grade' ? 'selected' : ''; ?>>پایه، سپس کلاس</option>
-                    <option value="nid"   <?php echo $sortKey === 'nid'   ? 'selected' : ''; ?>>کد ملی</option>
-                    <option value="gpa"   <?php echo $sortKey === 'gpa'   ? 'selected' : ''; ?>>آخرین معدل (بیشترین)</option>
-                    <option value="disc"  <?php echo $sortKey === 'disc'  ? 'selected' : ''; ?>>موارد انضباطی (بیشترین)</option>
-                </select>
-            </div>
-            <div class="filter-primary"><label class="text-xs font-bold">ترتیب</label>
-                <select name="dir" class="form-select">
-                    <option value="asc"  <?php echo $sortDir === 'asc'  ? 'selected' : ''; ?>>صعودی</option>
-                    <option value="desc" <?php echo $sortDir === 'desc' ? 'selected' : ''; ?>>نزولی</option>
-                </select>
-            </div>
-            <div class="flex gap-2"><button class="btn btn-primary">فیلتر</button><a href="students.php" class="btn btn-secondary">حذف</a></div>
-            <details class="filter-more" <?php echo ($filterClass||$disciplineFilter||$academicFilter||$subjectFilter||$minGpa||$maxGpa)?'open':''; ?>><summary>گزینه‌های بیشتر</summary>
-                <div class="grid grid-cols-5 gap-2 mt-2">
-                    <div><label class="text-xs font-bold">کلاس</label><select name="class_name" class="form-select"><option value="">همه</option><?php foreach($classOptions as $co): ?><option value="<?php echo clean($co['class_name']); ?>" <?php echo $filterClass===$co['class_name']?'selected':''; ?>><?php echo clean($co['class_name']); ?></option><?php endforeach; ?></select></div>
+            <?php /* v4.179.0: دو dropdown «چینش فهرست» و «ترتیب» از اینجا برداشته
+          شدند؛ چینش با کلیک روی سرستون‌های جدول انجام می‌شود ($stuSortLink
+          همان sort/dir را در URL می‌سازد). جای آن‌ها «کلاس» از «گزینه‌های
+          بیشتر» به این ردیف آمد، چون پرکاربردترین فیلتر است. */ ?>
+            <div class="filter-primary"><label class="text-xs font-bold">کلاس</label><select name="class_name" class="form-select"><option value="">همه</option><?php foreach($classOptions as $co): ?><option value="<?php echo clean($co['class_name']); ?>" <?php echo $filterClass===$co['class_name']?'selected':''; ?>><?php echo clean($co['class_name']); ?></option><?php endforeach; ?></select></div>
+            <div class="filter-actions"><button class="btn btn-primary">اعمال فیلتر</button><a href="students.php" class="btn btn-secondary">پاک کردن</a></div>
+            <details class="filter-more" <?php echo ($disciplineFilter||$academicFilter||$subjectFilter||$minGpa||$maxGpa)?'open':''; ?>><summary>گزینه‌های بیشتر</summary>
+                <div class="grid grid-cols-4 gap-2 mt-2">
                     <div><label class="text-xs font-bold">فیلتر انضباطی</label><select name="discipline_filter" class="form-select"><option value="">همه</option><option value="has_records" <?php echo $disciplineFilter==='has_records'?'selected':''; ?>>دارای مورد</option><option value="no_records" <?php echo $disciplineFilter==='no_records'?'selected':''; ?>>بدون مورد</option><option value="recent_30" <?php echo $disciplineFilter==='recent_30'?'selected':''; ?>>۳۰ روز اخیر</option></select></div>
                     <div><label class="text-xs font-bold">فیلتر تحصیلی</label><select name="academic_filter" class="form-select"><option value="">همه</option><option value="excellent" <?php echo $academicFilter==='excellent'?'selected':''; ?>>معدل عالی</option><option value="weak" <?php echo $academicFilter==='weak'?'selected':''; ?>>زیر ۱۲</option><option value="failed" <?php echo $academicFilter==='failed'?'selected':''; ?>>نمره زیر ۱۰</option></select></div>
                     <div><label class="text-xs font-bold">درس خاص</label><select name="subject_name" class="form-select"><option value="">همه</option><?php foreach($subjectOptions as $so): ?><option value="<?php echo clean($so['subject_name']); ?>" <?php echo $subjectFilter===$so['subject_name']?'selected':''; ?>><?php echo clean($so['subject_name']); ?></option><?php endforeach; ?></select></div>
