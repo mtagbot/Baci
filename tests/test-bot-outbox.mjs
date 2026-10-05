@@ -1,6 +1,8 @@
 // Actual application PHP + SQLite in MEMFS. Providers/network failures are deterministic mocks.
 import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {join} from 'node:path';
+import {REPO,resolveFile} from './harness/site.mjs';
 import {php,run,student,loginAdmin,req} from './harness/lib.mjs';
 const desktop=process.env.BOT_DESKTOP==='1';let checks=0;
 const check=(v,m)=>{assert(v,m);checks++;};
@@ -72,7 +74,7 @@ if(desktop){
  php.writeFile('/data/server.sqlite',php.readFileAsBuffer('/data/school.sqlite'));
  const originalConfig=php.readFileAsText('/www/config/database.php'),originalRelease=php.readFileAsText('/www/config/release.php');
  php.writeFile('/www/config/database.php',"<?php return ['driver'=>'sqlite','database'=>'/data/server.sqlite'];");php.writeFile('/www/config/release.php',"<?php return ['distribution'=>'site'];");
- php.writeFile('/www/class-exam-sync-api.php',readFileSync('update-v4.152.0/class-exam-sync-api.php'));
+ php.writeFile('/www/class-exam-sync-api.php',readFileSync(resolveFile('class-exam-sync-api.php')));
  await code('bot_outbox_sql("DELETE FROM bot_outbox");');
  const syncKey='ab'.repeat(32);php.writeFile('/www/config/desk-sync-key.php',`<?php return '${syncKey}';`);
  async function endpoint(key,jobs){return php.run({relativeUri:'/class-exam-sync-api.php',method:'POST',headers:{'content-type':'application/json'},body:new TextEncoder().encode(JSON.stringify({action:'bot_outbox',key,jobs})),code:`<?php ${mock} require '/www/class-exam-sync-api.php';`});}
@@ -97,6 +99,6 @@ const storeBefore=wire().length;
 check(await code("bot_outbox_schema();DB::getInstance()->getPdo()->rawScript(\"CREATE TRIGGER reject_outbox BEFORE INSERT ON bot_outbox BEGIN SELECT RAISE(ABORT,'storage failure'); END;\");try{bot_send_message('telegram','801','storage failure');echo 'BAD';}catch(PDOException $e){echo 'FAILED';}finally{bot_outbox_sql('DROP TRIGGER reject_outbox');}")==='FAILED','storage failure never reports queued success');
 check(wire().length===storeBefore,'storage failure cannot send an untracked message');
 // No generic sync of outbox tables (snapshot/reconcile must not delete or replay jobs).
-for(const file of ['update-v4.152.0/includes/desk_sync.php','update-v4.152.0/class-exam-sync-api.php']){const text=readFileSync(file,'utf8');const list=text.match(/json_encode\(\[([\s\S]*?)\]\)/)?.[1]||text.match(/const SYNC_TABLES\s*=\s*\[([\s\S]*?)\];/)?.[1];check(list&&!list.includes('bot_outbox'),'outbox not generic sync tables');}
+for(const file of ['includes/desk_sync.php','class-exam-sync-api.php']){const text=readFileSync(resolveFile(file),'utf8');const list=text.match(/json_encode\(\[([\s\S]*?)\]\)/)?.[1]||text.match(/const SYNC_TABLES\s*=\s*\[([\s\S]*?)\];/)?.[1];check(list&&!list.includes('bot_outbox'),'outbox not generic sync tables');}
 await loginAdmin('botAdmin');const page=await req('?platform=telegram',{file:'bot-queue.php',sid:'botAdmin'});check(!page.res.fatal&&!page.stderr,page.res.fatal||page.stderr);check(page.res.page.includes('صف ماندگار اعلان‌ها'),'queue status UI rendered on its own settings page');
-mkdirSync('docs/bot-outbox',{recursive:true});writeFileSync(`docs/bot-outbox/${desktop?'desktop':'site'}.json`,JSON.stringify({checks,provider:'deterministic mock; no live messages',runtime:'PHP 8.3 WASM + real SQLite',finalJobs:(await jobs()).map(r=>({platform:r.platform,owner:r.owner,state:r.state,attempts:r.attempts}))},null,2));console.log('PASS',checks,desktop?'desktop + authenticated relay':'site','outbox checks');process.exit(0);
+mkdirSync(join(REPO,'docs/bot-outbox'),{recursive:true});writeFileSync(join(REPO,'docs/bot-outbox',`${desktop?'desktop':'site'}.json`),JSON.stringify({checks,provider:'deterministic mock; no live messages',runtime:'PHP 8.3 WASM + real SQLite',finalJobs:(await jobs()).map(r=>({platform:r.platform,owner:r.owner,state:r.state,attempts:r.attempts}))},null,2));console.log('PASS',checks,desktop?'desktop + authenticated relay':'site','outbox checks');process.exit(0);

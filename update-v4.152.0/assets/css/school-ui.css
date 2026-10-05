@@ -160,6 +160,7 @@ body.school-app{height:auto!important;max-height:none!important;min-height:100vh
 .school-footer .school-footer-brand{padding:0;min-width:0;gap:9px;flex:1}
 .school-footer .school-footer-brand:before{content:"";width:4px;height:22px;border-radius:2px;background:var(--primary,#2563eb);flex:none}
 .school-footer .school-footer-brand strong{font-size:12px;font-weight:700;line-height:1.8}
+.school-footer .school-footer-version{flex:none;font-size:10px;line-height:1.8;color:#64748b;background:#eef2f7;border:1px solid #dbe3ee;border-radius:999px;padding:1px 8px;white-space:nowrap;direction:ltr}
 .school-footer .school-footer-credit{border:0;padding:0;margin:0;font-size:11px;line-height:1.8}
 .school-footer .school-footer-links{border:0;padding:0;margin:0;flex:none}
 .school-footer .school-footer-links a{padding:8px 12px;margin:0;font-size:11px;min-height:44px;text-decoration:none;color:#334155}

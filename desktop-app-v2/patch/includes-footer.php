@@ -10,8 +10,17 @@ if (is_admin_logged_in() || is_student_logged_in() || (function_exists('is_teach
     </main>
 <?php endif; ?>
 
+<?php
+/* v2.101.0: شمارهٔ نسخهٔ کد از config/version.php. عمداً از release.php
+   خوانده نمی‌شود — آن فایل درایور بانک اطلاعاتی دسکتاپ را انتخاب می‌کند و
+   بستهٔ اصلاحی نباید بازنویسی‌اش کند. */
+$footerVersionFile = dirname(__DIR__) . '/config/version.php';
+$footerVersion = is_file($footerVersionFile) ? (require $footerVersionFile) : [];
+$footerVersionLabel = (string)($footerVersion['desktop_version'] ?? '');
+?>
 <footer class="py-4 px-6 border-t border-color bg-card text-center text-xs text-muted mt-auto">
     <span>طراحی و توسعه : معاونت فناوری متوسطه اول</span>
+    <?php if ($footerVersionLabel !== ''): ?><span class="ml-2 opacity-70" title="نسخهٔ کد نصب‌شده">· نسخهٔ <?php echo clean($footerVersionLabel); ?></span><?php endif; ?>
 </footer>
 
 <script src="assets/vendor/chart.umd.min.js"></script>

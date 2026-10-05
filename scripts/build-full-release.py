@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reproducible Release_V1.0 full installs. Historical patches/archives are immutable inputs."""
+"""Reproducible Release_V1.1 full installs. Historical patches/archives are immutable inputs."""
 import argparse, base64, concurrent.futures, hashlib, json, os, re, shutil, sqlite3, subprocess, zipfile
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +18,28 @@ STAMP = (2026, 9, 19, 0, 0, 0)
 SITE_CORRECTIVES = ['svg-responsive','student-workflow','preview-navigation','fast-ui','mobile-hubs','report-tools','settings-health','bot-outbox','recovery-ui','scanner','desk-update','attendance-test-tag','bot-admin-login','mobile-exam-editor']
 DESKTOP_CORRECTIVES = ['svg-responsive','student-workflow','preview-navigation','fast-ui','mobile-hubs','report-tools','settings-health','reports-layout','bot-outbox','optimized-sync','event-sync','recovery-ui','scanner','desk-update','attendance-test-tag','bot-admin-login','mobile-exam-editor']
 SITE_CORRECTIVE_PREFIX = 'site-update-v4.152.0/'
+# Release_V1.1 identity. The base install number was frozen at 4.152.0/2.83.0
+# through the whole corrective chain up to 4.177.1/2.100.0, so a fresh install
+# could not tell what it actually contained. config/version.php now carries the
+# code version for existing installs too; release.php keeps describing the bundle.
+RELEASE_NAME = 'Release_V1.1'
+SITE_VERSION = '4.178.0'
+DESKTOP_VERSION = '2.101.0'
+# Correctives published after the V1.0 rebuild, in installation order. From
+# v4.170.0 on, packages are version-numbered instead of feature-slugged, and
+# V4.170.0 / v2.92.0 are cumulative for v4.161..v4.169.
+VERSIONED_CORRECTIVES = [
+    ('MODIFIED-FILES-V4.170.0.zip', 'SchoolDesk-FIX-v2.92.0.zip'),
+    ('MODIFIED-FILES-V4.171.0.zip', 'SchoolDesk-FIX-v2.93.0.zip'),
+    ('MODIFIED-FILES-V4.172.0.zip', 'SchoolDesk-FIX-v2.94.0.zip'),
+    ('MODIFIED-FILES-V4.173.0.zip', 'SchoolDesk-FIX-v2.95.0.zip'),
+    ('MODIFIED-FILES-V4.174.0.zip', 'SchoolDesk-FIX-v2.96.0.zip'),
+    ('MODIFIED-FILES-V4.175.0.zip', 'SchoolDesk-FIX-v2.97.0.zip'),
+    ('MODIFIED-FILES-V4.176.0.zip', 'SchoolDesk-FIX-v2.98.0.zip'),
+    ('MODIFIED-FILES-V4.177.0.zip', 'SchoolDesk-FIX-v2.99.0.zip'),
+    ('MODIFIED-FILES-V4.177.1.zip', 'SchoolDesk-FIX-v2.100.0.zip'),
+    ('MODIFIED-FILES-V4.178.0.zip', 'SchoolDesk-FIX-v2.101.0.zip'),
+]
 def sha(b): return hashlib.sha256(b).hexdigest()
 def run(*args): return subprocess.check_output(args, text=True)
 def version(p): return tuple(map(int,p.name.split('v',1)[1].split('.')))
@@ -87,11 +109,14 @@ def corrective_payload(platform):
     the reports-layout package is kept as the migration input.
     """
     packages=[];payload={};staged={};provenance={}
+    names=[]
     for slug in (SITE_CORRECTIVES if platform=='site' else DESKTOP_CORRECTIVES):
         if slug=='mobile-exam-editor':
-            name='MODIFIED-FILES-V4.160.0.zip' if platform=='site' else 'SchoolDesk-FIX-v2.90.0.zip'
+            names.append('MODIFIED-FILES-V4.160.0.zip' if platform=='site' else 'SchoolDesk-FIX-v2.90.0.zip')
         else:
-            name=(f'SITE-FIX-v4.152.0-{slug}.zip' if platform=='site' else f'SchoolDeskPro-FIX-v2.83.0-{slug}.zip')
+            names.append(f'SITE-FIX-v4.152.0-{slug}.zip' if platform=='site' else f'SchoolDeskPro-FIX-v2.83.0-{slug}.zip')
+    names += [site if platform=='site' else desk for site, desk in VERSIONED_CORRECTIVES]
+    for name in names:
         path=ROOT/name
         if not path.is_file():raise SystemExit('Missing corrective package: '+name)
         with zipfile.ZipFile(path) as z:
@@ -164,11 +189,29 @@ def assemble():
         for f in list(web.rglob('*')):
             if f.is_file() and (f.suffix.lower() in ['.sqlite','.db','.log','.bak','.zip','.csv'] or f.name in ['installer.log']):f.unlink()
         copy(ROOT/'upstream-reference/config/defaults.php',web/'config/defaults.php')
-        s=(web/'config/defaults.php').read_text();s=re.sub(r"'version'\s*=>\s*'[^']+'", "'version' => '4.152.0'",s);(web/'config/defaults.php').write_text(s)
+        s=(web/'config/defaults.php').read_text();s=re.sub(r"'version'\s*=>\s*'[^']+'", "'version' => '"+SITE_VERSION+"'",s);(web/'config/defaults.php').write_text(s)
         for layer in ['common',platform]:
             for f in (SOURCE/layer).rglob('*'):
                 if f.is_file():put(f,web,f.relative_to(SOURCE/layer),platform)
-        (web/'config/release.php').write_text("<?php\nreturn ['release'=>'Release_V1.0','distribution'=>'"+platform+"','site_version'=>'4.152.0','desktop_version'=>'2.83.0'];\n")
+        (web/'config/release.php').write_text("<?php\nreturn ['release'=>'"+RELEASE_NAME+"','distribution'=>'"+platform+"','site_version'=>'"+SITE_VERSION+"','desktop_version'=>'"+DESKTOP_VERSION+"'];\n")
+        # config/version.php is the corrective-safe version stamp: it carries no
+        # distribution key, so a corrective package can ship it without touching
+        # the DB-driver selection that config/release.php performs.
+        # Copied verbatim from the shipped patch — NOT regenerated here, because
+        # test-full-release-packaging.py asserts a fresh install is byte-identical
+        # to what the corrective chain would produce.
+        version_source = ROOT / 'update-v4.152.0' / 'config' / 'version.php'
+        if not version_source.is_file():
+            raise SystemExit('Missing version stamp source: ' + str(version_source))
+        stamp = {}
+        for line in version_source.read_text(encoding='utf-8').splitlines():
+            m = re.match(r"\s*'(site_version|desktop_version)'\s*=>\s*'([^']+)'", line)
+            if m: stamp[m.group(1)] = m.group(2)
+        if stamp.get('site_version') != SITE_VERSION or stamp.get('desktop_version') != DESKTOP_VERSION:
+            raise SystemExit('config/version.php (%s) disagrees with the builder (%s/%s)'
+                             % (stamp, SITE_VERSION, DESKTOP_VERSION))
+        copy(version_source, web / 'config/version.php')
+        origins[platform]['config/version.php'] = str(version_source.relative_to(ROOT))
         for d in ['config','includes','sql','vendor','backups']:
             (web/d).mkdir(exist_ok=True);(web/d/'.htaccess').write_text('Require all denied\n')
         copy(ROOT/'update-v4.131.0/backups/.htaccess',web/'backups/.htaccess')
@@ -179,7 +222,7 @@ def assemble():
                 # Historical fresh-schema index referenced a nonexistent column.
                 statements=[s.replace('ADD INDEX `idx_student_created` (`student_id`, `created_at`)', 'ADD INDEX `idx_student_created` (`student_id`, `created_at_jalali`)') for s in statements]
             (web/'sql'/('install-'+driver+'.json')).write_text(json.dumps(statements,ensure_ascii=False,indent=2)+'\n')
-            (web/'sql'/('database.sql' if driver=='mysql' else 'schema-sqlite.sql')).write_text('-- Release_V1.0: STRUCTURE ONLY. Install with installer.php.\n'+'\n\n'.join(statements)+'\n')
+            (web/'sql'/('database.sql' if driver=='mysql' else 'schema-sqlite.sql')).write_text('-- '+RELEASE_NAME+': STRUCTURE ONLY. Install with installer.php.\n'+'\n\n'.join(statements)+'\n')
         shutil.copytree(tcpdf,web/'vendor/tcpdf',dirs_exist_ok=True)
         # Chart.js's upstream UMD build is already minified; preserve the version/license header.
         chartfile=chart/'dist/chart.umd.min.js'
@@ -212,7 +255,7 @@ def assemble():
         if f.is_file() and f.name not in ['SchoolDeskPro.exe','README-FA.md','THIRD-PARTY.md']:f.unlink()
     for platform,folder,web in [('site',site,site),('desktop',desktop,dw)]:
         manifest={
-            'release':'Release_V1.0','platform':platform,'site_version':'4.152.0','desktop_version':'2.83.0',
+            'release':RELEASE_NAME,'platform':platform,'site_version':SITE_VERSION,'desktop_version':DESKTOP_VERSION,
             'base_commit':run('git','rev-parse','HEAD').strip(),
             'patches':[p.name for p in patches],
             'correctives':site_correctives if platform=='site' else desktop_correctives,
@@ -238,6 +281,6 @@ if __name__=='__main__':
     ap=argparse.ArgumentParser();ap.add_argument('--stage-only',action='store_true');args=ap.parse_args()
     site,desktop=assemble()
     if not args.stage_only:
-        outputs=[archive(site,'Release_V1.0-Site.zip'),archive(desktop,'Release_V1.0-Desktop.zip','SchoolDeskPro/')]
-        (ROOT/'Release_V1.0-SHA256SUMS.txt').write_text(''.join(x['sha256']+'  '+x['file']+'\n' for x in outputs));print(json.dumps(outputs,indent=2))
+        outputs=[archive(site,RELEASE_NAME+'-Site.zip'),archive(desktop,RELEASE_NAME+'-Desktop.zip','SchoolDeskPro/')]
+        (ROOT/(RELEASE_NAME+'-SHA256SUMS.txt')).write_text(''.join(x['sha256']+'  '+x['file']+'\n' for x in outputs));print(json.dumps(outputs,indent=2))
     print('Stage:',STAGE)

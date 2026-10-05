@@ -10,7 +10,9 @@ class FullRelease(unittest.TestCase):
     def setUpClass(cls):
         cls.bundles={}
         for platform,title,prefix in [('site','Site',''),('desktop','Desktop','SchoolDeskPro/')]:
-            z=zipfile.ZipFile(ROOT/f'Release_V1.0-{title}.zip')
+            # Read the release name from the builder itself so this test can
+            # never drift to a stale version label again.
+            z=zipfile.ZipFile(ROOT/f'{BUILDER.RELEASE_NAME}-{title}.zip')
             cls.bundles[platform]=(z,prefix,'' if platform=='site' else 'www/')
     def test_01_complete_payload(self):
         required=['includes/appearance.php','index.php','admin-login.php','installer.php','includes/release_install.php','includes/db.php','includes/install_guard.php','includes/db_sqlite_compat.php','entry-cards.php','entry-card-logo.php','attendance-scanner.php','attendance-scanner-legacy.php','class-exam-delete.php','includes/teacher_weekly_schedule.php','class-exam-sync-api.php','desk-sync-api.php','assets/js/jsqr.min.js','assets/js/qrcode-generator.js','assets/vendor/chart.umd.min.js','vendor/tcpdf/tcpdf.php','vendor/tcpdf/fonts/dejavusans.z','assets/templates/teacher-class-list.docx','assets/templates/school-students.docx','uploads/Vazirmatn/Vazirmatn-Regular.ttf','uploads/B-Titr/B-Titr.ttf','config/install-access.example.php','README-FA.md']
@@ -125,7 +127,7 @@ class FullRelease(unittest.TestCase):
             self.assertIn(platform.encode(),z.read(p+w+'config/release.php'))
         z,p,w=self.bundles['site'];self.assertIn(b"'super_admin'",z.read(p+w+'desk-sync.php'))
     def test_10_outer_checksums(self):
-        lines=(ROOT/'Release_V1.0-SHA256SUMS.txt').read_text().splitlines();self.assertEqual(len(lines),2)
+        lines=(ROOT/f'{BUILDER.RELEASE_NAME}-SHA256SUMS.txt').read_text().splitlines();self.assertEqual(len(lines),2)
         for line in lines:
             digest,name=line.split();self.assertEqual(hashlib.sha256((ROOT/name).read_bytes()).hexdigest(),digest)
 if __name__=='__main__':unittest.main(verbosity=2)

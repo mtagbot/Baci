@@ -1,54 +1,86 @@
-# Baci
+# Baci — سامانهٔ مدیریت مدرسهٔ SchoolDesk Pro
 
-## تازه‌ترین اصلاحی: فوتر، پیام ورود، نمایش پایدار و اتصال دسکتاپ
+سایت (PHP + MySQL) و نرم‌افزار دسکتاپ ویندوز (SQLite) به‌همراه بازوی بله/تلگرام،
+اسکنر حضور و غیاب، آزمون آنلاین، طراح زندهٔ آزمون، کارت و تگ QR، و گزارش‌های
+Word/PDF.
 
-فوتر کم‌ارتفاع تازه، پیام‌های قابل مشاهده برای دانش‌آموز/دبیر/استعلام، کاهش جهش اندازهٔ ردیف‌ها و نشانگر واقعی وضعیت همگام‌سازی دسکتاپ. فقط اصلاحی؛ بسته‌های کامل و فایل اجرایی ویندوز تغییر نکرده‌اند.
+**شاخهٔ جاری:** `arena/01a10d10-baci`
+**نسخهٔ کد:** سایت **4.178.0** / دسکتاپ **2.101.0**
 
-- [اصلاحی سایت](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SITE-FIX-v4.152.0-fast-ui.zip)
-- [اصلاحی دسکتاپ](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SchoolDeskPro-FIX-v2.83.0-fast-ui.zip)
-- [راهنمای نصب، اندازه‌گیری‌ها و حدود تأیید](CORRECTIONS-FAST-UI-FA.md) · [SHA256](FAST-UI-SHA256SUMS.txt)
+---
 
-**پس از اصلاحی preview-navigation نصب شود.** ۳۱ مجموعه‌آزمون روی هر توزیع موفق؛ حدود ۳۶٪ منابع کمتر و حدود ۹۹٪ کاهش CLS فهرست دانش‌آموز در نمونهٔ آزمایشگاهی. این اعداد تضمین سرعت همهٔ شبکه‌ها نیستند. محدودیت بازگشت به پیش‌نمایش‌ها و کنترل قلم چاپ حفظ شده است.
+## Release_V1.1 — نصب از صفر
 
-## اصلاحی قبلی: محدودکردن بازگشت به پیش‌نمایش‌ها
+بستهٔ کامل، با همهٔ اصلاحات تا **v4.178.0** ادغام‌شده. پس از نصب این بسته،
+**نیازی به نصب زنجیرهٔ اصلاحی نیست.**
 
-دکمهٔ اضافهٔ بازگشت از صفحات عادی حذف شده است؛ فقط در پیش‌نمایش‌های مجاز باقی می‌ماند و در ویرایشگر آزمون داخل نوار ابزار خود ویرایشگر است.
+| بسته | حجم | sha256 |
+|---|---|---|
+| [Release_V1.1-Site.zip](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a10d10-baci/Release_V1.1-Site.zip) | ۳٬۷۱۴٬۴۰۵ بایت | `b0357c23…d983326` |
+| [Release_V1.1-Desktop.zip](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a10d10-baci/Release_V1.1-Desktop.zip) | ۱۷٬۳۳۷٬۶۶۸ بایت | `6a77824d…c6732` |
 
-- [اصلاحی سایت](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SITE-FIX-v4.152.0-preview-navigation.zip)
-- [اصلاحی دسکتاپ](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SchoolDeskPro-FIX-v2.83.0-preview-navigation.zip)
-- [راهنما و محدودهٔ دقیق تغییر](CORRECTIONS-PREVIEW-NAVIGATION-FA.md) · [SHA256](PREVIEW-NAVIGATION-SHA256SUMS.txt)
+- [SHA256 کامل هر دو بسته](Release_V1.1-SHA256SUMS.txt)
+- [راهنمای نصب کامل](release-v1.0/README-FA.md)
+- هر بسته یک `RELEASE-MANIFEST.json` دارد با sha256 تک‌تک فایل‌ها و کامیتِ منبعِ ساخت.
 
-این اصلاحی پس از بستهٔ قبلی student-workflow نصب شود. هیچ نسخهٔ کامل یا فایل اجرایی دسکتاپ بازسازی نشده است.
+**پیش از نصب:** از اطلاعات مدرسهٔ فعال پشتیبان بگیرید. بستهٔ کامل را روی نصب
+دارای داده استخراج نکنید؛ برای نصب موجود از بستهٔ اصلاحی پایین استفاده کنید.
 
-## اصلاحی قبلی: فرم دانش‌آموز، گزارش و پنجرهٔ دسکتاپ
+---
 
-- [اصلاحی سایت](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SITE-FIX-v4.152.0-student-workflow.zip)
-- [اصلاحی دسکتاپ، همراه فایل اجرایی جدید](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SchoolDeskPro-FIX-v2.83.0-student-workflow.zip)
-- [راهنمای نصب، جزئیات پنج اصلاح و حدود تأیید ویندوز](CORRECTIONS-STUDENT-WORKFLOW-FA.md) · [SHA256](STUDENT-WORKFLOW-SHA256SUMS.txt)
+## بستهٔ اصلاحی v4.178.0 — برای نصبِ موجود
 
-روی آخرین نصب **همراه اصلاحی SVG قبلی** اعمال شود. فقط بستهٔ اصلاحی ساخته شده؛ Release_V1.0 همچنان نسخهٔ کامل قبلی است.
+اگر نصبِ فعال دارید، این دو بسته را جایگزین کنید (نه بستهٔ کامل):
 
-## اصلاحی قبلی: SVG و رابط واکنش‌گرا
+- [MODIFIED-FILES-V4.178.0.zip](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a10d10-baci/MODIFIED-FILES-V4.178.0.zip) — سایت
+- [SchoolDesk-FIX-v2.101.0.zip](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a10d10-baci/SchoolDesk-FIX-v2.101.0.zip) — دسکتاپ
+- [راهنما و فهرست دقیق تغییرات](CORRECTIONS-V4.178.0-FA.md) · [SHA256](V4.178.0-SHA256SUMS.txt)
 
-**فقط اصلاحی؛ نسخه‌های کامل در این مرحله بازسازی نشده‌اند.** روی آخرین نصب با اصلاحات قبلی اعمال شود.
+این بسته **جایگزین کامل v4.177.1** است.
 
-- [اصلاحی سایت — SVG و واکنش‌گرایی](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SITE-FIX-v4.152.0-svg-responsive.zip)
-- [اصلاحی دسکتاپ — SVG و واکنش‌گرایی](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SchoolDeskPro-FIX-v2.83.0-svg-responsive.zip)
-- [راهنما، شواهد آزمون و سه مسیر مفقودِ قبلی](CORRECTIONS-SVG-RESPONSIVE-FA.md) · [SHA256](SVG-RESPONSIVE-SHA256SUMS.txt)
+---
 
+## چگونه بفهمیم کدام نسخه نصب است؟
 
-## Release_V1.0 — نسخهٔ کامل قبلی
+از v4.178.0 به بعد شمارهٔ نسخه در **فوتر هر صفحه** نمایش داده می‌شود
+(«نسخهٔ 4.178.0» کنار نام مدرسه) و در فایل `config/version.php` ذخیره است.
 
-برای **نصب از صفر**؛ اصلاحات تا انتشار قبلی در این دو بسته ادغام شده‌اند؛ رابط SVG تازه را ندارند و برای آن باید اصلاحی بالا نیز نصب شود. شماره‌های داخلی سایت 4.152.0 و دسکتاپ 2.83.0 تغییر نکرده‌اند.
+تا پیش از این تنها مرجع `config/release.php` بود که روی ۴.۱۵۲.۰ مانده بود و
+هیچ‌جای رابط دیده نمی‌شد. آن فایل عمداً با بستهٔ اصلاحی بازنویسی **نمی‌شود**،
+چون کلید `distribution` در آن درایور بانک اطلاعاتی را انتخاب می‌کند
+(site ⇒ MySQL، desktop ⇒ SQLite).
 
-- [دانلود نسخهٔ کامل سایت](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/Release_V1.0-Site.zip)
-- [دانلود نسخهٔ کامل دسکتاپ ویندوز](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/Release_V1.0-Desktop.zip)
-- [راهنمای نصب کامل](release-v1.0/README-FA.md) · [SHA256 نسخه‌های کامل](Release_V1.0-SHA256SUMS.txt)
+---
 
-## اصلاحی کم‌حجم برای آخرین نصب موجود
+## نقشهٔ شاخه‌ها و تاریخچهٔ نسخه‌ها
 
-- [اصلاحی سایت](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SITE-FIX-v4.152.0-ui-print.zip)
-- [اصلاحی دسکتاپ](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a0a1d9-baci/SchoolDeskPro-FIX-v2.83.0-ui-print.zip)
-- [راهنما، فهرست اصلاحات و حدود آزمون](CORRECTIONS-UI-PRINT-FA.md) · [SHA256 اصلاحی‌ها](UI-PRINT-SHA256SUMS.txt)
+- [docs/BRANCH-TIMELINE-FA.md](docs/BRANCH-TIMELINE-FA.md) — نقشهٔ زمانی همهٔ شاخه‌ها از v4.29 تا v4.178.0
+- [docs/CODE-MAP-FA.md](docs/CODE-MAP-FA.md) — نقشهٔ کد
+- [docs/PLATFORM-BRIEF-FA.md](docs/PLATFORM-BRIEF-FA.md) — شناخت پلتفرم
 
-**پیش از ارتقای نصب موجود پشتیبان بگیرید.** ZIP کامل را روی اطلاعات مدرسهٔ فعال استخراج نکنید؛ برای آن از بستهٔ اصلاحی متناسب استفاده کنید. این مخزن خصوصی است و دانلود نیازمند دسترسی GitHub به مخزن است.
+---
+
+## تست‌ها
+
+۵۱ سوئیت با اجرای **واقعی** PHP (php-wasm 8.3 + SQLite) — نه بازنویسی منطق در تست:
+
+```sh
+npm ci --prefix tests
+unzip -qo Release_V1.1-Site.zip -d /tmp/baci-site
+SITE=/tmp/baci-site PATCH=update-v4.152.0 bash scripts/run-tests.sh
+```
+
+> سورس تست باید توزیع **سایت** باشد. با سورس دسکتاپ دو سوئیت به‌طور محیطی قرمز
+> می‌شوند — جزئیات در بند ۷ `docs/BRANCH-TIMELINE-FA.md`.
+
+بازسازی `Release_V1.1` از صفر:
+
+```sh
+python3 -m pip install --target .cache/release-v1/compiler ziglang==0.14.1
+python3 scripts/build-full-release.py --stage-only
+node tests/test-full-release-install.mjs        # نصب تازه، ۵۸ assertion
+python3 scripts/build-full-release.py
+python3 tests/test-full-release-packaging.py    # ۱۱ تست بسته‌بندی
+```
+
+جزئیات در [release-v1.0/BUILD.md](release-v1.0/BUILD.md).

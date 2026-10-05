@@ -15,10 +15,15 @@ $footerLogged=is_admin_logged_in()||is_student_logged_in()||(function_exists('is
 $footerRelease=is_file(dirname(__DIR__).'/config/release.php')?require dirname(__DIR__).'/config/release.php':[];
 $footerDesk=($footerRelease['distribution']??(PHP_SAPI==='cli-server'?'desktop':'site'))==='desktop';
 $showConnection=$footerDesk&&empty($isEmbedded);
+/* v4.178.0: شمارهٔ نسخه از config/version.php — نه از release.php، تا بستهٔ
+   اصلاحی مجبور نباشد فایلی را بازنویسی کند که درایور بانک را انتخاب می‌کند. */
+$footerVersionFile=dirname(__DIR__).'/config/version.php';
+$footerVersion=is_file($footerVersionFile)?(require $footerVersionFile):[];
+$footerVersionLabel=(string)($footerDesk?($footerVersion['desktop_version']??''):($footerVersion['site_version']??''));
 ?>
 <footer class="school-footer<?php echo $showConnection?' has-desk-state':''; ?>" aria-label="اطلاعات سامانه مدرسه">
 <div class="school-footer-inner">
-<div class="school-footer-brand"><strong><?php echo clean(get_setting('school_name','سامانه مدیریت مدرسه')); ?></strong></div>
+<div class="school-footer-brand"><strong><?php echo clean(get_setting('school_name','سامانه مدیریت مدرسه')); ?></strong><?php if($footerVersionLabel!==''): ?><span class="school-footer-version" title="نسخهٔ کد نصب‌شده">نسخهٔ <?php echo clean($footerVersionLabel); ?></span><?php endif; ?></div>
 <div class="school-footer-credit">طراحی و توسعه : معاونت فناوری متوسطه اول</div>
 <?php if($footerLogged): ?><nav class="school-footer-links" aria-label="نشست کاربری"><a href="my-sessions.php">نشست‌های من</a></nav><?php endif; ?>
 <?php if($showConnection): ?>
