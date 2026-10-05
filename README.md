@@ -28,15 +28,23 @@ Word/PDF.
 
 ---
 
-## بستهٔ اصلاحی v4.178.0 — برای نصبِ موجود
+## بستهٔ اصلاحی — برای نصبِ موجود
 
-اگر نصبِ فعال دارید، این دو بسته را جایگزین کنید (نه بستهٔ کامل):
+اگر نصبِ فعال دارید، این بسته‌ها را جایگزین کنید (نه بستهٔ کامل). به ترتیب نصب شوند:
+
+### v4.179.0 — غیبت و تأخیر موجه (جدیدترین)
+
+- [MODIFIED-FILES-V4.179.0.zip](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a10d10-baci/MODIFIED-FILES-V4.179.0.zip) — سایت
+- [SchoolDesk-FIX-v2.102.0.zip](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a10d10-baci/SchoolDesk-FIX-v2.102.0.zip) — دسکتاپ
+- [راهنما](CORRECTIONS-V4.179.0-FA.md) · [SHA256](V4.179.0-SHA256SUMS.txt)
+
+### v4.178.0 — شمارهٔ نسخه در فوتر
 
 - [MODIFIED-FILES-V4.178.0.zip](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a10d10-baci/MODIFIED-FILES-V4.178.0.zip) — سایت
 - [SchoolDesk-FIX-v2.101.0.zip](https://github.com/mtagbot/Baci/raw/refs/heads/arena/01a10d10-baci/SchoolDesk-FIX-v2.101.0.zip) — دسکتاپ
-- [راهنما و فهرست دقیق تغییرات](CORRECTIONS-V4.178.0-FA.md) · [SHA256](V4.178.0-SHA256SUMS.txt)
+- [راهنما](CORRECTIONS-V4.178.0-FA.md) · [SHA256](V4.178.0-SHA256SUMS.txt)
 
-این بسته **جایگزین کامل v4.177.1** است.
+هیچ‌کدام تغییر پایگاه‌داده‌ای ندارند.
 
 ---
 

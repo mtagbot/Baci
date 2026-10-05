@@ -85,10 +85,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // «تأخیر در ورود به مدرسه» (with title_id), so they show up
             // identically in student management and «موارد انضباطی».
             $target = $action === 'file_absents' ? 'absent' : 'late';
-            $title = $target === 'late' ? 'تأخیر در ورود به مدرسه' : 'غیبت';
-            $titleId = att_discipline_title_id($title);
+            // v4.179.0: per-row «موجه» checkbox from the records table.
+            //
+            // A justified row is filed under a DISTINCT title («غیبت موجه» /
+            // «تأخیر موجه در ورود به مدرسه») AND with is_justified=1. Using a
+            // distinct title is deliberate: the bot notification prints the
+            // title verbatim («عنوان: {$title}»), so parents see «غیبت موجه»
+            // with ZERO change to the bot code or message templates.
+            //
+            // No schema change and no data migration: is_justified has existed
+            // since v4.31.0 and every previously filed record keeps its value.
+            $justifiedIds = array_values(array_unique(array_map('intval', (array)($_POST['justified_ids'] ?? []))));
+            $baseTitle = $target === 'late' ? 'تأخیر در ورود به مدرسه' : 'غیبت';
+            $justTitle = $target === 'late' ? 'تأخیر موجه در ورود به مدرسه' : 'غیبت موجه';
+            $titleId = att_discipline_title_id($baseTitle);
+            // Created lazily: the «موجه» title only enters the school's saved
+            // title list once somebody actually files a justified record.
+            $justTitleId = $justifiedIds ? att_discipline_title_id($justTitle) : 0;
             $rows = DB::fetchAll("SELECT a.*, s.first_name, s.last_name FROM student_attendance a JOIN students s ON s.id=a.student_id WHERE a.id IN ($ph) AND a.status=?", array_merge($ids, [$target]));
-            $filed = 0; $skipped = 0; $notifiedChats = 0;
+            $filed = 0; $skipped = 0; $notifiedChats = 0; $filedJustified = 0;
             foreach ($rows as $rec) {
                 // one filing per attendance record — never duplicate.
                 // Marker [att#N] lives inside the internal note (also matches
@@ -97,20 +112,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $dup = DB::fetch("SELECT id FROM student_discipline_records WHERE student_id=? AND (internal_note=? OR internal_note LIKE ?)",
                     [(int)$rec['student_id'], 'att#' . (int)$rec['id'], '%' . $marker . '%']);
                 if ($dup) { $skipped++; continue; }
+                $isJustified = in_array((int)$rec['id'], $justifiedIds, true) ? 1 : 0;
+                $title = $isJustified ? $justTitle : $baseTitle;
+                $useTitleId = $isJustified ? ($justTitleId ?: null) : ($titleId ?: null);
                 // تاریخ و روز همان روز + ساعت دقیق ورود (در تأخیر)
                 $dayName = att_day_name($rec['date_jalali']);
                 $occur = trim(($dayName !== '' ? $dayName . ' ' : '') . att_norm($rec['date_jalali'])
                         . (!empty($rec['scan_time']) ? ' ' . att_norm($rec['scan_time']) : ''));
                 $detail = 'ثبت‌شده از سوابق حضور و غیاب'
                         . ($target === 'late' ? ' — ' . tr_num((string)max(1, (int)$rec['minutes_late']), 'fa') . ' دقیقه تأخیر' : '')
+                        . ($isJustified ? ' — موجه شده است' : '')
                         . (trim((string)$rec['note']) !== '' ? ' — ' . trim((string)$rec['note']) : '')
                         . ' ' . $marker;
                 DB::execute("INSERT INTO student_discipline_records (student_id,title_id,title_text,internal_note,occurred_at_jalali,notify_parents,is_justified,review_status,review_note,created_by_teacher_id,created_at_jalali) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                    [(int)$rec['student_id'], $titleId ?: null, $title, $detail,
-                     $occur, 1, 0, 'pending', null,
+                    [(int)$rec['student_id'], $useTitleId, $title, $detail,
+                     $occur, 1, $isJustified, 'pending', null,
                      $isDeputyAtt ? (int)$_SESSION['teacher_id'] : null, jalali_now()]);
                 $newRid = (int)DB::lastInsertId();
                 $filed++;
+                if ($isJustified) $filedJustified++;
                 try {
                     notify_student_discipline_bots((int)$rec['student_id'], $title, $occur, $newRid);
                     $notifiedChats++;
@@ -119,6 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $label = $target === 'late' ? 'تأخیر' : 'غیبت';
             if ($filed) {
                 $msg = tr_num($filed, 'fa') . ' مورد ' . $label . ' در پرونده انضباطی ثبت شد؛ اعلان حساب‌های متصل ارسال یا در صف قرار گرفت.';
+                if ($filedJustified) $msg .= ' (' . tr_num($filedJustified, 'fa') . ' مورد به‌صورت موجه.)';
                 if ($skipped) $msg .= ' (' . tr_num($skipped, 'fa') . ' مورد قبلاً ثبت شده بود.)';
                 set_flash_message('success', $msg);
             } elseif ($skipped) {
@@ -126,7 +147,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 set_flash_message('warning', 'در بین انتخاب‌شده‌ها رکوردی از نوع ' . $label . ' وجود نداشت.');
             }
-            log_activity($_SESSION['admin_id'] ?? null, 'ثبت ' . $label . ' در پرونده', tr_num($filed, 'fa') . ' مورد از سوابق حضور و غیاب');
+            log_activity($_SESSION['admin_id'] ?? null, 'ثبت ' . $label . ' در پرونده',
+                tr_num($filed, 'fa') . ' مورد از سوابق حضور و غیاب' . ($filedJustified ? ' (' . tr_num($filedJustified, 'fa') . ' موجه)' : ''));
             redirect($back);
         }
         redirect($back);
@@ -368,9 +390,9 @@ $scannerUrl = $attProto . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $attBase . '/
                 <h3 class="font-bold text-primary">سوابق ثبت‌شده</h3>
                 <div class="flex gap-2">
                     <button type="submit" form="attBulkForm" name="bulk_action" value="file_absents" class="btn btn-danger text-xs"
-                        onclick="return attBulkConfirm(this, 'غیبت‌های دانش‌آموزان انتخاب‌شده در پرونده انضباطی آن‌ها ثبت و به اولیا اطلاع داده شود؟')">ثبت غیبت‌ها در پرونده</button>
+                        onclick="return attBulkConfirm(this, 'غیبت‌های دانش‌آموزان انتخاب‌شده در پرونده انضباطی آن‌ها ثبت و به اولیا اطلاع داده شود؟ رکوردهایی که تیک «موجه» دارند به‌صورت «غیبت موجه» ثبت می‌شوند.')">ثبت غیبت‌ها در پرونده</button>
                     <button type="submit" form="attBulkForm" name="bulk_action" value="file_lates" class="btn btn-warning text-xs"
-                        onclick="return attBulkConfirm(this, 'تأخیرهای دانش‌آموزان انتخاب‌شده در پرونده انضباطی آن‌ها ثبت و به اولیا اطلاع داده شود؟')">ثبت تأخیرها در پرونده</button>
+                        onclick="return attBulkConfirm(this, 'تأخیرهای دانش‌آموزان انتخاب‌شده در پرونده انضباطی آن‌ها ثبت و به اولیا اطلاع داده شود؟ رکوردهایی که تیک «موجه» دارند به‌صورت «تأخیر موجه» ثبت می‌شوند.')">ثبت تأخیرها در پرونده</button>
                     <button type="submit" form="attBulkForm" name="bulk_action" value="delete" class="btn btn-outline text-xs"
                         onclick="return attBulkConfirm(this, 'رکوردهای انتخاب‌شده حذف شوند؟')">حذف انتخاب شده‌ها</button>
                 </div>
@@ -387,7 +409,7 @@ $scannerUrl = $attProto . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $attBase . '/
             </form>
             <div class="table-container max-h-[480px]">
                 <table>
-                    <thead><tr><th style="width:34px"><input type="checkbox" id="attCheckAll" onclick="attToggleAll(this)"></th><th>دانش‌آموز</th><th>کلاس</th><th>تاریخ</th><th>نوع</th><th>ورود</th><th>منبع</th><th>اعلان ربات</th><th>وضعیت ولی</th><th>عملیات</th></tr></thead>
+                    <thead><tr><th style="width:34px"><input type="checkbox" id="attCheckAll" onclick="attToggleAll(this)"></th><th>دانش‌آموز</th><th>کلاس</th><th>تاریخ</th><th>نوع</th><th style="width:58px" title="غیبت یا تأخیر موجه — با «ثبت … در پرونده» به‌صورت موجه در پرونده انضباطی ثبت می‌شود">موجه</th><th>ورود</th><th>منبع</th><th>اعلان ربات</th><th>وضعیت ولی</th><th>عملیات</th></tr></thead>
                     <tbody>
                     <?php foreach ($records as $r): ?>
                         <tr>
@@ -402,6 +424,17 @@ $scannerUrl = $attProto . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $attBase . '/
                                     <span class="badge badge-success">حضور</span>
                                 <?php else: ?>
                                     <span class="badge badge-danger">غیبت</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-center">
+                                <?php if ($r['status'] === 'absent' || $r['status'] === 'late'): ?>
+                                    <?php /* v4.179.0: only absent/late rows can be justified — a
+                                           present row has nothing to excuse. Deliberately NOT covered by
+                                           «select all» so justified is always an explicit choice. */ ?>
+                                    <input type="checkbox" class="att-just-check" name="justified_ids[]" value="<?php echo (int)$r['id']; ?>" form="attBulkForm"
+                                           title="<?php echo $r['status'] === 'late' ? 'تأخیر موجه' : 'غیبت موجه'; ?> — با «ثبت <?php echo $r['status'] === 'late' ? 'تأخیرها' : 'غیبت‌ها'; ?> در پرونده» به‌صورت موجه ثبت می‌شود">
+                                <?php else: ?>
+                                    <span class="text-muted">—</span>
                                 <?php endif; ?>
                             </td>
                             <td class="text-xs dir-ltr"><?php echo !empty($r['scan_time']) ? tr_num($r['scan_time'], 'fa') : '---'; ?></td>
@@ -428,7 +461,7 @@ $scannerUrl = $attProto . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $attBase . '/
                             </td>
                         </tr>
                     <?php endforeach; if (!$records): ?>
-                        <tr><td colspan="10" class="text-center text-muted py-6">رکوردی با این فیلتر یافت نشد.</td></tr>
+                        <tr><td colspan="11" class="text-center text-muted py-6">رکوردی با این فیلتر یافت نشد.</td></tr>
                     <?php endif; ?>
                     </tbody>
                 </table>
@@ -449,7 +482,16 @@ function attToggleAll(box){
 function attBulkConfirm(btn, msg){
   var n = document.querySelectorAll('.att-rec-check:checked').length;
   if (!n) { alert('ابتدا رکوردهای مورد نظر را از لیست انتخاب کنید.'); return false; }
-  return confirm(msg + ' (' + n + ' رکورد انتخاب شده)');
+  /* v4.179.0: tell the admin how many of the selection will be filed as
+     justified, before an irreversible parent notification goes out.
+     Only counts checkboxes belonging to SELECTED rows. */
+  var j = 0;
+  document.querySelectorAll('.att-just-check:checked').forEach(function(c){
+    var row = c.closest('tr');
+    if (row && row.querySelector('.att-rec-check:checked')) j++;
+  });
+  var extra = ' (' + n + ' رکورد انتخاب شده' + (j ? '، ' + j + ' مورد موجه' : '') + ')';
+  return confirm(msg + extra);
 }
 </script>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
