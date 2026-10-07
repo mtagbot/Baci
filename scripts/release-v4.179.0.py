@@ -57,6 +57,7 @@ SITE_PAIRS = [
     ('includes/header.php', 'update-v4.152.0/includes/header.php'),
     ('student-bulk-report.php', 'update-v4.152.0/student-bulk-report.php'),
     ('students.php', 'update-v4.152.0/students.php'),
+    ('teacher-panel.php', 'update-v4.152.0/teacher-panel.php'),
 ]
 DESKTOP_PAIRS = [
     ('attendance.php', 'update-v4.152.0/attendance.php'),
@@ -66,6 +67,7 @@ DESKTOP_PAIRS = [
     ('includes/header.php', 'update-v4.152.0/includes/header.php'),
     ('student-bulk-report.php', 'update-v4.152.0/student-bulk-report.php'),
     ('students.php', 'update-v4.152.0/students.php'),
+    ('teacher-panel.php', 'update-v4.152.0/teacher-panel.php'),
 ]
 
 PACKAGES = [

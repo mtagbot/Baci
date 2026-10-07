@@ -124,7 +124,11 @@ $tab = $_GET['tab'] ?? 'schedule';
         $month = trim($_GET['month'] ?? 'آبان');
         $monthsList = ['مهر', 'آبان', 'آذر', 'دی', 'نوبت اول', 'بهمن', 'اسفند', 'فروردین', 'اردیبهشت', 'خرداد', 'نوبت دوم', 'شهریور'];
 
-        $students = DB::fetchAll("SELECT id, first_name, last_name, national_id FROM students WHERE class_name = ? AND status='active'", [$cls]);
+        /* v4.179.0: فقط دانش‌آموزانِ همان سالِ تحصیلیِ انتخاب‌شده (منوی بالای
+           صفحه / ?year=) لیست می‌شوند، نه همهٔ سال‌هایی که در این کلاس‌اند.
+           پیش از این academic_year در WHERE نبود و دانش‌آموزان سال‌های دیگرِ
+           همان کلاس هم برای نمره‌دهی بالا می‌آمدند. */
+        $students = DB::fetchAll("SELECT id, first_name, last_name, national_id FROM students WHERE class_name = ? AND academic_year = ? AND status='active'", [$cls, $year]);
         persian_usort_by($students, ['last_name','first_name']);   // v4.77.0: آ قبل از ا
     ?>
     <div class="card shadow-lg">
@@ -178,7 +182,11 @@ $tab = $_GET['tab'] ?? 'schedule';
                     </thead>
                     <tbody>
                         <?php foreach ($students as $idx => $st): 
-                            $currGrade = DB::fetch("SELECT rg.score FROM report_grades rg JOIN reports r ON rg.report_id = r.id WHERE r.student_id = ? AND r.report_month = ? AND rg.subject_name = ?", [$st['id'], $month, $sub]);
+                            /* v4.179.0: نمرهٔ فعلی هم باید از همان سالِ تحصیلیِ
+                               انتخاب‌شده خوانده شود؛ چون نام ماه (مثلاً «آبان») در
+                               همهٔ سال‌ها تکرار می‌شود، بدون فیلتر سال، نمرهٔ سالِ
+                               دیگر نمایش/بازنویسی می‌شد. */
+                            $currGrade = DB::fetch("SELECT rg.score FROM report_grades rg JOIN reports r ON rg.report_id = r.id WHERE r.student_id = ? AND r.academic_year = ? AND r.report_month = ? AND rg.subject_name = ?", [$st['id'], $year, $month, $sub]);
                             $scVal = $currGrade ? $currGrade['score'] : '';
                         ?>
                         <tr>
