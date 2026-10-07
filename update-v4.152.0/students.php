@@ -387,29 +387,26 @@ else:
     </div>
 
     <div class="card p-4 students-filters-card">
-        <form method="GET" class="filters-line students-filters">
-            <div class="filter-primary f-search"><label class="text-xs font-bold">جستجو</label><input type="text" name="q" class="form-input" placeholder="نام یا کد ملی" title="جستجو در نام، نام خانوادگی، کد ملی و نام پدر" value="<?php echo clean($search); ?>"></div>
-            <div class="filter-primary f-year"><label class="text-xs font-bold">سال تحصیلی</label><select name="academic_year" class="form-select"><option value="">همه</option><?php foreach($yearOptions as $yo): ?><option value="<?php echo clean($yo['academic_year']); ?>" <?php echo $filterYear===$yo['academic_year']?'selected':''; ?>><?php echo clean($yo['academic_year']); ?></option><?php endforeach; ?></select></div>
-            <div class="filter-primary f-grade"><label class="text-xs font-bold">پایه</label><select name="grade_level" class="form-select"><option value="">همه</option><?php foreach($gradeOptions as $go): ?><option value="<?php echo clean($go['grade_level']); ?>" <?php echo $filterGrade===$go['grade_level']?'selected':''; ?>><?php echo clean($go['grade_level']); ?></option><?php endforeach; ?></select></div>
+        <form method="GET" id="studentsFilterForm" class="students-filters" data-base="students.php" data-sort="<?php echo htmlspecialchars($sortKey); ?>" data-dir="<?php echo htmlspecialchars($sortDir); ?>" autocomplete="off">
+            <div class="sf-field sf-search"><label for="sfSearch">جستجو</label><span class="sf-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span><input id="sfSearch" type="search" name="q" class="form-input" placeholder="نام، کد ملی یا نام پدر…" title="جستجو در نام، نام خانوادگی، کد ملی و نام پدر" value="<?php echo clean($search); ?>"></div>
+            <div class="sf-field"><label>سال تحصیلی</label><select name="academic_year" class="form-select"><option value="">همه</option><?php foreach($yearOptions as $yo): ?><option value="<?php echo clean($yo['academic_year']); ?>" <?php echo $filterYear===$yo['academic_year']?'selected':''; ?>><?php echo clean($yo['academic_year']); ?></option><?php endforeach; ?></select></div>
+            <div class="sf-field"><label>پایه</label><select name="grade_level" class="form-select"><option value="">همه</option><?php foreach($gradeOptions as $go): ?><option value="<?php echo clean($go['grade_level']); ?>" <?php echo $filterGrade===$go['grade_level']?'selected':''; ?>><?php echo clean($go['grade_level']); ?></option><?php endforeach; ?></select></div>
             <?php /* v4.179.0: دو dropdown «چینش فهرست» و «ترتیب» از اینجا برداشته
           شدند؛ چینش با کلیک روی سرستون‌های جدول انجام می‌شود ($stuSortLink
           همان sort/dir را در URL می‌سازد). جای آن‌ها «کلاس» از «گزینه‌های
           بیشتر» به این ردیف آمد، چون پرکاربردترین فیلتر است. */ ?>
-            <div class="filter-primary f-class"><label class="text-xs font-bold">کلاس</label><select name="class_name" class="form-select"><option value="">همه</option><?php foreach($classOptions as $co): ?><option value="<?php echo clean($co['class_name']); ?>" <?php echo $filterClass===$co['class_name']?'selected':''; ?>><?php echo clean($co['class_name']); ?></option><?php endforeach; ?></select></div>
-            <?php /* v4.179.0: «گزینه‌های بیشتر» و دکمه‌ها در یک نوار (filter-bar)
-              کنار هم نشستند؛ چون نوار space-between است، در RTL کلید افشاگر سمت
-              راست و دکمه‌های «اعمال فیلتر»/«پاک کردن» سمت چپ (طرف دیگر) می‌نشینند. */ ?>
-            <div class="filter-bar">
-            <details class="filter-more" <?php echo ($disciplineFilter||$academicFilter||$subjectFilter||$minGpa||$maxGpa)?'open':''; ?>><summary>گزینه‌های بیشتر</summary>
-                <div class="grid grid-cols-4 gap-2 mt-2">
-                    <div class="fm-disc"><label class="text-xs font-bold">فیلتر انضباطی</label><select name="discipline_filter" class="form-select"><option value="">همه</option><option value="has_records" <?php echo $disciplineFilter==='has_records'?'selected':''; ?>>دارای مورد</option><option value="no_records" <?php echo $disciplineFilter==='no_records'?'selected':''; ?>>بدون مورد</option><option value="recent_30" <?php echo $disciplineFilter==='recent_30'?'selected':''; ?>>۳۰ روز اخیر</option></select></div>
-                    <div class="fm-acad"><label class="text-xs font-bold">فیلتر تحصیلی</label><select name="academic_filter" class="form-select"><option value="">همه</option><option value="excellent" <?php echo $academicFilter==='excellent'?'selected':''; ?>>معدل عالی</option><option value="weak" <?php echo $academicFilter==='weak'?'selected':''; ?>>زیر ۱۲</option><option value="failed" <?php echo $academicFilter==='failed'?'selected':''; ?>>نمره زیر ۱۰</option></select></div>
-                    <div class="fm-subject"><label class="text-xs font-bold">درس خاص</label><select name="subject_name" class="form-select"><option value="">همه</option><?php foreach($subjectOptions as $so): ?><option value="<?php echo clean($so['subject_name']); ?>" <?php echo $subjectFilter===$so['subject_name']?'selected':''; ?>><?php echo clean($so['subject_name']); ?></option><?php endforeach; ?></select></div>
-                    <div class="fm-gpa grid grid-cols-2 gap-1"><div><label class="text-xs">حداقل معدل</label><input name="min_gpa" class="form-input" inputmode="decimal" title="حداقل معدل" placeholder="۰" value="<?php echo clean($minGpa); ?>"></div><div><label class="text-xs">حداکثر</label><input name="max_gpa" class="form-input" inputmode="decimal" title="حداکثر معدل" placeholder="۲۰" value="<?php echo clean($maxGpa); ?>"></div></div>
-                </div>
+            <div class="sf-field"><label>کلاس</label><select name="class_name" class="form-select"><option value="">همه</option><?php foreach($classOptions as $co): ?><option value="<?php echo clean($co['class_name']); ?>" <?php echo $filterClass===$co['class_name']?'selected':''; ?>><?php echo clean($co['class_name']); ?></option><?php endforeach; ?></select></div>
+            <?php /* v4.179.0: «گزینه‌های بیشتر» به‌صورت popover زیر کلیدش باز
+              می‌شود تا نوار اصلی باریک و تمیز بماند. */ ?>
+            <details class="sf-more" <?php echo ($disciplineFilter||$academicFilter||$subjectFilter||$minGpa||$maxGpa)?'open':''; ?>><summary>گزینه‌های بیشتر<svg class="sf-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></summary>
+                <div class="sf-more-panel"><div class="sf-more-grid">
+                    <div><label>فیلتر انضباطی</label><select name="discipline_filter" class="form-select"><option value="">همه</option><option value="has_records" <?php echo $disciplineFilter==='has_records'?'selected':''; ?>>دارای مورد</option><option value="no_records" <?php echo $disciplineFilter==='no_records'?'selected':''; ?>>بدون مورد</option><option value="recent_30" <?php echo $disciplineFilter==='recent_30'?'selected':''; ?>>۳۰ روز اخیر</option></select></div>
+                    <div><label>فیلتر تحصیلی</label><select name="academic_filter" class="form-select"><option value="">همه</option><option value="excellent" <?php echo $academicFilter==='excellent'?'selected':''; ?>>معدل عالی</option><option value="weak" <?php echo $academicFilter==='weak'?'selected':''; ?>>زیر ۱۲</option><option value="failed" <?php echo $academicFilter==='failed'?'selected':''; ?>>نمره زیر ۱۰</option></select></div>
+                    <div><label>درس خاص</label><select name="subject_name" class="form-select"><option value="">همه</option><?php foreach($subjectOptions as $so): ?><option value="<?php echo clean($so['subject_name']); ?>" <?php echo $subjectFilter===$so['subject_name']?'selected':''; ?>><?php echo clean($so['subject_name']); ?></option><?php endforeach; ?></select></div>
+                    <div class="sf-gpa"><div><label>حداقل معدل</label><input name="min_gpa" class="form-input" inputmode="decimal" title="حداقل معدل" placeholder="۰" value="<?php echo clean($minGpa); ?>"></div><div><label>حداکثر</label><input name="max_gpa" class="form-input" inputmode="decimal" title="حداکثر معدل" placeholder="۲۰" value="<?php echo clean($maxGpa); ?>"></div></div>
+                </div></div>
             </details>
-            <div class="filter-actions"><button class="btn btn-primary">اعمال فیلتر</button><a href="students.php" class="btn btn-secondary">پاک کردن</a></div>
-            </div>
+            <div class="sf-actions"><button type="submit" class="btn btn-primary">اعمال فیلتر</button><a href="students.php" class="btn btn-ghost" id="sfClear">پاک کردن</a></div>
         </form>
     </div>
 
@@ -419,6 +416,7 @@ else:
         <?php /* v4.176.0: ترتیبِ فعلیِ فهرست (پس از فیلتر و چینشِ صعودی/نزولی) را
               همراه گزارش می‌فرستیم تا خروجی دقیقاً به همان ترتیب چیده شود. */ ?>
         <input type="hidden" name="student_order" id="studentOrderBox" value="">
+    <div id="studentsResults">
         <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
             <h3 class="font-bold">نتایج: <?php echo tr_num(count($studentsList),'fa'); ?> دانش‌آموز</h3>
             <div class="flex gap-2 flex-wrap student-list-actions">
@@ -444,7 +442,7 @@ else:
             if ($minGpa !== '') $qs[] = 'min_gpa=' . urlencode($minGpa);
             if ($maxGpa !== '') $qs[] = 'max_gpa=' . urlencode($maxGpa);
             $arrow = $sortKey === $key ? ($sortDir === 'asc' ? ' ▲' : ' ▼') : '';
-            return '<th><a href="students.php?' . implode('&amp;', $qs) . '" style="color:inherit;text-decoration:none" title="چینش بر اساس این ستون">' . $label . $arrow . '</a></th>';
+            return '<th><a href="students.php?' . implode('&amp;', $qs) . '" data-sort="' . $key . '" data-dir="' . $dir . '" style="color:inherit;text-decoration:none" title="چینش بر اساس این ستون">' . $label . $arrow . '</a></th>';
         };
         ?>
         <div class="table-container">
@@ -471,6 +469,86 @@ else:
                 </tbody>
             </table>
         </div>
+    </div>
+
+    <?php /* v4.179.0 — جستجوی زنده و به‌روزرسانی درجا.
+          هر تغییر (تایپ جستجو، انتخاب سال/پایه/کلاس، کلیک چینش) یک fetch سبک
+          می‌فرستد و فقط #studentsResults تعویض می‌شود؛ AbortController درخواستِ
+          کهنه را لغو می‌کند تا تایپِ پشت‌سرهم کندی ایجاد نکند. بدون JS صفحه
+          مثل قبل با submit کامل کار می‌کند. */ ?>
+    <script>
+    (function () {
+      var form = document.getElementById('studentsFilterForm');
+      if (!form) return;
+      var results = document.getElementById('studentsResults');
+      var ctrl = null, timer = null;
+      var SVG_OK = true;
+
+      function url(extra) {
+        var p = new URLSearchParams(new FormData(form));
+        p.set('sort', form.dataset.sort || 'name');
+        p.set('dir', form.dataset.dir || 'asc');
+        if (extra) for (var k in extra) p.set(k, extra[k]);
+        return form.dataset.base + '?' + p.toString();
+      }
+      function syncSelects(doc) {
+        ['academic_year', 'grade_level', 'class_name'].forEach(function (n) {
+          var cur = form.querySelector('[name="' + n + '"]');
+          var nxt = doc.querySelector('#studentsFilterForm [name="' + n + '"]');
+          if (!cur || !nxt) return;
+          var val = cur.value;
+          cur.innerHTML = nxt.innerHTML;
+          if ([].some.call(cur.options, function (o) { return o.value === val; })) cur.value = val;
+        });
+        var nf = doc.getElementById('studentsFilterForm');
+        if (nf) { form.dataset.sort = nf.dataset.sort; form.dataset.dir = nf.dataset.dir; }
+      }
+      function swap(u) {
+        if (!results) return;
+        if (ctrl) ctrl.abort();
+        ctrl = new AbortController();
+        var mine = ctrl;
+        results.classList.add('sf-loading');
+        fetch(u, { signal: ctrl.signal }).then(function (r) { return r.text(); }).then(function (html) {
+          if (mine.signal.aborted) return;
+          var doc = new DOMParser().parseFromString(html, 'text/html');
+          var nr = doc.getElementById('studentsResults');
+          if (!nr) return;
+          syncSelects(doc);
+          results.replaceWith(nr);
+          results = nr;
+          history.replaceState(null, '', u);
+        }).catch(function () {}).then(function () {
+          if (!mine.signal.aborted && results) results.classList.remove('sf-loading');
+        });
+      }
+      var q = form.querySelector('[name="q"]');
+      if (q) q.addEventListener('input', function () {
+        clearTimeout(timer);
+        timer = setTimeout(function () { swap(url()); }, 140);
+      });
+      form.querySelectorAll('select').forEach(function (s) {
+        if (s.closest('.sf-more')) return;
+        s.addEventListener('change', function () { swap(url()); });
+      });
+      document.addEventListener('click', function (e) {
+        var a = e.target.closest && e.target.closest('#studentsResults a[data-sort]');
+        if (!a) return;
+        e.preventDefault();
+        form.dataset.sort = a.getAttribute('data-sort');
+        form.dataset.dir = a.getAttribute('data-dir');
+        swap(url());
+      });
+      form.addEventListener('submit', function (e) { e.preventDefault(); clearTimeout(timer); swap(url()); });
+      var clear = document.getElementById('sfClear');
+      if (clear) clear.addEventListener('click', function (e) {
+        e.preventDefault();
+        form.reset();
+        form.dataset.sort = 'name'; form.dataset.dir = 'asc';
+        swap(url());
+      });
+    })();
+    </script>
         <?php
         $transferMap = [];
         foreach ($yearOptions as $yo) {
