@@ -108,11 +108,13 @@ check(justRec && justRec.note.includes('موجه شده است'),
   'the internal note says «موجه شده است»: ' + (justRec ? justRec.note : ''));
 check(justRec && justRec.note.includes('[att#' + A1 + ']'), 'the dedupe marker is preserved on the justified record');
 
-const plainRec = byTitle('غیبت');
-check(!!plainRec, 'an unmarked absence is still filed as plain «غیبت» (unchanged behaviour)');
+const plainRec = byTitle('غیبت غیرموجه');
+check(!!plainRec, 'an UNMARKED absence is filed as «غیبت غیرموجه». Got: ' + recs.map(r => r.title).join(', '));
 check(plainRec && plainRec.just === 0, 'the unmarked record keeps is_justified=0');
 check(plainRec && !plainRec.note.includes('موجه شده است'),
   'the unmarked record does NOT claim to be justified');
+check(!byTitle('غیبت'),
+  'the ambiguous bare title «غیبت» is no longer produced — parents must be able to tell the two apart');
 
 /* ═══════ ۵) پیام ربات ═══════ */
 const outbox = await run(String.raw`<?php require_once '/www/includes/functions.php';
@@ -121,8 +123,9 @@ foreach (DB::fetchAll("SELECT payload FROM bot_outbox ORDER BY created_at") as $
 check(outbox.out.includes('عنوان: غیبت موجه'),
   'the bot message carries the justified title verbatim — no bot-code change needed: '
   + (outbox.out.match(/عنوان: [^\n]*/g) || []).join(' / '));
-check(/عنوان: غیبت\s*\n/.test(outbox.out),
-  'the plain absence message still says just «غیبت»');
+check(/عنوان: غیبت غیرموجه\s*\n/.test(outbox.out),
+  'the unmarked absence message to parents says «غیبت غیرموجه»: '
+  + (outbox.out.match(/عنوان: [^\n]*/g) || []).join(' / '));
 
 
 /* ═══════ ۶) تأخیر ═══════ */

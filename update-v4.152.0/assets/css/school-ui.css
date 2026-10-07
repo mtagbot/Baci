@@ -256,11 +256,26 @@ body.school-app{height:auto!important;max-height:none!important;min-height:100vh
   padding:0 var(--sf-pad);font-size:var(--sf-fs);line-height:calc(var(--sf-h) - 2px);
   border-radius:var(--sf-r);box-sizing:border-box;
 }
-/* نسبتِ عرض فیلدها — از طولِ واقعیِ مقدارِ هر فیلد */
-.school-app .students-filters .f-search{flex:1 1 120px;max-width:300px}
+/* نسبتِ عرض فیلدها — از طولِ واقعیِ مقدارِ هر فیلد.
+   ── چرا سقف‌ها باید بزرگ باشند ──
+   عرضِ واقعیِ فرم در ویوپورت ۱۴۴۰:
+     ۱۴۴۰ − sidebar ‏۲۴۸ (school-ui.css:15) − پدینگ main ‏۲۴×۲ − پدینگ کارت ۱۶×۲
+     = ۱۱۱۲ پیکسل.
+   با سقف‌های قبلی (۳۰۰ + ۸۰ + ۸۰ + ۳۴۰ + سه فاصلهٔ ۸ = ۸۲۴) هر چهار آیتم
+   freeze می‌شدند؛ در flex وقتی آیتمی به max-width می‌خورد از دور خارج می‌شود
+   و چون سال/پایه هم grow=0 بودند، هیچ آیتمِ انعطاف‌پذیری نمی‌ماند که بقیه را
+   بگیرد ⇒ ۲۸۸ پیکسل فضای مرده ته ردیف و ردیف «شکسته» دیده می‌شد.
+   (در ≥۱۶۰۰ که sidebar ‏۲۶۴ و پدینگ ۳۶ می‌شود، این فضا به ۴۰۸ پیکسل می‌رسید.)
+   حالا سقف‌ها آن‌قدر بزرگ‌اند که الگوریتم بتواند ردیف را تا ۱۰۰٪ پر کند.
+   ── چرا سال/پایه flex-grow گرفتند ──
+   با grow=0 روی ۸۰ پیکسل می‌ماندند و مقدار «۱۴۰۴-۱۴۰۵» بریده می‌شد
+   (≈۶۰ پیکسل متن + ۲۰ پیکسل پدینگ + ≈۱۸ پیکسل فلشِ select ≈ ۹۸ پیکسل).
+   حالا تا ۱۳۸ باز می‌شوند؛ basis همان ۸۰ مانده، پس نسبتِ خواسته‌شده
+   (کلاس = ۲٫۵ برابرِ پایه) سر جایش است. */
+.school-app .students-filters .f-search{flex:1 1 120px;max-width:620px}
 .school-app .students-filters .f-year,
-.school-app .students-filters .f-grade{flex:0 1 80px;max-width:124px}
-.school-app .students-filters .f-class{flex:2 1 200px;max-width:340px}
+.school-app .students-filters .f-grade{flex:0.6 1 80px;max-width:138px}
+.school-app .students-filters .f-class{flex:2 1 200px;max-width:470px}
 /* ── نوار پایین: «گزینه‌های بیشتر» یک سو، دکمه‌ها سوی دیگر ──
    align-items:flex-start عمدی است: وقتی «گزینه‌های بیشتر» باز می‌شود، جعبهٔ
    details بلند می‌شود و با center دکمه‌ها وسطِ ارتفاع معلق می‌ماندند. */
@@ -295,11 +310,6 @@ body.school-app{height:auto!important;max-height:none!important;min-height:100vh
   grid-template-columns:minmax(148px,1.15fr) minmax(148px,1.15fr) minmax(126px,1fr) minmax(158px,0.85fr);
 }
 .school-app .students-filters .fm-gpa{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-/* صفحهٔ خیلی پهن: جستجو و کلاس کمی بازتر می‌شوند تا ردیف خالی نماند */
-@media(min-width:1600px){
-.school-app .students-filters .f-search{max-width:420px}
-.school-app .students-filters .f-class{max-width:460px}
-}
 @media(max-width:900px){
 .school-app .students-filters .filter-more>div{grid-template-columns:repeat(2,minmax(0,1fr))}
 }

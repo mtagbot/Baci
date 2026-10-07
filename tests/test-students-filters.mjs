@@ -234,12 +234,68 @@ ok('پدینگ کارت فیلتر از ۲۴ پیکسلِ .card به 14px 16px �
    /\.students-filters-card\{padding:14px 16px\}/.test(css));
 
 /* ۶) موبایل: هدف لمسی ۴۴ برمی‌گردد */
+/* ═══════ ردیف باید پر شود، نه اینکه فضای مرده داشته باشد ═══════
+   شکایت کاربر: «نمایش خوبی ندارد». علتش این بود که با سقف‌های کوچک، هر چهار
+   آیتم به max-width می‌خوردند و freeze می‌شدند؛ چون سال/پایه هم grow=0 بودند،
+   هیچ آیتمِ انعطاف‌پذیری نمی‌ماند که بقیهٔ عرض را بگیرد ⇒ فضای مرده.
+   اینجا همان الگوریتم flex را روی اعدادِ واقعیِ CSS شبیه‌سازی می‌کنیم. */
+console.log('\n── پر شدن ردیف (شبیه‌سازی الگوریتم flex) ──');
+const growOf = (sel) => {
+  const m = css.match(new RegExp('\\.students-filters\\s+' + sel.replace(/\./g, '\\.') + '[^{}]*\\{([^}]*)\\}'));
+  const g = m && m[1].match(/flex:\s*([\d.]+)\s+[\d.]+\s+[\d.]+px/);
+  return g ? Number(g[1]) : null;
+};
+const FIELDS = [['search', '.f-search'], ['year', '.f-year'], ['grade', '.f-grade'], ['class', '.f-class']];
+const flex = FIELDS.map(([n, s]) => ({ n, basis: basisOf(s), grow: growOf(s), max: maxOf(s) }));
+ok('هر چهار فیلد basis/grow/max قابل استخراج دارند',
+   flex.every((f) => f.basis && f.grow !== null && f.max), JSON.stringify(flex));
+
+/* الگوریتم flex: توزیع بر پایهٔ grow، clamp با max-width، freeze و حلِ دوباره */
+const resolveFlex = (avail, items) => {
+  const final = {}; let rem = items.slice();
+  while (rem.length) {
+    const used = Object.values(final).reduce((a, b) => a + b, 0);
+    const free = (avail - used) - rem.reduce((a, f) => a + f.basis, 0);
+    const gsum = rem.reduce((a, f) => a + f.grow, 0);
+    if (free <= 0 || gsum <= 0) { rem.forEach((f) => { final[f.n] = f.basis; }); break; }
+    const clamped = rem.filter((f) => f.basis + free * f.grow / gsum > f.max);
+    if (!clamped.length) { rem.forEach((f) => { final[f.n] = f.basis + free * f.grow / gsum; }); break; }
+    clamped.forEach((f) => { final[f.n] = f.max; });
+    rem = rem.filter((f) => !(f.n in final));
+  }
+  return final;
+};
+/* عرض واقعیِ فرم = ویوپورت − sidebar − پدینگ main − پدینگ کارت
+   (sidebar/پدینگ از school-ui.css:15 پیش‌فرض و :71 برای ≥۱۶۰۰) */
+const formWidth = (vp) => {
+  const [side, pad] = vp >= 1600 ? [264, 36] : vp >= 1200 ? [248, 24] : [208, 18];
+  return vp - side - 2 * pad - 32;
+};
+const GAPS = 3 * 8;
+for (const vp of [1920, 1600, 1440, 1366, 1280, 1024]) {
+  const W = formWidth(vp);
+  const got = resolveFlex(W - GAPS, flex);
+  const dead = W - (Object.values(got).reduce((a, b) => a + b, 0) + GAPS);
+  ok(`ردیف در ویوپورت ${vp} پر می‌شود (فضای مرده ≤ ۲۰۰ پیکسل)`,
+     dead <= 200, `عرض فرم ${W} · مرده ${Math.round(dead)} · ` +
+     Object.entries(got).map(([k, v]) => k + '=' + Math.round(v)).join(' '));
+}
+ok('سال تحصیلی flex-grow دارد تا «۱۴۰۴-۱۴۰۵» بریده نشود',
+   growOf('.f-year') > 0 && maxOf('.f-year') >= 130,
+   `grow=${growOf('.f-year')} max=${maxOf('.f-year')}`);
+ok('سقف‌ها آن‌قدر بزرگ‌اند که ردیف قابل پر شدن است',
+   maxOf('.f-search') >= 600 && maxOf('.f-class') >= 450,
+   `search=${maxOf('.f-search')} class=${maxOf('.f-class')}`);
+ok('قاعدهٔ جداگانهٔ min-width:1600px برای فیلترها برداشته شد (سقف‌ها خودشان کافی‌اند)',
+   !/students-filters[^{}]*\{[^}]*\}\s*@media\(min-width:1600px\)/.test(css) &&
+   !/f-search\{max-width:420px\}/.test(css));
+
 ok('در موبایل ارتفاع به ۴۴ پیکسل برمی‌گردد', /--sf-h:44px/.test(css));
 
-ok('کش‌شکن school-ui.css جلو رفته است', page.includes('school-ui.css?v20261006b'),
+ok('کش‌شکن school-ui.css جلو رفته است', page.includes('school-ui.css?v20261006d'),
    'کش‌شکن قدیمی یعنی CSS تازه به کلاینت نمی‌رسد');
 ok('کش‌شکن قدیمی school-ui.css نمانده',
-   ['v20260917e', 'v20261005a', 'v20261006a'].every((v) => !page.includes('school-ui.css?' + v)));
+   ['v20260917e', 'v20261005a', 'v20261006a', 'v20261006b', 'v20261006c'].every((v) => !page.includes('school-ui.css?' + v)));
 
 const hdr = readFileSync(resolveFile('includes/header.php'), 'utf8');
 ok('skip-link دسترسی‌پذیری در هدر باقی است', hdr.includes('href="#main-content"'));

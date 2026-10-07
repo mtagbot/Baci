@@ -101,7 +101,8 @@ if (!function_exists('att_day_name')) {
 if (!function_exists('att_discipline_title_id')) {
     /**
      * v4.76.0: filing attendance into the discipline dossier must use the
-     * school's OFFICIAL saved titles («غیبت» / «تأخیر در ورود به مدرسه») so
+     * school's OFFICIAL saved titles («غیبت غیرموجه» / «غیبت موجه» /
+     * «تأخیر غیرموجه در ورود به مدرسه» / «تأخیر موجه در ورود به مدرسه») so
      * the filed records look exactly like ones registered by hand in
      * student management and the deputy panel. Finds the active title —
      * creating it once if the school never defined it — and returns its id.

@@ -87,16 +87,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $target = $action === 'file_absents' ? 'absent' : 'late';
             // v4.179.0: per-row «موجه» checkbox from the records table.
             //
-            // A justified row is filed under a DISTINCT title («غیبت موجه» /
-            // «تأخیر موجه در ورود به مدرسه») AND with is_justified=1. Using a
-            // distinct title is deliberate: the bot notification prints the
-            // title verbatim («عنوان: {$title}»), so parents see «غیبت موجه»
-            // with ZERO change to the bot code or message templates.
+            // Each row is filed under an EXPLICIT title that says whether it
+            // was justified:
+            //     justified   → «غیبت موجه» / «تأخیر موجه در ورود به مدرسه»
+            //     NOT marked  → «غیبت غیرموجه» / «تأخیر غیرموجه در ورود به مدرسه»
+            // plus is_justified=1/0.
+            //
+            // Why the unmarked case is «غیبت غیرموجه» and not plain «غیبت»:
+            // the bot notification prints the title verbatim
+            // («عنوان: {$title}» in includes/school_roles.php), so the message
+            // the parents receive and the discipline dossier entry both state
+            // the justification explicitly. Filing an unmarked absence as bare
+            // «غیبت» left parents unable to tell it apart from a generic
+            // absence. ZERO change to the bot code or message templates.
+            //
+            // The titles are created lazily by att_discipline_title_id(), so no
+            // schema change and no migration: records filed before this keep
+            // their old title_text, and «غیبت غیرموجه» only enters the school's
+            // saved title list the first time it is actually used.
             //
             // No schema change and no data migration: is_justified has existed
             // since v4.31.0 and every previously filed record keeps its value.
             $justifiedIds = array_values(array_unique(array_map('intval', (array)($_POST['justified_ids'] ?? []))));
-            $baseTitle = $target === 'late' ? 'تأخیر در ورود به مدرسه' : 'غیبت';
+            $baseTitle = $target === 'late' ? 'تأخیر غیرموجه در ورود به مدرسه' : 'غیبت غیرموجه';
             $justTitle = $target === 'late' ? 'تأخیر موجه در ورود به مدرسه' : 'غیبت موجه';
             $titleId = att_discipline_title_id($baseTitle);
             // Created lazily: the «موجه» title only enters the school's saved
