@@ -4,12 +4,66 @@
   "runtime": "PHP 8.3 WASM + real SQLite",
   "finalJobs": [
     {
+      "platform": "telegram",
+      "owner": "local",
+      "state": "sent",
+      "attempts": 2
+    },
+    {
+      "platform": "telegram",
+      "owner": "local",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "bale",
+      "owner": "local",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "telegram",
+      "owner": "local",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "telegram",
+      "owner": "local",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "bale",
+      "owner": "local",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
       "platform": "bale",
       "owner": "local",
       "state": "sent",
       "attempts": 2
     },
     {
+      "platform": "telegram",
+      "owner": "local",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "bale",
+      "owner": "local",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
+      "platform": "telegram",
+      "owner": "local",
+      "state": "sent",
+      "attempts": 1
+    },
+    {
       "platform": "bale",
       "owner": "local",
       "state": "sent",
@@ -26,18 +80,6 @@
       "owner": "local",
       "state": "sent",
       "attempts": 1
-    },
-    {
-      "platform": "telegram",
-      "owner": "local",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "telegram",
-      "owner": "local",
-      "state": "sent",
-      "attempts": 2
     },
     {
       "platform": "telegram",
@@ -64,12 +106,6 @@
       "attempts": 4
     },
     {
-      "platform": "telegram",
-      "owner": "local",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
       "platform": "bale",
       "owner": "local",
       "state": "sent",
@@ -77,42 +113,6 @@
     },
     {
       "platform": "telegram",
-      "owner": "local",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "telegram",
-      "owner": "local",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "bale",
-      "owner": "local",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "bale",
-      "owner": "local",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "telegram",
-      "owner": "local",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "telegram",
-      "owner": "local",
-      "state": "sent",
-      "attempts": 1
-    },
-    {
-      "platform": "bale",
       "owner": "local",
       "state": "sent",
       "attempts": 1
