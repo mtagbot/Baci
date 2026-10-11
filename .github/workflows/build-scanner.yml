@@ -1,0 +1,43 @@
+name: Build Scanner APK
+
+# ساختِ خودکار APK اسکنر اندروید روی سرور GitHub — بدون نیاز به Android Studio محلی.
+# خروجی: artifact به نام scanner-apk شامل app-debug.apk
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-scanner.yml'
+      - 'SchoolDesk-Scanner-Android-V1.0-source.zip'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Extract Android source
+        run: |
+          mkdir -p android-src
+          unzip -q SchoolDesk-Scanner-Android-V1.0-source.zip -d android-src
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.2'
+
+      - name: Build debug APK
+        run: |
+          cd android-src/SchoolDeskScanner
+          gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanner-apk
+          path: android-src/SchoolDeskScanner/app/build/outputs/apk/debug/app-debug.apk
