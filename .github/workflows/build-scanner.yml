@@ -2,12 +2,16 @@ name: Build Scanner APK
 
 # ساختِ خودکار APK اسکنر اندروید روی سرور GitHub — بدون نیاز به Android Studio محلی.
 # خروجی: artifact به نام scanner-apk شامل app-debug.apk
+# اگر build شکست بخورد، لاگ کامل در فایل scanner-build-log.txt روی همان برنچ commit می‌شود.
 on:
   workflow_dispatch:
   push:
     paths:
       - '.github/workflows/build-scanner.yml'
       - 'SchoolDesk-Scanner-Android-V1.0-source.zip'
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -34,7 +38,22 @@ jobs:
       - name: Build debug APK
         run: |
           cd android-src/SchoolDeskScanner
-          gradle assembleDebug --no-daemon --stacktrace
+          set +e
+          gradle assembleDebug --no-daemon --stacktrace > /tmp/build.log 2>&1
+          CODE=$?
+          set -e
+          cat /tmp/build.log
+          exit $CODE
+
+      - name: Publish build log on failure
+        if: failure()
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          cp /tmp/build.log scanner-build-log.txt
+          git config user.name "ci-log"
+          git config user.email "ci-log@example.com"
+          git add scanner-build-log.txt
+          git commit -m "ci: لاگ build اسکنر (ناموفق)" && git push origin "HEAD:${GITHUB_REF_NAME}" || true
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
