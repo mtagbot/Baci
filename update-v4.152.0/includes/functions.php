@@ -616,6 +616,66 @@ if (!function_exists('verify_exam_design_token')) {
     }
 }
 
+if (!function_exists('make_class_exam_entry_token')) {
+    /**
+     * v4.180.0 — توکن امضاشدهٔ «ورود به ویرایش آزمون کلاسی» (کلاسی و پایه‌ای).
+     *
+     * چرا؟ دکمه‌های ویرایش آزمون کلاسی به صفحهٔ class-exam-create.php و
+     * class-exam-group.php می‌رفتند که فقط با «نشست پنل» کار می‌کنند. در پنجرهٔ
+     * تازه — مرورگر داخلی بله یا پنجرهٔ جدایی که اپ دسکتاپ باز می‌کند — نشست
+     * وجود ندارد و کاربر به صفحهٔ ورود می‌افتاد، در حالی که دکمه‌های «طراحی
+     * آزمون جدید» با توکن طراحی (dt) بدون ورود کار می‌کردند. این توکن همان
+     * کار را برای ویرایش/ساخت انجام می‌دهد: امضای HMAC و انقضا.
+     *
+     * $allowCreate فقط برای دکمهٔ «طراحی آزمون جدید» روشن می‌شود؛ با آن، باز
+     * کردن لینک (GET) می‌تواند آزمون را بسازد. برای دکمهٔ ویرایش، ساختِ ناخواسته
+     * ممکن نیست و فقط آزمون موجود باز می‌شود.
+     */
+    function make_class_exam_entry_token($teacherId, $year, $class, $subject, $grade = '', $examId = 0, $ttl = 86400, $allowCreate = false) {
+        $secret = get_setting('class_exam_entry_secret', '');
+        if ($secret === '') { $secret = bin2hex(random_bytes(24)); set_setting('class_exam_entry_secret', $secret); }
+        $body = json_encode([
+            'v' => 1,
+            't' => (int)$teacherId,
+            'y' => (string)$year,
+            'c' => (string)$class,
+            's' => (string)$subject,
+            'g' => (string)$grade,
+            'e' => (int)$examId,
+            'n' => $allowCreate ? 1 : 0,
+            'x' => time() + (int)$ttl,
+        ], JSON_UNESCAPED_UNICODE);
+        return rtrim(strtr(base64_encode($body . '|' . hash_hmac('sha256', $body, $secret)), '+/', '-_'), '=');
+    }
+}
+if (!function_exists('verify_class_exam_entry_token')) {
+    /**
+     * توکن ورود به ویرایش آزمون کلاسی را می‌سنجد و در صورت درستی داده‌هایش را
+     * برمی‌گرداند، وگرنه false. اگر آرایهٔ $match بدهید، همهٔ کلیدهای آن باید
+     * برابر باشند (مثلاً ['c' => 'هفتم1']).
+     */
+    function verify_class_exam_entry_token($token, $match = []) {
+        $token = (string)$token;
+        if ($token === '') return false;
+        $secret = get_setting('class_exam_entry_secret', '');
+        if ($secret === '') return false;
+        $raw = base64_decode(strtr($token, '-_', '+/'));
+        if (!$raw) return false;
+        $cut = strrpos($raw, '|');
+        if ($cut === false) return false;
+        $body = substr($raw, 0, $cut);
+        $sig = substr($raw, $cut + 1);
+        if (!hash_equals(hash_hmac('sha256', $body, $secret), $sig)) return false;
+        $data = json_decode($body, true);
+        if (!is_array($data) || (int)($data['v'] ?? 0) !== 1) return false;
+        if ((int)($data['x'] ?? 0) < time()) return false;
+        foreach ($match as $key => $value) {
+            if ((string)($data[$key] ?? '') !== (string)$value) return false;
+        }
+        return $data;
+    }
+}
+
 if (!function_exists('display_score')) {
     function display_score($score) {
         if ($score === null || $score === '') return '---';

@@ -302,7 +302,7 @@ $tab = $_GET['tab'] ?? 'schedule';
             $gCount = $tpGroupCounts[$gk] ?? 1;
             $gFirst = empty($tpSeenGroups[$gk]); $tpSeenGroups[$gk] = true;
             $exGrade = trim($ex['grade_level'] ?? '') ?: infer_grade_from_class_name($ex['class_name'] ?? '');
-        ?><tr><td><?php echo clean($ex['academic_year'].' / '.$ex['exam_month']); ?></td><td><?php echo clean($ex['grade_level'].' '.$ex['class_name']); ?></td><td class="font-bold"><?php echo clean($ex['subject_name']); ?></td><td><?php echo tr_num($ex['exam_date_jalali'],'fa'); ?></td><td><?php echo tr_num($ex['start_time'],'fa'); ?></td><td><a class="btn btn-primary text-xs" target="_blank" href="exam-print.php?type=questions&exam_id=<?php echo $ex['id']; ?>&dt=<?php echo urlencode(make_exam_design_token($ex['id'], 'teacher', $teacherId)); ?>">ورود به ویرایش مرحله اول</a></td>
+        ?><tr><td><?php echo clean($ex['academic_year'].' / '.$ex['exam_month']); ?></td><td><?php echo clean($ex['grade_level'].' '.$ex['class_name']); ?></td><td class="font-bold"><?php echo clean($ex['subject_name']); ?></td><td><?php echo tr_num($ex['exam_date_jalali'],'fa'); ?></td><td><?php echo tr_num($ex['start_time'],'fa'); ?></td><td><a class="btn btn-primary text-xs" target="_blank" href="exam-print.php?type=questions&exam_id=<?php echo $ex['id']; ?>&dt=<?php echo urlencode(make_exam_design_token($ex['id'], 'teacher', $teacherId)); ?>">ویرایش آزمون ماهانه</a></td>
         <?php if ($gFirst): /* v4.70.0: یک خانه مشترک با rowspan برای همه کلاس‌های پایه/درس یکسان */ ?>
             <td rowspan="<?php echo (int)$gCount; ?>" class="text-center align-middle" style="background:rgba(16,185,129,.06);vertical-align:middle">
                 <?php if ($gCount > 1 && $exGrade !== ''): ?>

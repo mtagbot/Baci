@@ -1,5 +1,6 @@
 // v4.178.0 — شمارهٔ نسخهٔ کد + بهداشت مخزن (۵ اصلاح نشست ۱۰-۰۵)
 // v4.179.0 — بج نسخه بنا به درخواست کاربر از فوتر حذف شد.
+// v4.180.0 — ویرایش آزمون کلاسی/ماهانه با توکن امضاشده در پنجرهٔ تازه (بدون نشست).
 //
 // چه چیزی اینجا «اجرا» می‌شود، نه ادعا:
 //   ۱) config/version.php واقعاً با PHP خوانده می‌شود و شماره‌ها را برمی‌گرداند
@@ -21,8 +22,8 @@ let n = 0, skipped = 0;
 const check = (v, m) => { assert(v, m); n++; };
 const skip = (m) => { console.log('  ⏭  skip: ' + m); skipped++; };
 
-const SITE_VERSION = '4.179.0';
-const DESKTOP_VERSION = '2.103.0';
+const SITE_VERSION = '4.180.0';
+const DESKTOP_VERSION = '2.104.0';
 
 /* ═══════ ۱) فایل نسخه واقعاً با PHP خوانده می‌شود ═══════ */
 const meta = await run(String.raw`<?php
@@ -37,7 +38,7 @@ check(meta.out.includes('site=' + SITE_VERSION),
   'config/version.php reports the site version ' + SITE_VERSION + ': ' + meta.out.trim());
 check(meta.out.includes('desk=' + DESKTOP_VERSION),
   'config/version.php reports the desktop version ' + DESKTOP_VERSION);
-check(meta.out.includes('corr=V4.179.0'), 'the correction label is recorded');
+check(meta.out.includes('corr=V4.180.0'), 'the correction label is recorded');
 
 /* فایل نسخه نباید distribution داشته باشد — وگرنه همان ریسک release.php را دارد.
    این بررسی روی «آرایهٔ برگشتیِ واقعی» انجام می‌شود، نه روی متن فایل؛ وگرنه

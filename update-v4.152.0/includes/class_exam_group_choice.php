@@ -1,5 +1,8 @@
 <?php
-function ceg_render_choice($teacher,$year,$grade,$subject,$id='',$modal=true) {
+function ceg_render_choice($teacher,$year,$grade,$subject,$id='',$modal=true,$entryToken='') {
+    /* v4.180.0 — فرم این پنجره در «پنجرهٔ تازه» باز می‌شود و نشست پنل را همراه
+       ندارد؛ توکن امضاشده را با خودش می‌برد تا کاربر به صفحهٔ ورود نیفتد. */
+    if((string)$entryToken==='')$entryToken=make_class_exam_entry_token($teacher,$year,'',$subject,$grade,0,86400,false);
     $sources=ceg_sources($teacher,$year,$grade,$subject);
     foreach($sources as &$source){$source['has_design']=(bool)DB::fetch('SELECT exam_id FROM exam_designs WHERE exam_id=?',[$source['id']]) || !empty($source['question_file']);}unset($source);
     uasort($sources,function($a,$b){return ((int)$b['has_design']<=>(int)$a['has_design']) ?: ((int)$b['id']<=>(int)$a['id']);});
@@ -13,6 +16,7 @@ function ceg_render_choice($teacher,$year,$grade,$subject,$id='',$modal=true) {
         <p class="text-xs text-muted">شروع تازه، طرح مشترک خالی می‌سازد؛ آزمون‌ها و فایل‌های قبلی حذف نمی‌شوند. تا قبل از تأیید هیچ تغییری ثبت نمی‌شود.</p>
         <form method="POST" action="class-exam-group.php" target="_blank" class="no-ajax" onsubmit="window.classExamPending=true;var m=this.closest('.ceg-modal');if(m)setTimeout(function(){m.hidden=true;},0);">
             <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
+            <input type="hidden" name="ct" value="<?php echo clean($entryToken); ?>">
             <input type="hidden" name="year" value="<?php echo clean($year); ?>">
             <input type="hidden" name="grade" value="<?php echo clean($grade); ?>">
             <input type="hidden" name="subject" value="<?php echo clean($subject); ?>">
