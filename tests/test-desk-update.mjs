@@ -420,6 +420,16 @@ $out['status_launcher_failed'] = desk_update_status();
 $out['failed_marker_removed'] = !file_exists('/data/update/launcher/failed.txt');
 $final = desk_update_state();
 $out['state_after_failure'] = ['applied_id' => (string)($final['applied_id'] ?? ''), 'error' => (string)($final['error'] ?? '')];
+/* v2.107.0: ترجمهٔ خطای کلید — بدون شبکه، از خودِ تابع خالص موتور */
+$out['err_key_mismatch'] = desk_update_error_result(['ok' => false, 'code' => 'key_mismatch', 'error' => 'کلید نامعتبر']);
+$out['err_legacy_invalid'] = desk_update_error_result(['ok' => false, 'error' => 'invalid key']);
+$out['err_key_missing']  = desk_update_error_result(['ok' => false, 'code' => 'key_missing']);
+$out['err_other']        = desk_update_error_result(['ok' => false, 'error' => 'سرور مشغول است']);
+$out['err_empty']        = desk_update_error_result(['ok' => false]);
+desk_update_set_state(['checked_at' => time(), 'latest' => null, 'error' => $out['err_key_mismatch']['error'], 'error_code' => $out['err_key_mismatch']['code'], 'applied_id' => '', 'auto_fail_id' => '', 'auto_fail_count' => 0, 'auto_fail_at' => 0]);
+$out['status_key_mismatch'] = desk_update_status();
+desk_update_set_state(['checked_at' => time(), 'latest' => null, 'error' => $out['err_other']['error'], 'error_code' => '']);
+$out['status_other_error'] = desk_update_status();
 echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);`);
 let A = {};
 try { A = JSON.parse(auto.out); } catch (e) {
@@ -449,6 +459,28 @@ ok('شکست راه‌انداز: هشدار صریح، نشانه پاک می�
 ok('پس از دو شکست، نصب خودکار تا یک ساعت پشت سر هم تکرار نمی‌شود',
   A.auto_throttled?.ok === false && A.auto_throttled?.installed === false
   && String(A.auto_throttled?.error).includes('یک ساعت'), JSON.stringify(A.auto_throttled).slice(0, 160));
+ok('کلید ناهمخوان: پیام فارسی دقیق، بدون «invalid key» خام و بدون اتهام به خرابی برنامه',
+  A.err_key_mismatch?.code === 'key_mismatch' && A.err_key_mismatch?.error.includes('یکسان نیست')
+  && !A.err_key_mismatch?.error.includes('invalid key')
+  && A.err_key_mismatch?.error.includes('همگام‌سازی'), JSON.stringify(A.err_key_mismatch));
+ok('سایت قدیمی که فقط «invalid key» می‌فرستد، هم همان پیام فارسی را می‌گیرد',
+  A.err_legacy_invalid?.code === 'key_mismatch' && A.err_legacy_invalid?.error.includes('یکسان نیست'),
+  JSON.stringify(A.err_legacy_invalid));
+ok('نبود کلید روی سایت، پیام جداگانه و راهنما دارد', A.err_key_missing?.code === 'key_missing'
+  && A.err_key_missing?.error.includes('هیچ کلید همگام‌سازی تنظیم نشده'), JSON.stringify(A.err_key_missing));
+ok('خطای دیگر سایت دست‌نخورده و بدون ترجمهٔ نادرست می‌ماند',
+  A.err_other?.code === '' && A.err_other?.error === 'سرور مشغول است', JSON.stringify(A.err_other));
+ok('پاسخ خالی سایت، پیام «بسته‌ای منتشر نشده» می‌دهد (نه خطای خالی)',
+  A.err_empty?.error.includes('بسته‌ای برای این مدرسه منتشر نکرده'), JSON.stringify(A.err_empty));
+ok('بنر به‌روزرسانی برای کلید ناهمخوان: عنوان «کلید … یکسان نیست» + اطمینان‌بخشی دربارهٔ همگام‌سازی',
+  A.status_key_mismatch?.code === 'key-mismatch' && A.status_key_mismatch?.tone === 'warn'
+  && A.status_key_mismatch?.label.includes('یکسان نیست')
+  && A.status_key_mismatch?.detail.includes('داده‌های مدرسه طبق روال همگام می‌شوند')
+  && A.status_key_mismatch?.label.includes('وضعیت به‌روزرسانی نامعلوم') === false,
+  JSON.stringify(A.status_key_mismatch));
+ok('خطای دیگر به‌روزرسانی، همچنان همان بنر «وضعیت نامعلوم» را نشان می‌دهد',
+  A.status_other_error?.code === 'check-error' && A.status_other_error?.label.includes('وضعیت به‌روزرسانی نامعلوم است'),
+  JSON.stringify(A.status_other_error));
 ok('وضعیت پس از شکست خودکار علت را نشان می‌دهد (نه «به‌روز» دروغین)',
   A.status_auto_failed?.code === 'auto-failed' && A.status_auto_failed?.tone === 'bad',
   JSON.stringify(A.status_auto_failed).slice(0, 160));

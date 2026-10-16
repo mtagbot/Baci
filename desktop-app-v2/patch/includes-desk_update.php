@@ -94,8 +94,29 @@ function desk_update_request(string $url, array $payload, bool $binary, int $con
     if ($body === false) return ['ok' => false, 'error' => $error !== '' ? $error : 'ارتباط با سایت برقرار نشد.'];
     $json = json_decode((string)$body, true);
     if (!is_array($json)) return ['ok' => false, 'error' => 'پاسخ سایت قابل خواندن نیست.'];
-    if (empty($json['ok'])) return ['ok' => false, 'error' => (string)($json['error'] ?? 'سایت بسته‌ای برای این مدرسه منتشر نکرده است.')];
+    if (empty($json['ok'])) return desk_update_error_result($json);
     return ['ok' => true, 'data' => $json];
+}
+/**
+ * v2.107.0: the site API says «invalid key» in English when the desktop's sync
+ * key and the site's update key differ. That is NOT a broken device — school
+ * data keeps syncing normally — so it is translated here, once, in Persian, and
+ * the code is normalised to `key_mismatch` for the banner in the sync page.
+ * Pure function: the whole mapping is testable without a network.
+ */
+function desk_update_error_result(array $json): array {
+    $code = (string)($json['code'] ?? '');
+    $error = trim((string)($json['error'] ?? ''));
+    if ($code === 'key_mismatch' || strcasecmp($error, 'invalid key') === 0) {
+        return ['ok' => false, 'code' => 'key_mismatch',
+                'error' => 'کلید به‌روزرسانی با کلید همگام‌سازی سایت یکسان نیست. کلید را از صفحهٔ «اتصال دسکتاپ به این مدرسه» روی سایت بردارید و در بخش «همگام‌سازی» همین برنامه وارد کنید.'];
+    }
+    if ($code === 'key_missing') {
+        return ['ok' => false, 'code' => 'key_missing',
+                'error' => 'روی سایت هیچ کلید همگام‌سازی تنظیم نشده است. از صفحهٔ «اتصال دسکتاپ به این مدرسه» کلید را بردارید و در بخش «همگام‌سازی» همین برنامه وارد کنید.'];
+    }
+    if ($error === '') $error = 'سایت بسته‌ای برای این مدرسه منتشر نکرده است.';
+    return ['ok' => false, 'code' => $code, 'error' => $error];
 }
 function desk_update_check(bool $force = false, int $interval = 21600): array {
     $ready = desk_update_ready();
@@ -105,9 +126,12 @@ function desk_update_check(bool $force = false, int $interval = 21600): array {
         return ['ok' => true, 'cached' => true, 'latest' => $state['latest'] ?? null, 'available' => desk_update_available($state), 'state' => $state];
     }
     $result = desk_update_request($ready['url'], ['action' => 'latest', 'key' => $ready['key'], 'platform' => 'desktop', 'version' => desk_update_local_version()], false, 8, 20);
-    if (!$result['ok']) { desk_update_set_state(['checked_at' => time(), 'error' => $result['error']]); return ['ok' => false, 'error' => $result['error']]; }
+    if (!$result['ok']) {
+        desk_update_set_state(['checked_at' => time(), 'error' => $result['error'], 'error_code' => (string)($result['code'] ?? '')]);
+        return ['ok' => false, 'error' => $result['error'], 'code' => (string)($result['code'] ?? '')];
+    }
     $latest = $result['data']['update'] ?? null;
-    $state = desk_update_set_state(['checked_at' => time(), 'latest' => $latest, 'error' => '']);
+    $state = desk_update_set_state(['checked_at' => time(), 'latest' => $latest, 'error' => '', 'error_code' => '']);
     return ['ok' => true, 'latest' => $latest, 'available' => desk_update_available($state), 'state' => $state];
 }
 function desk_update_available(array $state): bool {
@@ -431,6 +455,13 @@ function desk_update_status(array $state = null, bool $persist = true): array {
 
     $error = trim((string)($state['error'] ?? ''));
     if ($error !== '') {
+        /* A key difference is not a broken update engine: school data keeps
+           syncing normally, so say exactly that instead of «نامعلوم است». */
+        if ((string)($state['error_code'] ?? '') === 'key_mismatch') {
+            return array_merge($base, ['ok' => false, 'code' => 'key-mismatch', 'tone' => 'warn',
+                'label' => 'کلید به‌روزرسانی با کلید همگام‌سازی سایت یکسان نیست',
+                'detail' => $error . ' تا آن زمان داده‌های مدرسه طبق روال همگام می‌شوند و برنامه خودش دوباره تلاش می‌کند.']);
+        }
         return array_merge($base, ['ok' => false, 'code' => 'check-error', 'tone' => 'warn',
             'label' => 'آخرین بررسی با سایت انجام نشد؛ وضعیت به‌روزرسانی نامعلوم است',
             'detail' => $error . ' — برنامه خودش دوباره تلاش می‌کند.']);

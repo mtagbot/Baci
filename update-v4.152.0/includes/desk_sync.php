@@ -381,6 +381,16 @@ class DeskSync {
                     $res = self::call('ping', [], true);
                     if (!isset($res['log_max']) || !is_numeric($res['log_max']) || $res['log_max'] < 0) throw new Exception('پاسخ بررسی سرور معتبر نیست');
                     self::setCfg('desk_sync_ping_last', (string)$now);
+                    /* v2.107.0: persist the proof of a *real* site answer.
+                       Only `run()` used to record it, and full cycles are rare
+                       (300s safety cycle), so the idle heartbeat carried
+                       server_verified=false almost always and the connection
+                       monitor flipped back to «در انتظار وضعیت همگامسازی»
+                       within seconds — while the site was perfectly reachable
+                       and the manual button worked. Now one good probe keeps
+                       the flag true for the next 60s (recency check below),
+                       i.e. for the whole 30s probe cadence. */
+                    self::setCfg('desk_sync_verified_at', (string)$now);
                     $base['server_verified'] = true;
                     $base['fails'] = 0; $base['alert'] = false; $base['retry_in'] = 0;
                     if ((int)($res['log_max'] ?? 0) > (int) self::getCfg('desk_sync_cursor', '0')) $due = true;
@@ -415,7 +425,11 @@ class DeskSync {
             self::setCfg('desk_sync_fails', '0');
             self::setCfg('desk_sync_next_try', '0');
             if (!isset($res['skipped'])) self::setCfg('desk_sync_verified_at', (string)$now);
-            return $res + ['pending' => $pending, 'fails' => 0, 'alert' => false, 'retry_in' => 0, 'server_verified' => !isset($res['skipped'])];
+            /* A cycle that was skipped (e.g. another worker held the lock) is
+               not proof by itself, but a proof recorded moments ago stays
+               valid — the panel must not flash «در انتظار…» during a lock. */
+            return $res + ['pending' => $pending, 'fails' => 0, 'alert' => false, 'retry_in' => 0,
+                            'server_verified' => !isset($res['skipped']) || $base['server_verified']];
         }
         if (isset($res['error']) && mb_strpos((string)$res['error'], 'اتصال به سرور برقرار نشد') !== false) {
             return self::noteFailure($now) + $res + ['pending' => $pending];
@@ -892,9 +906,20 @@ class DeskSync {
 
             self::setCfg('desk_sync_err', $warn);
             self::setCfg('desk_sync_last_ok', (string) time());
+            /* v2.107.0: «successful exchange» is recorded here, inside run(),
+               so it is written by EVERY path — the manual «همگامسازی همین حالا»
+               button (desk-sync.php?ajax=run&force) and the background daemon
+               alike. The connection monitor used to depend only on a flag in
+               the daemon heartbeat, so on installs whose heartbeat did not
+               carry it the panel stayed on «در انتظار وضعیت همگامسازی» even
+               right after a perfectly successful manual sync. */
+            self::setCfg('desk_sync_verified_at', (string) time());
             self::setCfg('desk_sync_pushed', (string)((int)self::getCfg('desk_sync_pushed','0') + $pushed));
             self::setCfg('desk_sync_pulled', (string)((int)self::getCfg('desk_sync_pulled','0') + $pulled));
-            $out = ['ok' => true, 'pushed' => $pushed, 'pulled' => $pulled];
+            /* Explicit proof for whoever consumes this result (manual button
+               JSON, daemon heartbeat, notification hand-off): the site really
+               answered a full cycle. */
+            $out = ['ok' => true, 'pushed' => $pushed, 'pulled' => $pulled, 'server_verified' => true];
             if (!empty($out0)) $out['reconciled'] = $out0;
             if ($warn !== '') $out['warning'] = $warn;
         } catch (Throwable $e) {

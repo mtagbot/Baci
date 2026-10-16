@@ -1,6 +1,8 @@
 // v4.178.0 — شمارهٔ نسخهٔ کد + بهداشت مخزن (۵ اصلاح نشست ۱۰-۰۵)
 // v4.179.0 — بج نسخه بنا به درخواست کاربر از فوتر حذف شد.
 // v4.180.0 — ویرایش آزمون کلاسی/ماهانه با توکن امضاشده در پنجرهٔ تازه (بدون نشست).
+// v4.183.0 — صداقت وضعیت همگام‌سازی + کلید به‌روزرسانی، راهنمای
+//            «آماده‌سازی سوال جدید» و هم‌خوانی چاپ/PDF با طراحی زنده。
 // v4.182.0 — چهار اصلاح کارفرما: کلیدهای جهت‌دار مدیریت ستونی، جای امضای
 //            رضایت‌نامه، فاصلهٔ خط تاریخ در برگهٔ حضور و غیاب، و تاریخ بدون ساعت در دعوتنامه.
 // v4.181.0 — مدیریت ستونی نمرات + بازگشت به چیدمان خواستهٔ کارفرما در برگهٔ حضور و غیاب
@@ -26,8 +28,8 @@ let n = 0, skipped = 0;
 const check = (v, m) => { assert(v, m); n++; };
 const skip = (m) => { console.log('  ⏭  skip: ' + m); skipped++; };
 
-const SITE_VERSION = '4.182.0';
-const DESKTOP_VERSION = '2.106.0';
+const SITE_VERSION = '4.183.0';
+const DESKTOP_VERSION = '2.107.0';
 
 /* ═══════ ۱) فایل نسخه واقعاً با PHP خوانده می‌شود ═══════ */
 const meta = await run(String.raw`<?php
@@ -42,7 +44,7 @@ check(meta.out.includes('site=' + SITE_VERSION),
   'config/version.php reports the site version ' + SITE_VERSION + ': ' + meta.out.trim());
 check(meta.out.includes('desk=' + DESKTOP_VERSION),
   'config/version.php reports the desktop version ' + DESKTOP_VERSION);
-check(meta.out.includes('corr=V4.182.0'), 'the correction label is recorded');
+check(meta.out.includes('corr=V4.183.0'), 'the correction label is recorded');
 
 /* فایل نسخه نباید distribution داشته باشد — وگرنه همان ریسک release.php را دارد.
    این بررسی روی «آرایهٔ برگشتیِ واقعی» انجام می‌شود، نه روی متن فایل؛ وگرنه

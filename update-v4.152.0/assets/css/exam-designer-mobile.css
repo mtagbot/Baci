@@ -350,6 +350,16 @@
   .mobile-img-handle-layer .img-handle-se { right: -23px; bottom: -23px; }
   .mobile-img-handle-layer .img-handle-sw { left: -23px; bottom: -23px; }
 
+  /* v4.183.0: × حذف تصویر — روی صفحهٔ کوچک دستگیره‌های گوشه ۴۶ پیکسلی‌اند، پس
+     دکمهٔ حذف بالای تصویر و کمی داخل‌تر می‌نشیند تا با آن‌ها تلاقی نکند. */
+  .mobile-img-handle-layer .img-del-btn {
+    width: 42px;
+    height: 42px;
+    font-size: 22px;
+    top: -60px;
+    right: 4px;
+  }
+
   .mobile-image-tools {
     position: fixed;
     z-index: 120;

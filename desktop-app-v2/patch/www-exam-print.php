@@ -391,6 +391,10 @@ body.qh-resizing{user-select:none;-webkit-user-select:none;cursor:ns-resize}
 .img-handle-s{left:calc(50% - 6px);bottom:-6px;cursor:ns-resize}
 .img-handle-sw{left:-6px;bottom:-6px;cursor:nesw-resize}
 .img-handle-w{left:-6px;top:calc(50% - 6px);cursor:ew-resize}
+/* v4.183.0: × حذف تصویر روی گوشهٔ بالای همان تصویر انتخاب‌شده */
+.img-del-btn{position:absolute;right:-22px;top:-22px;width:24px;height:24px;padding:0;border:0;border-radius:50%;background:#ef4444;color:#fff;font-size:15px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:62;pointer-events:auto;box-shadow:0 1px 5px rgba(2,6,23,.4)}
+.img-del-btn:hover{background:#dc2626}
+.img-del-btn:focus-visible{outline:2px solid #fff;outline-offset:-2px}
 body.img-resizing{user-select:none;-webkit-user-select:none}.upload-modal{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:60;display:flex;align-items:center;justify-content:center}.upload-card{width:min(560px,94vw);background:white;border-radius:14px;padding:16px;box-shadow:0 20px 60px rgba(0,0,0,.25);position:relative}.upload-close{position:absolute;left:12px;top:10px;border:0;background:#ef4444;color:white;border-radius:8px;padding:4px 10px}.upload-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:12px 0}.upload-steps span{background:#e5e7eb;border-radius:8px;padding:8px;text-align:center;font-size:11px}.upload-steps span.active{background:#2563eb;color:white}.upload-step-body{border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin:10px 0}.upload-step-body input{width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px}.progressbar{height:12px;background:#e5e7eb;border-radius:999px;overflow:hidden}.progressbar div{height:100%;width:0;background:#16a34a;transition:.2s}.upload-actions{display:flex;gap:8px;justify-content:flex-end}.questions-hidden .questions-table{display:none!important}.btn-save{background:#16a34a!important;color:white!important}.btn-print{background:#f59e0b!important;color:white!important}.toolbar button{border:0;border-radius:6px;padding:5px 8px;font-family:inherit}.editor-panel,.bank-panel{font-family:Vazirmatn,Tahoma,sans-serif}.image-modal{position:fixed;inset:0;background:rgba(15,23,42,.58);z-index:75;display:none;align-items:center;justify-content:center}.image-card{width:min(980px,96vw);max-height:94vh;overflow:auto;background:white;border-radius:14px;padding:14px;box-shadow:0 20px 60px rgba(0,0,0,.3)}.image-editor-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:12px}.image-canvas-wrap{background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;padding:10px;text-align:center;overflow:auto}.image-canvas-wrap canvas{max-width:100%;height:auto;background:white}.image-controls label{font-size:11px;font-weight:700;display:block;margin-top:6px}.image-controls input[type=range],.image-controls input[type=file]{width:100%}.math-modal{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:70;display:none;align-items:center;justify-content:center}.math-card{width:min(760px,96vw);max-height:92vh;overflow:auto;background:white;border-radius:14px;padding:14px;box-shadow:0 20px 60px rgba(0,0,0,.28)}.math-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin:8px 0}.math-grid button{padding:7px;border:1px solid #cbd5e1;background:#f8fafc;border-radius:7px;font-size:16px}.math-preview{border:1px dashed #94a3b8;border-radius:8px;padding:10px;min-height:42px;background:#f8fafc;font-size:18px;direction:ltr;text-align:left}.math-token{direction:ltr;unicode-bidi:embed;font-family:Cambria Math,Times New Roman,serif;font-size:1.12em;display:inline-block;padding:0 2px}.math-frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;line-height:1.05;margin:0 3px}.math-frac .top{border-bottom:1px solid #111;padding:0 4px}.math-frac .bottom{padding:0 4px}.math-frac .math-frac{font-size:.92em}.math-sqrt{display:inline-flex;align-items:baseline}.math-sqrt-sym{font-size:1.12em}.math-sqrt-body{border-top:1.2px solid #111;padding:0 3px}.math-matrix{display:inline-table;border-collapse:collapse;vertical-align:middle;margin:0 4px;direction:ltr}.math-matrix td{border:0!important;padding:1px 6px!important;text-align:center}.math-bracket{display:inline-flex;align-items:center;gap:2px;direction:ltr}.math-big{font-size:1.8em;line-height:1}.math-vector{position:relative;display:inline-block}.math-vector:before{content:"→";position:absolute;top:-.85em;left:0;right:0;text-align:center;font-size:.8em}/* v4.95.0: بخش آزمون‌های ذخیره‌شده در بانک */.bank-exam{border:1px solid #cbd5e1;border-radius:8px;padding:7px;margin-bottom:7px;background:#fff}.bank-exam-thumbs{display:flex;gap:4px;overflow-x:auto;margin:5px 0;cursor:zoom-in}.bank-exam-thumbs img{height:86px;width:auto;border:1px solid #e2e8f0;border-radius:4px;background:#fff;position:static!important}.bank-exam small{color:#475569}
 .bank-sec{border-top:2px solid #e2e8f0;padding-top:8px}
 .bank-sec-title{cursor:pointer;font-weight:800;font-size:13px;color:#0f172a;list-style:none;display:flex;align-items:center;gap:6px;padding:4px 0;user-select:none}
@@ -434,6 +438,18 @@ body.modal-open{overflow:hidden}
 /* ---------- بهبود ریزتعامل‌ها ---------- */
 .rich-editor{min-height:130px;border:1.5px solid var(--line2);border-radius:10px;padding:0 10px 10px;background:#fff;outline:none;position:relative;overflow:auto;transition:border-color .15s}
 .rich-editor:focus{border-color:var(--brand);box-shadow:var(--focus)}
+/* v4.183.0: راهنمای نوع سوال به‌جای متنِ پیش‌نوشته. قبلاً قالب هر نوع سوال یک
+   جملهٔ واقعی داخل ویرایشگر می‌نوشت و کاربر باید اول آن را پاک می‌کرد. حالا
+   ویرایشگر خالی می‌ماند و این لایه (بیرون از #qText، پس هرگز ذخیره/چاپ
+   نمی‌شود) فقط راهنما را نشان می‌دهد و با شروع تایپ محو می‌شود. */
+.rich-wrap{position:relative}
+.rich-ph{position:absolute;top:7px;inset-inline-start:12px;color:#94a3b8;font-size:12px;line-height:1.6;pointer-events:none;user-select:none;max-width:calc(100% - 24px)}
+.rich-wrap.rich-ph-hidden .rich-ph{display:none}
+/* راهنمای خانه‌های گزینه فقط داخل ویرایشگر دیده می‌شود — نه در برگهٔ آزمون و
+   نه در چاپ/PDF. سلکتور عمداً به .rich-editor محدود است، وگرنه گزینه‌های
+   خالیِ یک سوال ذخیره‌شده روی ورقهٔ امتحان هم متن راهنما چاپ می‌کردند. */
+.rich-editor .q-options span:empty{min-height:16px}
+.rich-editor .q-options span:empty:before{content:attr(data-ph);color:#94a3b8;font-weight:400}
 .q-actions button{font-size:10px;padding:3px 8px;border:1px solid var(--line2);background:#fff;border-radius:6px;cursor:pointer;transition:background .15s}
 .q-actions button:hover{background:#eef2f7}
 .q-actions button:last-child:hover{background:#fee2e2;border-color:#fca5a5;color:#b91c1c}
@@ -449,7 +465,7 @@ body.modal-open{overflow:hidden}
    even with hundreds of print pages; ignored harmlessly by very old browsers.
    Print media is unaffected: all pages always render fully on paper. */
 @media screen{.page{content-visibility:auto;contain-intrinsic-size:210mm 297mm}}
-</style><link rel="stylesheet" href="assets/css/exam-designer-mobile.css?v=4.163.0"></head><body>
+</style><link rel="stylesheet" href="assets/css/exam-designer-mobile.css?v=4.183.0"></head><body>
 <div class="toolbar" id="mainToolbar">
   <div class="tb-group no-ajax"><span class="tb-title">فایل منبع</span><button type="button" onclick="openSourceUploadModal()">بارگذاری PDF/تصویر</button><button type="button" onclick="deleteLiveSource()">حذف/تغییر</button></div>
   <span class="tb-sep"></span>
@@ -502,7 +518,7 @@ body.modal-open{overflow:hidden}
         <div class="q-field-row">
           <div class="q-field"><label>نوع سوال</label><select id="qType" onchange="applyQuestionTemplate()"><option value="text">متنی / تشریحی</option><option value="mcq">چند گزینه‌ای</option><option value="blank">جای خالی</option><option value="tf">صحیح و غلط</option></select></div>
           <div class="q-field"><label>شماره ردیف</label><input id="qNumber" type="number" min="1" value="1" oninput="updateQuestionPreview()"></div>
-          <div class="q-field"><label>بارم / نمره</label><input id="qScore" type="text" value="1" oninput="updateQuestionPreview()"></div>
+          <div class="q-field"><label>بارم / نمره</label><input id="qScore" type="text" value="" placeholder="1" oninput="updateQuestionPreview()"></div>
         </div>
         <div class="q-field-row">
           <div class="q-field"><label>فونت متن</label><select id="qFont" onchange="applyFontToEditor()"><option value="Vazirmatn">وزیرمتن (Vazirmatn)</option><option value="Yekan">یکان (Yekan)</option><option value="Sahel">ساحل (Sahel)</option><option value="BTitr">تیتر (B-Titr)</option><option value="Tahoma">Tahoma</option><option value="serif">Serif</option><option value="sans-serif">Sans</option></select></div>
@@ -529,13 +545,16 @@ body.modal-open{overflow:hidden}
           <button type="button" title="واگرد" onclick="cmd('undo')">↶</button><button type="button" title="ازنو" onclick="cmd('redo')">↷</button>
         </div>
         <label>متن، گزینه‌ها و تصویر سوال</label>
-        <div id="qText" class="rich-editor" contenteditable="true" oninput="updateQuestionPreview()"></div>
+        <div class="rich-wrap">
+          <div id="qText" class="rich-editor" contenteditable="true" oninput="updateQuestionPreview()"></div>
+          <div id="qTextPh" class="rich-ph" aria-hidden="true"></div>
+        </div>
       </div>
       <div class="q-preview-col">
         <label>پیش‌نمایش سوال در برگه</label>
         <div class="q-preview-sheet">
           <table class="questions-table"><thead><tr><th class="q-no">ردیف</th><th class="th-q-title">سوال</th><th class="q-score">بارم</th></tr></thead>
-          <tbody><tr><td class="q-no" id="qPrevNo">1</td><td class="q-content" id="qPrevContent"></td><td class="q-score" id="qPrevScore">1</td></tr></tbody></table>
+          <tbody><tr><td class="q-no" id="qPrevNo">1</td><td class="q-content" id="qPrevContent"></td><td class="q-score" id="qPrevScore"></td></tr></tbody></table>
         </div>
         <small class="q-preview-hint">پیش‌نمایش با همان فونت، اندازه و ارتفاع واقعی برگه به‌روز می‌شود.</small>
       </div>
@@ -809,6 +828,7 @@ function updateQuestionPreview(){
 }
 function renderQuestionPreviewNow(){
   const c=document.getElementById('qPrevContent'),ed=document.getElementById('qText'); if(!c||!ed)return;
+  syncQuestionPlaceholder();
   const html=normalizeQuestionHtml(ed.innerHTML); c.innerHTML=html||`<span class="preview-empty">متن سوال را وارد کنید...</span>`;
   c.style.fontFamily=document.getElementById('qFont').value; c.style.fontSize=document.getElementById('qFontSize').value+'px'; c.style.height=document.getElementById('qHeight').value+'mm';
   document.getElementById('qPrevNo').textContent=document.getElementById('qNumber').value||'۱'; document.getElementById('qPrevScore').textContent=document.getElementById('qScore').value||'';
@@ -910,8 +930,12 @@ function qStripEqSlots(html){const tmp=document.createElement('div'); tmp.innerH
     const txt=x.textContent.replace(/\u200b/g,'').trim();
     if(txt==='')x.remove(); else if(x.attributes.length===0)x.replaceWith(...x.childNodes);});
   return tmp.innerHTML;}
-function clearQuestionForm(){deselectSelectedImage();document.getElementById('editingQid').value='';const qEditor=document.getElementById('qText');qEditor.innerHTML='';qEditor.removeAttribute('dir');qEditor.style.direction='';qEditor.style.textAlign='';document.getElementById('qScore').value='1';document.getElementById('qHeight').value='18';document.getElementById('qModalTitle').textContent='آماده‌سازی سوال جدید';document.getElementById('qInsertBtn').textContent='درج در آزمون';applyQuestionTemplate();renumberQuestions();updateQuestionPreview();}
-function applyQuestionTemplate(){const t=document.getElementById('qType').value, ed=document.getElementById('qText'); if(t==='text')ed.innerHTML='<p>صورت سوال تشریحی را اینجا بنویسید...</p>'; if(t==='mcq')ed.innerHTML='<p>صورت سوال چندگزینه‌ای را اینجا بنویسید.</p><div class="q-options"><span>الف) گزینه اول</span><span>ب) گزینه دوم</span><span>ج) گزینه سوم</span><span>د) گزینه چهارم</span></div>'; if(t==='blank')ed.innerHTML='<p>عبارت زیر را کامل کنید: <span class="blank-line"></span></p>'; if(t==='tf')ed.innerHTML='<p>متن عبارت... <span class="tf-square"></span> صحیح <span class="tf-square"></span> غلط</p>'; applyFontToEditor(); updateQuestionPreview();}
+function clearQuestionForm(){deselectSelectedImage();document.getElementById('editingQid').value='';const qEditor=document.getElementById('qText');qEditor.innerHTML='';qEditor.removeAttribute('dir');qEditor.style.direction='';qEditor.style.textAlign='';document.getElementById('qScore').value='';   /* v4.183.0: بارم خالی می‌آید و ۱ فقط راهنما است */document.getElementById('qHeight').value='18';document.getElementById('qModalTitle').textContent='آماده‌سازی سوال جدید';document.getElementById('qInsertBtn').textContent='درج در آزمون';applyQuestionTemplate();renumberQuestions();updateQuestionPreview();}
+/* v4.183.0: راهنمای «نوع سوال» به‌جای متن پیش‌نوشته. لایهٔ راهنما بیرون از #qText است، پس هرگز در HTML سوال (و در نتیجه در چاپ/PDF) نمی‌آید؛ با شروع تایپ محو می‌شود. */
+const QUESTION_PH={text:'صورت سوال تشریحی را اینجا بنویسید...',mcq:'صورت سوال چندگزینه‌ای را اینجا بنویسید؛ گزینه‌ها را در چهار خانهٔ زیر بنویسید.',blank:'عبارت را بنویسید؛ برای نقطه‌چین جای خالی دکمهٔ «جای‌خالی» را بزنید.',tf:'متن عبارت صحیح یا غلط را اینجا بنویسید؛ مربع‌ها برای پاسخ دانش‌آموز است.'};
+function questionEditorHasContent(ed){if(!ed)return false; if(ed.querySelector('img'))return true; const clone=ed.cloneNode(true); clone.querySelectorAll('[data-ph-only]').forEach(x=>x.remove()); return clone.textContent.replace(/[\s\u200c\u200e\u200f\u00a0]/g,'')!=='';}
+function syncQuestionPlaceholder(){const ed=document.getElementById('qText'), ph=document.getElementById('qTextPh'); if(!ed||!ph||!ed.parentElement)return; const sel=document.getElementById('qType'); ph.textContent=QUESTION_PH[(sel&&sel.value)||'text']||''; ed.parentElement.classList.toggle('rich-ph-hidden',questionEditorHasContent(ed));}
+function applyQuestionTemplate(){const t=document.getElementById('qType').value, ed=document.getElementById('qText'); if(!ed)return;/* v4.183.0: هیچ جملهٔ آماده‌ای داخل ویرایشگر نوشته نمی‌شود. ساختار واقعی هر نوع سوال (خانه‌های گزینه، مربع صحیح/غلط) می‌ماند و راهنمای متنی فقط به‌شکل placeholder (لایهٔ #qTextPh و data-ph روی خانه‌ها) نمایش داده می‌شود — پس کاربر هیچ‌وقت لازم نیست اول متن آماده را پاک کند و آن جمله هرگز داخل سوال ذخیره یا چاپ نمی‌شود. */if(t==='mcq')ed.innerHTML='<div class="q-options"><span data-ph="الف) گزینه اول"></span><span data-ph="ب) گزینه دوم"></span><span data-ph="ج) گزینه سوم"></span><span data-ph="د) گزینه چهارم"></span></div>';else if(t==='tf')ed.innerHTML='<p><span class="tf-square"></span> <span data-ph-only="1">صحیح</span> &nbsp; <span class="tf-square"></span> <span data-ph-only="1">غلط</span></p>';else ed.innerHTML='';applyFontToEditor(); syncQuestionPlaceholder(); updateQuestionPreview();}
 function applyFontToEditor(){const ed=document.getElementById('qText'),family=document.getElementById('qFont').value,px=document.getElementById('qFontSize').value+'px';qRestoreSel();const sel=getSelection();const selected=sel&&sel.rangeCount&&!sel.isCollapsed&&ed.contains(sel.anchorNode)&&ed.contains(sel.focusNode);if(selected){document.execCommand('styleWithCSS',false,true);document.execCommand('fontName',false,family);document.execCommand('fontSize',false,'7');const made=[];ed.querySelectorAll('font[size="7"]').forEach(f=>{const span=document.createElement('span');span.style.fontSize=px;span.dataset.qFontFix='1';span.innerHTML=f.innerHTML;f.replaceWith(span);made.push(span);});ed.querySelectorAll('font[face]').forEach(f=>{const span=document.createElement('span');span.style.fontFamily=f.getAttribute('face');span.dataset.qFontFix='1';span.innerHTML=f.innerHTML;f.replaceWith(span);made.push(span);});
   /* v4.163.0: انتخاب روی خودِ متنِ استایل‌گرفته بازجا می‌افتد. قبلاً اولین تیکِ
      لغزنده اندازه فونت انتخاب را از دست می‌داد و تیک‌های بعدی فونت را به کل
@@ -925,6 +949,10 @@ function nextQuestionImageId(){return 'img_'+Date.now()+'_'+Math.random().toStri
 function normalizeQuestionHtml(html,seen){
   const box=document.createElement('div'); box.innerHTML=String(html||'');
   box.querySelectorAll('.img-resize-box').forEach(x=>x.remove());
+  /* v4.183.0: متن‌های راهنما هرگز داخل سوال ذخیره نمی‌شوند (نه نشانهٔ برچسب
+     صحیح/غلط و نه متن راهنمای خانه‌های خالی گزینه‌ها). */
+  box.querySelectorAll('[data-ph-only]').forEach(x=>x.removeAttribute('data-ph-only'));
+  box.querySelectorAll('[data-ph]').forEach(x=>x.removeAttribute('data-ph'));
   const used=seen||new Set();
   box.querySelectorAll('img').forEach(img=>{
     let id=img.dataset.imgid||'';
@@ -1013,6 +1041,23 @@ function moveSelectedImage(dx,dy){
 /* ============ v4.161.0: دستگیره‌های کشیدنی تغییر اندازه تصویر روی خود برگه ============ */
 let imgHandleBox=null, imgResizeState=null, imgDragState=null;
 function removeImgHandles(){if(imgHandleBox){imgHandleBox.remove(); imgHandleBox=null;} imgResizeState=null; hideImageTouchTools();}
+/* v4.183.0: حذف تصویر سوال. تصویر در هر دو جا می‌تواند باشد: داخل ویرایشگر
+   (#qText) یا روی برگهٔ رندرشده. مسیر به‌روزرسانی مدل بر همان اساس انتخاب
+   می‌شود تا تغییر، مانند جابه‌جایی/تغییر اندازه، فوراً ذخیره شود. */
+function removeQuestionImage(id,node){
+  if(!id&&node)id=node.dataset.imgid;
+  if(!id)return;
+  const nodes=questionImageNodes(id);
+  if(!nodes.length)return;
+  const ed=document.getElementById('qText');
+  const inEditor=nodes.some(n=>!!(ed&&ed.contains(n)));
+  removeImgHandles();
+  nodes.forEach(n=>n.remove());
+  selectedImageId=null; selectedImageNode=null; hideImageTouchTools();
+  if(inEditor){updateModelFromDomImage(); updateQuestionPreview(); syncQuestionPlaceholder();}
+  else{syncRenderedImagesToModel(); renderQuestions();}
+  autosaveLocal(); showToast('تصویر از سوال حذف شد');
+}
 function attachImgHandles(img){
   removeImgHandles();
   if(!img||!img.isConnected)return;
@@ -1031,6 +1076,16 @@ function attachImgHandles(img){
     });
     box.appendChild(h);
   });
+  /* v4.183.0: × حذف در گوشهٔ بالای همان تصویر انتخاب‌شده — کاربر دیگر برای
+     برداشتن تصویر لازم نیست ویرایشگر را دست‌کاری کند. مکان دکمه در موبایل با
+     قاعدهٔ اختصاصی در exam-designer-mobile.css جابه‌جا می‌شود تا با دستگیره‌های
+     بزرگ گوشه تلاقی نکند. */
+  const del=document.createElement('button');
+  del.type='button'; del.className='img-del-btn'; del.textContent='×';
+  del.title='حذف تصویر'; del.setAttribute('aria-label','حذف تصویر');
+  del.addEventListener('pointerdown',e=>{e.preventDefault(); e.stopPropagation();});
+  del.addEventListener('click',e=>{e.preventDefault(); e.stopPropagation(); removeQuestionImage(img.dataset.imgid,img);});
+  box.appendChild(del);
   host.appendChild(box); imgHandleBox=box; positionImgHandles(img);
 }
 function positionImgHandles(img){
@@ -1064,7 +1119,7 @@ document.addEventListener('pointerdown',e=>{if(e.target.closest&&(e.target.close
 function updateModelFromDomImage(){const edit=document.getElementById('editingQid').value; const ed=document.getElementById('qText'); if(edit&&ed){const it=qItems.find(x=>x.id===edit); if(it)it.html=normalizeQuestionHtml(ed.innerHTML);}}
 function previewQuestionHeight(v){updateQuestionPreview(); const id=document.getElementById('editingQid').value; if(id){const it=qItems.find(x=>x.id===id); if(it){it.height=v;renderQuestions();}}}
 function saveQuestion(){const edit=document.getElementById('editingQid').value; decorateQuestionImages(document.getElementById('qText')); const no=document.getElementById('qNumber').value||'1', score=document.getElementById('qScore').value||'', html=qStripEqSlots(normalizeQuestionHtml(document.getElementById('qText').innerHTML.trim())), height=document.getElementById('qHeight').value||18, font=document.getElementById('qFont').value, fontSize=document.getElementById('qFontSize').value||11, qtype=document.getElementById('qType').value; if(!html){alert('متن سوال را وارد کنید.');return;} if(edit){const it=qItems.find(x=>x.id===edit); if(!it){document.getElementById('editingQid').value=''; qItems.push({type:'q',id:'q_'+Date.now(),qtype,no,score,html,height,font,fontSize});} else Object.assign(it,{no,score,html,height,font,fontSize,qtype});} else qItems.push({type:'q',id:'q_'+Date.now(),qtype,no,score,html,height,font,fontSize}); renderQuestions(); clearQuestionForm(); autosaveLocal(); closeQuestionModal(); showToast(edit?'سوال ویرایش و در برگه به‌روزرسانی شد':'سوال در آزمون درج شد');}
-function editQuestion(id){const it=qItems.find(x=>x.id===id); if(!it)return; deselectSelectedImage(); document.getElementById('editingQid').value=id; document.getElementById('qNumber').value=it.no; document.getElementById('qScore').value=it.score; document.getElementById('qText').innerHTML=normalizeQuestionHtml(it.html); decorateQuestionImages(document.getElementById('qText')); document.getElementById('qHeight').value=it.height; document.getElementById('qFont').value=it.font; document.getElementById('qFontSize').value=it.fontSize; document.getElementById('qModalTitle').textContent='ویرایش سوال'; document.getElementById('qInsertBtn').textContent='ذخیره تغییرات'; applyFontToEditor(); openQuestionModal(id);}
+function editQuestion(id){const it=qItems.find(x=>x.id===id); if(!it)return; deselectSelectedImage(); document.getElementById('editingQid').value=id; document.getElementById('qNumber').value=it.no; document.getElementById('qScore').value=it.score; document.getElementById('qText').innerHTML=normalizeQuestionHtml(it.html); decorateQuestionImages(document.getElementById('qText')); syncQuestionPlaceholder(); document.getElementById('qHeight').value=it.height; document.getElementById('qFont').value=it.font; document.getElementById('qFontSize').value=it.fontSize; document.getElementById('qModalTitle').textContent='ویرایش سوال'; document.getElementById('qInsertBtn').textContent='ذخیره تغییرات'; applyFontToEditor(); openQuestionModal(id);}
 function deleteQuestion(id){if(confirm('سوال حذف شود؟')){qItems=qItems.filter(x=>x.id!==id); if(document.getElementById('editingQid').value===id) clearQuestionForm(); renderQuestions(); autosaveLocal();}}
 /* Touch-safe ordering: the saved qItems order remains the single source of truth
    for desktop drag, mobile buttons, print and the question bank copy. */

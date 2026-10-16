@@ -566,10 +566,19 @@ if (!function_exists('bot_exam_design_pdf_path')) {
         $headerH = 39; /* v4.101.0: ارتفاع سربرگ ثابت ۳۹mm — تنظیم‌گر حذف شد، مقادیر قدیمی نادیده گرفته می‌شود */
         /* v4.91.0: اندازه عکس (۳×۴) و مهر ثابت است — تنظیم ذخیره‌شده قدیمی نادیده گرفته می‌شود */
         $photoMm = 20; $stampMm = 18; /* v4.95.0: مهر ۱۸ + کادر شماره صندلی زیرش = هم‌ارتفاع عکس */
-        $qWmm    = bot_exam_css_mm($style['--qW'] ?? '', 203);
-        $qHmm    = bot_exam_css_mm($style['--qH'] ?? '', 260);
-        $qTopMm  = bot_exam_css_mm($style['--qTop'] ?? '', 1);
-        $qBorderCss = (float)str_replace('px', '', (string)($style['--qBorder'] ?? '1'));
+        /* v4.183.0: هندسهٔ PDF عیناً همان CSS ویرایشگر زنده/چاپ است.
+           ویرایشگر این کلیدها را در طراحی ذخیره نمی‌کند (pageStyleAttr در
+           exam-print.php آن‌ها را حذف می‌کند) و CSS مقدار ثابت می‌دهد:
+             .page{--headerH:39mm;--qW:210mm;--qTop:0mm;--qBorder:1px}
+             .qwrap{height:calc(296mm - var(--headerH) - var(--qTop))}
+             .page.no-header .qwrap{height:294mm;margin-top:1mm}
+           پیش از این عرض ۲۰۳mm و ارتفاع صفحهٔ زوج ۲۸۶mm بود؛ یعنی کادر سوال
+           در PDF از طراحی زنده باریک‌تر و کوتاه‌تر بود، متن زودتر می‌شکست و
+           سوال‌هایی که در ویرایشگر داخل یک برگه جا می‌شدند در فایل PDF به
+           برگهٔ بعد می‌رفتند. حالا هر دو عدد از همان فرمول CSS می‌آید. */
+        $qWmm    = 210.0;   // CSS: --qW:210mm (مقدار ذخیره‌شدهٔ قدیمی نادیده گرفته می‌شود)
+        $qTopMm  = 0.0;     // CSS: --qTop:0mm
+        $qBorderCss = 1.0;  // CSS: --qBorder:1px
         $bpx = max(0, (int)round($qBorderCss * $PX));
 
         $srcFiles = bot_exam_source_page_files($exam);
@@ -578,17 +587,17 @@ if (!function_exists('bot_exam_design_pdf_path')) {
         if (!$srcFiles && !count($orderRaw)) $srcCount = 1;
 
         $qwrapW = function () use ($qWmm, $S) { return (int)round($qWmm * $S); };
-        /* v4.169.0: ارتفاع کادر سوال در صفحهٔ فرد به اندازهٔ قابل‌جا شدن در
-           صفحه مهار می‌شود — همان فرمول CSS صفحهٔ چاپ سایت
-           (calc(296mm - headerH - qTop)). پیش از این ارتفاع پیش‌فرض ۲۶۰mm
-           باعث می‌شد کف کادر در ۳۰۰mm بیرون بوم ۲۹۷mm بیفتد و خط پایین
-           کادر اصلاً رسم نشود (در چاپ فقط چپ/راست/بالا دیده می‌شد). */
-        $qwrapH = function ($pageNo) use ($qHmm, $S, $headerH, $qTopMm) {
-            $mm = (($pageNo % 2) === 1) ? min($qHmm, 296 - $headerH - $qTopMm) : min(286, 291);
+        /* v4.169.0/v4.183.0: ارتفاع و جای کادر سوال دقیقاً از CSS ویرایشگر:
+           صفحهٔ فرد → height:calc(296mm - headerH - qTop) و top:headerH+qTop
+           صفحهٔ زوج (no-header) → height:294mm و margin-top:1mm
+           (پیش‌تر صفحهٔ زوج ۲۸۶mm از ۵mm بود: ۸ میلی‌متر کمتر از طراحی زنده
+           که باعث می‌شد سوال‌ها در PDF به صفحهٔ بعد بروند.) */
+        $qwrapH = function ($pageNo) use ($S, $headerH, $qTopMm) {
+            $mm = (($pageNo % 2) === 1) ? (296 - $headerH - $qTopMm) : 294;
             return (int)round($mm * $S);
         };
         $qwrapX = (int)round((210 - $qWmm) / 2 * $S);
-        $qwrapY = function ($pageNo) use ($headerH, $qTopMm, $S) { return (int)round((($pageNo % 2) === 1 ? ($headerH + $qTopMm) : 5) * $S); };
+        $qwrapY = function ($pageNo) use ($headerH, $qTopMm, $S) { return (int)round((($pageNo % 2) === 1 ? ($headerH + $qTopMm) : 1) * $S); };
 
         $cropOf = function ($pageNo) use ($crops) {
             $c = $crops[(string)$pageNo] ?? ($crops[$pageNo] ?? []);
@@ -669,8 +678,17 @@ if (!function_exists('bot_exam_design_pdf_path')) {
             }
             unset($igRef);
             $minH = max(12.0, (float)($q['height'] ?? 18)) * $S;
-            $contentH = max($minH, count($lines) * $lineH, (int)ceil($imgBottom));
-            $rowH = (int)round($contentH + 2 * $cellPad + $tblBorder);
+            /* v4.183.0: مدل جعبهٔ سلول دقیقاً همان CSS ویرایشگر/چاپ است:
+                 .q-content{height:${it.height}mm; padding:4px; padding-top:0!important;
+                            border:1px (border-collapse:collapse)}  + *{box-sizing:border-box}
+               یعنی ارتفاعِ ذخیره‌شده «مرزِ جعبه» است و فقط پدینگ پایین (۴px) و
+               یک مرز ۱px روی آن می‌آید؛ سرریزِ متن هم اگر از آن بیشتر شد، ردیف
+               را بلند می‌کند. پیش از این PDF روی هر ردیف ۲×پدینگ+مرز (۱۰px) و
+               روی ارتفاع پایه هم اضافه می‌کرد؛ یعنی هر سوال ~۱.۳mm بلندتر از
+               طراحی زنده و در یک برگهٔ ۸ سوالی ~۱۰mm اختلاف — همان چیزی که
+               سوال آخر را در PDF به برگهٔ بعد می‌انداخت. */
+            $innerH = max(count($lines) * $lineH, (int)ceil($imgBottom));
+            $rowH = (int)round(max($minH, $innerH + $cellPad + $tblBorder));
             $y = $startTableY($pageNo);
             $limit = $qwrapH($pageNo) - 2 * $bpx;
             if (($rowCount[$pageNo] ?? 0) > 0 && $y + $rowH > $limit + (int)round(4 * $PX)) {

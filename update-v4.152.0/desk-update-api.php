@@ -3,8 +3,9 @@
  * File: desk-update-api.php — تحویل به‌روزرسانی دسکتاپ به نسخهٔ نصب‌شدهٔ همان مدرسه.
  *
  * روی همان سایتی قرار می‌گیرد که desk-sync-api.php در آن است و با همان کلید
- * هر نصب (config/desk-sync-key.php) احراز هویت می‌کند. کلید در بدنهٔ POST
- * فرستاده می‌شود تا در لاگ آدرس‌ها نیفتد.
+ * هر نصب احراز هویت می‌کند (v2.107.0: هم config/desk-sync-key.php و هم
+ * کلید داخل desk-sync-api.php پذیرفته می‌شود — دقیقاً همان‌هایی که همگام‌سازی
+ * قبول می‌کند). کلید در بدنهٔ POST فرستاده می‌شود تا در لاگ آدرس‌ها نیفتد.
  *
  *   {"action":"latest","key":"..."}                → آخرین بستهٔ منتشرشده
  *   {"action":"download","key":"...","id":"..."}   → خود فایل ZIP
@@ -21,7 +22,31 @@ function desk_update_api_json(array $payload, int $status = 200): void {
     exit;
 }
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') desk_update_api_json(['ok' => false, 'error' => 'POST required'], 405);
-$stored = is_file(__DIR__.'/config/desk-sync-key.php') ? require __DIR__.'/config/desk-sync-key.php' : '';
+/**
+ * v2.107.0: this endpoint must accept EXACTLY the key the sync endpoint
+ * accepts. In the field the sync key lives in one of two places:
+ *   1) config/desk-sync-key.php — site installs (release installer) and
+ *      every pre-release install that created the private key file.
+ *   2) the literal DESK_SYNC_KEY inside desk-sync-api.php — desktop-paired
+ *      installs, where the pairing step writes the SDP-… key into that file
+ *      and into the desktop settings table (see desktop-app-v2/BUILD-NOTES).
+ * class-exam-sync-api.php inherits one of the two, so it needs no extra source.
+ * Accepting only source 1 made every device that synced perfectly report
+ * «invalid key» in its update banner — sync worked, updates never did.
+ */
+function desk_update_api_keys(): array {
+    $keys = [];
+    $private = __DIR__.'/config/desk-sync-key.php';
+    if (is_file($private)) { $v = require $private; if (is_string($v) && strlen($v) >= 32) $keys[] = $v; }
+    $file = __DIR__.'/desk-sync-api.php';
+    if (is_file($file)) {
+        $src = (string)@file_get_contents($file, false, null, 0, 131072);
+        if (preg_match("~define\\s*\\(\\s*['\"]DESK_SYNC_KEY['\"]\\s*,\\s*'((?:[^'\\\\]|\\\\.){16,200})'~", $src, $m)) {
+            $keys[] = str_replace(["\\\\", "\\'"], ["\\", "'"], $m[1]);
+        }
+    }
+    return array_values(array_unique(array_filter($keys, function ($k) { return is_string($k) && strlen($k) >= 16; })));
+}
 $input = json_decode((string)file_get_contents('php://input'), true);
 /* Some proxies/servers hand a JSON POST over as a form field instead of a raw
    body; accept both so the endpoint keeps working behind them. */
@@ -29,7 +54,14 @@ if (!is_array($input)) $input = json_decode((string)($_POST['payload'] ?? ''), t
 if (!is_array($input)) $input = is_array($_POST) ? $_POST : [];
 $key = (string)($input['key'] ?? '');
 $action = (string)($input['action'] ?? '');
-if (!is_string($stored) || strlen($stored) < 32 || !hash_equals($stored, $key)) desk_update_api_json(['ok' => false, 'error' => 'invalid key'], 403);
+$keys = desk_update_api_keys();
+if (!$keys) desk_update_api_json(['ok' => false, 'code' => 'key_missing',
+    'error' => 'کلید همگام‌سازی روی این سایت تنظیم نشده است؛ مقدار config/desk-sync-key.php را تنظیم کنید.'], 403);
+$authorized = false;
+foreach ($keys as $candidate) { if (hash_equals($candidate, $key)) { $authorized = true; break; } }
+/* No key material is ever echoed back, only a precise, actionable diagnosis. */
+if (!$authorized) desk_update_api_json(['ok' => false, 'code' => 'key_mismatch',
+    'error' => 'کلید به‌روزرسانی با کلید همگام‌سازی سایت یکسان نیست؛ کلید را از صفحهٔ «اتصال دسکتاپ به این مدرسه» بردارید و در صفحهٔ «همگام‌سازی» دستگاه وارد کنید.'], 403);
 
 $updates = desk_updates_index();
 if ($action === 'latest') {

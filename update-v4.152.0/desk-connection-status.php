@@ -17,7 +17,14 @@ try {
     require_once __DIR__.'/includes/desk_connection.php';
     $path=dirname(__DIR__).'/data/sync-heartbeat.json';$hb=null;
     if(is_file($path)&&filesize($path)<65536)$hb=json_decode((string)file_get_contents($path),true);
-    $state=desk_connection_snapshot(DeskSync::enabled(),$hb,DeskSync::pendingCount(),(int)DeskSync::getCfg('desk_sync_last_ok','0'),DeskSync::getCfg('desk_sync_snapshot_done')==='1',time(),DeskSync::getCfg('desk_sync_err','')!=='');
+    $now=time();
+    /* v2.107.0: the worker heartbeat is one source of proof, the engine's own
+       «last successful exchange» record is the other. Feeding both into the
+       (unchanged, strict) reducer keeps the panel honest: a sync that really
+       succeeded seconds ago always shows as successful, and a genuine failure
+       still wins. */
+    $hb=desk_connection_verified_heartbeat($hb,(int)DeskSync::getCfg('desk_sync_verified_at','0'),(int)DeskSync::getCfg('desk_sync_last_ok','0'),$now);
+    $state=desk_connection_snapshot(DeskSync::enabled(),$hb,DeskSync::pendingCount(),(int)DeskSync::getCfg('desk_sync_last_ok','0'),DeskSync::getCfg('desk_sync_snapshot_done')==='1',$now,DeskSync::getCfg('desk_sync_err','')!=='');
     if(!$admin)$state['pending']=null; // Do not reveal school-wide record counts to students or teachers.
     echo json_encode($state,JSON_UNESCAPED_UNICODE);
 } catch(Throwable $e) {

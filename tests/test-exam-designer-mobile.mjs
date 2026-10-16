@@ -12,7 +12,7 @@ function ok(condition, message) {
 }
 
 for (const [name, source] of [['site', site], ['desktop', desktop]]) {
-  ok(source.includes('assets/css/exam-designer-mobile.css?v=4.163.0'), `${name}: mobile layer is linked`);
+  ok(source.includes('assets/css/exam-designer-mobile.css?v=4.183.0'), `${name}: mobile layer is linked`);
   ok(source.includes('data-mobile-control="bank"'), `${name}: touch dock is installed`);
   ok(source.includes('function editorViewportScale()'), `${name}: preview scale helper exists`);
   ok(source.includes('source-crop-handle'), `${name}: source pages expose four direct crop handles`);

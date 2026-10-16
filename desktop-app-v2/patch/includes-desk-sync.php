@@ -45,6 +45,10 @@ class DeskSync {
     const ID_BASE = 5000000;      // desktop-created rows start here
     const BATCH   = 400;
     const MIN_INTERVAL = 120;     // seconds between automatic runs
+    /* v2.107.0: the idle probe is throttled to 30s. Before this, a desktop
+       that had nothing to push pinged the site every 5 seconds (the daemon
+       loop interval) — twelve times a minute for nothing. */
+    const PING_INTERVAL = 30;     // seconds between idle site probes
     const LOCK_TTL     = 180;     // stale-lock takeover
     const RECON_INTERVAL = 3600;  // v2.11.0: mirror-reconcile at most once per hour
 
@@ -308,25 +312,45 @@ class DeskSync {
         $fails   = (int) self::getCfg('desk_sync_fails', '0');
         $nextTry = (int) self::getCfg('desk_sync_next_try', '0');
         $base    = ['pending' => $pending, 'fails' => $fails, 'alert' => $fails >= 15,
-                    'retry_in' => max(0, $nextTry - $now)];
+                    'retry_in' => max(0, $nextTry - $now), 'server_verified' => false];
 
         // offline back-off window still open → wait
         if ($fails > 0 && $now < $nextTry) return ['ok' => true, 'skipped' => 'backoff'] + $base;
 
         $due = $pending > 0 || self::getCfg('desk_sync_snapshot_done') !== '1';
 
-        // nothing to push → ask the site (cheap) whether IT has news
+        // nothing to push → ask the site (cheap) whether IT has news.
+        // Throttled to PING_INTERVAL so the 5-second daemon loop does not hammer
+        // the site; the timestamp only advances on a GOOD answer, so the offline
+        // back-off ladder still owns retry timing.
         if (!$due) {
+            $lastPing = (int) self::getCfg('desk_sync_ping_last', '0');
+            if ($now - $lastPing >= self::PING_INTERVAL) {
             try {
                 $res = self::call('ping', [], true);
+                if (!isset($res['log_max']) || !is_numeric($res['log_max']) || $res['log_max'] < 0) throw new Exception('پاسخ بررسی سرور معتبر نیست');
+                self::setCfg('desk_sync_ping_last', (string)$now);
+                /* v2.107.0: a good answer IS proof that the site is reachable —
+                   record it so the connection panel stops sitting on
+                   «در انتظار وضعیت همگام‌سازی» between the (rare) full cycles. */
+                self::setCfg('desk_sync_verified_at', (string)$now);
+                $base['server_verified'] = true;
+                $base['fails'] = 0; $base['alert'] = false; $base['retry_in'] = 0;
                 if ((int)($res['log_max'] ?? 0) > (int) self::getCfg('desk_sync_cursor', '0')) $due = true;
                 if ($fails > 0) { self::setCfg('desk_sync_fails', '0'); self::setCfg('desk_sync_next_try', '0'); $fails = 0; }
             } catch (Throwable $e) {
                 if (self::isOffline($e)) return self::noteFailure($now) + ['ok' => true, 'skipped' => 'offline', 'pending' => $pending];
+                // a rejected answer is not proof of a healthy link
+                $base['probe_failed'] = true;
                 // old server file (no ping action) → fall back to the periodic cycle
                 $due = ($now - (int) self::getCfg('desk_sync_last', '0')) >= self::MIN_INTERVAL;
             }
+            }
         }
+
+        /* A probe or a full cycle that verified the site within the last minute
+           still counts, so the status does not flicker between two probes. */
+        if (!$base['server_verified'] && ($now - (int) self::getCfg('desk_sync_verified_at', '0')) < 60) $base['server_verified'] = true;
 
         // periodic safety cycle even when both sides look quiet
         if (!$due && ($now - (int) self::getCfg('desk_sync_last', '0')) >= self::MIN_INTERVAL) $due = true;
@@ -338,7 +362,9 @@ class DeskSync {
         if (!empty($res['ok'])) {
             self::setCfg('desk_sync_fails', '0');
             self::setCfg('desk_sync_next_try', '0');
-            return $res + ['pending' => $pending, 'fails' => 0, 'alert' => false, 'retry_in' => 0];
+            if (!isset($res['skipped'])) self::setCfg('desk_sync_verified_at', (string)$now);
+            return $res + ['pending' => $pending, 'fails' => 0, 'alert' => false, 'retry_in' => 0,
+                            'server_verified' => !isset($res['skipped']) || $base['server_verified']];
         }
         if (isset($res['error']) && mb_strpos((string)$res['error'], 'اتصال به سرور برقرار نشد') !== false) {
             return self::noteFailure($now) + $res + ['pending' => $pending];
@@ -812,6 +838,11 @@ class DeskSync {
 
             self::setCfg('desk_sync_err', $warn);
             self::setCfg('desk_sync_last_ok', (string) time());
+            /* v2.107.0: the manual «همگام‌سازی همین حالا» button and every full
+               cycle record the moment the site was actually reached. The panel
+               reads this as proof, so a successful sync can never be reported
+               as «هنوز تأیید نشده». */
+            self::setCfg('desk_sync_verified_at', (string) time());
             self::setCfg('desk_sync_pushed', (string)((int)self::getCfg('desk_sync_pushed','0') + $pushed));
             self::setCfg('desk_sync_pulled', (string)((int)self::getCfg('desk_sync_pulled','0') + $pulled));
             $out = ['ok' => true, 'pushed' => $pushed, 'pulled' => $pulled];
