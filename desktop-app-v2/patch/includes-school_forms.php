@@ -238,11 +238,24 @@ if (!function_exists('sf_val')) {
         return $value === '' ? $fallback : $value;
     }
 }
-if (!function_exists('sf_today_with_time')) {
-    function sf_today_with_time() {
-        if (function_exists('jdate')) return jdate('Y/m/d H:i');
-        if (function_exists('jalali_now')) return jalali_now();
-        return date('Y/m/d H:i');
+if (!function_exists('sf_today_date')) {
+    /** امروز، فقط تاریخ (بدون ساعت) — پیش‌فرض «تاریخ» دعوتنامه.
+     *  v4.182.0: تا پیش از این، پیش‌فرض «۱۴۰۵/۰۷/۲۴ ۱۷:۱۲» بود؛ کاربر خواست
+     *  تاریخ بدون ساعت دقیق درج شود. */
+    function sf_today_date() {
+        if (function_exists('jdate')) return jdate('Y/m/d');
+        if (function_exists('jalali_now')) {
+            $now = (string)jalali_now();
+            return trim(preg_split('/\s+/', $now)[0]);   /* اگر جاالای ساعت داشت، برش می‌خورد */
+        }
+        return date('Y/m/d');
+    }
+}
+if (!function_exists('sf_strip_time')) {
+    /** ساعت چسبیده به یک تاریخ را جدا می‌کند: «۱۴۰۵/۰۷/۲۴ ۱۷:۱۲» → «۱۴۰۵/۰۷/۲۴».
+     *  برای مقادیری که در نسخهٔ قبل با ساعت ذخیره شده‌اند. */
+    function sf_strip_time($value) {
+        return trim((string)preg_replace('/\s+\d{1,2}:\d{2}.*$/u', '', trim((string)$value)));
     }
 }
 if (!function_exists('sf_form_defaults')) {
@@ -268,7 +281,7 @@ if (!function_exists('sf_form_defaults')) {
                     . " جدید و انتخاب اعضای انجمن تشکیل می‌شود. حضور و نظر شما، هرچند کوتاه، در کیفیت آموزش مدرسه"
                     . " مؤثر خواهد بود.",
                 'agenda' => "گزارش عملکرد انجمن در سال تحصیلی گذشته.\nبرنامهٔ کار انجمن برای سال تحصیلی جدید.\nمعرفی داوطلبان عضویت در انجمن و رأی‌گیری.",
-                'place' => '', 'number' => '', 'date' => sf_today_with_time(),
+                'place' => '', 'number' => '', 'date' => sf_today_date(),
                 'show' => ['intro' => true, 'agenda' => true, 'place' => true, 'number' => true, 'date' => true,
                            'member_name' => true, 'member_phone' => true, 'member_education' => true, 'parent_sign' => true],
             ];
@@ -277,6 +290,9 @@ if (!function_exists('sf_form_defaults')) {
             if ($k === 'show') { if (is_array($v)) $base['show'] = array_merge($base['show'], $v); continue; }
             if (is_string($v) || is_numeric($v)) $base[$k] = (string)$v;
         }
+        /* اگر «تاریخ» دعوتنامه در نسخهٔ پیشین با ساعت ذخیره شده بود، ساعتش
+           برداشته می‌شود تا برگه با تاریخِ بدون ساعت چاپ شود (درخواست کارفرما). */
+        if ($form !== 'consent' && isset($base['date'])) $base['date'] = sf_strip_time($base['date']);
         return $base;
     }
 }
@@ -347,16 +363,16 @@ if (!function_exists('sf_render_absents_form')) {
   <div style="text-align:center;font-size:13pt;font-weight:700;margin-bottom:3mm">
     <?php echo $esc($title); ?> <?php echo $esc(sf_fa($classLabel)); ?>
   </div>
-  <table style="width:100%;border-collapse:separate;border-spacing:2.5mm;table-layout:fixed">
+  <table style="width:100%;border-collapse:separate;border-spacing:0 3mm;table-layout:fixed">
     <colgroup><col style="width:50%"><col style="width:50%"></colgroup>
     <?php foreach ($pairs as $pair): ?>
     <tr>
       <?php foreach ($pair as $day): ?>
-      <td style="vertical-align:top;border:0.5mm solid #000;border-radius:1.5mm;height:82mm;padding:1.5mm 2mm">
+      <td style="vertical-align:top;border:0.5mm solid #000;height:82mm;padding:1.5mm 2mm">
         <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:1.5mm">
           <tr>
             <td style="font-size:11.5pt;font-weight:700;text-align:right;padding:0">روز <?php echo $esc($day); ?></td>
-            <td style="font-size:10.5pt;font-weight:700;text-align:left;padding:0;white-space:nowrap">تاریخ:&nbsp;&nbsp;<?php echo $esc(sf_fa('/')); ?>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<?php echo $esc(sf_fa('/')); ?></td>
+            <td style="font-size:10.5pt;font-weight:700;text-align:left;padding:0 2mm 0 0;white-space:nowrap">تاریخ:<span style="display:inline-block;width:7mm"></span><?php echo $esc(sf_fa('/')); ?><span style="display:inline-block;width:13mm"></span><?php echo $esc(sf_fa('/')); ?><span style="display:inline-block;width:13mm"></span></td>
           </tr>
         </table>
         <table style="width:100%;border-collapse:collapse;table-layout:fixed">
@@ -588,16 +604,19 @@ if (!function_exists('sf_camp_blocks')) {
       <span data-sfe="notes" style="white-space:pre-line"><?php if (sf_show($opts, 'notes')) echo $esc(trim((string)($opts['notes'] ?? ''))); ?></span>
     </div>
   </div>
+  <?php /* v4.182.0: ردیف امضا سه عنصر داشت (برچسب ولی / امضای مدیر / یک فاصله‌گذار
+           ۱ پیکسلی) و «space-between» فاصله‌گذار را هم می‌چید؛ به همین دلیل امضای
+           مدیر وسط کادر می‌افتاد. حالا فقط دو عنصر است، پس امضای مدیر به لب کادر
+           می‌چسبد و تصویرش هم بزرگ‌تر شده است. */ ?>
   <div style="display:flex;justify-content:space-between;align-items:flex-end;font-size:7.6pt;margin-top:1.5mm;color:#334155">
     <span>محل امضا و اثر انگشت ولی دانش‌آموز</span>
-    <span style="position:relative;display:inline-block;padding:0 2mm">
+    <span style="position:relative;display:inline-block;padding:0;margin-left:-2.5mm;margin-bottom:1mm">
       امضای مدیر / مهر مدرسه
       <?php if ($stamp !== ''): ?>
         <img src="<?php echo $esc($stamp); ?>" alt="" class="sfe-stamp"
-             style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:26mm;max-height:12mm;object-fit:contain;opacity:.9;pointer-events:none;mix-blend-mode:multiply">
+             style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36mm;max-height:17mm;object-fit:contain;opacity:.92;pointer-events:none;mix-blend-mode:multiply">
       <?php endif; ?>
     </span>
-    <span aria-hidden="true" style="width:1px"></span>
   </div>
 </div>
             <?php

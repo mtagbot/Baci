@@ -73,6 +73,10 @@ check(html.includes('placeholder="-"'), 'a student with no grade shows «-»');
 check(html.includes('data-avg="17.5"'), 'the GPA of the month is in the row');
 check(/کد Tab|Tab/.test(html) && /ArrowUp/.test(html) && /ArrowDown/.test(html) && /ArrowLeft/.test(html) && /ArrowRight/.test(html),
   'Tab and the four arrow keys move between cells');
+check(/gcTargetIndex\(e\.key, list\.indexOf\(input\), perRow, list\.length\)/.test(html),
+  'the keydown handler finds the cell by its position in the reading order, not by td index');
+check(html.indexOf('Array.prototype.slice.call(table.querySelectorAll(\'input.gc-cell\'))')
+      < html.indexOf('gcTargetIndex(e.key'), 'the flat cell list is built before the mapping is called');
 check(html.includes('gc_action') === false || /body\.set\('gc_action', 'save'\)/.test(html), 'each change is posted for that one grade');
 
 /* ═══════ ۱) مسیر ذخیره ═══════ */
@@ -152,12 +156,14 @@ const makeBody = rows => ({
   appendChild(row) { this.rows = this.rows.filter(r => r !== row); this.rows.push(row); },
 });
 const api = new Function('tbody', 'table', logic + `
-  return { toNumber: toNumber, sortBy: sortBy, renumber: renumber, rows: rows, valueOf: valueOf };`)(null, null);
+  return { toNumber: toNumber, sortBy: sortBy, renumber: renumber, rows: rows, valueOf: valueOf,
+           gcTargetIndex: gcTargetIndex };`)(null, null);
 
 const build = (rows) => {
   tbody = makeBody(rows);
   return new Function('tbody', 'table', logic + `
-    return { toNumber: toNumber, sortBy: sortBy, renumber: renumber, rows: rows, valueOf: valueOf };`)(tbody, null);
+    return { toNumber: toNumber, sortBy: sortBy, renumber: renumber, rows: rows, valueOf: valueOf,
+             gcTargetIndex: gcTargetIndex };`)(tbody, null);
 };
 check(typeof api.toNumber === 'function', 'the extracted block compiles and exposes toNumber/sortBy');
 
@@ -196,6 +202,56 @@ check(g2.valueOf(g2.rows()[0], 'ریاضی') === null && g2.valueOf(g2.rows()[0]
   'an empty cell and an empty GPA read as "no value"');
 check(g2.valueOf(g2.rows()[0], 'name') === 'الف ب', 'valueOf returns the row name for the name key');
 
+/* ═══════ ۲٫۵) حرکت با کلیدهای جهت‌دار ═══════
+   باگ گزارش‌شدهٔ کارفرما: ↓ یک ردیف پایین و یک سلول چپ می‌رفت، ↑ بالا و راست،
+   → هیچ حرکتی نمی‌کرد و ← دو سلول می‌رفت. حسابِ قدیمی روی شمارهٔ ستونِ `td` بود
+   (که دو ستون نام و ردیف هم دارد) و در RTL جهت‌ها را جابه‌جا می‌کرد.
+   قرارداد تازه: ترتیب خواندن، در جدول راست‌به‌چپ، از بالا-راست شروع می‌شود.
+   برای شبکهٔ ۳×۳ (۳ دانش‌آموز × ۳ درس)، اندیس‌ها این‌طور چیده می‌شوند:
+       ۰ ۱ ۲     ۰ = بالا-راست (اولین درس)      ۱ = وسط      ۲ = بالا-چپ
+       ۳ ۴ ۵     ۳ = نفر دوم، راست‌ترین ستون
+       ۶ ۷ ۸     ۸ = پایین-چپ
+*/
+const move = api.gcTargetIndex;
+const ROWS = 3, PER = 3, TOTAL = ROWS * PER;
+const where = i => i < 0 ? '—' : `ردیف ${Math.floor(i / PER) + 1} · ستون ${(i % PER) + 1} از راست`;
+
+check(typeof move === 'function', 'the shipped logic exposes gcTargetIndex (the arrow-key map)');
+/* ↓ : همان ستون، یک ردیف پایین‌تر */
+check(move('ArrowDown', 4, PER, TOTAL) === 7,
+  '↓ از ردیف دوم می‌رود به همان ستونِ ردیف سوم (۴→۷): ' + where(move('ArrowDown', 4, PER, TOTAL)));
+check(move('ArrowDown', 1, PER, TOTAL) === 4, '↓ از ردیف اول می‌رود به همان ستونِ ردیف دوم (۱→۴)');
+check(move('ArrowDown', 7, PER, TOTAL) === -1, '↓ در ردیف آخر بی‌حرکت می‌ماند (خارج از جدول نمی‌رود)');
+/* ↑ : همان ستون، یک ردیف بالاتر */
+check(move('ArrowUp', 7, PER, TOTAL) === 4, '↑ از ردیف سوم به همان ستونِ ردیف دوم (۷→۴)');
+check(move('ArrowUp', 1, PER, TOTAL) === -1, '↑ در ردیف اول بی‌حرکت می‌ماند');
+/* ← : یک سلول به چپِ دیداری = یک قدم جلو در ترتیب خواندن */
+check(move('ArrowLeft', 4, PER, TOTAL) === 5,
+  '← دقیقاً یک سلول به چپ (۴→۵): ' + where(move('ArrowLeft', 4, PER, TOTAL)));
+check(move('ArrowLeft', 0, PER, TOTAL) === 1, '← از اولین سلول یک قدم به چپ می‌رود');
+check(move('ArrowLeft', 8, PER, TOTAL) === -1, '← در سلول آخرِ جدول بی‌حرکت می‌ماند');
+/* → : یک سلول به راستِ دیداری = یک قدم عقب در ترتیب خواندن */
+check(move('ArrowRight', 4, PER, TOTAL) === 3,
+  '→ دقیقاً یک سلول به راست (۴→۳): ' + where(move('ArrowRight', 4, PER, TOTAL)));
+check(move('ArrowRight', 1, PER, TOTAL) === 0, '→ از سلول وسط یک قدم به راست می‌رود');
+check(move('ArrowRight', 0, PER, TOTAL) === -1,
+  '→ روی اولین سلول جدول بی‌حرکت می‌ماند (قدیم همین‌جا هیچ کاری نمی‌کرد و کاربر همان را دید)');
+/* Enter = ذخیره و یک ردیف پایین، مثل ↓ */
+check(move('Enter', 4, PER, TOTAL) === 7 && move('Enter', 7, PER, TOTAL) === -1,
+  'Enter مثل ↓ می‌رود پایین و در ردیف آخر بی‌حرکت است');
+/* هیچ کلیدی نباید «یک ردیف + یک ستون» جابه‌جا کند (همان باگ قدیم) */
+const walk = key => Array.from({ length: TOTAL }, (_, i) => move(key, i, PER, TOTAL));
+const down = walk('ArrowDown'), up = walk('ArrowUp'), left = walk('ArrowLeft'), right = walk('ArrowRight');
+
+check(down.every((t, i) => t === -1 || t === i + PER) && down.filter(t => t !== -1).length === TOTAL - PER,
+  '↓ همه‌جا (جز ردیف آخر) فقط یک ردیف پایین و در همان ستون می‌رود: ' + down.join(','));
+check(up.every((t, i) => t === -1 || t === i - PER) && up.filter(t => t !== -1).length === TOTAL - PER,
+  '↑ همه‌جا (جز ردیف اول) فقط یک ردیف بالا و در همان ستون می‌رود: ' + up.join(','));
+check(left.every((t, i) => t === -1 || t === i + 1), '← همیشه فقط یک قدم به چپ می‌رود: ' + left.join(','));
+check(right.every((t, i) => t === -1 || t === i - 1), '→ همیشه فقط یک قدم به راست می‌رود: ' + right.join(','));
+check(move('ArrowDown', -1, PER, TOTAL) === -1 && move('ArrowDown', TOTAL, PER, TOTAL) === -1,
+  'اندیس نامعتبر هم امن است (بدون خطا)');
+
 /* ═══════ ۳) تب جدید در هاب «مدیریت کارنامه‌ها» ═══════ */
 const hub = await req('هاب کارنامه‌ها', { file: 'reports-management.php', sid: 'gc01', query: 'hub_tab=columns' });
 check(hub.res.page.includes('مدیریت ستونی'), 'the new tab «مدیریت ستونی» sits next to the report tabs');
@@ -213,5 +269,5 @@ const otherMonth = await req('ماه دیگر', { file: 'grade-columns.php', sid
 check(otherMonth.res.page.includes('data-month="آبان"') && otherMonth.res.page.includes('placeholder="-"'),
   'switching the month shows that month’s grades (empty → «-»)');
 
-console.log('PASS ' + n + ' grade-column checks (v4.181.0 column manager: layout, save path, sort logic, hub tab)');
+console.log('PASS ' + n + ' grade-column checks (v4.182.0 column manager: layout, save path, sort logic, arrow keys, hub tab)');
 process.exit(0);

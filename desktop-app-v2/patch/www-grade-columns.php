@@ -522,6 +522,33 @@ require_once __DIR__ . '/includes/header.php';
     list.forEach(function (row) { tbody.appendChild(row); });
     renumber();
   }
+  /* نقشهٔ حرکت با کلیدهای جهت‌دار.
+     قرارداد: idx = شمارهٔ سلول در «ترتیب خواندن» (۰ = بالا-راستِ جدول، چون جدول
+     راست‌به‌چپ است)، perRow = تعداد سلول هر ردیف و total = کل سلول‌ها.
+
+       ↑ / ↓  → همان ستون، یک ردیف بالا/پایین (لبه که رسید، هیچ حرکتی نمی‌کند)
+       ←      → یک سلول به سمت چپ دیداری = یک قدم جلو در ترتیب خواندن
+       →      → یک سلول به سمت راست دیداری = یک قدم عقب در ترتیب خواندن
+       Enter  → مثل ↓ (ذخیره و رفتن به نفر بعدِ همان درس)
+
+     نسخهٔ پیشین با شمارهٔ ستونِ td حساب می‌کرد و وسط ردیف نام دانش‌آموز
+     مبدأ می‌گرفت؛ نتیجه‌اش همان جابه‌جایی اشتباه بود که کارفرما دید. حالا
+     حساب روی همین ترتیب خواندن است، پس هر کلید دقیقاً یک قدم در جهت خودش
+     می‌رود. خروجی: شمارهٔ مقصد، یا -1 وقتی جایی برای رفتن نیست. */
+  function gcTargetIndex(key, idx, perRow, total) {
+    if (idx < 0 || idx >= total) return -1;
+    if (key === 'ArrowDown' || key === 'Enter') {
+      var down = idx + perRow;
+      return (perRow > 0 && down < total) ? down : -1;
+    }
+    if (key === 'ArrowUp') {
+      var up = idx - perRow;
+      return up >= 0 ? up : -1;
+    }
+    if (key === 'ArrowLeft')  return (idx + 1 < total) ? idx + 1 : -1;
+    if (key === 'ArrowRight') return (idx - 1 >= 0) ? idx - 1 : -1;
+    return -1;
+  }
   /* @gc-logic-end */
   var heads = Array.prototype.slice.call(table.querySelectorAll('th.gc-sort'));
   heads.forEach(function (th) {
@@ -605,27 +632,28 @@ require_once __DIR__ . '/includes/header.php';
     var input = e.target.closest && e.target.closest('.gc-cell');
     if (input) save(input);
   }, true);
+  function allCells() { return Array.prototype.slice.call(table.querySelectorAll('input.gc-cell')); }
+  function focusIndex(li) {
+    if (li < 0) return false;
+    var list = allCells();
+    if (!list[li]) return false;
+    list[li].focus();
+    if (list[li].select) list[li].select();
+    return true;
+  }
   table.addEventListener('keydown', function (e) {
     var input = e.target.closest && e.target.closest('.gc-cell');
     if (!input) return;
-    var row = input.closest('tr'), cell = input.closest('td');
-    var rowsAll = rows();
-    var r = rowsAll.indexOf(row), c = Array.prototype.slice.call(row.cells).indexOf(cell);
-    function focusCell(rr, cc) {
-      var target = rowsAll[rr];
-      if (!target) return false;
-      var ins = target.querySelectorAll('input.gc-cell');
-      if (cc < 0 || cc >= ins.length) return false;
-      ins[cc].focus();
-      if (ins[cc].select) ins[cc].select();
-      return true;
-    }
-    if (e.key === 'Enter') { e.preventDefault(); save(input); focusCell(r + 1, c - 1); return; }
+    var keys = ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Enter'];
+    if (keys.indexOf(e.key) === -1 && e.key !== 'Escape') return;
+    e.preventDefault();
     if (e.key === 'Escape') { input.value = input.dataset.saved || ''; mark(input); input.blur(); return; }
-    if (e.key === 'ArrowDown') { e.preventDefault(); focusCell(r + 1, c - 1); return; }
-    if (e.key === 'ArrowUp') { e.preventDefault(); focusCell(r - 1, c - 1); return; }
-    if (e.key === 'ArrowRight') { e.preventDefault(); if (!focusCell(r, c - 2)) focusCell(r - 1, row.querySelectorAll('input.gc-cell').length - 1); return; }
-    if (e.key === 'ArrowLeft') { e.preventDefault(); if (!focusCell(r, c)) focusCell(r + 1, 0); return; }
+    var row = input.closest('tr');
+    var perRow = row ? row.querySelectorAll('input.gc-cell').length : 0;
+    var list = allCells();
+    var target = gcTargetIndex(e.key, list.indexOf(input), perRow, list.length);
+    if (e.key === 'Enter') save(input);
+    focusIndex(target);
   });
 })();
 </script>

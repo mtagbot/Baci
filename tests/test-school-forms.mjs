@@ -1,6 +1,8 @@
-// فرم‌های اداری از قالب‌های .mrt — v4.177.0 و بازسازی v4.181.0
+// فرم‌های اداری از قالب‌های .mrt — v4.177.0، بازسازی v4.181.0 و اصلاح‌های v4.182.0
 //
 // v4.181.0: سه تغییر درخواستی کارفرما اینجا واقعاً اجرا و سنجیده می‌شود —
+// v4.182.0: (الف) فاصلهٔ «تاریخ:» از اسلش‌ها و اسلش‌ها از لب کادر، (ب) تاریخ
+//   دعوتنامه بدون ساعت، (ج) امضای مدیر کنار کادر رضایت‌نامه و کمی بزرگ‌تر.
 //   ۱) برگهٔ حضور و غیاب طبق تصویر ارسالی: شش کادر روز، سه ردیف زنگ،
 //      ستون‌های «اسامی غایبین» و «امضای دبیر».
 //   ۲) دعوتنامهٔ انجمن: متن، فهرست برنامه‌ها، زمان/مکان، تاریخ و شمارهٔ نامه از
@@ -13,21 +15,25 @@ import { run, req, loginAdmin } from './harness/lib.mjs';
 
 let n = 0;
 const check = (v, m) => { assert(v, m); n++; };
+/* سال تحصیلی از خود سایت خوانده می‌شود (هارد‌کد کردنش، تست را بی‌صدا می‌شکند) */
+const curYear = (await run(String.raw`<?php require_once '/www/includes/functions.php';
+echo 'Y=' . get_current_academic_year();`)).out.match(/Y=([\d\/\-]+)/)[1];
+const YQ = curYear.replace(/\//g, '%2F');
 
 /* داده: یک کلاس با ۳ دانش‌آموز */
 await run(String.raw`<?php require_once '/www/includes/functions.php';
 DB::execute("DELETE FROM students WHERE national_id LIKE '066%'");
 foreach ([['آرش','کاظمی','پدر۱','06600000001'],['بهنام','احمدی','پدر۲','06600000002'],['پریسا','رضایی','پدر۳','06600000003']] as $i => $st)
   DB::execute("INSERT INTO students (first_name,last_name,father_name,national_id,class_name,grade_level,academic_year,status,password) VALUES (?,?,?,?,?,?,?,?,?)",
-    [$st[0],$st[1],$st[2],$st[3],'۸/۱','هشتم','1403/1404','active','x']);
+    [$st[0],$st[1],$st[2],$st[3],'۸/۱','هشتم',${JSON.stringify(curYear)},'active','x']);
 set_setting('school_name','دبیرستان آزمایشی راهنما');
-set_setting('current_academic_year','1403/1404');`);
+set_setting('current_academic_year',${JSON.stringify(curYear)});`);
 
 /* ═══════ ۱) برگهٔ حضور و غیاب — چیدمان تصویر ارسالی ═══════ */
 const absents = await run(String.raw`<?php require_once '/www/includes/functions.php';
 require_once '/www/includes/school_forms.php';
 $ctx = sf_context();
-$students = sf_students_of_class('۸/۱','1403/1404');
+$students = sf_students_of_class('۸/۱',${JSON.stringify(curYear)});
 $html = sf_render_absents_form('۷-۱','هفتم',$students,$ctx,false,false);
 echo 'sheets=' . substr_count($html,'class="sheet"') . ';';
 echo 'title=' . (strpos($html,'لیست ثبت حضور و غیاب کلاس') !== false ? 'yes':'no') . ';';
@@ -40,7 +46,12 @@ echo 'bellcol=' . substr_count($html,'>زنگ<') . ';';
 echo 'absentcol=' . substr_count($html,'اسامی غایبین') . ';';
 echo 'signcol=' . substr_count($html,'امضای دبیر') . ';';
 echo 'dateline=' . substr_count($html,'تاریخ:') . ';';
-echo 'names=' . (strpos($html,'آرش کاظمی') !== false ? 'present':'gone') . ';';`);
+echo 'names=' . (strpos($html,'آرش کاظمی') !== false ? 'present':'gone') . ';';
+echo 'nbsp=' . substr_count($html,'تاریخ:&nbsp;') . ';';
+echo 'gap_words=' . substr_count($html,'تاریخ:<span style="display:inline-block;width:7mm">') . ';';
+echo 'gap_slashes=' . substr_count($html,'<span style="display:inline-block;width:13mm">') . ';';
+echo 'edge=' . substr_count($html,'padding:0 2mm 0 0') . ';';
+echo 'joined=' . (strpos($html,'border-spacing:0 3mm') !== false ? 'yes':'no') . ';';`);
 check(absents.out.includes('sheets=1'), 'one sheet per class (A4 portrait)');
 check(absents.out.includes('title=yes') && absents.out.includes('classline=yes'),
   'the sheet is titled «لیست ثبت حضور و غیاب کلاس ۷-۱»: ' + absents.out.match(/title=\w+/)[0]);
@@ -53,11 +64,24 @@ check(absents.out.includes('absentcol=6'), 'the «اسامی غایبین» colu
 check(absents.out.includes('signcol=6'), 'the «امضای دبیر» column header appears in every box: ' + absents.out.match(/signcol=\d+/)[0]);
 check(absents.out.includes('dateline=6'), 'every box has a «تاریخ:  /  /» line: ' + absents.out.match(/dateline=\d+/)[0]);
 check(absents.out.includes('names=gone'), 'the sheet records absentees by hand, so no student names are printed');
+/* v4.182.0: «تاریخ:» باید از اسلش فاصله داشته باشد و دو اسلش هم از هم دور باشند
+   تا روز/ماه/سال جا برای نوشتن داشته باشد. */
+check(absents.out.includes('nbsp=0') && absents.out.includes('gap_words=6'),
+  'the word «تاریخ:» is separated from the slashes by a real gap in every box: '
+  + absents.out.match(/gap_words=\d+/)[0]);
+check(absents.out.includes('gap_slashes=12'),
+  'the two slashes have wide gaps between them (and room after the second) in every box: '
+  + absents.out.match(/gap_slashes=\d+/)[0]);
+check(absents.out.includes('edge=6'),
+  'the date line keeps a 2mm margin from the box edge so day/month/year can be written');
+check(absents.out.includes('joined=yes'),
+  'the two day boxes of each row touch each other like the reference image: '
+  + absents.out.match(/joined=\w+/)[0]);
 
 /* حالت «چاپ پایه» عین همین برگه است (هم برای نوشتن با دست) */
 const absentsBlank = await run(String.raw`<?php require_once '/www/includes/functions.php';
 require_once '/www/includes/school_forms.php';
-$students = sf_students_of_class('۸/۱','1403/1404');
+$students = sf_students_of_class('۸/۱',${JSON.stringify(curYear)});
 $html = sf_render_absents_form('۷-۱','هفتم',$students,sf_context(),false,true);
 echo 'boxes=' . substr_count($html,'border:0.5mm solid #000') . ';';
 echo 'names=' . (strpos($html,'آرش کاظمی') !== false ? 'present':'gone') . ';';
@@ -69,7 +93,7 @@ check(absentsBlank.out.includes('names=gone'), 'no student names on the blank sh
 /* ═══════ ۲) فرم ثبت تحویل و دریافت کتاب (بدون تغییر) ═══════ */
 const amanat = await run(String.raw`<?php require_once '/www/includes/functions.php';
 require_once '/www/includes/school_forms.php';
-$students = sf_students_of_class('۸/۱','1403/1404');
+$students = sf_students_of_class('۸/۱',${JSON.stringify(curYear)});
 $html = sf_render_amanat_form($students,sf_context(),false,true,'۸/۱');
 echo 'sheets=' . substr_count($html,'class="sheet"') . ';';
 echo 'title=' . (strpos($html,'فرم ثبت تحویل و دریافت کتاب') !== false ? 'yes':'no') . ';';
@@ -88,7 +112,7 @@ check(['نام کتاب', 'کد کتاب و قفسه', 'تاریخ دریافت'
 
 const amanatStu = await run(String.raw`<?php require_once '/www/includes/functions.php';
 require_once '/www/includes/school_forms.php';
-$students = sf_students_of_class('۸/۱','1403/1404');
+$students = sf_students_of_class('۸/۱',${JSON.stringify(curYear)});
 $html = sf_render_amanat_form($students,sf_context(),false,false,'۸/۱');
 echo 'sheets=' . substr_count($html,'class="sheet"') . ';';
 echo 'name=' . (strpos($html,'دانش‌آموز: آرش کاظمی') !== false ? 'yes':'no') . ';';`);
@@ -98,7 +122,7 @@ check(amanatStu.out.includes('name=yes'), 'the student name appears on the sheet
 /* ═══════ ۳) دعوتنامهٔ انجمن — مقادیر ورودی کاربر + کلید نمایش ═══════ */
 const anjoman = await run(String.raw`<?php require_once '/www/includes/functions.php';
 require_once '/www/includes/school_forms.php';
-$students = sf_students_of_class('۸/۱','1403/1404');
+$students = sf_students_of_class('۸/۱',${JSON.stringify(curYear)});
 $opts = sf_form_defaults('anjoman');
 $opts['date'] = '۱۴۰۵/۰۷/۲۴ ۱۷:۱۲';
 $opts['number'] = '۱۲۳/۴۵۶';
@@ -123,7 +147,15 @@ echo 'off_place=' . (strpos($htmlOff,'سالن اجتماعات') !== false ? 's
 echo 'off_member=' . (strpos($htmlOff,'شمارهٔ تماس:') !== false ? 'shown':'hidden') . ';';
 echo 'off_sign=' . (strpos($htmlOff,'امضای ولی دانش‌آموز') !== false ? 'shown':'hidden') . ';';
 echo 'off_agenda=' . (substr_count($htmlOff,'<li>')) . ';';
-echo 'off_intro=' . (strpos($htmlOff,'هرچند کوتاه') !== false ? 'shown':'hidden') . ';';`);
+echo 'off_intro=' . (strpos($htmlOff,'هرچند کوتاه') !== false ? 'shown':'hidden') . ';';
+/* v4.182.0: تاریخ نامه بدون ساعت (پیش‌تر «۱۴۰۵/۰۷/۲۴ ۱۷:۱۲» بود) */
+set_setting('form_options_anjoman','');
+$defDate = sf_form_defaults('anjoman')['date'];
+echo 'default_date=' . $defDate . ';';
+echo 'date_has_time=' . (preg_match('/\d{1,2}:\d{2}/u', $defDate) ? 'yes':'no') . ';';
+set_setting('form_options_anjoman', json_encode(['date' => '۱۴۰۵/۰۷/۲۴ ۱۷:۱۲'], JSON_UNESCAPED_UNICODE));
+echo 'stripped=' . sf_form_defaults('anjoman')['date'] . ';';
+echo 'plain=' . sf_strip_time('۱۴۰۵/۰۷/۲۴') . ';';`);
 check(anjoman.out.includes('blocks=3'), 'one letter per student: ' + anjoman.out.match(/blocks=\d+/)[0]);
 check(anjoman.out.includes('sheets=2'), 'two letters per page (3 letters → 2 sheets): ' + anjoman.out.match(/sheets=\d+/)[0]);
 check(anjoman.out.includes('title=yes'), 'the invitation keeps the original title');
@@ -140,6 +172,13 @@ check(anjoman.out.includes('off_member=hidden') && anjoman.out.includes('off_sig
   'the member fields and the parent signature can be switched off per session');
 check(anjoman.out.includes('off_agenda=0'), 'the agenda list disappears when switched off: ' + anjoman.out.match(/off_agenda=\d+/)[0]);
 check(anjoman.out.includes('off_intro=shown'), 'unrelated fields stay as they were');
+check(/default_date=[۰-۹\d]{4}\/[۰-۹\d]{2}\/[۰-۹\d]{2};/.test(anjoman.out),
+  'the default letter date is a plain date: ' + anjoman.out.match(/default_date=[^;]*/)[0]);
+check(anjoman.out.includes('date_has_time=no'),
+  'the default date carries NO clock time: ' + anjoman.out.match(/date_has_time=\w+/)[0]);
+check(anjoman.out.includes('stripped=۱۴۰۵/۰۷/۲۴;'),
+  'a date saved with a time by the older version is cleaned on load: ' + anjoman.out.match(/stripped=[^;]*/)[0]);
+check(anjoman.out.includes('plain=۱۴۰۵/۰۷/۲۴;'), 'sf_strip_time leaves a plain date untouched');
 
 const anjomanBlank = await run(String.raw`<?php require_once '/www/includes/functions.php';
 require_once '/www/includes/school_forms.php';
@@ -155,7 +194,7 @@ file_put_contents('/www/uploads/manager-sig.png', base64_decode('/9j/4AAQSkZJRgA
 set_setting('principal_signature_url','uploads/manager-sig.png');`);
 const camp = await run(String.raw`<?php require_once '/www/includes/functions.php';
 require_once '/www/includes/school_forms.php';
-$students = sf_students_of_class('۸/۱','1403/1404');
+$students = sf_students_of_class('۸/۱',${JSON.stringify(curYear)});
 $opts = sf_form_defaults('consent');
 $opts['year_label'] = '۱۴۰۴/۱۴۰۵';
 $opts['trip'] = 'بازدید از موزهٔ علوم';
@@ -272,5 +311,5 @@ check(allEditor.res.page.includes('ویرایشگر زنده') && allEditor.res.
 const none = await req('کلاس بدون دانش‌آموز', { file: 'reports-lists.php', sid: 'forms02', query: 'action=absents_form&class=' + encodeURIComponent('۹/۹') + '&mode=students' });
 check(/دانش‌آموز/.test(none.res.flash?.message || ''), 'an empty class shows a helpful message: ' + (none.res.flash?.message || ''));
 
-console.log('PASS ' + n + ' school-form checks (v4.181.0 attendance sheet, customisable invitation and consent form)');
+console.log('PASS ' + n + ' school-form checks (v4.182.0: date spacing, no clock on the letter, signature at the box edge)');
 process.exit(0);
