@@ -214,61 +214,180 @@ if (!function_exists('sf_shell_blocks')) {
     }
 }
 
+/* ═══════════ v4.181.0: گزینه‌های فرم — مقادیر ورودی کاربر + کلید فعال/غیرفعال ═══════════
+   مشکل گزارش‌شده: متن دعوتنامه و رضایت‌نامه ثابت بود (اردو، تاریخ، محل، مبلغ، فهرست
+   برنامه‌ها…) و مدرسه نمی‌توانست آن‌ها را پر کند؛ بخشی از متن هم خراب بود. حالا هر
+   فیلد «مقدار» دارد و «کلید نمایش»؛ مقادیر آخرین ویرایش در settings می‌ماند تا برای
+   جلسهٔ بعد فقط تیک‌ها را عوض کنند. */
+
+if (!function_exists('sf_show')) {
+    /** آیا فیلد در این چاپ نمایش داده شود؟ (پیش‌فرض: بله) */
+    function sf_show(array $opts, $key) {
+        $show = $opts['show'] ?? [];
+        if (!is_array($show) || !array_key_exists($key, $show)) return true;
+        return (bool)$show[$key];
+    }
+}
+if (!function_exists('sf_val')) {
+    /** مقدار یک فیلد برای چاپ: اگر «ندارد» باشد خط‌چین نقطه‌چین می‌ماند.
+     *  فیلد خاموش (کلید نمایش برداشته‌شده) اصلاً چاپ نمی‌شود؛ چون اگر فقط با
+     *  CSS پنهان شود، متن در HTML/PDF می‌ماند و جای برگه را هم می‌خورد. */
+    function sf_val(array $opts, $key, $fallback = '......................') {
+        if (!sf_show($opts, $key)) return '';
+        $value = trim((string)($opts[$key] ?? ''));
+        return $value === '' ? $fallback : $value;
+    }
+}
+if (!function_exists('sf_today_with_time')) {
+    function sf_today_with_time() {
+        if (function_exists('jdate')) return jdate('Y/m/d H:i');
+        if (function_exists('jalali_now')) return jalali_now();
+        return date('Y/m/d H:i');
+    }
+}
+if (!function_exists('sf_form_defaults')) {
+    /**
+     * پیش‌فرض فیلدهای هر فرم. اگر مدیر قبلاً «ذخیرهٔ پیش‌فرض» زده باشد، همان
+     * مقادیر برمی‌گردد؛ وگرنه متن اصلی و تیک‌های پیش‌فرض.
+     */
+    function sf_form_defaults($form) {
+        $saved = json_decode((string)get_setting('form_options_' . $form, ''), true);
+        if (!is_array($saved)) $saved = [];
+        if ($form === 'consent') {
+            $base = [
+                'year_label' => (string)get_setting('current_academic_year', ''),
+                'trip' => '', 'date' => '', 'time' => '', 'from' => '', 'to' => '',
+                'days' => '', 'amount' => '', 'notes' => '',
+                'show' => ['year_label' => true, 'trip' => true, 'date' => true, 'time' => true,
+                           'from' => true, 'to' => true, 'days' => true, 'amount' => true, 'notes' => true],
+            ];
+        } else {
+            $base = [
+                'intro' => "با سلام و احترام؛\nامید است که امسال نیز، همچون سال‌های گذشته، شاهد همراهی گرم شما در مسیر آموزش"
+                    . " فرزندانمان باشیم. جلسهٔ عمومی انجمن اولیاء و مربیان مدرسه به منظور بررسی برنامه‌های سال تحصیلی"
+                    . " جدید و انتخاب اعضای انجمن تشکیل می‌شود. حضور و نظر شما، هرچند کوتاه، در کیفیت آموزش مدرسه"
+                    . " مؤثر خواهد بود.",
+                'agenda' => "گزارش عملکرد انجمن در سال تحصیلی گذشته.\nبرنامهٔ کار انجمن برای سال تحصیلی جدید.\nمعرفی داوطلبان عضویت در انجمن و رأی‌گیری.",
+                'place' => '', 'number' => '', 'date' => sf_today_with_time(),
+                'show' => ['intro' => true, 'agenda' => true, 'place' => true, 'number' => true, 'date' => true,
+                           'member_name' => true, 'member_phone' => true, 'member_education' => true, 'parent_sign' => true],
+            ];
+        }
+        foreach ($saved as $k => $v) {
+            if ($k === 'show') { if (is_array($v)) $base['show'] = array_merge($base['show'], $v); continue; }
+            if (is_string($v) || is_numeric($v)) $base[$k] = (string)$v;
+        }
+        return $base;
+    }
+}
+if (!function_exists('sf_agenda_lines')) {
+    /** فهرست برنامه‌ها: هر خط یک بند. */
+    function sf_agenda_lines($raw) {
+        $lines = preg_split('/\r\n|\r|\n/', (string)$raw);
+        $out = [];
+        foreach ($lines as $line) {
+            $line = trim(preg_replace('/^\s*[-•*\d]+[\).\-\s]*/u', '', (string)$line));
+            if ($line !== '') $out[] = $line;
+        }
+        return $out;
+    }
+}
+if (!function_exists('sf_form_options_from_post')) {
+    /** مقادیر و تیک‌های ارسالی ویرایشگر را به ساختار opts تبدیل می‌کند. */
+    function sf_form_options_from_post($form, array $src) {
+        $base = sf_form_defaults($form);
+        $fields = $form === 'consent'
+            ? ['year_label', 'trip', 'date', 'time', 'from', 'to', 'days', 'amount', 'notes']
+            : ['intro', 'agenda', 'place', 'number', 'date'];
+        $out = [];
+        foreach ($fields as $f) {
+            if (array_key_exists('f_' . $f, $src)) $out[$f] = (string)$src['f_' . $f];
+            elseif (array_key_exists($f, $base)) $out[$f] = $base[$f];
+        }
+        $show = [];
+        foreach (array_keys($base['show']) as $key) $show[$key] = !empty($src['show_' . $key]);
+        $out['show'] = $show;
+        return $out;
+    }
+}
+if (!function_exists('sf_form_options_save')) {
+    function sf_form_options_save($form, array $opts) {
+        set_setting('form_options_' . $form, json_encode($opts, JSON_UNESCAPED_UNICODE));
+    }
+}
+
 /* ═══════════ ۱) برگهٔ حضور و غیاب هفتگی ═══════════ */
 
 if (!function_exists('sf_render_absents_form')) {
     /**
-     * برگهٔ حضور و غیاب — بازشناسی absentsForm.mrt (نسخهٔ هفتگی v4.177.0)
-     * چیدمان: فقط یک خط با نام کلاس (مثل «۷-۱») و جدول یک هفته:
-     * ۶ روز (شنبه تا پنجشنبه) × ۳ زنگ. ردیف‌ها یا نام دانش‌آموزان‌اند
-     * ($blank=false) یا خالی ($blank=true).
+     * برگهٔ «لیست ثبت حضور و غیاب کلاس» — v4.181.0، بازسازی‌شده طبق تصویر ارسالی
+     * کارفرما (جای چیدمان هفتگیِ ماه-محور قبلی):
+     *
+     *   یک برگهٔ A4 عمودی؛ شش کادر روز در سه ردیف و دو ستون
+     *   (شنبه، یکشنبه / دوشنبه، سه‌شنبه / چهارشنبه، پنجشنبه).
+     *   هر کادر: سرصفحهٔ «روز …» و «تاریخ: …/…/…»، سپس جدولی سه‌ستونی
+     *   «زنگ | اسامی غایبین | امضای دبیر» با سه ردیف زنگ اول/دوم/سوم —
+     *   یعنی هر روز سه ظرفیت ثبت غایب و سه امضای دبیر.
+     *
+     * $students/$blank برای سازگاری امضا نگه داشته شده‌اند؛ این برگه جای نام
+     * دانش‌آموز، خودِ «غایبین» را ثبت می‌کند، پس در هر دو حالت یکی است.
      */
-    function sf_render_absents_form($className, $grade, array $students, $ctx, $autoPrint = false, $blank = false) {
-        $days    = ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه'];
-        $periods = 3;
-        $blankRows = 30;
-        $rows = $blank ? $blankRows : count($students);
-        if ($rows < 1) $rows = 1;
-        /* ارتفاع ردیف: صفحه ۲۸۱ میلی‌متر منهای حاشیه، خط کلاس و دو ردیف عنوان */
-        $avail = 281 - 16 - 12 - 14;
-        $rowH  = max(5.4, min(11, $avail / $rows));
+    function sf_render_absents_form($className, $grade, array $students, $ctx, $autoPrint = false, $blank = false, array $opts = []) {
+        $pairs = [['شنبه', 'یکشنبه'], ['دوشنبه', 'سه‌شنبه'], ['چهارشنبه', 'پنجشنبه']];
+        $periods = ['اول', 'دوم', 'سوم'];
+        $title = trim((string)($opts['title'] ?? '')) !== '' ? (string)$opts['title'] : 'لیست ثبت حضور و غیاب کلاس';
+        $classLabel = trim((string)$className) !== '' ? trim((string)$className) : '..............................';
+        $esc = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
+        $th = 'border:0.4mm solid #000;font-size:10pt;font-weight:700;padding:1.2mm;background:#f1f5f9';
+        $td = 'border:0.4mm solid #000;font-size:10pt;font-weight:700;padding:1mm;text-align:center';
+        $empty = 'border:0.4mm solid #000;font-size:10pt;padding:1mm';
         ob_start();
         ?>
 <div class="sheet">
-  <div style="font-size:13pt;font-weight:700;margin-bottom:2mm">کلاس <?php echo htmlspecialchars($className, ENT_QUOTES, 'UTF-8'); ?></div>
-  <table style="width:100%;border-collapse:collapse;table-layout:fixed">
-    <colgroup><col style="width:9mm"><col style="width:46mm"><?php for ($i = 0; $i < count($days) * $periods; $i++): ?><col><?php endfor; ?></colgroup>
-    <thead>
-      <tr>
-        <th colspan="2" style="border:0.35mm solid #000;background:#e2e8f0;font-size:8pt;padding:1mm"></th>
-        <?php foreach ($days as $d): ?>
-        <th colspan="<?php echo $periods; ?>" style="border:0.35mm solid #000;background:#e2e8f0;font-size:7.6pt;padding:1mm"><?php echo htmlspecialchars($d, ENT_QUOTES, 'UTF-8'); ?></th>
-        <?php endforeach; ?>
-      </tr>
-      <tr>
-        <th style="border:0.35mm solid #000;background:#f1f5f9;font-size:7.2pt;padding:1mm">ردیف</th>
-        <th style="border:0.35mm solid #000;background:#f1f5f9;font-size:7.6pt;padding:1mm">نام و نام خانوادگی</th>
-        <?php for ($d = 0; $d < count($days); $d++): for ($p = 1; $p <= $periods; $p++): ?>
-        <th style="border:0.35mm solid #000;background:#f1f5f9;font-size:6.4pt;padding:0.6mm"><?php echo htmlspecialchars(sf_fa($p), ENT_QUOTES, 'UTF-8'); ?></th>
-        <?php endfor; endfor; ?>
-      </tr>
-    </thead>
-    <tbody>
-      <?php for ($r = 1; $r <= $rows; $r++):
-        $s = $blank ? null : ($students[$r - 1] ?? null);
-        $name = $s ? trim(($s['first_name'] ?? '') . ' ' . ($s['last_name'] ?? '')) : '';
-      ?>
-      <tr style="height:<?php echo number_format($rowH, 2, '.', ''); ?>mm">
-        <td style="border:0.25mm solid #64748b;text-align:center;font-size:7pt"><?php echo htmlspecialchars(sf_fa($r), ENT_QUOTES, 'UTF-8'); ?></td>
-        <td style="border:0.25mm solid #64748b;font-size:8pt;padding:0 1.5mm"><?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?></td>
-        <?php for ($c = 0; $c < count($days) * $periods; $c++): ?><td style="border:0.25mm solid #94a3b8"></td><?php endfor; ?>
-      </tr>
-      <?php endfor; ?>
-    </tbody>
+  <div style="text-align:center;font-size:13pt;font-weight:700;margin-bottom:3mm">
+    <?php echo $esc($title); ?> <?php echo $esc(sf_fa($classLabel)); ?>
+  </div>
+  <table style="width:100%;border-collapse:separate;border-spacing:2.5mm;table-layout:fixed">
+    <colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+    <?php foreach ($pairs as $pair): ?>
+    <tr>
+      <?php foreach ($pair as $day): ?>
+      <td style="vertical-align:top;border:0.5mm solid #000;border-radius:1.5mm;height:82mm;padding:1.5mm 2mm">
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:1.5mm">
+          <tr>
+            <td style="font-size:11.5pt;font-weight:700;text-align:right;padding:0">روز <?php echo $esc($day); ?></td>
+            <td style="font-size:10.5pt;font-weight:700;text-align:left;padding:0;white-space:nowrap">تاریخ:&nbsp;&nbsp;<?php echo $esc(sf_fa('/')); ?>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<?php echo $esc(sf_fa('/')); ?></td>
+          </tr>
+        </table>
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed">
+          <colgroup><col style="width:15mm"><col><col style="width:31mm"></colgroup>
+          <thead>
+            <tr>
+              <th style="<?php echo $th; ?>">زنگ</th>
+              <th style="<?php echo $th; ?>">اسامی غایبین</th>
+              <th style="<?php echo $th; ?>">امضای دبیر</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($periods as $period): ?>
+            <tr style="height:19mm">
+              <td style="<?php echo $td; ?>"><?php echo $esc($period); ?></td>
+              <td style="<?php echo $empty; ?>"></td>
+              <td style="<?php echo $empty; ?>"></td>
+            </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </td>
+      <?php endforeach; ?>
+    </tr>
+    <?php endforeach; ?>
   </table>
 </div>
         <?php
-        return sf_shell('برگهٔ حضور و غیاب کلاس ' . $className, ob_get_clean(), $autoPrint);
+        $out = sf_head('لیست ثبت حضور و غیاب کلاس ' . $classLabel);
+        $out .= '<style>.sheet{padding:7mm 6mm}</style>';
+        return $out . ob_get_clean() . sf_tail($autoPrint);
     }
 }
 
@@ -322,75 +441,89 @@ if (!function_exists('sf_render_amanat_form')) {
 
 /* ═══════════ ۳) دعوتنامهٔ انجمن — دو برگه در هر صفحه ═══════════ */
 
-if (!function_exists('sf_render_anjoman_letter')) {
+if (!function_exists('sf_anjoman_blocks')) {
     /**
-     * دعوتنامهٔ جلسهٔ عمومی انجمن اولیاء و مربیان — بازشناسی anjoman.mrt (v4.177.0)
-     * دو دعوتنامه در هر برگه. چیدمان بر پایهٔ اصول نامهٔ نگاری فارسی:
-     * تاریخ بالا-چپ، موضوع در middle، سلام و بدنهٔ راست‌چین و هم‌تراز،
-     * امضا پایین-چپ. با $blank=true نام دانش‌آموز خالی می‌ماند.
+     * بلوک‌های یک دعوتنامه برای هر دانش‌آموز (خروجی: آرایهٔ HTML).
+     * جدا شده از پوسته تا ویرایشگر زنده بتواند همان بلوک‌ها را پیش‌نمایش کند.
      */
-    function sf_render_anjoman_letter(array $students, $ctx, $autoPrint = false, $blank = false) {
-        $program = [
-            'گزارش عملکرد انجمن در سال تحصیلی گذشته.',
-            'برنامهٔ کار انجمن برای سال تحصیلی جدید.',
-            'معرفی داوطلبان عضویت در انجمن و رأی‌گیری.',
-        ];
+    function sf_anjoman_blocks(array $students, $ctx, $blank, array $opts) {
+        $esc  = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
+        $vis = function ($key) use ($opts) { return sf_show($opts, $key) ? '' : 'display:none;'; };
+        $opt = function ($key, $style = '') use ($vis) { return ' class="sfe-opt" data-sfe-opt="' . $key . '" style="' . $vis($key) . $style . '"'; };
+        $node = function ($key, $text, $style = '') use ($esc, $vis) {
+            if ($vis($key) !== '') $text = '';   /* فیلد خاموش حتی متنش هم چاپ نمی‌شود */
+            return '<span data-sfe="' . $esc($key) . '" style="' . $style . '">' . $esc($text) . '</span>';
+        };
+        $agenda = sf_show($opts, 'agenda') ? sf_agenda_lines((string)($opts['agenda'] ?? '')) : [];
+        $introLines = preg_split('/\r\n|\r|\n/', (string)($opts['intro'] ?? ''));
         $blocks = [];
         $items = $blank ? [null] : $students;
         if (!$items) $items = [null];
-        foreach ($items as $s) {
-            $name = $s ? trim(($s['first_name'] ?? '') . ' ' . ($s['last_name'] ?? '')) : '';
-            $cls  = $s ? trim((string)($s['class_name'] ?? '')) : '';
+        foreach ($items as $st) {
+            $name = $st ? trim((string)($st['first_name'] ?? '') . ' ' . (string)($st['last_name'] ?? '')) : '';
+            $cls  = $st ? trim((string)($st['class_name'] ?? '')) : '';
             ob_start();
             ?>
 <div class="blk" style="height:124mm;border:0.35mm solid #334155;border-radius:2mm;padding:5mm 6mm;position:relative;overflow:hidden">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;font-size:8pt;color:#334155">
-    <span>تاریخ: <?php echo htmlspecialchars(sf_fa($ctx['today']), ENT_QUOTES, 'UTF-8'); ?></span>
-    <span>شمارهٔ نامه: ................</span>
+    <span<?php echo $opt('date'); ?>><?php if (sf_show($opts, 'date')): ?>تاریخ: <?php echo $node('date', (string)($opts['date'] ?? '')); ?><?php endif; ?></span>
+    <span<?php echo $opt('number'); ?>><?php if (sf_show($opts, 'number')): ?>شمارهٔ نامه: <?php echo $node('number', sf_val($opts, 'number', '................')); ?><?php endif; ?></span>
   </div>
   <div style="text-align:center;margin:3mm 0 1mm">
     <div style="font-size:11.5pt;font-weight:700">دعوتنامهٔ جلسهٔ عمومی انجمن اولیاء و مربیان</div>
-    <div style="font-size:8.5pt;margin-top:1mm"><?php echo htmlspecialchars($ctx['school'], ENT_QUOTES, 'UTF-8'); ?>
-      <?php if ($ctx['year'] !== ''): ?> — سال تحصیلی <?php echo htmlspecialchars(sf_fa($ctx['year']), ENT_QUOTES, 'UTF-8'); ?><?php endif; ?></div>
+    <div style="font-size:8.5pt;margin-top:1mm"><?php echo $esc($ctx['school']); ?>
+      <?php if ($ctx['year'] !== ''): ?> — سال تحصیلی <?php echo $esc(sf_fa($ctx['year'])); ?><?php endif; ?></div>
   </div>
   <div style="font-size:9pt;margin:2mm 0">ولی محترم دانش‌آموز:
-    <b><?php echo htmlspecialchars($name !== '' ? $name : '................................', ENT_QUOTES, 'UTF-8'); ?></b>
-    <?php if ($cls !== ''): ?><span style="color:#334155">(کلاس <?php echo htmlspecialchars($cls, ENT_QUOTES, 'UTF-8'); ?>)</span><?php endif; ?>
+    <b><?php echo $esc($name !== '' ? $name : '................................'); ?></b>
+    <?php if ($cls !== ''): ?><span style="color:#334155">(کلاس <?php echo $esc($cls); ?>)</span><?php endif; ?>
   </div>
-  <div style="font-size:8.6pt;line-height:2;text-align:justify;text-justify:inter-word">
-    با سلام و احترام؛<br>
-    امید است که امسال نیز، همچون سال‌های گذشته، شاهد همراهی گرم شما در مسیر آموزش
-    فرزندانمان باشیم. جلسهٔ عمومی انجمن اولیاء و مربیان مدرسه به منظور بررسی
-    برنامه‌های سال تحصیلی جدید و انتخاب اعضای انجمن تشکیل می‌شود. حضور و نظر
-    شما، هرچند крат، در کیفیت آموزش مدرسه مؤثر خواهد بود.
+  <div<?php echo $opt('intro', 'font-size:8.6pt;line-height:2;text-align:justify;text-justify:inter-word'); ?>>
+    <?php echo $node('intro', implode("\n", $introLines), 'white-space:pre-line'); ?>
   </div>
-  <div style="font-size:8.6pt;line-height:2;margin-top:2mm">
+  <div<?php echo $opt('agenda', 'font-size:8.6pt;line-height:2;margin-top:2mm'); ?>>
     <div style="font-weight:700">فهرست برنامه‌ها:</div>
-    <ol style="margin-right:8mm">
-      <?php foreach ($program as $p): ?><li><?php echo htmlspecialchars($p, ENT_QUOTES, 'UTF-8'); ?></li><?php endforeach; ?>
+    <ol class="sfe-agenda" style="margin-right:8mm">
+      <?php foreach ($agenda as $item): ?><li><?php echo $esc($item); ?></li><?php endforeach; ?>
     </ol>
   </div>
-  <table style="width:100%;border-collapse:collapse;margin-top:2mm;font-size:8.2pt">
+  <table class="sfe-member" style="width:100%;border-collapse:collapse;margin-top:2mm;font-size:8.2pt">
     <tr>
-      <td style="width:50%;border:0.25mm solid #475569;padding:1.6mm;height:9mm">نام و نام خانوادگی:</td>
-      <td style="border:0.25mm solid #475569;padding:1.6mm">شمارهٔ تماس:</td>
+      <td<?php echo $opt('member_name', 'width:50%;border:0.25mm solid #475569;padding:1.6mm;height:9mm'); ?>><?php if (sf_show($opts, 'member_name')): ?>نام و نام خانوادگی:<?php endif; ?></td>
+      <td<?php echo $opt('member_phone', 'border:0.25mm solid #475569;padding:1.6mm'); ?>><?php if (sf_show($opts, 'member_phone')): ?>شمارهٔ تماس:<?php endif; ?></td>
     </tr>
     <tr>
-      <td style="border:0.25mm solid #475569;padding:1.6mm;height:9mm">رشته و میزان تحصیلات:</td>
-      <td style="border:0.25mm solid #475569;padding:1.6mm">زمان و مکان جلسه: ..............................</td>
+      <td<?php echo $opt('member_education', 'border:0.25mm solid #475569;padding:1.6mm;height:9mm'); ?>><?php if (sf_show($opts, 'member_education')): ?>رشته و میزان تحصیلات:<?php endif; ?></td>
+      <td<?php echo $opt('place', 'border:0.25mm solid #475569;padding:1.6mm'); ?>><?php if (sf_show($opts, 'place')): ?>زمان و مکان جلسه: <?php echo $node('place', sf_val($opts, 'place', '..............................')); ?><?php endif; ?></td>
     </tr>
   </table>
   <div style="display:flex;justify-content:space-between;font-size:8pt;margin-top:2.5mm;color:#334155">
-    <span>با احترام — مدیریت <?php echo htmlspecialchars($ctx['school'], ENT_QUOTES, 'UTF-8'); ?></span>
-    <span>امضای ولی دانش‌آموز</span>
+    <span>با احترام — مدیریت <?php echo $esc($ctx['school']); ?></span>
+    <span<?php echo $opt('parent_sign'); ?>><?php if (sf_show($opts, 'parent_sign')): ?>امضای ولی دانش‌آموز<?php endif; ?></span>
   </div>
 </div>
             <?php
             $blocks[] = ob_get_clean();
         }
+        return $blocks;
+    }
+}
+
+if (!function_exists('sf_render_anjoman_letter')) {
+    /**
+     * دعوتنامهٔ جلسهٔ عمومی انجمن اولیاء و مربیان — دو دعوتنامه در هر برگه A4.
+     *
+     * v4.181.0: متن، فهرست برنامه‌ها، زمان و مکان جلسه، تاریخ و شمارهٔ نامه از
+     * «گزینه‌های فرم» می‌آید (ویرایشگر زنده در همین صفحه ذخیره‌شان می‌کند) و هر
+     * فیلد یک کلید «نمایش» دارد؛ در جلسه‌ای که لازم نیست، تیکش برداشته می‌شود.
+     * متن خراب «هرچند крат» هم به «هرچند کوتاه» اصلاح شد.
+     */
+    function sf_render_anjoman_letter(array $students, $ctx, $autoPrint = false, $blank = false, array $opts = []) {
+        if (!$opts) $opts = sf_form_defaults('anjoman');
+        $blocks = sf_anjoman_blocks($students, $ctx, $blank, $opts);
         /* دو دعوتنامه در هر برگه */
         $out = sf_head('دعوتنامهٔ انجمن اولیاء و مربیان');
-        $out .= '<style>.sheet{padding:8mm 9mm}.blk+.blk{margin-top:10mm}</style>';  /* ۱۲۴+۱۲۴+۱۰ = ۲۵۸ میلی‌متر */
+        $out .= '<style>.sheet{padding:8mm 9mm}.blk+.blk{margin-top:10mm}</style>';
         foreach (array_chunk($blocks, 2) as $page) {
             $out .= '<div class="sheet">' . implode('', $page) . '</div>';
         }
@@ -400,50 +533,94 @@ if (!function_exists('sf_render_anjoman_letter')) {
 
 /* ═══════════ ۴) رضایت‌نامهٔ اردو — چهار برگه در هر صفحه ═══════════ */
 
-if (!function_exists('sf_render_camp_consent')) {
+if (!function_exists('sf_camp_blocks')) {
     /**
-     * رضایت‌نامهٔ اردو — بازشناسی campConsent.mrt (v4.177.0)
-     * چهار برگه در هر صفحه. مهر مدیر مدرسه به‌صورت روی‌هم (overlay) روی
-     * کادر توضیحات قرار می‌گیرد. با $blank=true نام خالی می‌ماند.
+     * بلوک‌های یک رضایت‌نامهٔ اردو برای هر دانش‌آموز (خروجی: آرایهٔ HTML).
+     * v4.181.0: مقادیر اردو (عنوان، تاریخ، ساعت، مبدأ، مقصد، مدت، مبلغ و
+     * توضیحات) از گزینه‌های فرم می‌آید و هر کدام کلید نمایش جدا دارد؛ جمله
+     * فقط از بخش‌های فعال ساخته می‌شود تا با خاموش‌کردن یک فیلد، متن ناقص نشود.
+     * جای «تاریخ» در سرصفحه، «سال تحصیلی» نشسته است و امضای مدیر (overlay)
+     * دقیقاً روی «امضای مدیر / مهر مدرسه» می‌افتد، نه وسط کادر توضیحات.
      */
-    function sf_render_camp_consent(array $students, $ctx, $autoPrint = false, $blank = false) {
+    function sf_camp_blocks(array $students, $ctx, $blank, array $opts) {
+        $esc = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
         $stamp = sf_data_uri($ctx['signature']);
+        $val   = function ($key, $style = '') use ($opts, $esc) {
+            return '<b data-sfe="' . $esc($key) . '" style="' . $style . '">' . $esc(sf_val($opts, $key, '......................')) . '</b>';
+        };
+        $optC  = function ($key, $style = '') use ($opts) {
+            return ' class="sfe-opt" data-sfe-opt="' . $key . '" style="' . (sf_show($opts, $key) ? '' : 'display:none;') . $style . '"';
+        };
+        /* جملهٔ اصلی فقط از بخش‌های فعال ساخته می‌شود؛ با خاموش‌کردن هر فیلد
+           متن به‌هم‌ریخته نمی‌شود (نه «که در تاریخ» بی‌دنباله می‌ماند، نه «به»). */
+        $clauses = ['که در تاریخ ' . $val('date'), 'راس ساعت ' . $val('time'), 'از محل ' . $val('from'),
+                    'به مقصد ' . $val('to'), 'به مدت ' . $val('days') . ' روز', 'به مبلغ ' . $val('amount') . ' تومان'];
+        $keys = ['date', 'time', 'from', 'to', 'days', 'amount'];
+        $live = [];
+        foreach ($keys as $i => $k) if (sf_show($opts, $k)) $live[] = $clauses[$i];
+        $sentence = 'رضایت خود را جهت عزیمت فرزندم به ' . (sf_show($opts, 'trip') ? 'اردوی ' . $val('trip') : 'اردو');
+        if ($live) {
+            $lastOne = array_pop($live);
+            $sentence .= ' ' . implode('، ', $live) . ($live ? ' و ' : '') . $lastOne;
+        }
+        $sentence .= ' برگزار می‌شود، اعلام می‌دارم.';
         $blocks = [];
         $items = $blank ? [null] : $students;
         if (!$items) $items = [null];
-        foreach ($items as $s) {
-            $name = $s ? trim(($s['first_name'] ?? '') . ' ' . ($s['last_name'] ?? '')) : '';
-            $cls  = $s ? trim((string)($s['class_name'] ?? '')) : '';
+        foreach ($items as $st) {
+            $name = $st ? trim((string)($st['first_name'] ?? '') . ' ' . (string)($st['last_name'] ?? '')) : '';
+            $cls  = $st ? trim((string)($st['class_name'] ?? '')) : '';
             ob_start();
             ?>
 <div class="blk" style="height:62mm;border:0.35mm solid #334155;border-radius:2mm;padding:3mm 4mm;position:relative;overflow:hidden">
   <div style="display:flex;justify-content:space-between;font-size:7.6pt;color:#334155">
-    <span><?php echo htmlspecialchars($ctx['school'], ENT_QUOTES, 'UTF-8'); ?><?php if ($cls !== ''): ?> — کلاس <?php echo htmlspecialchars($cls, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?></span>
-    <span>تاریخ: <?php echo htmlspecialchars(sf_fa($ctx['today']), ENT_QUOTES, 'UTF-8'); ?></span>
+    <span><?php echo $esc($ctx['school']); ?><?php if ($cls !== ''): ?> — کلاس <?php echo $esc($cls); ?><?php endif; ?></span>
+    <span<?php echo $optC('year_label'); ?>><?php if (sf_show($opts, 'year_label')): ?>سال تحصیلی: <?php echo $val('year_label', 'font-weight:700'); ?><?php endif; ?></span>
   </div>
   <div style="text-align:center;font-size:10.5pt;font-weight:700;margin:1.5mm 0">رضایت‌نامهٔ اردو</div>
   <div style="font-size:8.2pt;line-height:1.9">
-    اینجانب ولی دانش‌آموز <b><?php echo htmlspecialchars($name !== '' ? $name : '................................', ENT_QUOTES, 'UTF-8'); ?></b>
-    رضایت خود را جهت عزیمت فرزندم به اردوی <b>......................</b> که در تاریخ
-    <b>................</b> و راس ساعت <b>..........</b> از محل <b>......................</b>
-    به مقصد <b>......................</b> و به مدت <b>..........</b> روز و به مبلغ
-    <b>................</b> تومان برگزار می‌شود، اعلام می‌دارم.
+    اینجانب ولی دانش‌آموز <b><?php echo $esc($name !== '' ? $name : '................................'); ?></b>
+    <?php echo $sentence; ?>
   </div>
-  <div style="position:relative;margin-top:1.5mm">
-    <div style="border:0.25mm solid #475569;height:22mm;padding:1.5mm;font-size:7.4pt;color:#334155">توضیحات:</div>
-    <?php if ($stamp !== ''): ?>
-      <img src="<?php echo htmlspecialchars($stamp, ENT_QUOTES, 'UTF-8'); ?>" alt=""
-           style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:30mm;opacity:.3;pointer-events:none">
-    <?php endif; ?>
+  <div<?php echo $optC('notes', 'margin-top:1.5mm'); ?>>
+    <div style="border:0.25mm solid #475569;height:20mm;padding:1.5mm;font-size:7.4pt;color:#334155;overflow:hidden">
+      <?php if (sf_show($opts, 'notes')): ?><span style="font-weight:700">توضیحات:</span><?php endif; ?>
+      <span data-sfe="notes" style="white-space:pre-line"><?php if (sf_show($opts, 'notes')) echo $esc(trim((string)($opts['notes'] ?? ''))); ?></span>
+    </div>
   </div>
-  <div style="display:flex;justify-content:space-between;font-size:7.6pt;margin-top:1.5mm;color:#334155">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;font-size:7.6pt;margin-top:1.5mm;color:#334155">
     <span>محل امضا و اثر انگشت ولی دانش‌آموز</span>
-    <span>امضای مدیر / مهر مدرسه</span>
+    <span style="position:relative;display:inline-block;padding:0 2mm">
+      امضای مدیر / مهر مدرسه
+      <?php if ($stamp !== ''): ?>
+        <img src="<?php echo $esc($stamp); ?>" alt="" class="sfe-stamp"
+             style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:26mm;max-height:12mm;object-fit:contain;opacity:.9;pointer-events:none;mix-blend-mode:multiply">
+      <?php endif; ?>
+    </span>
+    <span aria-hidden="true" style="width:1px"></span>
   </div>
 </div>
             <?php
             $blocks[] = ob_get_clean();
         }
+        return $blocks;
+    }
+}
+
+if (!function_exists('sf_render_camp_consent')) {
+    /**
+     * رضایت‌نامهٔ اردو — چهار برگه در هر صفحه A4.
+     *
+     * v4.181.0: بر پایهٔ بازخورد کارفرما —
+     *   • سرصفحه به‌جای «تاریخ» عنوان «سال تحصیلی» را نشان می‌دهد.
+     *   • عنوان اردو، تاریخ، ساعت، مبدأ، مقصد، مدت، مبلغ و توضیحات از ورودی
+     *     کاربر می‌آید و هر کدام کلید نمایش مستقل دارد.
+     *   • امضای مدیر به‌صورت پوشش (overlay) روی «امضای مدیر / مهر مدرسه»
+     *     می‌افتد، نه وسط کادر توضیحات.
+     */
+    function sf_render_camp_consent(array $students, $ctx, $autoPrint = false, $blank = false, array $opts = []) {
+        if (!$opts) $opts = sf_form_defaults('consent');
+        $blocks = sf_camp_blocks($students, $ctx, $blank, $opts);
         /* چهار برگه در هر صفحه */
         $out = sf_head('رضایت‌نامهٔ اردو');
         $out .= '<style>.sheet{padding:7mm 8mm}.blk+.blk{margin-top:4mm}</style>';  /* ۶۲×۴ + ۳×۴ = ۲۶۰ میلی‌متر */

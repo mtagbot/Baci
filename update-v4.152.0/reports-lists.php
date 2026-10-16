@@ -18,6 +18,7 @@ require_once __DIR__ . '/includes/docx_class_list.php';
 require_once __DIR__ . '/includes/docx_school_list.php';
 require_once __DIR__ . '/includes/photo_album.php';
 require_once __DIR__ . '/includes/school_forms.php';   /* v4.176.0: فرم‌های اداری از قالب‌های .mrt */
+require_once __DIR__ . '/includes/school_form_editor.php';  /* v4.181.0: ویرایشگر زندهٔ دعوتنامه/رضایت‌نامه */
 require_once __DIR__ . '/includes/academic_year_helpers.php';
 
 /* v4.169.0: معاون اجرایی هم به «لیست‌ها و گزارشات» دسترسی کامل دارد
@@ -131,6 +132,30 @@ if ($action === 'photo_album_pdf') {
      mode=students → «چاپ کل دانش‌آموزان»: نام دانش‌آموزان روی برگه
    و دو گستره:
      class=… → یک کلاس   |   grade=… → یک پایه   |   scope=all → کل مدرسه */
+/* ═══ v4.181.0: ویرایشگر زندهٔ دو فرم نامه‌ای ═══
+   کاربر مقادیر را در همان صفحه وارد می‌کند، پیش‌نمایش برگه‌ها زنده عوض می‌شود و
+   «ذخیرهٔ پیش‌فرض» آنها را برای جلسهٔ بعد نگه می‌دارد. */
+if (in_array($action, ['anjoman_editor', 'camp_editor'], true)) {
+    $form     = ($action === 'camp_editor') ? 'consent' : 'anjoman';
+    $mode     = (trim($_GET['mode'] ?? 'students') === 'blank') ? 'blank' : 'students';
+    $scope    = trim($_GET['scope'] ?? '');
+    $gradeQ   = trim($_GET['grade'] ?? '');
+    $className = trim($_GET['class'] ?? '');
+    $ctx = sf_context();
+    $blank = ($mode === 'blank');
+    if ($scope === 'all' || $gradeQ !== '') {
+        $students = $scope === 'all' ? sf_all_students($year) : sf_students_of_grade($gradeQ, $year);
+    } else {
+        if ($className === '') { set_flash_message('error', 'کلاس انتخاب نشده است.'); redirect('reports-lists.php?tab=forms'); }
+        $students = sf_students_of_class($className, $year);
+        if (!$students && !$blank) { set_flash_message('error', 'برای کلاس ' . $className . ' دانش‌آموز فعالی ثبت نشده است.'); redirect('reports-lists.php?tab=forms'); }
+    }
+    $grade = '';
+    foreach ($classes as $c) if (norm_class_str($c['class_name']) === norm_class_str($className)) { $grade = $c['grade_level']; break; }
+    echo sfe_render($form, ['class' => $className, 'grade' => $gradeQ, 'scope' => $scope, 'mode' => $mode], $students, $grade, $className, $ctx);
+    exit;
+}
+
 if (in_array($action, ['absents_form', 'amanat_form', 'anjoman_letter', 'camp_consent'], true)) {
     $mode    = (trim($_GET['mode'] ?? 'students') === 'blank') ? 'blank' : 'students';
     $scope   = trim($_GET['scope'] ?? '');
@@ -161,9 +186,9 @@ if (in_array($action, ['absents_form', 'amanat_form', 'anjoman_letter', 'camp_co
         } elseif ($action === 'amanat_form') {
             echo sf_render_amanat_form($students, $ctx, $autoPrint, $blank, '');
         } elseif ($action === 'anjoman_letter') {
-            echo sf_render_anjoman_letter($students, $ctx, $autoPrint, $blank);
+            echo sf_render_anjoman_letter($students, $ctx, $autoPrint, $blank, sf_form_defaults('anjoman'));
         } else {
-            echo sf_render_camp_consent($students, $ctx, $autoPrint, $blank);
+            echo sf_render_camp_consent($students, $ctx, $autoPrint, $blank, sf_form_defaults('consent'));
         }
         exit;
     }
@@ -175,8 +200,8 @@ if (in_array($action, ['absents_form', 'amanat_form', 'anjoman_letter', 'camp_co
     if (!$students && !$blank) { set_flash_message('error', 'برای کلاس ' . $className . ' دانش‌آموز فعالی ثبت نشده است.'); redirect('reports-lists.php?tab=forms'); }
     if ($action === 'absents_form')       echo sf_render_absents_form($className, $grade, $students, $ctx, $autoPrint, $blank);
     elseif ($action === 'amanat_form')    echo sf_render_amanat_form($students, $ctx, $autoPrint, $blank, $className);
-    elseif ($action === 'anjoman_letter') echo sf_render_anjoman_letter($students, $ctx, $autoPrint, $blank);
-    else                                  echo sf_render_camp_consent($students, $ctx, $autoPrint, $blank);
+    elseif ($action === 'anjoman_letter') echo sf_render_anjoman_letter($students, $ctx, $autoPrint, $blank, sf_form_defaults('anjoman'));
+    else                                  echo sf_render_camp_consent($students, $ctx, $autoPrint, $blank, sf_form_defaults('consent'));
     exit;
 }
 
@@ -450,6 +475,12 @@ require_once __DIR__ . '/includes/header.php';
                        href="reports-lists.php?action=<?php echo $act; ?>&amp;scope=all&amp;mode=students"
                        title="یک برگه برای هر دانش‌آموز مدرسه"><?php echo $lbl; ?> — کل مدرسه</a>
                 <?php endforeach; ?>
+                <a class="btn btn-primary text-xs" target="_blank" rel="noopener"
+                   href="reports-lists.php?action=anjoman_editor&amp;scope=all&amp;mode=blank"
+                   title="مقادیر این جلسه را وارد کنید و پیش‌نمایش زنده ببینید">دعوتنامهٔ انجمن — ویرایش متن و فیلدها</a>
+                <a class="btn btn-warning text-xs" target="_blank" rel="noopener"
+                   href="reports-lists.php?action=camp_editor&amp;scope=all&amp;mode=blank"
+                   title="مقادیر این اردو را وارد کنید و پیش‌نمایش زنده ببینید">رضایت‌نامهٔ اردو — ویرایش متن و فیلدها</a>
             </div>
             <div class="text-xs text-muted" style="margin-top:6px;line-height:2">
                 «کل مدرسه» برای هر دانش‌آموز یک برگه می‌سازد (دعوتنامه دو تا و رضایت‌نامه چهار تا در هر برگه).
@@ -490,10 +521,12 @@ require_once __DIR__ . '/includes/header.php';
                                 <td>
                                     <a class="btn btn-outline text-xs" target="_blank" rel="noopener" href="<?php echo $link('anjoman_letter'); ?>&amp;mode=blank">پایه</a>
                                     <a class="btn btn-accent text-xs" target="_blank" rel="noopener" href="<?php echo $link('anjoman_letter'); ?>&amp;mode=students">کل دانش‌آموزان</a>
+                                    <a class="btn btn-primary text-xs" target="_blank" rel="noopener" title="مقادیر این جلسه را وارد کنید؛ پیش‌نمایش زنده" href="reports-lists.php?action=anjoman_editor&amp;class=<?php echo urlencode($cn); ?>&amp;mode=blank">ویرایش متن و فیلدها</a>
                                 </td>
                                 <td>
                                     <a class="btn btn-outline text-xs" target="_blank" rel="noopener" href="<?php echo $link('camp_consent'); ?>&amp;mode=blank">پایه</a>
                                     <a class="btn btn-accent text-xs" target="_blank" rel="noopener" href="<?php echo $link('camp_consent'); ?>&amp;mode=students">کل دانش‌آموزان</a>
+                                    <a class="btn btn-warning text-xs" target="_blank" rel="noopener" title="مقادیر این اردو را وارد کنید؛ پیش‌نمایش زنده" href="reports-lists.php?action=camp_editor&amp;class=<?php echo urlencode($cn); ?>&amp;mode=blank">ویرایش متن و فیلدها</a>
                                 </td>
                             <?php endif; ?>
                         </tr>
@@ -502,9 +535,11 @@ require_once __DIR__ . '/includes/header.php';
                 </table>
             </div>
             <p class="text-xs text-muted" style="margin-top:10px;line-height:2">
-                «برگهٔ حضور و غیاب» یک هفته کامل است: شنبه تا پنجشنبه، هر روز سه زنگ. «دعوتنامهٔ انجمن» دو تا و
-                «رضایت‌نامهٔ اردو» چهار تا در هر برگه A4 چاپ می‌شود. «فرم کتاب» یک برگهٔ خالی با ستون
-                «نام دریافت کننده» است.
+                «برگهٔ حضور و غیاب» یک برگهٔ A4 با شش کادر روز (شنبه تا پنجشنبه) است؛ هر کادر سه ردیف زنگ با
+                ستون‌های «اسامی غایبین» و «امضای دبیر» دارد. «دعوتنامهٔ انجمن» دو تا و «رضایت‌نامهٔ اردو» چهار تا
+                در هر برگه A4 چاپ می‌شود و مقادیرشان (اردو، تاریخ، ساعت، مبدأ، مقصد، مدت، مبلغ، توضیحات،
+                فهرست برنامه‌ها، زمان و مکان جلسه) از «ویرایش متن و فیلدها» می‌آید. «فرم کتاب» یک برگهٔ خالی با
+                ستون «نام دریافت کننده» است.
             </p>
         <?php endif; ?>
     </div>
