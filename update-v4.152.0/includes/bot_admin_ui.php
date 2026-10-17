@@ -10,19 +10,20 @@ require_once __DIR__ . '/school_sort.php';
 
 if (!function_exists('bot_admin_platform_title')) {
     function bot_admin_platform_title($platform) {
-        return bot_valid_platform($platform) === 'telegram' ? 'تلگرام' : 'بله';
+        return bot_platform_label($platform);
     }
 }
 
 if (!function_exists('bot_admin_webhook_file')) {
+    /** هر پیام‌رسان فایل وبهوک خودش را دارد: <platform>-webhook.php */
     function bot_admin_webhook_file($platform) {
-        return bot_valid_platform($platform) === 'telegram' ? 'telegram-webhook.php' : 'bale-webhook.php';
+        return bot_valid_platform($platform) . '-webhook.php';
     }
 }
 
 if (!function_exists('bot_admin_page_file')) {
     function bot_admin_page_file($platform) {
-        return bot_valid_platform($platform) === 'telegram' ? 'telegram-bot.php' : 'bale-bot.php';
+        return bot_valid_platform($platform) . '-bot.php';
     }
 }
 
@@ -237,8 +238,8 @@ if (!function_exists('bot_admin_render_page')) {
         $title = bot_admin_platform_title($platform);
         $page = bot_admin_page_file($platform);
         $userTable = bot_user_table($platform);
-        $chatCol = $platform === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
-        $usernameCol = $platform === 'telegram' ? 'telegram_username' : 'bale_username';
+        $chatCol = bot_chat_column($platform);
+        $usernameCol = bot_username_column($platform);
         $token = get_setting(bot_token_key($platform), '');
         $adminSecret = get_setting('admin_bot_login_secret', '');
         if ($adminSecret === '') { $adminSecret = bin2hex(random_bytes(8)); set_setting('admin_bot_login_secret', $adminSecret); }
@@ -284,7 +285,9 @@ if (!function_exists('bot_admin_render_page')) {
             <p class="text-sm text-muted">احراز هویت اولیا، دریافت کارنامه تصویری، ارسال هدفمند و سفارشی‌سازی متن‌ها/دکمه‌ها</p>
         </div>
         <div class="flex gap-2">
-            <a href="<?php echo $platform === 'telegram' ? 'bale-bot.php' : 'telegram-bot.php'; ?>" class="btn btn-secondary text-xs">رفتن به ربات <?php echo $platform === 'telegram' ? 'بله' : 'تلگرام'; ?></a>
+            <?php foreach (bot_platforms() as $otherPf): if ($otherPf === $platform) continue; ?>
+            <a href="<?php echo clean(bot_admin_page_file($otherPf)); ?>" class="btn btn-secondary text-xs">رفتن به ربات <?php echo clean(bot_platform_label($otherPf)); ?></a>
+            <?php endforeach; ?>
             <a href="sms-panel.php" class="btn btn-outline text-xs">بازگشت</a>
         </div>
     </div>
@@ -329,6 +332,16 @@ if (!function_exists('bot_admin_render_page')) {
                         <li>دکمه «ثبت خودکار Webhook» را بزنید — این‌بار درخواست از طریق واسط به تلگرام می‌رسد.</li>
                     </ol>
                     <p class="text-muted">نکته: واسط فقط تماس‌های «خروجی» سایت شما را حل می‌کند. اگر بعد از ثبت وبهوک، ربات همچنان به پیام‌ها جواب نداد و در getWebhookInfo خطای Connection timed out از سمت تلگرام دیدید، یعنی هاست شما ترافیک «ورودی» خارجی را هم بسته است — در این حالت از بخش «دریافت پیام‌ها با Cron» پایین همین ستون استفاده کنید. اگر دامنه workers.dev هم روی هاست شما بسته بود، می‌توانید یک دامنه دلخواه به همان Worker وصل کنید یا واسط را روی هر هاست خارجی دیگری (یک فایل PHP ساده) قرار دهید.</p>
+                </div>
+            </details>
+            <?php endif; ?>
+            <?php if ($platform === 'soroush'): ?>
+            <details class="soft-panel text-xs">
+                <summary class="font-bold cursor-pointer">راهنما: ساخت ربات سروش پلاس</summary>
+                <div class="space-y-2 mt-2">
+                    <p>در سروش پلاس به <b>splus.ir/botfather</b> بروید، یک ربات بسازید و توکنی مثل <code class="dir-ltr">123456:ABC-DEF…</code> بگیرید؛ همان را در فیلد «توکن ربات» بالا ذخیره کنید.</p>
+                    <p>آدرس وبهوک باید روی پورت‌های <b class="dir-ltr">443 / 80 / 88 / 8443</b> در دسترس باشد. اگر هاست شما ترافیک ورودی خارجی را می‌بندد، «ثبت خودکار Webhook» خطا می‌دهد؛ در آن صورت با پشتیبانی هاست یا یک واسط، دسترسی ورودی را باز کنید.</p>
+                    <p class="text-muted">سروش پلاس فعلاً متدهای <code class="dir-ltr">getChat</code> و <code class="dir-ltr">leaveChat</code> را در API ربات ندارد؛ پس در تب «گروه‌ها و کانال‌ها» فقط گفتگوهایی که پیام فرستاده‌اند دیده می‌شوند و دکمهٔ خروج/افزودن دستی برای این پیام‌رسان نمایش داده نمی‌شود.</p>
                 </div>
             </details>
             <?php endif; ?>

@@ -1,28 +1,75 @@
 <?php
 // File: includes/bot_helpers.php
 /**
- * Shared Bale/Telegram bot helpers: schema migration, API wrappers, templates,
- * targeting, and report-image delivery.
+ * Shared Bale/Telegram/Soroush bot helpers: schema migration, API wrappers,
+ * templates, targeting, and report-image delivery.
  */
 
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/report_image.php';
 
+if (!function_exists('bot_platforms')) {
+    /** v4.185.0: پیام‌رسان‌های پشتیبانی‌شده — نسخهٔ دسکتاپ. */
+    function bot_platforms() {
+        return ['bale', 'telegram', 'soroush'];
+    }
+}
+
+if (!function_exists('bot_platform_labels')) {
+    function bot_platform_labels() {
+        return ['bale' => 'بله', 'telegram' => 'تلگرام', 'soroush' => 'سروش پلاس'];
+    }
+}
+
+if (!function_exists('bot_platform_label')) {
+    function bot_platform_label($platform) {
+        $labels = bot_platform_labels();
+        return $labels[bot_valid_platform($platform)] ?? 'بله';
+    }
+}
+
 if (!function_exists('bot_valid_platform')) {
     function bot_valid_platform($platform) {
-        return in_array($platform, ['bale', 'telegram'], true) ? $platform : 'bale';
+        return in_array($platform, bot_platforms(), true) ? $platform : 'bale';
     }
 }
 
 if (!function_exists('bot_user_table')) {
     function bot_user_table($platform) {
-        return bot_valid_platform($platform) === 'telegram' ? 'telegram_bot_users' : 'bale_bot_users';
+        return bot_valid_platform($platform) . '_bot_users';
     }
 }
 
 if (!function_exists('bot_state_table')) {
     function bot_state_table($platform) {
-        return bot_valid_platform($platform) === 'telegram' ? 'telegram_bot_state' : 'bale_bot_state';
+        return bot_valid_platform($platform) . '_bot_state';
+    }
+}
+
+if (!function_exists('bot_chat_column')) {
+    function bot_chat_column($platform) {
+        return bot_valid_platform($platform) . '_chat_id';
+    }
+}
+
+if (!function_exists('bot_username_column')) {
+    function bot_username_column($platform) {
+        return bot_valid_platform($platform) . '_username';
+    }
+}
+
+if (!function_exists('bot_migrate_platform_enum')) {
+    /** MySQL-only; SQLite enum ندارد. */
+    function bot_migrate_platform_enum($table, $column, $definition) {
+        try {
+            $pdo = DB::getInstance()->getPdo();
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'mysql') return;
+            if (!preg_match('/^[a-z_]+$/', (string)$table) || !preg_match('/^[a-z_]+$/', (string)$column)) return;
+            $col = DB::fetch("SHOW COLUMNS FROM `$table` LIKE ?", [(string)$column]);
+            $type = strtolower((string)($col['Type'] ?? ''));
+            if ($type === '' || strpos($type, "'soroush'") !== false) return;
+            DB::execute("ALTER TABLE `$table` MODIFY `$column` " . $definition);
+        } catch (Throwable $e) { error_log('bot platform enum migration: ' . $e->getMessage()); }
     }
 }
 
@@ -37,8 +84,8 @@ if (!function_exists('ensure_bot_schema')) {
         $platform = bot_valid_platform($platform);
         $userTable = bot_user_table($platform);
         $stateTable = bot_state_table($platform);
-        $chatCol = $platform === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
-        $usernameCol = $platform === 'telegram' ? 'telegram_username' : 'bale_username';
+        $chatCol = bot_chat_column($platform);
+        $usernameCol = bot_username_column($platform);
 
         DB::execute("CREATE TABLE IF NOT EXISTS `$userTable` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -62,7 +109,7 @@ if (!function_exists('ensure_bot_schema')) {
 
         DB::execute("CREATE TABLE IF NOT EXISTS `bot_message_templates` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
-            `platform` enum('bale','telegram') NOT NULL,
+            `platform` enum('bale','telegram','soroush') NOT NULL,
             `template_key` varchar(80) NOT NULL,
             `template_text` text NOT NULL,
             `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -72,7 +119,7 @@ if (!function_exists('ensure_bot_schema')) {
 
         DB::execute("CREATE TABLE IF NOT EXISTS `bot_button_templates` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
-            `platform` enum('bale','telegram') NOT NULL,
+            `platform` enum('bale','telegram','soroush') NOT NULL,
             `button_key` varchar(80) NOT NULL,
             `button_text` varchar(150) NOT NULL,
             `sort_order` int(11) NOT NULL DEFAULT 0,
@@ -85,7 +132,7 @@ if (!function_exists('ensure_bot_schema')) {
 
         DB::execute("CREATE TABLE IF NOT EXISTS `bot_message_logs` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
-            `platform` enum('bale','telegram') NOT NULL,
+            `platform` enum('bale','telegram','soroush') NOT NULL,
             `chat_id` varchar(80) NOT NULL,
             `student_id` int(11) DEFAULT NULL,
             `message_type` varchar(50) DEFAULT 'text',
@@ -98,6 +145,14 @@ if (!function_exists('ensure_bot_schema')) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
         try { DB::execute("ALTER TABLE `$stateTable` ADD COLUMN temp_payload text DEFAULT NULL"); } catch (Exception $e) {}
+        /* v4.185.0: enumهای قدیمی ('bale','telegram') سروش را نمی‌پذیرند. */
+        static $enumMigrated = false;
+        if (!$enumMigrated) {
+            $enumMigrated = true;
+            foreach (['bot_message_templates', 'bot_button_templates', 'bot_message_logs'] as $tbl) {
+                bot_migrate_platform_enum($tbl, 'platform', "enum('bale','telegram','soroush') NOT NULL");
+            }
+        }
         bot_seed_templates($platform);
     }
 }
@@ -217,6 +272,7 @@ if (!function_exists('bot_api_endpoint')) {
             if ($base === '') $base = 'https://api.telegram.org';
             return $base . "/bot{$token}/{$method}";
         }
+        if ($platform === 'soroush') return "https://api.splus.ir/bot{$token}/{$method}";
         return "https://tapi.bale.ai/bot{$token}/{$method}";
     }
 }
@@ -344,7 +400,7 @@ if (!function_exists('bot_target_recipients')) {
         ensure_bot_schema($platform);
         $platform = bot_valid_platform($platform);
         $table = bot_user_table($platform);
-        $chatCol = $platform === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
+        $chatCol = bot_chat_column($platform);
         $base = "SELECT DISTINCT b.`$chatCol` AS chat_id, s.id AS student_id, s.first_name, s.last_name, s.national_id, s.grade_level, s.class_name FROM `$table` b JOIN students s ON s.id = b.student_id WHERE s.status = 'active'";
         // v4.77.0: true Persian collation (آ before ا) applied after fetch
         /* v4.89.0: دو مخاطب جدید — «همه دبیران» و «یک دبیر خاص».
@@ -540,11 +596,11 @@ if (!function_exists('notify_student_attendance_bots')) {
         if ($isLate && trim((string)$scanTime) !== '') {
             $line .= "\n" . 'ساعت دقیق ورود به مدرسه: ' . tr_num(trim((string)$scanTime), 'fa');
         }
-        foreach (['bale', 'telegram'] as $platform) {
+        foreach (bot_platforms() as $platform) {
             try {
                 ensure_bot_schema($platform);
                 $table = bot_user_table($platform);
-                $chatCol = $platform === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
+                $chatCol = bot_chat_column($platform);
                 $rows = DB::fetchAll("SELECT DISTINCT b.`$chatCol` AS chat_id, s.first_name, s.last_name FROM `$table` b JOIN students s ON s.id=b.student_id WHERE b.student_id=?", [(int)$studentId]);
                 foreach ($rows as $r) {
                     $msg = $title . "\n"
@@ -702,7 +758,7 @@ if (!function_exists('bot_migrate_to_latest_year')) {
             // v4.46.0: fetch link_id, current student_id and chat_id in a single
             // query and compare student ids correctly (the old code compared the
             // student id against the link id and re-queried the table per row).
-            $chatCol = $platform === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
+            $chatCol = bot_chat_column($platform);
             $rows = DB::fetchAll("SELECT b.id AS link_id, b.student_id AS current_student_id, b.`$chatCol` AS chat_id, s.national_id FROM `$userTable` b JOIN students s ON s.id=b.student_id WHERE s.national_id<>''");
             foreach ($rows as $r) {
                 $latest = get_latest_student_by_national_id($r['national_id']);
@@ -729,8 +785,8 @@ if (!function_exists('bot_link_student')) {
         ensure_bot_schema($platform);
         $platform = bot_valid_platform($platform);
         $table = bot_user_table($platform);
-        $chatCol = $platform === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
-        $usernameCol = $platform === 'telegram' ? 'telegram_username' : 'bale_username';
+        $chatCol = bot_chat_column($platform);
+        $usernameCol = bot_username_column($platform);
         $exists = DB::fetch("SELECT id FROM `$table` WHERE `$chatCol` = ? AND student_id = ?", [(string)$chatId, (int)$studentId]);
         if ($exists) {
             DB::execute("UPDATE `$table` SET `$usernameCol` = ? WHERE id = ?", [(string)$username, (int)$exists['id']]);
@@ -786,7 +842,7 @@ if (!function_exists('counseling_resolve_students')) {
         $out = [];
         if (!$reqs) return $out;
         ensure_counseling_schema();
-        $ids = []; $chats = ['bale' => [], 'telegram' => []];
+        $ids = []; $chats = array_fill_keys(bot_platforms(), []);
         foreach ($reqs as $r) {
             $rid = (int)$r['id'];
             $out[$rid] = null;
@@ -806,10 +862,10 @@ if (!function_exists('counseling_resolve_students')) {
             } catch (Throwable $e) {}
         }
         /* ۲) اتصال چت ولی در جدول لینک همان پلتفرم */
-        foreach (['bale', 'telegram'] as $p) {
+        foreach (bot_platforms() as $p) {
             if (!$chats[$p]) continue;
             $table = bot_user_table($p);
-            $chatCol = $p === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
+            $chatCol = bot_chat_column($p);
             $marks = implode(',', array_fill(0, count($chats[$p]), '?'));
             try {
                 ensure_bot_schema($p);
@@ -845,7 +901,7 @@ if (!function_exists('counseling_notify_counselors')) {
             ensure_bot_schema('bale');
             $counselors = DB::fetchAll("SELECT id FROM teachers WHERE is_counselor=1 AND status=1");
             foreach ($counselors as $c) {
-                foreach (['bale', 'telegram'] as $platform) {
+                foreach (bot_platforms() as $platform) {
                     try {
                         ensure_bot_schema($platform);
                         $sessions = DB::fetchAll("SELECT chat_id FROM bot_admin_sessions WHERE platform=? AND teacher_id=? AND role_type='teacher' AND is_active=1", [$platform, (int)$c['id']]);

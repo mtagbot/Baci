@@ -50,7 +50,7 @@ const SYNC_TABLES = [
     'online_exam_categories','online_question_categories','online_question_bank',
     'online_exams','online_questions','online_exam_attempts','online_exam_answers',
     'grade_messages','counseling_requests','student_attendance','student_qr_tags',
-    'bale_bot_users','telegram_bot_users','bot_admin_sessions',
+    'bale_bot_users','telegram_bot_users','soroush_bot_users','bot_admin_sessions',
     'bot_message_templates','bot_button_templates','bot_login_tokens','bot_message_logs',
     'activity_logs','notifications','sms_logs','report_parent_reviews',
     'settings',

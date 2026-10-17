@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['retry_bot_outbox'])) 
 }
 
 require_once __DIR__ . '/includes/header.php';
-$queueTitles = ['bale' => 'بله', 'telegram' => 'تلگرام'];
+$queueTitles = bot_platform_labels();
 ?>
 <div class="space-y-6">
     <div class="page-hero flex justify-between items-center">
@@ -43,8 +43,9 @@ $queueTitles = ['bale' => 'بله', 'telegram' => 'تلگرام'];
             <p class="text-sm text-muted">پیام‌های متنی همهٔ نقش‌ها پس از قطعی حفظ می‌شوند. «در صف» به معنی تحویل به پیام‌رسان نیست.</p>
         </div>
         <div class="flex gap-2">
-            <a href="bot-queue.php?platform=bale" class="btn <?php echo $queuePlatform === 'bale' ? 'btn-primary' : 'btn-secondary'; ?> text-xs">بله</a>
-            <a href="bot-queue.php?platform=telegram" class="btn <?php echo $queuePlatform === 'telegram' ? 'btn-primary' : 'btn-secondary'; ?> text-xs">تلگرام</a>
+            <?php foreach ($queueTitles as $pfKey => $pfLabel): ?>
+            <a href="bot-queue.php?platform=<?php echo clean($pfKey); ?>" class="btn <?php echo $queuePlatform === $pfKey ? 'btn-primary' : 'btn-secondary'; ?> text-xs"><?php echo clean($pfLabel); ?></a>
+            <?php endforeach; ?>
             <a href="other-settings.php" class="btn btn-outline text-xs">بازگشت به تنظیمات دیگر</a>
         </div>
     </div>

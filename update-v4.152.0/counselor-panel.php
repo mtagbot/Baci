@@ -40,12 +40,12 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['reply_request'])) {
     if ($reply !== '') {
         DB::execute("INSERT INTO counseling_messages (request_id, sender, sender_id, body, created_at_jalali) VALUES (?, 'counselor', ?, ?, ?)", [$id, $teacherId, $reply, jalali_now()]);
     }
-    if ($reqRow && in_array($reqRow['platform'], ['bale','telegram'], true) && trim((string)$reqRow['chat_id']) !== '') {
+    if ($reqRow && in_array($reqRow['platform'], bot_platforms(), true) && trim((string)$reqRow['chat_id']) !== '') {
         $msgBody = "🧭 پاسخ مشاور به درخواست #" . tr_num($id,'fa') . ":\n" . ($reply !== '' ? $reply : '(بدون متن — وضعیت: ' . $status . ')') . "\n\nبرای ادامهٔ گفتگو دکمهٔ «پاسخ» را بزنید.";
         $kbReply = ['inline_keyboard' => [[['text' => '💬 پاسخ', 'callback_data' => 'counselreply_' . $id]]]];
         try { bot_send_message($reqRow['platform'], $reqRow['chat_id'], $msgBody, $kbReply); } catch (Throwable $e) {}
     }
-    set_flash_message('success','پاسخ/وضعیت درخواست مشاوره ذخیره شد.' . ($reply !== '' && $reqRow && in_array($reqRow['platform'], ['bale','telegram'], true) ? ' پیام پاسخ در صف ارسال ربات قرار گرفت.' : ''));
+    set_flash_message('success','پاسخ/وضعیت درخواست مشاوره ذخیره شد.' . ($reply !== '' && $reqRow && in_array($reqRow['platform'], bot_platforms(), true) ? ' پیام پاسخ در صف ارسال ربات قرار گرفت.' : ''));
     redirect('counselor-panel.php?tab=requests');
 }
 

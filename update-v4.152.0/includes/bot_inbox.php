@@ -144,7 +144,7 @@ if (!function_exists('bot_inbox_student_id')) {
         try {
             $table = function_exists('bot_user_table') ? bot_user_table($platform) : '';
             if ($table === '') return null;
-            $col = $platform === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
+            $col = bot_chat_column($platform);
             $row = DB::fetch("SELECT student_id FROM `$table` WHERE `$col` = ? LIMIT 1", [(string)$chatId]);
             $sid = (int)($row['student_id'] ?? 0);
             return $sid > 0 ? $sid : null;

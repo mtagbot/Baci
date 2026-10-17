@@ -26,7 +26,7 @@
 if (!function_exists('bot_login_platform_fa')) {
     /** نام فارسی پیام‌رسان — در متن پیام‌ها استفاده می‌شود. */
     function bot_login_platform_fa($platform) {
-        return bot_valid_platform($platform) === 'telegram' ? 'تلگرام' : 'بله';
+        return bot_platform_label($platform);
     }
 }
 
@@ -78,7 +78,7 @@ if (!function_exists('bot_login_ask_admin_password')) {
     function bot_login_ask_admin_password($platform, $chatId, array $admin, $username) {
         $platform = bot_valid_platform($platform);
         $stateTable = bot_state_table($platform);
-        $chatCol = $platform === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
+        $chatCol = bot_chat_column($platform);
         $username = (string)$username;
         DB::execute("REPLACE INTO `$stateTable` (`$chatCol`, step, temp_nid, temp_payload) VALUES (?, 'admin_password', ?, NULL)",
                     [$chatId, $username]);

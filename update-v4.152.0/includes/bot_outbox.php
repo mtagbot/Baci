@@ -40,7 +40,7 @@ function bot_outbox_sql($sql,$params=[]) {
     $st=DB::getInstance()->getPdo()->prepare($sql);$st->execute($params);return $st;
 }
 function bot_outbox_payload($platform,$payload) {
-    if(!in_array($platform,['telegram','bale'],true)||!is_array($payload))throw new InvalidArgumentException('Invalid notification platform/payload');
+    if(!in_array($platform,['telegram','bale','soroush'],true)||!is_array($payload))throw new InvalidArgumentException('Invalid notification platform/payload');
     if(array_diff(array_keys($payload),['chat_id','text','reply_markup']))throw new InvalidArgumentException('Invalid notification fields');
     if(!isset($payload['chat_id'],$payload['text'])||!is_string($payload['chat_id'])||!is_string($payload['text'])||$payload['chat_id']===''||strlen($payload['chat_id'])>80||$payload['text']==='')throw new InvalidArgumentException('Invalid notification recipient/text');
     if(isset($payload['reply_markup'])&&!is_array($payload['reply_markup']))throw new InvalidArgumentException('Invalid keyboard');
@@ -200,7 +200,7 @@ function bot_outbox_apply_receipts($jobs,$receipts) {
    دانش‌آموزان متصلِ هر چت از جدول اتصال همان پلتفرم نشان داده می‌شوند.
    این تابع فقط گزارش می‌دهد؛ صف و وضعیت jobها را تغییر نمی‌دهد. */
 function bot_outbox_blocked_chats($platform) {
-    if (!in_array($platform, ['telegram', 'bale'], true)) return [];
+    if (!in_array($platform, ['telegram','bale','soroush'], true)) return [];
     bot_outbox_schema();
     $rows = bot_outbox_sql("SELECT payload, attempts FROM bot_outbox WHERE platform=? AND state<>'sent' AND last_error LIKE '%HTTP 403%'", [$platform])->fetchAll(PDO::FETCH_ASSOC);
     $chats = [];
@@ -215,8 +215,8 @@ function bot_outbox_blocked_chats($platform) {
     if (!$chats) return [];
     /* همان قرارداد نام‌گذاری bot_user_table() — عمداً محلی نگه داشته شده تا این
        گزارش بدون بارگذاری کامل هلپرهای ربات هم کار کند. */
-    $table   = $platform === 'telegram' ? 'telegram_bot_users' : 'bale_bot_users';
-    $chatCol = $platform === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
+    $table   = function_exists('bot_user_table') ? bot_user_table($platform) : ($platform . '_bot_users');
+    $chatCol = function_exists('bot_chat_column') ? bot_chat_column($platform) : ($platform . '_chat_id');
     $marks = implode(',', array_fill(0, count($chats), '?'));
     try {
         $srows = DB::fetchAll("SELECT b.`$chatCol` AS chat_id, s.first_name, s.last_name, s.class_name FROM `$table` b JOIN students s ON s.id=b.student_id WHERE b.`$chatCol` IN ($marks)", array_keys($chats));
@@ -256,7 +256,7 @@ function bot_outbox_chat_like($chatId) {
    برای همان chat_id کافی است). */
 function bot_outbox_chat_is_blocked($platform, $chatId) {
     $chatId = trim((string)$chatId);
-    if ($chatId === '' || !in_array($platform, ['telegram', 'bale'], true)) return false;
+    if ($chatId === '' || !in_array($platform, ['telegram','bale','soroush'], true)) return false;
     try {
         $hit = bot_outbox_sql("SELECT job_id FROM bot_outbox WHERE platform=? AND owner='local' AND state='blocked' AND payload LIKE ? LIMIT 1", [$platform, bot_outbox_chat_like($chatId)])->fetch(PDO::FETCH_ASSOC);
         return (bool)$hit;
@@ -269,7 +269,7 @@ function bot_outbox_chat_is_blocked($platform, $chatId) {
    یا تغییر نمی‌شوند. */
 function bot_outbox_prune_blocked_chat($platform, $chatId, $cap = BOT_OUTBOX_BLOCKED_CAP) {
     $chatId = trim((string)$chatId);
-    if ($chatId === '' || !in_array($platform, ['telegram', 'bale'], true)) return 0;
+    if ($chatId === '' || !in_array($platform, ['telegram','bale','soroush'], true)) return 0;
     bot_outbox_schema();
     $cap = max(1, (int)$cap);
     $like = bot_outbox_chat_like($chatId);
@@ -294,7 +294,7 @@ function bot_outbox_prune_blocked_chat($platform, $chatId, $cap = BOT_OUTBOX_BLO
    جریان اتصال اولیا اثر بگذارد. jobهای رله (دسکتاپ) دست‌نخورده می‌مانند. */
 function bot_outbox_unblock_chat($platform, $chatId, $limit = BOT_OUTBOX_WAKE_LIMIT) {
     $chatId = trim((string)$chatId);
-    if ($chatId === '' || !in_array($platform, ['telegram', 'bale'], true)) return 0;
+    if ($chatId === '' || !in_array($platform, ['telegram','bale','soroush'], true)) return 0;
     bot_outbox_schema();
     $limit = max(1, min(200, (int)$limit));
     $like = bot_outbox_chat_like($chatId);

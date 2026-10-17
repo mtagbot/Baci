@@ -306,7 +306,7 @@ if (!function_exists('att_test_scan_message')) {
         $kinds  = att_test_tag_kinds();
         $meta   = isset($kinds[$kind]) ? $kinds[$kind] : $kinds['present'];
         $isLate = ($meta['status'] === 'late');
-        $messenger = ($platform === 'telegram') ? 'تلگرام' : 'بله';
+        $messenger = bot_platform_label($platform);
         $msg = '🧪 آزمون سامانهٔ حضور و غیاب — پیام نمونه روی ' . $messenger . "\n"
              . ($isLate ? '⏰ اطلاع‌رسانی تأخیر (نمونهٔ آزمایشی)' : '🔔 اطلاع ورود به مدرسه (نمونهٔ آزمایشی)') . "\n"
              . 'وضعیت آزمایشی: ' . $meta['label'] . "\n";
@@ -325,10 +325,10 @@ if (!function_exists('att_test_scan_message')) {
 }
 
 if (!function_exists('att_test_notify_management')) {
-    /** ارسال پیام آزمایشی به حساب‌های مدیریتی — هم روی بله و هم روی تلگرام. */
+    /** ارسال پیام آزمایشی به حساب‌های مدیریتی — هم روی بله، تلگرام و سروش پلاس. */
     function att_test_notify_management($kind, $time = '', $minutesLate = 0) {
-        $result = ['bale' => 0, 'telegram' => 0, 'missing' => []];
-        foreach (['bale', 'telegram'] as $platform) {
+        $result = array_fill_keys(bot_platforms(), 0) + ['missing' => []];
+        foreach (bot_platforms() as $platform) {
             try {
                 $chats = att_management_chats($platform);
                 if (!$chats) { $result['missing'][] = $platform; continue; }
@@ -347,14 +347,14 @@ if (!function_exists('att_test_notify_management')) {
         /* نتیجهٔ آخرین آزمون ذخیره می‌شود تا صفحهٔ چاپ تگ بتواند نشان دهد پیام
            آزمایشی به چند حساب مدیریتی رسیده است. */
         try {
-            set_setting('att_test_last_result', json_encode([
-                'kind'     => (string)$kind,
-                'time'     => (string)$time,
-                'at'       => jalali_now(),
-                'bale'     => $result['bale'],
-                'telegram' => $result['telegram'],
-                'missing'  => $result['missing'],
-            ], JSON_UNESCAPED_UNICODE));
+            $payload = [
+                'kind'    => (string)$kind,
+                'time'    => (string)$time,
+                'at'      => jalali_now(),
+                'missing' => $result['missing'],
+            ];
+            foreach (bot_platforms() as $pf) $payload[$pf] = (int)$result[$pf];
+            set_setting('att_test_last_result', json_encode($payload, JSON_UNESCAPED_UNICODE));
         } catch (Exception $e) {}
         return $result;
     }
@@ -397,11 +397,11 @@ if (!function_exists('att_process_test_scan')) {
 if (!function_exists('att_notify_scan')) {
     // Optional "arrived at school" info push to parents (both platforms).
     function att_notify_scan($studentId, $statusFa, $time) {
-        foreach (['bale', 'telegram'] as $platform) {
+        foreach (bot_platforms() as $platform) {
             try {
                 ensure_bot_schema($platform);
                 $table = bot_user_table($platform);
-                $chatCol = $platform === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
+                $chatCol = bot_chat_column($platform);
                 $rows = DB::fetchAll("SELECT DISTINCT b.`$chatCol` AS chat_id, s.first_name, s.last_name FROM `$table` b JOIN students s ON s.id=b.student_id WHERE b.student_id=?", [(int)$studentId]);
                 foreach ($rows as $r) {
                     $msg = "🏫 اطلاع ورود به مدرسه\n"

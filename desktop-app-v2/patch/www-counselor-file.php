@@ -51,10 +51,10 @@ $notes=DB::fetchAll("SELECT n.*, t.full_name AS teacher_name FROM counselor_note
 $reqs=[];
 try{
     $links=[];
-    foreach(['bale','telegram'] as $p){
+    foreach(bot_platforms() as $p){
         try{
             ensure_bot_schema($p);
-            $table=bot_user_table($p); $chatCol=$p==='telegram'?'telegram_chat_id':'bale_chat_id';
+            $table=bot_user_table($p); $chatCol=bot_chat_column($p);
             $lrows=DB::fetchAll("SELECT `$chatCol` AS chat_id FROM `$table` WHERE student_id=?",[$sid]);
             foreach($lrows as $lr) $links[$p][]=(string)$lr['chat_id'];
         }catch(Throwable $e){}

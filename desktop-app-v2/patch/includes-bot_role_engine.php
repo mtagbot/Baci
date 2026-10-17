@@ -87,7 +87,7 @@ if (!function_exists('bot_notify_teacher_chats')) {
      */
     function bot_notify_teacher_chats($teacherId, $text, $inlineKeyboard = null, $roleFlag = '') {
         $sent = 0;
-        foreach (['bale', 'telegram'] as $pf) {
+        foreach (bot_platforms() as $pf) {
             try {
                 ensure_bot_schema($pf);
                 ensure_school_roles_schema();
@@ -109,7 +109,7 @@ if (!function_exists('bot_notify_role_chats')) {
     function bot_notify_role_chats($roleFlag, $text, $inlineKeyboard = null) {
         $flag = preg_replace('/[^a-z_]/', '', $roleFlag);
         $sent = 0;
-        foreach (['bale', 'telegram'] as $pf) {
+        foreach (bot_platforms() as $pf) {
             try {
                 ensure_bot_schema($pf);
                 ensure_school_roles_schema();
@@ -1201,11 +1201,11 @@ if (!function_exists('bot_role_finish_objection')) {
                . "💬 پاسخ:\n" . ($reply !== '' ? $reply : '—')
                . ($changed !== '' ? "\n" . trim($changed) : '');
         $notified = 0;
-        foreach (['bale', 'telegram'] as $pf) {
+        foreach (bot_platforms() as $pf) {
             try {
                 ensure_bot_schema($pf);
                 $tbl = bot_user_table($pf);
-                $col = $pf === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
+                $col = bot_chat_column($pf);
                 $chats = DB::fetchAll("SELECT DISTINCT `$col` AS cid FROM `$tbl` WHERE student_id=?", [(int)$gm['student_id']]);
                 foreach ($chats as $c) {
                     try { bot_send_message($pf, $c['cid'], $stMsg); $notified++; }

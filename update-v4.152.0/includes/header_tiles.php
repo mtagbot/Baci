@@ -38,6 +38,7 @@ if (!function_exists('header_tiles_catalog')) {
             'messages'    => ['t' => 'پیامک و اعلان',  'i' => '✉️', 'ic' => 'messages', 'u' => 'messages-management.php', 'p' => 'send_sms'],
             'bale'        => ['t' => 'بازوی بله',      'i' => '🤖', 'ic' => 'bale', 'u' => 'bale-bot.php',            'p' => 'send_sms'],
             'telegram'    => ['t' => 'ربات تلگرام',    'i' => '✈️', 'ic' => 'telegram', 'u' => 'telegram-bot.php',        'p' => 'send_sms'],
+            'soroush'     => ['t' => 'ربات سروش پلاس', 'i' => '💬', 'ic' => 'messages', 'u' => 'soroush-bot.php',      'p' => 'send_sms'],
             'botaccounts' => ['t' => 'اکانت‌های متصل', 'i' => '🔗', 'ic' => 'botaccounts', 'u' => 'bot-accounts.php',        'p' => 'send_sms'],
             'backups'     => ['t' => 'پشتیبان‌گیری',    'i' => '💾', 'ic' => 'backups', 'u' => 'backups.php',             'p' => null],
             'logs'        => ['t' => 'گزارش فعالیت',   'i' => '🕓', 'ic' => 'logs', 'u' => 'activity-logs.php',       'p' => null],

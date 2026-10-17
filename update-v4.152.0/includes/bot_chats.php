@@ -3,7 +3,7 @@
 /**
  * «گفتگوهای ربات» — فهرست گروه‌ها، کانال‌ها و گفتگوهای خصوصیِ ربات/بازو.
  *
- * چرا این ماژول لازم است: هیچ‌کدام از APIهای بله و تلگرام متدی برای «فهرست
+ * چرا این ماژول لازم است: هیچ‌کدام از APIهای بله، تلگرام و سروش پلاس متدی برای «فهرست
  * همهٔ گفتگوهایی که ربات در آن‌ها عضو است» ندارند. تنها راه، ساختنِ فهرست از
  * همان چیزی است که ربات واقعاً می‌بیند:
  *
@@ -119,6 +119,23 @@ if (!function_exists('bot_chats_type_label')) {
 if (!function_exists('bot_chats_status_label')) {
     function bot_chats_status_label($status) {
         return ['member' => 'عضو', 'left' => 'خارج‌شده', 'unknown' => 'نامشخص'][$status] ?? 'نامشخص';
+    }
+}
+
+if (!function_exists('bot_chats_capabilities')) {
+    /**
+     * v4.185.0: هر پیام‌رسان کدام متدهای API ربات را دارد.
+     * بر پایهٔ مستندات رسمی سروش پلاس (soroushplus.com/p/documents): getChat
+     * و leaveChat هنوز در فهرست متدها نیستند («getChat — به‌زودی»)، پس برای
+     * سروش پلاس فهرست فقط از پیام‌های دریافتی ساخته می‌شود و دکمه‌های
+     * خروج/افزودن دستی/بروزرسانی وضعیت نمایش داده نمی‌شوند.
+     */
+    function bot_chats_capabilities($platform) {
+        $platform = function_exists('bot_valid_platform') ? bot_valid_platform($platform) : 'bale';
+        return [
+            'get_chat' => $platform !== 'soroush',
+            'leave'    => $platform !== 'soroush',
+        ];
     }
 }
 
@@ -348,6 +365,13 @@ if (!function_exists('bot_chats_refresh')) {
         $out = ['ok' => true, 'checked' => 0, 'failed' => 0, 'left' => 0, 'errors' => []];
         if (!bot_chats_schema()) { $out['ok'] = false; return $out; }
         $platform = function_exists('bot_valid_platform') ? bot_valid_platform($platform) : 'bale';
+        $caps = bot_chats_capabilities($platform);
+        if (empty($caps['get_chat'])) {
+            $out['ok'] = false;
+            $out['unsupported'] = true;
+            $out['note'] = 'سروش پلاس هنوز متد getChat ندارد؛ فهرست و وضعیت گفتگوها از همان پیام‌های دریافتی ساخته می‌شود.';
+            return $out;
+        }
         $limit = max(1, min(50, (int)$limit));
         $cut = date('Y-m-d H:i:s', time() - 600);      // ۱۰ دقیقه: بیشتر از این، تازه است
         try {
@@ -421,6 +445,9 @@ if (!function_exists('bot_chats_leave')) {
         $platform = function_exists('bot_valid_platform') ? bot_valid_platform($platform) : 'bale';
         $chatId = trim((string)$chatId);
         if ($chatId === '') return ['ok' => false, 'error' => 'شناسهٔ گفتگو خالی است.'];
+        if (empty(bot_chats_capabilities($platform)['leave'])) {
+            return ['ok' => false, 'error' => 'سروش پلاس هنوز متد leaveChat ندارد؛ خروج از گروه از داخل سایت ممکن نیست.'];
+        }
         $row = null;
         try { $row = DB::fetch("SELECT * FROM bot_chats WHERE platform = ? AND chat_id = ?", [$platform, $chatId]); }
         catch (Throwable $e) { $row = null; }
@@ -434,7 +461,9 @@ if (!function_exists('bot_chats_leave')) {
             $msg = bot_chats_error_text($e);
             /* فقط ردیف موجود خطا می‌گیرد؛ گفتگوی ناشناخته با یک خروجِ ناموفق
                ساخته نمی‌شود (وگرنه ردیفی «عضو» تلقی می‌شد که هرگز دیده نشده). */
-            if ($row) bot_chats_save($platform, $chatId, ['last_error' => $msg, 'checked_at' => date('Y-m-d H:i:s')]);
+            if ($row) {
+                bot_chats_save($platform, $chatId, ['last_error' => $msg, 'checked_at' => date('Y-m-d H:i:s')]);
+            }
             return ['ok' => false, 'error' => $msg];
         }
         $now = date('Y-m-d H:i:s');
@@ -468,6 +497,9 @@ if (!function_exists('bot_chats_add')) {
         $platform = function_exists('bot_valid_platform') ? bot_valid_platform($platform) : 'bale';
         $chatId = trim((string)$chatId);
         if ($chatId === '') return ['ok' => false, 'error' => 'شناسهٔ گفتگو را وارد کنید.'];
+        if (empty(bot_chats_capabilities($platform)['get_chat'])) {
+            return ['ok' => false, 'error' => 'سروش پلاس هنوز متد getChat ندارد؛ افزودن دستی با شناسه ممکن نیست.'];
+        }
         if (!preg_match('/^@?[A-Za-z0-9_\-]{2,64}$/', $chatId)) {
             return ['ok' => false, 'error' => 'شناسه باید عددی (مثل ‎-1001234567890‎) یا نام کاربری با @ باشد.'];
         }

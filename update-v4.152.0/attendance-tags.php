@@ -298,7 +298,7 @@ html,body{background:#fff;font-family:<?php echo $fontStack; ?>}
    پیش از چاپ برگهٔ «تگ آزمایشی» خوب است بدانیم کدام پیام‌رسان حساب
    مدیریت متصل دارد؛ وگرنه تگ چاپ می‌شود ولی پیامی به کسی نمی‌رسد. */
 $testMgState = [];
-foreach (['bale' => 'بله', 'telegram' => 'تلگرام'] as $pfKey => $pfFa) {
+foreach (bot_platform_labels() as $pfKey => $pfFa) {
     try {
         $cntMg = count(att_management_chats($pfKey));
         $testMgState[] = $pfFa . ': ' . ($cntMg > 0
@@ -311,7 +311,7 @@ $lastTestLine = '';
 if (is_array($lastTest)) {
     $testMissing = array_map('strval', (array)($lastTest['missing'] ?? []));
     $testParts = [];
-    foreach (['بله' => 'bale', 'تلگرام' => 'telegram'] as $pfFa => $pfKey) {
+    foreach (array_flip(bot_platform_labels()) as $pfFa => $pfKey) {
         $nMg = (int)($lastTest[$pfKey] ?? 0);
         if ($nMg > 0) $testParts[] = $pfFa . ': ' . tr_num($nMg, 'fa') . ' پیام';
         else $testParts[] = $pfFa . ': ' . (in_array($pfKey, $testMissing, true) ? 'بدون حساب مدیریت متصل' : 'ارسال نشد');

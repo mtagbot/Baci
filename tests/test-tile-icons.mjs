@@ -30,8 +30,8 @@ const catKeys = [...tiles.matchAll(/'(\w+)'\s*=>\s*\['t'\s*=>/g)].map(m => m[1])
 const icRefs  = [...tiles.matchAll(/'ic'\s*=>\s*'([\w-]+)'/g)].map(m => m[1]);
 const symbols = [...sprite.matchAll(/<symbol id="t-([\w-]+)"/g)].map(m => m[1]);
 
-ok('کاتالوگ ۱۷ کاشی دارد؛ سه ابزار زیر تنظیمات دیگر هستند', catKeys.length === 17, String(catKeys.length));
-ok('هر ۱۷ کاشی آیکون دارد', icRefs.length === 17, String(icRefs.length));
+ok('کاتالوگ ۱۸ کاشی دارد؛ سه ابزار زیر تنظیمات دیگر هستند', catKeys.length === 18, String(catKeys.length));
+ok('هر ۱۸ کاشی آیکون دارد', icRefs.length === 18, String(icRefs.length));
 ok('sprite ۲۰ آیکون دارد', symbols.length === 20, String(symbols.length));
 ok('هیچ آیکونی در sprite گم نیست',
    icRefs.every(r => symbols.includes(r)),
@@ -187,7 +187,7 @@ ok('دیگر از data-icon ایموجی استفاده نمی‌شود', !setts
 /* ═══ ۵) ایموجی به‌عنوان پشتیبان حفظ شده ═══ */
 console.log('\n══ پشتیبان ══');
 ok("کلید 'i' (ایموجی) برای پشتیبانی حذف نشده",
-   (tiles.match(/'i'\s*=>/g) || []).length === 17);
+   (tiles.match(/'i'\s*=>/g) || []).length === 18);
 ok('اگر آیکون نبود به ایموجی برمی‌گردد', /else\s*\{?\s*echo \$tile\['i'\]/.test(tiles));
 
 console.log(`\n  سوئیت آیکون کاشی‌ها: ${pass} PASS / ${fail} FAIL`);

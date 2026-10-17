@@ -481,5 +481,69 @@ ok('صفحه دو تب را با if/else واقعی جدا می‌کند',
 ok('خروج از صفحه با تأیید مرورگر انجام می‌شود (برگشت‌ناپذیر)',
    page.includes('onsubmit="return confirm('));
 
+
+/* ═══════ ۱۲) سروش پلاس: قابلیت‌ها و صفحهٔ گفتگوها ═══════ */
+const sor = J(await run(HEAD + String.raw`
+$out = [];
+$out['caps'] = [
+    bot_chats_capabilities('bale'),
+    bot_chats_capabilities('telegram'),
+    bot_chats_capabilities('soroush'),
+];
+$boom = function ($m, $p) { throw new RuntimeException('TRANSPORT_MUST_NOT_BE_CALLED'); };
+$out['refresh'] = bot_chats_refresh('soroush', 20, $boom);
+$out['add'] = bot_chats_add('soroush', '-1001234567890', $boom);
+$out['leave'] = bot_chats_leave('soroush', '-1001234567890', $boom, 'admin1');
+$out['add_bad'] = bot_chats_add('soroush', '!!!', $boom);
+$out['leave_empty'] = bot_chats_leave('soroush', '   ', $boom, 'admin1');
+/* ردیف سروش نباید به بله/تلگرام سرایت کند */
+$out['bale_before'] = bot_chats_total(['platform' => 'bale', 'type' => '', 'status' => '', 'q' => '']);
+DB::execute("DELETE FROM bot_chats WHERE platform='soroush'");
+bot_chats_save('soroush', '-1001234567890', ['chat_type' => 'group', 'title' => 'گروه سروش', 'status' => 'member']);
+bot_chats_save('soroush', '4242', ['chat_type' => 'private', 'title' => 'والد سروش', 'status' => 'member']);
+$out['count_s'] = bot_chats_total(['platform' => 'soroush', 'type' => '', 'status' => '', 'q' => '']);
+$out['count_b'] = bot_chats_total(['platform' => 'bale', 'type' => '', 'status' => '', 'q' => '']);
+$out['sum_s'] = bot_chats_summary('soroush');
+echo json_encode($out, JSON_UNESCAPED_UNICODE);`));
+ok('قابلیت‌ها: بله/تلگرام getChat و leaveChat دارند، سروش هیچ‌کدام',
+   JSON.stringify(sor.caps) === JSON.stringify([
+       {get_chat: true, leave: true}, {get_chat: true, leave: true}, {get_chat: false, leave: false}]) ||
+   (sor.caps[0].get_chat === true && sor.caps[1].leave === true && sor.caps[2].get_chat === false && sor.caps[2].leave === false),
+   JSON.stringify(sor.caps));
+ok('رفرش سروش «پشتیبانی نمی‌شود» برمی‌گرداند و به شبکه نمی‌زند',
+   sor.refresh.ok === false && sor.refresh.unsupported === true && String(sor.refresh.note).includes('getChat'),
+   JSON.stringify(sor.refresh));
+ok('افزودن دستی سروش پیام روشن می‌دهد و به شبکه نمی‌زند',
+   sor.add.ok === false && String(sor.add.error).includes('getChat'), JSON.stringify(sor.add));
+ok('خروج سروش پیام روشن می‌دهد و به شبکه نمی‌زند',
+   sor.leave.ok === false && String(sor.leave.error).includes('leaveChat'), JSON.stringify(sor.leave));
+ok('اعتبارسنجی شناسه پیش از قابلیت انجام می‌شود (شناسهٔ بد ⇒ پیام شناسه)',
+   sor.add_bad.ok === false && String(sor.add_bad.error).includes('شناسه'), JSON.stringify(sor.add_bad));
+ok('شناسهٔ خالی همچنان پیام «وارد کنید» می‌دهد',
+   sor.leave_empty.ok === false && String(sor.leave_empty.error).includes('خالی'), JSON.stringify(sor.leave_empty));
+ok('گفتگوهای سروش جدا از بله شمرده می‌شوند', sor.count_s === 2 && sor.count_b === sor.bale_before,
+   JSON.stringify([sor.count_s, sor.count_b, sor.bale_before]));
+ok('خلاصهٔ سروش: ۱ گروه + ۱ خصوصی', sor.sum_s.group === 1 && sor.sum_s.private === 1 && sor.sum_s.total === 2,
+   JSON.stringify(sor.sum_s));
+
+const sorPage = await req('chats-soroush', { file: 'bot-inbox.php', query: 'platform=soroush&view=chats', sid: 'harnessAdm0001' });
+const spg = sorPage.res.page || '';
+ok('صفحهٔ گفتگوهای سروش بدون خطا رندر می‌شود و ردیف‌ها را نشان می‌دهد',
+   !sorPage.res.fatal && spg.includes('گفتگوهای سروش پلاس') && spg.includes('گروه سروش') && spg.includes('والد سروش'),
+   (sorPage.res.fatal || '').slice(0, 200));
+ok('هیچ دکمه/فرم پشتیبانی‌نشده‌ای برای سروش رندر نمی‌شود',
+   !spg.includes('value="refresh"') && !spg.includes('value="add"') && !spg.includes('value="leave"'),
+   'unsupported controls');
+ok('برای سروش دکمهٔ خروج نیست و نوع خصوصی توضیح خودش را دارد',
+   !spg.includes('خروج از گروه') && spg.includes('گفتگوی خصوصی — خروج معنا ندارد'));
+ok('دلیل نبودن getChat داخل صفحه نوشته شده است',
+   spg.includes('در سروش پلاس هنوز') && spg.includes('getChat'));
+
+const sorPost = await req('sor-post', { file: 'bot-inbox.php', method: 'POST', query: 'platform=soroush&view=chats', sid: 'harnessAdm0001',
+  post: { chats_action: 'refresh', csrf_token: csrf } });
+ok('POST «رفرش» دستی برای سروش هم پیام «هنوز پشتیبانی نمی‌شود» می‌دهد',
+   sorPost.res.flash && String(sorPost.res.flash.message).includes('به‌زودی') === false &&
+   String(sorPost.res.flash.message).includes('getChat'), JSON.stringify(sorPost.res.flash));
+
 console.log(`\n──── نتیجه: ${pass} ✅ / ${fail} ❌ ────`);
 process.exit(fail ? 1 : 0);

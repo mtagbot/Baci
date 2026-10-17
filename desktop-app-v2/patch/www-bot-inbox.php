@@ -26,7 +26,7 @@ $inboxPages    = max(1, (int)ceil($inboxTotal / $inboxPerPage));
 $inboxPage     = max(1, min($inboxPages, (int)($_GET['page'] ?? 1)));
 $inboxRows     = bot_inbox_rows($inboxFilters, $inboxPage, $inboxPerPage);
 $inboxKinds    = bot_inbox_kind_counts($inboxPlatform);
-$inboxTitles   = ['bale' => 'بله', 'telegram' => 'تلگرام'];
+$inboxTitles   = bot_platform_labels();
 
 /* v4.184.0 — «گروه‌ها و کانال‌ها»: فهرست گفتگوهایی که ربات در آن‌هاست.
    دو منبع دارد: پیام‌هایی که به ربات می‌رسند (و لحظه‌ای ثبت می‌شوند) و
@@ -34,6 +34,7 @@ $inboxTitles   = ['bale' => 'بله', 'telegram' => 'تلگرام'];
    نمی‌دهد، این فهرست چیزی را نشان می‌دهد که خودِ ربات دیده است. */
 bot_chats_schema();
 $inboxView = (($_GET['view'] ?? 'messages') === 'chats') ? 'chats' : 'messages';
+$chatCaps  = bot_chats_capabilities($inboxPlatform);
 
 /* عملیات فهرست گفتگوها — POST + CSRF (خروج برگشت‌ناپذیر است) */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['chats_action'])) {
@@ -46,6 +47,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['chats_action'])) {
     $chatsChatId = trim((string)($_POST['chat_id'] ?? ''));
     if ($chatsAction === 'refresh') {
         $rr = bot_chats_refresh($inboxPlatform, 20);
+        if (!empty($rr['unsupported'])) {
+            set_flash_message('warning', (string)($rr['note'] ?? 'این پیام‌رسان هنوز متد getChat ندارد.'));
+            redirect($back);
+        }
         $msg = 'وضعیت ' . tr_num((string)$rr['checked'], 'fa') . ' گفتگو تازه شد';
         if ($rr['failed'] > 0) $msg .= ' — ' . tr_num((string)$rr['failed'], 'fa') . ' مورد بررسی نشد';
         if (!empty($rr['errors'])) $msg .= ' (' . implode('، ', array_slice($rr['errors'], 0, 2)) . ')';
@@ -100,8 +105,9 @@ require_once __DIR__ . '/includes/header.php';
             <p class="text-sm text-muted">هر متنی که کاربران به ربات فرستادند اینجا ثبت می‌شود — از جمله پیام‌های بی‌هدف یا اشتباهی. فهرست گروه‌ها و کانال‌هایی که ربات در آن‌هاست در تب «گروه‌ها و کانال‌ها» است.</p>
         </div>
         <div class="flex gap-2">
-            <a href="bot-inbox.php?platform=bale" class="btn <?php echo $inboxPlatform === 'bale' ? 'btn-primary' : 'btn-secondary'; ?> text-xs">بله</a>
-            <a href="bot-inbox.php?platform=telegram" class="btn <?php echo $inboxPlatform === 'telegram' ? 'btn-primary' : 'btn-secondary'; ?> text-xs">تلگرام</a>
+            <?php foreach ($inboxTitles as $pfKey => $pfLabel): ?>
+            <a href="bot-inbox.php?platform=<?php echo clean($pfKey); ?>" class="btn <?php echo $inboxPlatform === $pfKey ? 'btn-primary' : 'btn-secondary'; ?> text-xs"><?php echo clean($pfLabel); ?></a>
+            <?php endforeach; ?>
             <a href="other-settings.php" class="btn btn-outline text-xs">بازگشت به تنظیمات دیگر</a>
         </div>
     </div>
@@ -225,11 +231,13 @@ require_once __DIR__ . '/includes/header.php';
                 <?php echo clean(tr_num((string)$chatSummary['private'], 'fa')); ?> گفتگوی خصوصی ·
                 <?php echo clean(tr_num((string)$chatSummary['left'], 'fa')); ?> خارج‌شده
             </div>
+            <?php if (!empty($chatCaps['get_chat'])): ?>
             <form method="POST" style="margin:0">
                 <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
                 <input type="hidden" name="chats_action" value="refresh">
                 <button class="btn btn-secondary text-xs" title="getChat برای گفتگوهایی که مدتی بررسی نشده‌اند">بروزرسانی وضعیت (۲۰ مورد)</button>
             </form>
+            <?php endif; ?>
         </div>
         <form method="GET" class="filters-line">
             <input type="hidden" name="platform" value="<?php echo clean($inboxPlatform); ?>">
@@ -315,7 +323,7 @@ require_once __DIR__ . '/includes/header.php';
                         <td class="text-xs text-muted" dir="ltr"><?php echo !empty($c['last_message_at']) ? clean(jdate('Y/m/d H:i', strtotime((string)$c['last_message_at']))) : '—'; ?></td>
                         <td class="text-xs"><?php echo clean(tr_num((string)(int)($c['msg_count'] ?? 0), 'fa')); ?></td>
                         <td>
-                            <?php if (in_array($ct, ['group', 'channel'], true) && $st !== 'left'): ?>
+                            <?php if (!empty($chatCaps['leave']) && in_array($ct, ['group', 'channel'], true) && $st !== 'left'): ?>
                             <form method="POST" style="margin:0" onsubmit="return confirm('ربات از این گفتگو خارج شود؟ این کار برگشت‌پذیر نیست و برای برگشت باید مدیر گروه دوباره ربات را اضافه کند.');">
                                 <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
                                 <input type="hidden" name="chats_action" value="leave">
@@ -340,10 +348,11 @@ require_once __DIR__ . '/includes/header.php';
         <p class="text-muted text-xs" style="line-height:2;margin-top:10px">
             این فهرست از همان چیزی ساخته می‌شود که ربات دیده است: هر پیام یا دکمه‌ای که به ربات برسد، گفتگو را همان‌جا ثبت می‌کند؛
             پیام سرویسیِ «افزودن/حذف عضو» هم همان لحظه ثبت می‌شود. برای گفتگوهای قدیمی‌تر، «بروزرسانی وضعیت» با
-            <span dir="ltr">getChat</span> عنوان و عضویت را تازه می‌کند.
+            <?php if (!empty($chatCaps['get_chat'])): ?><span dir="ltr">getChat</span> عنوان و عضویت را تازه می‌کند.<?php else: ?>در سروش پلاس هنوز <span dir="ltr">getChat</span> وجود ندارد، پس همین فهرست از پیام‌های دریافتی ساخته می‌شود.<?php endif; ?>
         </p>
     </div>
 
+    <?php if (!empty($chatCaps['get_chat'])): ?>
     <div class="card p-4">
         <h3 class="font-bold text-sm" style="margin-bottom:6px">افزودن دستی با شناسهٔ گفتگو</h3>
         <p class="text-xs text-muted" style="line-height:2;margin-bottom:8px">
@@ -358,6 +367,7 @@ require_once __DIR__ . '/includes/header.php';
             <div class="flex gap-2"><button class="btn btn-primary">افزودن / بررسی</button></div>
         </form>
     </div>
+    <?php endif; ?>
     <?php endif; ?>
 </div>
 <?php
