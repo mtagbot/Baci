@@ -12,6 +12,7 @@ require_once __DIR__ . '/online_exam_helpers.php';
 require_once __DIR__ . '/bot_role_engine.php';   // v4.87.0: multi-role staff panels
 require_once __DIR__ . '/bot_login_flow.php';    // v4.152.0: the manager logs in from inside the bot
 require_once __DIR__ . '/bot_inbox.php';         // v4.177.1: log every incoming message (never throws)
+require_once __DIR__ . '/bot_chats.php';         // v4.184.0: groups/channels inventory (never throws)
 ensure_school_roles_schema();
 ensure_exams_schema();
 
@@ -88,9 +89,25 @@ function bot_webhook_answer_callback($platform, $callbackId) {
 $callbackQuery = $update['callback_query'] ?? null;
 $message = $update['message'] ?? null;
 
+/* v4.184.0: تلگرام هنگام افزودن/حذف/ارتقای ربات در گروه، آپدیت my_chat_member
+   می‌فرستد. این دقیق‌ترین منبع برای فهرست «گروه‌هایی که ربات در آن‌هاست» است.
+   بله چنین آپدیتی ندارد و همان‌جا new_chat_members/left_chat_member کار را می‌کند.
+   مثل بقیهٔ نقاط: هر خطا فقط لاگ می‌شود و جریان ربات دست‌نخورده می‌ماند. */
+if (is_array($update['my_chat_member'] ?? null)) {
+    try { bot_chats_touch_my_member($platform, $update['my_chat_member']); }
+    catch (Throwable $e) { error_log('bot_chats my_chat_member: ' . $e->getMessage()); }
+    http_response_code(200);
+    exit;
+}
+
 if ($callbackQuery) {
     $chatId = (string)($callbackQuery['message']['chat']['id'] ?? '');
     $data = (string)($callbackQuery['data'] ?? '');
+    /* v4.184.0: هر دکمه‌ای هم ثابت می‌کند ربات در این گفتگوست. */
+    if ($chatId !== '') {
+        try { bot_chats_touch($platform, $callbackQuery['message']['chat'] ?? [], $callbackQuery['from'] ?? [], []); }
+        catch (Throwable $e) { error_log('bot_chats callback: ' . $e->getMessage()); }
+    }
     bot_webhook_answer_callback($platform, $callbackQuery['id'] ?? '');
 
     // v4.87.0: staff-role buttons (exam-design PDF, objection reply flow)
@@ -211,6 +228,11 @@ if (function_exists('bot_inbox_log')) {
     try { bot_inbox_log($platform, $chatId, $username, $text !== '' ? $text : '[' . $inboxKind . ']', $inboxKind, bot_inbox_student_id($platform, $chatId), 'received'); }
     catch (Throwable $e) { error_log('bot_inbox_log: ' . $e->getMessage()); }
 }
+
+/* v4.184.0: هر پیام — از جمله پیام سرویسیِ new_chat_members/left_chat_member —
+   گفتگو را در فهرست «گروه‌ها و کانال‌ها» ثبت یا به‌روز می‌کند. */
+try { bot_chats_touch($platform, $message['chat'] ?? [], $message['from'] ?? [], $message); }
+catch (Throwable $e) { error_log('bot_chats_touch: ' . $e->getMessage()); }
 
 /* v4.165.0: همین که کاربر توانست پیامی بفرستد یعنی کانال باز است؛ اگر قبلاً
    مسدود کرده بود، پیام‌های پارک‌شده‌اش خودکار به چرخهٔ ارسال برمی‌گردند.
