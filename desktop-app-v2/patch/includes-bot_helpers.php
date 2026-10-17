@@ -1,7 +1,7 @@
 <?php
 // File: includes/bot_helpers.php
 /**
- * Shared Bale/Telegram/Soroush bot helpers: schema migration, API wrappers,
+ * Shared Bale/Telegram/Rubika bot helpers: schema migration, API wrappers,
  * templates, targeting, and report-image delivery.
  */
 
@@ -9,15 +9,15 @@ require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/report_image.php';
 
 if (!function_exists('bot_platforms')) {
-    /** v4.185.0: پیام‌رسان‌های پشتیبانی‌شده — نسخهٔ دسکتاپ. */
+    /** v4.186.0: پیام‌رسان‌های پشتیبانی‌شده — نسخهٔ دسکتاپ. */
     function bot_platforms() {
-        return ['bale', 'telegram', 'soroush'];
+        return ['bale', 'telegram', 'rubika'];
     }
 }
 
 if (!function_exists('bot_platform_labels')) {
     function bot_platform_labels() {
-        return ['bale' => 'بله', 'telegram' => 'تلگرام', 'soroush' => 'سروش پلاس'];
+        return ['bale' => 'بله', 'telegram' => 'تلگرام', 'rubika' => 'روبیکا'];
     }
 }
 
@@ -67,7 +67,7 @@ if (!function_exists('bot_migrate_platform_enum')) {
             if (!preg_match('/^[a-z_]+$/', (string)$table) || !preg_match('/^[a-z_]+$/', (string)$column)) return;
             $col = DB::fetch("SHOW COLUMNS FROM `$table` LIKE ?", [(string)$column]);
             $type = strtolower((string)($col['Type'] ?? ''));
-            if ($type === '' || strpos($type, "'soroush'") !== false) return;
+            if ($type === '' || strpos($type, "'rubika'") !== false) return;
             DB::execute("ALTER TABLE `$table` MODIFY `$column` " . $definition);
         } catch (Throwable $e) { error_log('bot platform enum migration: ' . $e->getMessage()); }
     }
@@ -109,7 +109,7 @@ if (!function_exists('ensure_bot_schema')) {
 
         DB::execute("CREATE TABLE IF NOT EXISTS `bot_message_templates` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
-            `platform` enum('bale','telegram','soroush') NOT NULL,
+            `platform` enum('bale','telegram','soroush','rubika') NOT NULL,
             `template_key` varchar(80) NOT NULL,
             `template_text` text NOT NULL,
             `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -119,7 +119,7 @@ if (!function_exists('ensure_bot_schema')) {
 
         DB::execute("CREATE TABLE IF NOT EXISTS `bot_button_templates` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
-            `platform` enum('bale','telegram','soroush') NOT NULL,
+            `platform` enum('bale','telegram','soroush','rubika') NOT NULL,
             `button_key` varchar(80) NOT NULL,
             `button_text` varchar(150) NOT NULL,
             `sort_order` int(11) NOT NULL DEFAULT 0,
@@ -132,7 +132,7 @@ if (!function_exists('ensure_bot_schema')) {
 
         DB::execute("CREATE TABLE IF NOT EXISTS `bot_message_logs` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
-            `platform` enum('bale','telegram','soroush') NOT NULL,
+            `platform` enum('bale','telegram','soroush','rubika') NOT NULL,
             `chat_id` varchar(80) NOT NULL,
             `student_id` int(11) DEFAULT NULL,
             `message_type` varchar(50) DEFAULT 'text',
@@ -145,12 +145,12 @@ if (!function_exists('ensure_bot_schema')) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
         try { DB::execute("ALTER TABLE `$stateTable` ADD COLUMN temp_payload text DEFAULT NULL"); } catch (Exception $e) {}
-        /* v4.185.0: enumهای قدیمی ('bale','telegram') سروش را نمی‌پذیرند. */
+        /* v4.186.0: enumهای قدیمی ('bale','telegram') روبیکا را نمی‌پذیرند. */
         static $enumMigrated = false;
         if (!$enumMigrated) {
             $enumMigrated = true;
             foreach (['bot_message_templates', 'bot_button_templates', 'bot_message_logs'] as $tbl) {
-                bot_migrate_platform_enum($tbl, 'platform', "enum('bale','telegram','soroush') NOT NULL");
+                bot_migrate_platform_enum($tbl, 'platform', "enum('bale','telegram','soroush','rubika') NOT NULL");
             }
         }
         bot_seed_templates($platform);
@@ -272,14 +272,125 @@ if (!function_exists('bot_api_endpoint')) {
             if ($base === '') $base = 'https://api.telegram.org';
             return $base . "/bot{$token}/{$method}";
         }
-        if ($platform === 'soroush') return "https://api.splus.ir/bot{$token}/{$method}";
+        if ($platform === 'rubika') return "https://botapi.rubika.ir/v3/{$token}/{$method}";
         return "https://tapi.bale.ai/bot{$token}/{$method}";
+    }
+}
+
+if (!function_exists('bot_rubika_normalize_payload')) {
+    /**
+     * Rubika uses Bot API v3 field/keypad names, not Telegram reply_markup.
+     * Convert the shared internal keyboard contract at the transport boundary.
+     */
+    function bot_rubika_normalize_payload($method, array $data) {
+        if (!in_array($method, ['sendMessage', 'sendFile'], true) || !isset($data['reply_markup'])) return $data;
+        $markup = $data['reply_markup'];
+        unset($data['reply_markup']);
+        if (is_string($markup)) $markup = json_decode($markup, true);
+        if (!is_array($markup)) return $data;
+        if (isset($markup['keyboard']) && is_array($markup['keyboard'])) {
+            $rows = [];
+            foreach ($markup['keyboard'] as $ri => $row) {
+                $buttons = [];
+                foreach ((array)$row as $bi => $button) {
+                    $text = (string)($button['text'] ?? '');
+                    if ($text === '') continue;
+                    $buttons[] = ['id' => 'k' . $ri . '_' . $bi, 'type' => 'Simple', 'button_text' => $text];
+                }
+                if ($buttons) $rows[] = ['buttons' => $buttons];
+            }
+            if ($rows) {
+                $data['chat_keypad_type'] = 'New';
+                $data['chat_keypad'] = ['rows' => $rows, 'resize_keyboard' => !empty($markup['resize_keyboard']), 'one_time_keyboard' => !empty($markup['one_time_keyboard'])];
+            }
+        } elseif (isset($markup['inline_keyboard']) && is_array($markup['inline_keyboard'])) {
+            $rows = [];
+            foreach ($markup['inline_keyboard'] as $ri => $row) {
+                $buttons = [];
+                foreach ((array)$row as $bi => $button) {
+                    $text = (string)($button['text'] ?? '');
+                    if ($text === '') continue;
+                    $id = (string)($button['callback_data'] ?? ('i' . $ri . '_' . $bi));
+                    $entry = ['id' => $id, 'type' => isset($button['url']) ? 'Link' : 'Simple', 'button_text' => $text];
+                    if (isset($button['url'])) $entry['url'] = (string)$button['url'];
+                    $buttons[] = $entry;
+                }
+                if ($buttons) $rows[] = ['buttons' => $buttons];
+            }
+            if ($rows) $data['inline_keypad'] = ['rows' => $rows];
+        }
+        return $data;
+    }
+}
+
+if (!function_exists('bot_rubika_normalize_update')) {
+    /** Normalize documented Rubika Update/InlineMessage envelopes for the shared bot engine. */
+    function bot_rubika_normalize_update(array $payload) {
+        if (is_array($payload['update'] ?? null)) {
+            $ru = $payload['update'];
+            $nm = is_array($ru['new_message'] ?? null) ? $ru['new_message'] : (is_array($ru['updated_message'] ?? null) ? $ru['updated_message'] : []);
+            $type = strtolower((string)($ru['type'] ?? ''));
+            if (in_array($type, ['newmessage','updatedmessage','startedbot'], true)) {
+                $txt = (string)($nm['text'] ?? '');
+                if ($txt === '' && $type === 'startedbot') $txt = '/start';
+                $ct = strtolower((string)($ru['chat_type'] ?? 'user'));
+                $ct = ['user'=>'private','bot'=>'private','group'=>'group','channel'=>'channel'][$ct] ?? 'unknown';
+                $payload['message'] = [
+                    'message_id' => (string)($nm['message_id'] ?? ''),
+                    'chat' => ['id' => (string)($ru['chat_id'] ?? $nm['chat_id'] ?? ''), 'type' => $ct],
+                    'from' => ['id' => (string)($nm['sender_id'] ?? $ru['sender_id'] ?? ''), 'username' => (string)($nm['username'] ?? ''), 'first_name' => (string)($nm['first_name'] ?? '')],
+                    'text' => $txt,
+                ];
+            }
+        }
+        if (is_array($payload['inline_message'] ?? null)) {
+            $im = $payload['inline_message'];
+            $buttonId = (string)($im['aux_data']['button_id'] ?? '');
+            $payload['callback_query'] = [
+                'id' => (string)($im['message_id'] ?? 'rubika-inline'),
+                'from' => ['id' => (string)($im['sender_id'] ?? '')],
+                'data' => $buttonId !== '' ? $buttonId : (string)($im['text'] ?? ''),
+                'message' => ['message_id' => (string)($im['message_id'] ?? ''), 'chat' => ['id' => (string)($im['chat_id'] ?? ''), 'type' => 'private']],
+            ];
+        }
+        return $payload;
+    }
+}
+
+if (!function_exists('bot_rubika_upload_and_send')) {
+    /** Rubika file delivery is a two-step requestSendFile → multipart upload → sendFile flow. */
+    function bot_rubika_upload_and_send(array $data) {
+        $fileField = '';
+        foreach (['photo','document','video','audio','voice','animation'] as $field) {
+            if (isset($data[$field]) && $data[$field] instanceof CURLFile) { $fileField = $field; break; }
+        }
+        if ($fileField === '') throw new RuntimeException('فایل ارسالی روبیکا شناسایی نشد.');
+        $file = $data[$fileField];
+        $type = $fileField === 'photo' ? 'Image' : ($fileField === 'video' ? 'Video' : (in_array($fileField, ['audio','voice'], true) ? 'Voice' : 'File'));
+        $requested = bot_api_request('rubika', 'requestSendFile', ['type' => $type]);
+        $requestData = $requested['result'] ?? $requested['data'] ?? [];
+        $uploadUrl = (string)($requestData['upload_url'] ?? '');
+        if ($uploadUrl === '') throw new RuntimeException('روبیکا نشانی بارگذاری فایل را برنگرداند.');
+        $ch = curl_init();
+        curl_setopt_array($ch, [CURLOPT_URL=>$uploadUrl,CURLOPT_POST=>true,CURLOPT_RETURNTRANSFER=>true,CURLOPT_POSTFIELDS=>['file'=>$file],CURLOPT_TIMEOUT=>180,CURLOPT_CONNECTTIMEOUT=>15,CURLOPT_SSL_VERIFYPEER=>true]);
+        $body = curl_exec($ch); $err = curl_error($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+        if ($body === false || $code >= 400) throw new RuntimeException('بارگذاری فایل در روبیکا ناموفق بود: ' . ($err ?: ('HTTP ' . $code . ' ' . (string)$body)));
+        $uploaded = json_decode($body, true);
+        if (!is_array($uploaded) || (isset($uploaded['status']) && strtoupper((string)$uploaded['status']) !== 'OK')) throw new RuntimeException('پاسخ بارگذاری فایل روبیکا قابل قبول نیست.');
+        $uploadedData = $uploaded['data'] ?? $uploaded;
+        $fileId = (string)($uploadedData['file_id'] ?? $uploadedData['fileId'] ?? '');
+        if ($fileId === '') throw new RuntimeException('روبیکا شناسهٔ فایل بارگذاری‌شده را برنگرداند.');
+        $send = ['chat_id'=>(string)($data['chat_id']??''),'file_id'=>$fileId,'text'=>(string)($data['caption']??'')];
+        if (isset($data['reply_markup'])) $send['reply_markup']=$data['reply_markup'];
+        return bot_api_request('rubika', 'sendFile', bot_rubika_normalize_payload('sendFile', $send));
     }
 }
 
 if (!function_exists('bot_api_request')) {
     function bot_api_request($platform, $method, $data = [], $multipart = false) {
+        if ($platform === 'rubika' && $multipart) return bot_rubika_upload_and_send($data);
         $url = bot_api_endpoint($platform, $method);
+        if ($platform === 'rubika' && !$multipart && is_array($data)) $data = bot_rubika_normalize_payload($method, $data);
         /* v2.11.0 (desktop only): offline circuit-breaker.
            The desktop runs the whole app on ONE PHP worker — a bot call with
            8s connect + 20s total timeout while the internet is down froze
@@ -318,8 +429,14 @@ if (!function_exists('bot_api_request')) {
         }
         if ($isDesk && $cbFile !== '' && is_file($cbFile)) @unlink($cbFile); // back online
         $json = json_decode($res, true);
-        if ($code >= 400 || !is_array($json) || (array_key_exists('ok', $json) && !$json['ok'])) {
+        $rubikaFailed = $platform === 'rubika' && (!isset($json['status']) || strtoupper((string)$json['status']) !== 'OK');
+        if ($code >= 400 || !is_array($json) || (array_key_exists('ok', $json) && !$json['ok']) || $rubikaFailed) {
             throw new RuntimeException('پاسخ ناموفق API: HTTP ' . $code . ' - ' . $res);
+        }
+        if ($platform === 'rubika' && strtoupper((string)($json['status'] ?? '')) === 'OK') {
+            $json['ok'] = true; $d = $json['data'] ?? [];
+            if (is_array($d) && isset($d['chat']) && is_array($d['chat'])) $d = $d['chat'];
+            $json['result'] = $d;
         }
         return $json;
     }

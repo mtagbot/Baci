@@ -348,7 +348,7 @@ require_once __DIR__ . '/includes/header.php';
         <p class="text-muted text-xs" style="line-height:2;margin-top:10px">
             این فهرست از همان چیزی ساخته می‌شود که ربات دیده است: هر پیام یا دکمه‌ای که به ربات برسد، گفتگو را همان‌جا ثبت می‌کند؛
             پیام سرویسیِ «افزودن/حذف عضو» هم همان لحظه ثبت می‌شود. برای گفتگوهای قدیمی‌تر، «بروزرسانی وضعیت» با
-            <?php if (!empty($chatCaps['get_chat'])): ?><span dir="ltr">getChat</span> عنوان و عضویت را تازه می‌کند.<?php else: ?>در سروش پلاس هنوز <span dir="ltr">getChat</span> وجود ندارد، پس همین فهرست از پیام‌های دریافتی ساخته می‌شود.<?php endif; ?>
+            <?php if (!empty($chatCaps['get_chat'])): ?><span dir="ltr">getChat</span> عنوان و عضویت را تازه می‌کند.<?php else: ?>در روبیکا هنوز <span dir="ltr">getChat</span> وجود ندارد، پس همین فهرست از پیام‌های دریافتی ساخته می‌شود.<?php endif; ?>
         </p>
     </div>
 

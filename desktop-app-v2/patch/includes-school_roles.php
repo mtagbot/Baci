@@ -64,7 +64,7 @@ if (!function_exists('ensure_school_roles_schema')) {
 
         DB::execute("CREATE TABLE IF NOT EXISTS counseling_requests (
             id int(11) NOT NULL AUTO_INCREMENT,
-            platform enum('site','bale','telegram','soroush') NOT NULL DEFAULT 'site',
+            platform enum('site','bale','telegram','soroush','rubika') NOT NULL DEFAULT 'site',
             chat_id varchar(80) DEFAULT NULL,
             student_id int(11) DEFAULT NULL,
             requester_name varchar(150) NOT NULL,
@@ -83,7 +83,7 @@ if (!function_exists('ensure_school_roles_schema')) {
 
         DB::execute("CREATE TABLE IF NOT EXISTS bot_admin_sessions (
             id int(11) NOT NULL AUTO_INCREMENT,
-            platform enum('bale','telegram','soroush') NOT NULL,
+            platform enum('bale','telegram','soroush','rubika') NOT NULL,
             chat_id varchar(80) NOT NULL,
             admin_id int(11) DEFAULT NULL,
             teacher_id int(11) DEFAULT NULL,
@@ -105,18 +105,18 @@ if (!function_exists('ensure_school_roles_schema')) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
         /* v4.185.0: ستون platform در دو جدول زیر enum قدیمی داشت و MySQL
-           مقدار «soroush» را رد می‌کرد. SQLite enum ندارد، پس فقط MySQL. */
+           مقدار «rubika» را رد می‌کرد. SQLite enum ندارد، پس فقط MySQL. */
         try {
             $pdo = DB::getInstance()->getPdo();
             if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
                 $migrations = [
-                    ['counseling_requests', "enum('site','bale','telegram','soroush') NOT NULL DEFAULT 'site'"],
-                    ['bot_admin_sessions', "enum('bale','telegram','soroush') NOT NULL"],
+                    ['counseling_requests', "enum('site','bale','telegram','soroush','rubika') NOT NULL DEFAULT 'site'"],
+                    ['bot_admin_sessions', "enum('bale','telegram','soroush','rubika') NOT NULL"],
                 ];
                 foreach ($migrations as $mig) {
                     $col = DB::fetch("SHOW COLUMNS FROM `{$mig[0]}` LIKE 'platform'");
                     $type = strtolower((string)($col['Type'] ?? ''));
-                    if ($type !== '' && strpos($type, 'soroush') === false) {
+                    if ($type !== '' && strpos($type, 'rubika') === false) {
                         DB::execute("ALTER TABLE `{$mig[0]}` MODIFY `platform` " . $mig[1]);
                     }
                 }

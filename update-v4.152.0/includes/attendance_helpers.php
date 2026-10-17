@@ -325,7 +325,7 @@ if (!function_exists('att_test_scan_message')) {
 }
 
 if (!function_exists('att_test_notify_management')) {
-    /** ارسال پیام آزمایشی به حساب‌های مدیریتی — هم روی بله، تلگرام و سروش پلاس. */
+    /** ارسال پیام آزمایشی به حساب‌های مدیریتی — هم روی بله، تلگرام و روبیکا. */
     function att_test_notify_management($kind, $time = '', $minutesLate = 0) {
         $result = array_fill_keys(bot_platforms(), 0) + ['missing' => []];
         foreach (bot_platforms() as $platform) {

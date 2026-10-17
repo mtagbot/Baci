@@ -3,7 +3,7 @@
 /**
  * «گفتگوهای ربات» — فهرست گروه‌ها، کانال‌ها و گفتگوهای خصوصیِ ربات/بازو.
  *
- * چرا این ماژول لازم است: هیچ‌کدام از APIهای بله، تلگرام و سروش پلاس متدی برای «فهرست
+ * چرا این ماژول لازم است: هیچ‌کدام از APIهای بله، تلگرام و روبیکا متدی برای «فهرست
  * همهٔ گفتگوهایی که ربات در آن‌ها عضو است» ندارند. تنها راه، ساختنِ فهرست از
  * همان چیزی است که ربات واقعاً می‌بیند:
  *
@@ -106,6 +106,7 @@ if (!function_exists('bot_chats_norm_type')) {
     function bot_chats_norm_type($type) {
         $type = strtolower(trim((string)$type));
         if ($type === 'supergroup') return 'group';
+        if ($type === 'user' || $type === 'bot') return 'private';
         return in_array($type, ['private', 'group', 'channel'], true) ? $type : 'unknown';
     }
 }
@@ -124,17 +125,15 @@ if (!function_exists('bot_chats_status_label')) {
 
 if (!function_exists('bot_chats_capabilities')) {
     /**
-     * v4.185.0: هر پیام‌رسان کدام متدهای API ربات را دارد.
-     * بر پایهٔ مستندات رسمی سروش پلاس (soroushplus.com/p/documents): getChat
-     * و leaveChat هنوز در فهرست متدها نیستند («getChat — به‌زودی»)، پس برای
-     * سروش پلاس فهرست فقط از پیام‌های دریافتی ساخته می‌شود و دکمه‌های
-     * خروج/افزودن دستی/بروزرسانی وضعیت نمایش داده نمی‌شوند.
+     * v4.186.0: هر پیام‌رسان کدام متدهای API ربات را دارد.
+     * بر پایهٔ مستندات رسمی Bot API روبیکا: getChat پشتیبانی می‌شود؛
+     * leaveChat در فهرست متدها نیست، پس فقط عملیات خروج برای روبیکا غیرفعال است.
      */
     function bot_chats_capabilities($platform) {
         $platform = function_exists('bot_valid_platform') ? bot_valid_platform($platform) : 'bale';
         return [
-            'get_chat' => $platform !== 'soroush',
-            'leave'    => $platform !== 'soroush',
+            'get_chat' => true,
+            'leave'    => $platform !== 'rubika',
         ];
     }
 }
@@ -369,7 +368,7 @@ if (!function_exists('bot_chats_refresh')) {
         if (empty($caps['get_chat'])) {
             $out['ok'] = false;
             $out['unsupported'] = true;
-            $out['note'] = 'سروش پلاس هنوز متد getChat ندارد؛ فهرست و وضعیت گفتگوها از همان پیام‌های دریافتی ساخته می‌شود.';
+            $out['note'] = 'این پیام‌رسان متد getChat را پشتیبانی نمی‌کند؛ فهرست گفتگوها از پیام‌های دریافتی ساخته می‌شود.';
             return $out;
         }
         $limit = max(1, min(50, (int)$limit));
@@ -397,7 +396,7 @@ if (!function_exists('bot_chats_refresh')) {
                 $c = is_array($res) ? ($res['result'] ?? null) : null;
                 if (!is_array($c)) throw new RuntimeException('پاسخ getChat قابل خواندن نیست');
                 $fields = ['checked_at' => $now, 'last_error' => null,
-                           'chat_type' => bot_chats_norm_type($c['type'] ?? '')];
+                           'chat_type' => bot_chats_norm_type($c['type'] ?? $c['chat_type'] ?? '')];
                 if (!empty($c['title'])) $fields['title'] = (string)$c['title'];
                 if (!empty($c['username'])) $fields['username'] = (string)$c['username'];
                 if (!empty($c['first_name']) && ($fields['chat_type'] ?? '') === 'private') {
@@ -446,7 +445,7 @@ if (!function_exists('bot_chats_leave')) {
         $chatId = trim((string)$chatId);
         if ($chatId === '') return ['ok' => false, 'error' => 'شناسهٔ گفتگو خالی است.'];
         if (empty(bot_chats_capabilities($platform)['leave'])) {
-            return ['ok' => false, 'error' => 'سروش پلاس هنوز متد leaveChat ندارد؛ خروج از گروه از داخل سایت ممکن نیست.'];
+            return ['ok' => false, 'error' => 'روبیکا در API رسمی leaveChat ندارد؛ خروج از گفتگو از داخل سایت ممکن نیست.'];
         }
         $row = null;
         try { $row = DB::fetch("SELECT * FROM bot_chats WHERE platform = ? AND chat_id = ?", [$platform, $chatId]); }
@@ -498,7 +497,7 @@ if (!function_exists('bot_chats_add')) {
         $chatId = trim((string)$chatId);
         if ($chatId === '') return ['ok' => false, 'error' => 'شناسهٔ گفتگو را وارد کنید.'];
         if (empty(bot_chats_capabilities($platform)['get_chat'])) {
-            return ['ok' => false, 'error' => 'سروش پلاس هنوز متد getChat ندارد؛ افزودن دستی با شناسه ممکن نیست.'];
+            return ['ok' => false, 'error' => 'این پیام‌رسان متد getChat را پشتیبانی نمی‌کند؛ افزودن دستی ممکن نیست.'];
         }
         if (!preg_match('/^@?[A-Za-z0-9_\-]{2,64}$/', $chatId)) {
             return ['ok' => false, 'error' => 'شناسه باید عددی (مثل ‎-1001234567890‎) یا نام کاربری با @ باشد.'];
@@ -506,11 +505,11 @@ if (!function_exists('bot_chats_add')) {
         try {
             $res = bot_chats_call($platform, 'getChat', ['chat_id' => $chatId], $transport);
             $c = is_array($res) ? ($res['result'] ?? null) : null;
-            if (!is_array($c) || empty($c['id'])) throw new RuntimeException('این شناسه در پیام‌رسان پیدا نشد.');
+            if (!is_array($c) || empty($c['id']) && empty($c['chat_id'])) throw new RuntimeException('این شناسه در پیام‌رسان پیدا نشد.');
         } catch (Throwable $e) {
             return ['ok' => false, 'error' => bot_chats_error_text($e)];
         }
-        $type = bot_chats_norm_type($c['type'] ?? '');
+        $type = bot_chats_norm_type($c['type'] ?? $c['chat_type'] ?? '');
         $title = (string)($c['title'] ?? '');
         if ($title === '' && !empty($c['first_name'])) $title = trim((string)$c['first_name'] . ' ' . (string)($c['last_name'] ?? ''));
         $now = date('Y-m-d H:i:s');

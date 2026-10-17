@@ -174,6 +174,16 @@ if (!function_exists('bot_admin_handle_request')) {
             if ($base === '.') $base = '';
             $webhookUrl = $protocol . $host . $base . '/' . bot_admin_webhook_file($platform);
             try {
+                if ($platform === 'rubika') {
+                    // Rubika Bot API v3 uses updateBotEndpoints (not setWebhook).
+                    // Its receiveUpdate and receiveInlineMessage callbacks are
+                    // separate endpoint types, both normalized by this script.
+                    $res = bot_api_request($platform, 'updateBotEndpoints', ['url' => $webhookUrl, 'type' => 'ReceiveUpdate']);
+                    $inlineRes = bot_api_request($platform, 'updateBotEndpoints', ['url' => $webhookUrl, 'type' => 'ReceiveInlineMessage']);
+                    log_activity($_SESSION['admin_id'] ?? null, 'تنظیم endpoint ربات ' . $title, json_encode([$res, $inlineRes], JSON_UNESCAPED_UNICODE));
+                    set_flash_message('success', 'هر دو endpoint دریافت پیام و دکمه‌های روبیکا با موفقیت روی ' . $webhookUrl . ' تنظیم شدند.');
+                    redirect($page);
+                }
                 $webhookPayload = ['url' => $webhookUrl];
                 if ($platform === 'telegram') {
                     // v4.46.0: register a secret token so the webhook only accepts
@@ -335,13 +345,13 @@ if (!function_exists('bot_admin_render_page')) {
                 </div>
             </details>
             <?php endif; ?>
-            <?php if ($platform === 'soroush'): ?>
+            <?php if ($platform === 'rubika'): ?>
             <details class="soft-panel text-xs">
-                <summary class="font-bold cursor-pointer">راهنما: ساخت ربات سروش پلاس</summary>
+                <summary class="font-bold cursor-pointer">راهنما: ساخت ربات روبیکا</summary>
                 <div class="space-y-2 mt-2">
-                    <p>در سروش پلاس به <b>splus.ir/botfather</b> بروید، یک ربات بسازید و توکنی مثل <code class="dir-ltr">123456:ABC-DEF…</code> بگیرید؛ همان را در فیلد «توکن ربات» بالا ذخیره کنید.</p>
-                    <p>آدرس وبهوک باید روی پورت‌های <b class="dir-ltr">443 / 80 / 88 / 8443</b> در دسترس باشد. اگر هاست شما ترافیک ورودی خارجی را می‌بندد، «ثبت خودکار Webhook» خطا می‌دهد؛ در آن صورت با پشتیبانی هاست یا یک واسط، دسترسی ورودی را باز کنید.</p>
-                    <p class="text-muted">سروش پلاس فعلاً متدهای <code class="dir-ltr">getChat</code> و <code class="dir-ltr">leaveChat</code> را در API ربات ندارد؛ پس در تب «گروه‌ها و کانال‌ها» فقط گفتگوهایی که پیام فرستاده‌اند دیده می‌شوند و دکمهٔ خروج/افزودن دستی برای این پیام‌رسان نمایش داده نمی‌شود.</p>
+                    <p>در روبیکا، BotFather@ را باز کنید، ربات بسازید و توکن دریافتی را بدون پیشوند اضافی در فیلد «توکن ربات» ذخیره کنید.</p>
+                    <p>روبیکا از Bot API نسخهٔ ۳ در <code class="dir-ltr">botapi.rubika.ir/v3</code> استفاده می‌کند. دکمهٔ ثبت، دو endpoint رسمی <code class="dir-ltr">ReceiveUpdate</code> و <code class="dir-ltr">ReceiveInlineMessage</code> را ثبت می‌کند؛ این API با setWebhook تلگرام/بله متفاوت است. سرور باید با HTTPS از اینترنت عمومی در دسترس باشد.</p>
+                    <p class="text-muted">روبیکا getChat را دارد اما متد رسمی leaveChat در فهرست API نیست؛ پس تازه‌سازی و افزودن دستی پشتیبانی می‌شوند ولی خروج از گفتگو غیرفعال است.</p>
                 </div>
             </details>
             <?php endif; ?>

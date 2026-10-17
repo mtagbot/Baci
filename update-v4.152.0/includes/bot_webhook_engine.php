@@ -1,8 +1,8 @@
 <?php
 // File: includes/bot_webhook_engine.php
 /**
- * Shared webhook workflow for Bale, Telegram and Soroush Plus.
- * The including file must define BOT_PLATFORM as 'bale', 'telegram' or 'soroush'.
+ * Shared webhook workflow for Bale, Telegram and Rubika Plus.
+ * The including file must define BOT_PLATFORM as 'bale', 'telegram' or 'rubika'.
  */
 
 require_once __DIR__ . '/bot_helpers.php';
@@ -53,6 +53,8 @@ if (!is_array($update)) {
     exit;
 }
 
+if ($platform === 'rubika') $update = bot_rubika_normalize_update($update);
+
 $userTable = bot_user_table($platform);
 $stateTable = bot_state_table($platform);
 $chatCol = bot_chat_column($platform);
@@ -78,7 +80,7 @@ function bot_webhook_safe_send($platform, $chatId, $text, $keyboard = null) {
 }
 
 function bot_webhook_answer_callback($platform, $callbackId) {
-    if (!$callbackId) return;
+    if (!$callbackId || $platform === 'rubika') return;
     try {
         bot_api_request($platform, 'answerCallbackQuery', ['callback_query_id' => $callbackId]);
     } catch (Exception $e) {
@@ -118,8 +120,8 @@ if ($callbackQuery) {
 
     if ($chatId !== '' && strpos($data, 'ack_rep_') === 0) {
         $repId = (int)substr($data, 8);
-        DB::execute("CREATE TABLE IF NOT EXISTS report_parent_reviews (id int(11) NOT NULL AUTO_INCREMENT, report_id int(11) NOT NULL, platform enum('bale','telegram','soroush') NOT NULL, chat_id varchar(80) NOT NULL, reviewed_at_jalali varchar(30) NOT NULL, PRIMARY KEY(id), UNIQUE KEY uniq_review (report_id, platform, chat_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-        if (function_exists('bot_migrate_platform_enum')) bot_migrate_platform_enum('report_parent_reviews', 'platform', "enum('bale','telegram','soroush') NOT NULL");
+        DB::execute("CREATE TABLE IF NOT EXISTS report_parent_reviews (id int(11) NOT NULL AUTO_INCREMENT, report_id int(11) NOT NULL, platform enum('bale','telegram','soroush','rubika') NOT NULL, chat_id varchar(80) NOT NULL, reviewed_at_jalali varchar(30) NOT NULL, PRIMARY KEY(id), UNIQUE KEY uniq_review (report_id, platform, chat_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        if (function_exists('bot_migrate_platform_enum')) bot_migrate_platform_enum('report_parent_reviews', 'platform', "enum('bale','telegram','soroush','rubika') NOT NULL");
         DB::execute("INSERT INTO report_parent_reviews (report_id, platform, chat_id, reviewed_at_jalali) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE reviewed_at_jalali=VALUES(reviewed_at_jalali)", [$repId, $platform, $chatId, jalali_now()]);
         bot_webhook_safe_send($platform, $chatId, '✅ بررسی کارنامه ثبت شد.');
     }

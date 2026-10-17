@@ -316,7 +316,7 @@ if ($view === 'dashboard' && is_admin_logged_in()):
         </div>
         <div class="card shadow-lg">
             <h4 class="font-bold mb-3">ارسال سریع پیام هدفمند</h4>
-            <div class="grid grid-cols-4 gap-2 mb-3"><a class="btn btn-primary text-xs" href="bale-bot.php">بله</a><a class="btn btn-primary text-xs" href="telegram-bot.php">تلگرام</a><a class="btn btn-primary text-xs" href="soroush-bot.php">سروش پلاس</a><a class="btn btn-success text-xs" href="sms-panel.php">پیامک</a><a class="btn btn-warning text-xs" href="notifications.php">اعلان</a></div>
+            <div class="grid grid-cols-4 gap-2 mb-3"><a class="btn btn-primary text-xs" href="bale-bot.php">بله</a><a class="btn btn-primary text-xs" href="telegram-bot.php">تلگرام</a><a class="btn btn-primary text-xs" href="rubika-bot.php">روبیکا</a><a class="btn btn-success text-xs" href="sms-panel.php">پیامک</a><a class="btn btn-warning text-xs" href="notifications.php">اعلان</a></div>
             <p class="text-xs text-muted">برای ارسال سریع هدفمند با انتخاب پایه، کلاس یا دانش‌آموز از پنل مربوط استفاده کنید.</p>
         </div>
     </div>

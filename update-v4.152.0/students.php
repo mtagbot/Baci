@@ -16,8 +16,8 @@ ensure_school_roles_schema();
 
 if (!current_teacher_is_executive()) require_permission('manage_students');
 try { DB::execute("ALTER TABLE students ADD COLUMN academic_year varchar(20) DEFAULT NULL"); } catch (Exception $e) {}
-try { DB::execute("CREATE TABLE IF NOT EXISTS report_parent_reviews (id int(11) NOT NULL AUTO_INCREMENT, report_id int(11) NOT NULL, platform enum('bale','telegram','soroush') NOT NULL, chat_id varchar(80) NOT NULL, reviewed_at_jalali varchar(30) NOT NULL, PRIMARY KEY(id), UNIQUE KEY uniq_review (report_id, platform, chat_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"); } catch (Exception $e) {}
-try { $pdo=DB::getInstance()->getPdo(); if($pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'){ $col=DB::fetch("SHOW COLUMNS FROM report_parent_reviews LIKE 'platform'"); $type=strtolower((string)($col['Type']??'')); if($type!==''&&strpos($type,'soroush')===false) DB::execute("ALTER TABLE report_parent_reviews MODIFY platform enum('bale','telegram','soroush') NOT NULL"); } } catch (Exception $e) {}
+try { DB::execute("CREATE TABLE IF NOT EXISTS report_parent_reviews (id int(11) NOT NULL AUTO_INCREMENT, report_id int(11) NOT NULL, platform enum('bale','telegram','soroush','rubika') NOT NULL, chat_id varchar(80) NOT NULL, reviewed_at_jalali varchar(30) NOT NULL, PRIMARY KEY(id), UNIQUE KEY uniq_review (report_id, platform, chat_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"); } catch (Exception $e) {}
+try { $pdo=DB::getInstance()->getPdo(); if($pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'){ $col=DB::fetch("SHOW COLUMNS FROM report_parent_reviews LIKE 'platform'"); $type=strtolower((string)($col['Type']??'')); if($type!==''&&strpos($type,'rubika')===false) DB::execute("ALTER TABLE report_parent_reviews MODIFY platform enum('bale','telegram','soroush','rubika') NOT NULL"); } } catch (Exception $e) {}
 sync_student_photos_from_uploads();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['transfer_students'])) {

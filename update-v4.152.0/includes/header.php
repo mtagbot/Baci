@@ -197,7 +197,7 @@ function mtagToggleSidebar(){
             <a href="messages-management.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['messages-management.php','notifications.php','sms-panel.php']) ? 'active' : ''; ?>">پیامک و اعلان‌ها</a>
             <a href="bale-bot.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'bale-bot.php' ? 'active' : ''; ?>">بازوی بله</a>
             <a href="telegram-bot.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'telegram-bot.php' ? 'active' : ''; ?>">ربات تلگرام</a>
-            <a href="soroush-bot.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'soroush-bot.php' ? 'active' : ''; ?>">ربات سروش پلاس</a>
+            <a href="rubika-bot.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'rubika-bot.php' ? 'active' : ''; ?>">ربات روبیکا</a>
             <a href="bot-accounts.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'bot-accounts.php' ? 'active' : ''; ?>">اکانت‌های متصل</a>
         <?php endif; ?>
         <div class="sidebar-section-title">سیستم</div>

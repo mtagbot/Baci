@@ -30,8 +30,8 @@ if (!defined('DESK_SYNC_TABLES')) {
         'online_exams','online_questions','online_exam_attempts','online_exam_answers',
         'grade_messages','counseling_requests','student_attendance','student_qr_tags',
         // bot integration: registrations, staff bot sessions, templates, logs —
-        // so everything the site's Bale/Telegram/Soroush bots know is also on the desktop
-        'bale_bot_users','telegram_bot_users','soroush_bot_users','bot_admin_sessions',
+        // so everything the site's Bale/Telegram/Rubika bots know is also on the desktop
+        'bale_bot_users','telegram_bot_users','rubika_bot_users','bot_admin_sessions',
         'bot_message_templates','bot_button_templates','bot_login_tokens','bot_message_logs',
         // v2.11.0: full parity with the site dashboard — admin activity log,
         // notifications, SMS log and parent report reviews sync too
@@ -726,7 +726,7 @@ class DeskSync {
                 // upgraded from a pre-2.4 install: everything except the
                 // bot tables was already imported by the original snapshot
                 $snapped = array_values(array_diff(json_decode(DESK_SYNC_TABLES, true), [
-                    'bale_bot_users','telegram_bot_users','soroush_bot_users','bot_admin_sessions',
+                    'bale_bot_users','telegram_bot_users','rubika_bot_users','bot_admin_sessions',
                     'bot_message_templates','bot_button_templates','bot_login_tokens','bot_message_logs',
                 ]));
                 self::setCfg('desk_sync_snapped', json_encode($snapped));
@@ -736,7 +736,7 @@ class DeskSync {
             // if an older version wrongly marked them as already snapped
             // (v2.4.0 recorded skipped tables as done). Costs one tiny call per
             // empty table and is skipped when local deletions are still pending.
-            foreach (['bale_bot_users','telegram_bot_users','soroush_bot_users','bot_admin_sessions',
+            foreach (['bale_bot_users','telegram_bot_users','rubika_bot_users','bot_admin_sessions',
                       'bot_message_templates','bot_button_templates','bot_login_tokens','bot_message_logs'] as $bt) {
                 if (in_array($bt, $newTables, true)) continue;
                 try {

@@ -163,6 +163,13 @@ if (!function_exists('bot_admin_handle_request')) {
             if ($base === '.') $base = '';
             $webhookUrl = $protocol . $host . $base . '/' . bot_admin_webhook_file($platform);
             try {
+                if ($platform === 'rubika') {
+                    $res = bot_api_request($platform, 'updateBotEndpoints', ['url' => $webhookUrl, 'type' => 'ReceiveUpdate']);
+                    $inlineRes = bot_api_request($platform, 'updateBotEndpoints', ['url' => $webhookUrl, 'type' => 'ReceiveInlineMessage']);
+                    log_activity($_SESSION['admin_id'] ?? null, 'تنظیم endpoint ربات ' . $title, json_encode([$res, $inlineRes], JSON_UNESCAPED_UNICODE));
+                    set_flash_message('success', 'هر دو endpoint دریافت پیام و دکمه‌های روبیکا با موفقیت روی ' . $webhookUrl . ' تنظیم شدند.');
+                    redirect($page);
+                }
                 $webhookPayload = ['url' => $webhookUrl];
                 if ($platform === 'telegram') {
                     // v4.46.0: register a secret token so the webhook only accepts
@@ -324,12 +331,12 @@ if (!function_exists('bot_admin_render_page')) {
                 </div>
             </details>
             <?php endif; ?>
-            <?php if ($platform === 'soroush'): ?>
+            <?php if ($platform === 'rubika'): ?>
             <details class="soft-panel text-xs">
-                <summary class="font-bold cursor-pointer">راهنما: ساخت ربات سروش پلاس</summary>
+                <summary class="font-bold cursor-pointer">راهنما: ساخت ربات روبیکا</summary>
                 <div class="space-y-2 mt-2">
-                    <p>در سروش پلاس به <b>splus.ir/botfather</b> بروید، ربات بسازید و توکن را همین‌جا ذخیره کنید.</p>
-                    <p>وبهوک باید روی پورت‌های <b class="dir-ltr">443 / 80 / 88 / 8443</b> در دسترس باشد. سروش پلاس فعلاً <code class="dir-ltr">getChat</code> و <code class="dir-ltr">leaveChat</code> ندارد.</p>
+                    <p>در روبیکا، BotFather@ را باز کنید، ربات بسازید و توکن دریافتی را بدون پیشوند اضافی همین‌جا ذخیره کنید.</p>
+                    <p>روبیکا از Bot API نسخهٔ ۳ در <code class="dir-ltr">botapi.rubika.ir/v3</code> استفاده می‌کند. ثبت خودکار دو endpoint رسمی <code class="dir-ltr">ReceiveUpdate</code> و <code class="dir-ltr">ReceiveInlineMessage</code> را تنظیم می‌کند. <code class="dir-ltr">getChat</code> پشتیبانی می‌شود؛ <code class="dir-ltr">leaveChat</code> در API نیست.</p>
                 </div>
             </details>
             <?php endif; ?>
