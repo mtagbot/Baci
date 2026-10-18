@@ -218,9 +218,11 @@ if (!$examId || (!$designTokenOk && !exam_can_design($examId))) json_out(false, 
 $exam = DB::fetch("SELECT es.*, COALESCE(t.full_name, es.teacher_name) AS t_name FROM exam_schedules es LEFT JOIN teachers t ON t.id=es.teacher_id WHERE es.id=?", [$examId]);
 if (!$exam) json_out(false, ['error'=>'آزمون یافت نشد']);
 if(($exam['exam_kind']??'')==='class_deleted')json_out(false,['error'=>'این آزمون کلاسی حذف شده است.']);
+if (in_array($action,['save','import_design'],true) && !exam_schedule_design_ready($exam)) json_out(false,['error'=>'برنامهٔ امتحانی ناقص است؛ طراحی آزمون ذخیره نشد.']);
 if(in_array($action,['save','import_design'],true))ceg_write_begin($exam);
 $exam=DB::fetch('SELECT es.*,COALESCE(t.full_name,es.teacher_name) t_name FROM exam_schedules es LEFT JOIN teachers t ON t.id=es.teacher_id WHERE es.id=?',[$examId]);
 if(($exam['exam_kind']??'')==='class_deleted')json_out(false,['error'=>'این آزمون کلاسی حذف شده است.']);
+if (in_array($action,['save','import_design'],true) && !exam_schedule_design_ready($exam)) json_out(false,['error'=>'برنامهٔ امتحانی ناقص است؛ طراحی آزمون ذخیره نشد.']);
 $boundGroup=ceg_for_exam($exam);
 if(ceg_pending_sync($exam,$boundGroup))json_out(false,['error'=>'اطلاعات گروه هنوز همگام نشده است.']);
 if($boundGroup && !$boundGroup['excluded'] && (int)$boundGroup['design_exam_id']!==$examId) json_out(false,['error'=>'این کلاس اکنون عضو آزمون پایه است؛ صفحه را تازه‌سازی کنید.']);

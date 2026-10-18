@@ -230,6 +230,28 @@ if (!function_exists('bot_seed_templates')) {
     }
 }
 
+if (!function_exists('bot_format_student_exam_schedule')) {
+    function bot_format_student_exam_schedule($studentName, array $items, $title = '') {
+        $title = trim((string)$title);
+        $msg = ($title !== '' ? $title : ("📝 برنامهٔ امتحانی " . trim((string)$studentName))) . "\n";
+        $msg .= "────────────────────\n";
+        foreach ($items as $index => $ex) {
+            $room = trim((string)($ex['exam_room'] ?? ''));
+            if ($room === '') $room = trim((string)($ex['exam_room_default'] ?? ''));
+            $className = trim((string)($ex['class_name'] ?? ''));
+            $subject = trim((string)($ex['subject_name'] ?? '')) ?: 'درس نامشخص';
+            $msg .= "\n📚 " . tr_num((string)($index + 1), 'fa') . '. ' . $subject . "\n";
+            $msg .= "   📅 تاریخ: " . tr_num((string)($ex['exam_date_jalali'] ?? ''), 'fa') . "\n";
+            $msg .= "   🕗 ساعت: " . tr_num((string)($ex['start_time'] ?? ''), 'fa') . "\n";
+            if ($className !== '') $msg .= "   🏫 کلاس: {$className}\n";
+            $msg .= "   💺 صندلی: " . tr_num((string)($ex['seat_number'] ?? '') ?: '---', 'fa') . "\n";
+            $msg .= "   📍 حوزه/سالن: " . ($room !== '' ? $room : '---') . "\n";
+            $msg .= "────────────────────\n";
+        }
+        return $msg;
+    }
+}
+
 if (!function_exists('bot_text')) {
     function bot_text($platform, $key, $vars = []) {
         $platform = bot_valid_platform($platform);

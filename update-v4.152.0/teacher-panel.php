@@ -270,7 +270,7 @@ $tab = $_GET['tab'] ?? 'schedule';
         /* v4.70.0: مرتب‌سازی طوری که آزمون‌های «پایه یکسان + درس یکسان» پشت‌سرهم
          * قرار بگیرند تا خانه مشترک «طراحی پایه‌ای» با rowspan روی همه ردیف‌های
          * گروه بنشیند. */
-        $teacherExams = DB::fetchAll("SELECT * FROM exam_schedules WHERE teacher_id = ? AND is_active = 1 AND COALESCE(exam_kind,'official') NOT IN ('class','class_deleted') ORDER BY academic_year DESC, exam_month ASC, grade_level ASC, subject_name ASC, class_name ASC, exam_date_jalali ASC, start_time ASC", [$teacherId]);
+        $teacherExams = DB::fetchAll("SELECT * FROM exam_schedules WHERE teacher_id = ? AND is_active = 1 AND COALESCE(exam_kind,'official') NOT IN ('class','class_deleted') AND TRIM(COALESCE(academic_year,''))<>'' AND TRIM(COALESCE(subject_name,''))<>'' AND TRIM(COALESCE(exam_date_jalali,''))<>'' AND TRIM(COALESCE(start_time,''))<>'' AND duration_minutes>0 ORDER BY academic_year DESC, exam_month ASC, grade_level ASC, subject_name ASC, class_name ASC, exam_date_jalali ASC, start_time ASC", [$teacherId]);
         // شمارش اعضای هر گروه: سال|ماه|پایه|درس
         $tpGroupCounts = [];
         foreach ($teacherExams as $tex) {

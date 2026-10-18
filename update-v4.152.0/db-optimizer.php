@@ -203,6 +203,34 @@ function dbopt_orphan_defs() {
             "DELETE FROM exam_assignments WHERE exam_id IS NOT NULL AND exam_id NOT IN (SELECT id FROM exam_schedules)",
         ];
     }
+    /* v4.188.0: آزمون رسمی فعال با برنامهٔ ناقص و بدون هیچ وابستگی.
+       آزمون‌های کلاسی عمداً تاریخ/ساعت ندارند و همیشه مستثنا هستند؛ همچنین
+       هر رکورد دارای طراحی/بایگانی/assignment/فایل منبع قابل پاکسازی نیست. */
+    if (dbopt_table_exists('exam_schedules')
+        && dbopt_column_exists('exam_schedules','exam_date_jalali')
+        && dbopt_column_exists('exam_schedules','start_time')) {
+        $incompleteParts = [
+            "TRIM(COALESCE(es.exam_date_jalali,''))=''",
+            "TRIM(COALESCE(es.start_time,''))=''",
+        ];
+        if (dbopt_column_exists('exam_schedules','academic_year')) $incompleteParts[] = "TRIM(COALESCE(es.academic_year,''))=''";
+        if (dbopt_column_exists('exam_schedules','subject_name')) $incompleteParts[] = "TRIM(COALESCE(es.subject_name,''))=''";
+        if (dbopt_column_exists('exam_schedules','duration_minutes')) $incompleteParts[] = 'COALESCE(es.duration_minutes,0)<=0';
+        $incompleteWhere = '(' . implode(' OR ', $incompleteParts) . ')';
+        if (dbopt_column_exists('exam_schedules','is_active')) $incompleteWhere .= ' AND COALESCE(es.is_active,1)=1';
+        if (dbopt_column_exists('exam_schedules','exam_kind')) $incompleteWhere .= " AND COALESCE(es.exam_kind,'official') NOT IN ('class','class_deleted')";
+        foreach ([['exam_designs','exam_id'],['exam_design_archive','exam_id'],['exam_assignments','exam_id'],['exam_question_bank','source_exam_id']] as [$depTable,$depColumn]) {
+            if (dbopt_table_exists($depTable) && dbopt_column_exists($depTable,$depColumn)) {
+                $incompleteWhere .= " AND NOT EXISTS (SELECT 1 FROM `$depTable` dep WHERE dep.`$depColumn`=es.id)";
+            }
+        }
+        if (dbopt_column_exists('exam_schedules','question_file')) $incompleteWhere .= " AND TRIM(COALESCE(es.question_file,''))=''";
+        $defs['incomplete_exam_schedules'] = [
+            'برنامه‌های امتحانی رسمی ناقص و بدون وابستگی (قابل حذف امن)',
+            "SELECT COUNT(*) c FROM exam_schedules es WHERE $incompleteWhere",
+            "DELETE FROM exam_schedules WHERE id IN (SELECT orphan_id FROM (SELECT es.id AS orphan_id FROM exam_schedules es WHERE $incompleteWhere) safe_incomplete_exam_ids)",
+        ];
+    }
     if (dbopt_table_exists('counseling_requests')) {
         $defs['counseling_orphan'] = [
             'درخواست‌های مشاوره دانش‌آموز حذف‌شده',
@@ -304,6 +332,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         log_activity($_SESSION['admin_id'] ?? null, 'پاکسازی دیتابیس', $total ? implode(' | ', $details) : 'موردی یافت نشد');
         set_flash_message($failed?'warning':'success', $failed?'پاکسازی کامل نشد؛ برخی بررسی‌ها یا حذف‌ها ناموفق بودند. تعداد حذف‌شده: '.$total : ($total ? "پاکسازی انجام شد — مجموعاً $total رکورد یتیم/منقضی حذف شد:\n" . implode("\n", $details) : 'هیچ رکورد یتیم یا منقضی‌ای یافت نشد. دیتابیس در بررسی‌های انجام‌شده تمیز است.'));
+        redirect('db-optimizer.php?'.(!empty($_GET['embedded'])?'embedded=1&':'').'scan=1');
+    }
+
+    /* حذف هدفمند برنامه‌های امتحانی ناقص؛ مستقل از بقیهٔ پاکسازی‌ها. */
+    if ($act === 'cleanup_incomplete_exam_schedules') {
+        $defs = dbopt_orphan_defs();
+        $entry = $defs['incomplete_exam_schedules'] ?? null;
+        if (!$entry) set_flash_message('warning','پاکسازی برنامه‌های ناقص در این ساختار در دسترس نیست.');
+        else {
+            $n = dbopt_count($entry[1]);
+            if ($n < 0) set_flash_message('warning','اسکن برنامه‌های ناقص ناموفق بود؛ هیچ رکوردی حذف نشد.');
+            elseif ($n === 0) set_flash_message('success','برنامهٔ ناقصِ بدون وابستگی برای حذف پیدا نشد.');
+            else {
+                try {
+                    $stmt = DB::query($entry[2]);
+                    $removed = $stmt ? (int)$stmt->rowCount() : 0;
+                    log_activity($_SESSION['admin_id'] ?? null, 'پاکسازی برنامه‌های امتحانی ناقص', 'برنامه‌های ناقصِ بدون وابستگی: ' . $removed);
+                    set_flash_message('success','برنامه‌های ناقصِ بدون وابستگی حذف شد: ' . $removed . ' رکورد. سایر داده‌های یتیم پاک نشدند.');
+                } catch (Throwable $e) {
+                    set_flash_message('warning','پاکسازی برنامه‌های ناقص ناموفق بود؛ رکوردها را بررسی کنید.');
+                }
+            }
+        }
         redirect('db-optimizer.php?'.(!empty($_GET['embedded'])?'embedded=1&':'').'scan=1');
     }
 
@@ -590,6 +641,15 @@ require_once __DIR__ . '/includes/header.php';
             </tbody>
         </table>
     </div>
+    <?php $incompleteExamCount = $orphanCounts['برنامه‌های امتحانی رسمی ناقص و بدون وابستگی (قابل حذف امن)'] ?? 0; ?>
+    <?php if (array_key_exists('برنامه‌های امتحانی رسمی ناقص و بدون وابستگی (قابل حذف امن)', $orphanCounts)): ?>
+    <form method="POST" class="mt-3" onsubmit="return confirm('فقط برنامه‌های رسمی ناقصِ بدون طراحی، تخصیص یا فایل منبع حذف شوند؟ سایر داده‌های یتیم دست‌نخورده می‌مانند.');">
+        <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
+        <input type="hidden" name="do" value="cleanup_incomplete_exam_schedules">
+        <button type="submit" class="btn btn-warning btn-sm" <?php echo (!$detailedScan || $incompleteExamCount<=0) ? 'disabled' : ''; ?>>حذف امن برنامه‌های امتحانی ناقص (<?php echo $detailedScan ? tr_num((string)max(0,(int)$incompleteExamCount),'fa') : 'اسکن نشده'; ?>)</button>
+        <span class="text-muted text-xs">این دکمه فقط همین مورد را پاک می‌کند؛ آزمون کلاسی و برنامهٔ دارای وابستگی حفظ می‌شود.</span>
+    </form>
+    <?php endif; ?>
 </div>
 
 <?php /* ═══ v4.176.0: قواعد نگهداشت — رشد پایدار جدول‌های پرشونده ═══ */ ?>

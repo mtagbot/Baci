@@ -123,6 +123,7 @@ $examId = (int)($_GET['exam_id'] ?? 0);
 $exam = DB::fetch('SELECT es.*, COALESCE(t.full_name, es.teacher_name) t_name, t.last_name t_last FROM exam_schedules es LEFT JOIN teachers t ON t.id=es.teacher_id WHERE es.id=?',[$examId]);
 if (!$exam) app_page_error('امتحان یافت نشد');
 if(($exam['exam_kind']??'')==='class_deleted')app_page_error('این آزمون کلاسی حذف شده و قابل ویرایش یا چاپ نیست.');
+if (in_array($type,['questions','questions_editor'],true) && !exam_schedule_design_ready($exam)) app_page_error('این برنامهٔ امتحانی ناقص است و برای طراحی آزمون در دسترس نیست؛ ابتدا تاریخ و ساعت را کامل کنید.');
 $designToken = $_GET['dt'] ?? '';
 $designTokenOk = verify_exam_design_token($designToken, $examId);
 if (($type === 'questions' || $type === 'questions_editor') && !$designTokenOk && !exam_can_design($examId)) app_page_error('شما مجاز به طراحی سوالات این آزمون نیستید.');

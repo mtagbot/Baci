@@ -56,9 +56,18 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
   if($changing && in_array($changing['exam_kind']??'',['class','class_deleted'],true)){set_flash_message('error','آزمون کلاسی را از بخش آزمون‌های کلاسی ویرایش کنید.');redirect('exams.php?tab=class&year='.urlencode($year));}
 
   $id=(int)($_POST['exam_id']??0); $tid=(int)($_POST['teacher_id']??0); $tname=''; if($tid){$t=DB::fetch('SELECT full_name FROM teachers WHERE id=?',[$tid]);$tname=$t['full_name']??'';}
+  $scheduleYear=unify_academic_year(trim($_POST['academic_year']??$year));
+  $scheduleSubject=trim($_POST['subject_name']??'');
+  $scheduleDate=trim($_POST['exam_date_jalali']??'');
+  $scheduleTime=trim($_POST['start_time']??'');
+  $scheduleDuration=(int)($_POST['duration_minutes']??90);
+  if($scheduleYear==='' || $scheduleSubject==='' || $scheduleDate==='' || $scheduleTime==='' || $scheduleDuration<=0){
+   set_flash_message('error','ثبت برنامهٔ امتحان ناقص مجاز نیست؛ سال تحصیلی، درس، تاریخ، ساعت و مدت معتبر را کامل کنید.');
+   redirect('exams.php?tab=schedule&year='.urlencode($year));
+  }
   $file=$_POST['existing_question_file']??'';
   if(isset($_FILES['question_file']) && $_FILES['question_file']['error']===UPLOAD_ERR_OK){$ext=strtolower(pathinfo($_FILES['question_file']['name'],PATHINFO_EXTENSION)); if(in_array($ext,['pdf','png','jpg','jpeg','webp'])){$dir=__DIR__.'/uploads/exams'; if(!is_dir($dir))mkdir($dir,0755,true); $fn='question_'.time().'_'.bin2hex(random_bytes(3)).'.'.$ext; move_uploaded_file($_FILES['question_file']['tmp_name'],$dir.'/'.$fn); $file='uploads/exams/'.$fn;}}
-  $p=[unify_academic_year(trim($_POST['academic_year']??$year)),trim($_POST['grade_level']??''),trim($_POST['class_name']??''),trim($_POST['subject_name']??''),$tid?:null,$tname,trim($_POST['exam_date_jalali']??''),trim($_POST['start_time']??''),(int)($_POST['duration_minutes']??90),trim($_POST['exam_room_default']??''),$file,json_encode($_POST['header']??[],JSON_UNESCAPED_UNICODE)];
+  $p=[$scheduleYear,trim($_POST['grade_level']??''),trim($_POST['class_name']??''),$scheduleSubject,$tid?:null,$tname,$scheduleDate,$scheduleTime,$scheduleDuration,trim($_POST['exam_room_default']??''),$file,json_encode($_POST['header']??[],JSON_UNESCAPED_UNICODE)];
   if($id) DB::execute('UPDATE exam_schedules SET academic_year=?,grade_level=?,class_name=?,subject_name=?,teacher_id=?,teacher_name=?,exam_date_jalali=?,start_time=?,duration_minutes=?,exam_room_default=?,question_file=?,header_config=? WHERE id=?',array_merge($p,[$id]));
   else DB::execute('INSERT INTO exam_schedules (academic_year,grade_level,class_name,subject_name,teacher_id,teacher_name,exam_date_jalali,start_time,duration_minutes,exam_room_default,question_file,header_config,created_at_jalali) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',array_merge($p,[jdate('Y/m/d H:i')]));
   set_flash_message('success','برنامه امتحانی ذخیره شد.'); redirect('exams.php?tab=schedule&year='.urlencode($p[0]));

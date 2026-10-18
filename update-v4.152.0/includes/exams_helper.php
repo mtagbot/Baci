@@ -136,6 +136,19 @@ if (!function_exists('exam_year_students_sql')) {
         return [$sql, [$y, $y, $y, $y]];
     }
 }
+if (!function_exists('exam_schedule_design_ready')) {
+    /** آزمون کلاسی عمداً تاریخ/ساعت ندارد؛ فقط رکورد رسمی ناقص رد می‌شود. */
+    function exam_schedule_design_ready(array $exam) {
+        $kind = (string)($exam['exam_kind'] ?? 'official');
+        if ($kind === 'class') return true;
+        if ($kind === 'class_deleted') return false;
+        foreach (['academic_year','subject_name','exam_date_jalali','start_time'] as $field) {
+            if (trim((string)($exam[$field] ?? '')) === '') return false;
+        }
+        return (int)($exam['duration_minutes'] ?? 0) > 0;
+    }
+}
+
 if (!function_exists('exam_student_schedule')) {
     /**
      * برنامهٔ حضوری همان سال تحصیلیِ دانش‌آموز را برمی‌گرداند.

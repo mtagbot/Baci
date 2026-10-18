@@ -18,7 +18,7 @@ $legacy=ceg_insert_exam(801,'1404/1405','هفتم','ریاضی','هفتم1');
 $future=ceg_insert_exam(801,'1405/1406','هفتم','ریاضی','هفتم1');
 $science=ceg_insert_exam(801,'1404/1405','هفتم','علوم','هفتم1');
 $foreign=ceg_insert_exam(802,'1404/1405','هفتم','ریاضی','هفتم4');
-$monthly=ceg_insert_exam(801,'1404/1405','هفتم','ریاضی','هفتم1');DB::execute("UPDATE exam_schedules SET exam_kind='official',exam_month='MONTHLY_SENTINEL' WHERE id=?",[$monthly]);
+$monthly=ceg_insert_exam(801,'1404/1405','هفتم','ریاضی','هفتم1');DB::execute("UPDATE exam_schedules SET exam_kind='official',exam_month='MONTHLY_SENTINEL',exam_date_jalali='1404/05/10',start_time='08:00',duration_minutes=90 WHERE id=?",[$monthly]);
 DB::execute('UPDATE exam_schedules SET question_file=? WHERE id=?',['uploads/exams/converted.pdf',$src]);
 $path='uploads/exams/pdf-pages/exam_'.$src.'/page_001.jpg';
 DB::execute('UPDATE exam_schedules SET header_config=?,duration_minutes=64 WHERE id=?',[json_encode(['logo'=>$path,'paths'=>[$path=>'preserved']]),$src]);

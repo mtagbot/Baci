@@ -383,10 +383,8 @@ if ($text === $btnExamSchedule) {
         $items = exam_student_schedule($effectiveId);
         $studentName = trim($st['first_name'] . ' ' . $st['last_name']);
         if (!$items) { bot_webhook_safe_send($platform, $chatId, bot_text($platform, 'exam_schedule_empty', ['student_name'=>$studentName]), bot_main_keyboard($platform)); continue; }
-        $msg = bot_text($platform, 'exam_schedule_title', ['student_name'=>$studentName]);
-        foreach ($items as $ex) {
-            $msg .= "\n▪️ " . $ex['subject_name'] . " | " . tr_num($ex['exam_date_jalali'], 'fa') . " ساعت " . tr_num($ex['start_time'], 'fa') . " | صندلی: " . tr_num($ex['seat_number'] ?: '---', 'fa') . " | کلاس: " . ($ex['exam_room'] ?: $ex['exam_room_default'] ?: '---');
-        }
+        $scheduleTitle = bot_text($platform, 'exam_schedule_title', ['student_name'=>$studentName]);
+        $msg = bot_format_student_exam_schedule($studentName, $items, $scheduleTitle);
         // Also include online exams for latest year (virtual exams)
         try {
             ensure_online_exams_schema();
