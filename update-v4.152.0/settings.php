@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     set_setting('report_image_footer_text', trim($_POST['report_image_footer_text'] ?? 'تولید شده توسط سامانه مدیریت کارنامه - {date}'));
     set_setting('exam_header_title', trim($_POST['exam_header_title'] ?? 'سربرگ رسمی آزمون'));
     set_setting('exam_header_subtitle', trim($_POST['exam_header_subtitle'] ?? ''));
-    
+
     // Handle stamp & signature upload
     foreach (['principal_signature_file' => 'principal_signature_url', 'school_stamp_file' => 'school_stamp_url', 'exam_stamp_file' => 'exam_stamp_url'] as $fInput => $fKey) {
         if (isset($_FILES[$fInput]) && $_FILES[$fInput]['error'] === UPLOAD_ERR_OK) {
@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
             }
         }
     }
-    
+
     set_setting('theme_color', app_color($_POST['theme_color'] ?? '', '#2563eb'));
     set_setting('success_color', app_color($_POST['success_color'] ?? '', '#15803d'));
     set_setting('danger_color', app_color($_POST['danger_color'] ?? '', '#b91c1c'));
@@ -62,12 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     set_setting('font_family', $chosenFont);
     set_setting('body_font_size', trim($_POST['body_font_size'] ?? '14px'));
     set_setting('body_text_color', trim($_POST['body_text_color'] ?? '#0f172a'));
-    
+
     set_setting('heading_font_family', $chosenFont);
     set_setting('heading_font_size', trim($_POST['heading_font_size'] ?? '22px'));
     set_setting('heading_font_weight', trim($_POST['heading_font_weight'] ?? '700'));
     set_setting('heading_text_color', trim($_POST['heading_text_color'] ?? '#1e293b'));
-    
+
     set_setting('table_font_size', trim($_POST['table_font_size'] ?? '13px'));
     set_setting('table_header_bg', trim($_POST['table_header_bg'] ?? '#f1f5f9'));
 
@@ -92,6 +92,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     set_setting('sms_username', trim($_POST['sms_username'] ?? ''));
     set_setting('sms_password', trim($_POST['sms_password'] ?? ''));
     set_setting('sms_sender_number', trim($_POST['sms_sender_number'] ?? ''));
+
+    // Only administrators control this single school-wide teacher-design switch.
+    // Existing class exams/designs and their is_active flags are never altered here.
+    if (is_admin_logged_in()) {
+        set_setting('class_exam_design_enabled', isset($_POST['class_exam_design_enabled']) ? '1' : '0');
+    }
 
     log_activity($_SESSION['admin_id'] ?? null, 'تغییر تنظیمات سیستم', 'تنظیمات ظاهری، سربرگ کارنامه، فونت و پیامک بروزرسانی شد.');
     set_flash_message('success', 'تنظیمات ظاهری و سفارشی‌سازی سایت با موفقیت اعمال شد.');
@@ -138,6 +144,7 @@ $sms_key   = get_setting('sms_api_key', '');
 $sms_user  = get_setting('sms_username', '');
 $sms_pass  = get_setting('sms_password', '');
 $sms_send  = get_setting('sms_sender_number', '');
+$class_exam_design_enabled = get_setting('class_exam_design_enabled', '1') !== '0';
 ?>
 <div class="space-y-6">
     <div class="flex justify-between items-center">
@@ -386,6 +393,16 @@ $sms_send  = get_setting('sms_sender_number', '');
                 </div>
             </div>
         </div>
+
+        <?php if (is_admin_logged_in()): ?>
+        <div class="card mt-6 border border-amber-200 space-y-3">
+            <h3 class="font-bold text-primary border-b pb-2">تنظیمات آزمون‌های کلاسی دبیران</h3>
+            <label class="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" name="class_exam_design_enabled" value="1" <?php echo $class_exam_design_enabled ? 'checked' : ''; ?> style="margin-top:5px;accent-color:#15803d">
+                <span><b>فعال‌سازی طراحی آزمون کلاسی برای همهٔ دبیران و درس‌ها</b><small class="block text-muted mt-1">با خاموش‌کردن این گزینه، طراحی آزمون کلاسی جدید و ویرایش آن برای دبیران غیرفعال می‌شود. آزمون‌ها، وضعیت فعال‌بودن و طراحی‌های قبلی دست‌نخورده می‌مانند؛ مدیر و معاون اجرایی همچنان می‌توانند آزمون‌ها را ببینند و چاپ کنند.</small></span>
+            </label>
+        </div>
+        <?php endif; ?>
 
         <div class="flex justify-end mt-6">
             <button type="submit" class="btn btn-success px-8 py-3 font-bold shadow-lg">

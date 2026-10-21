@@ -127,7 +127,7 @@ if (in_array($type,['questions','questions_editor'],true) && !exam_schedule_desi
 if (in_array($type,['questions','questions_editor'],true) && !exam_teacher_class_design_enabled($exam)) app_page_error('طراحی آزمون‌های کلاسی در حال حاضر توسط مدیریت غیرفعال شده است.');
 $designToken = $_GET['dt'] ?? '';
 $designTokenOk = verify_exam_design_token($designToken, $examId);
-if (($type === 'questions' || $type === 'questions_editor') && !$designTokenOk && !exam_can_design($examId)) app_page_error('شما مجاز به طراحی سوالات این آزمون نیستید.');
+if (($type === 'questions' || $type === 'questions_editor') && !$designTokenOk && !exam_can_view_design($examId)) app_page_error('شما مجاز به مشاهدهٔ سوالات این آزمون نیستید.');
 if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['upload_question_source'])){ceg_write_begin($exam);$fresh=DB::fetch('SELECT exam_kind FROM exam_schedules WHERE id=?',[$examId]);if(!$fresh || $fresh['exam_kind']==='class_deleted')app_page_error('این آزمون کلاسی حذف شده است.');}
 $classGroup=ceg_for_exam($exam);
 if(ceg_pending_sync($exam,$classGroup))app_page_error('اطلاعات گروه هنوز همگام نشده است؛ پس از تکمیل همگام‌سازی صفحه را باز کنید.');

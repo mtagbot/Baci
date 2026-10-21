@@ -2,6 +2,7 @@
 // File: includes/exams_helper.php
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/school_sort.php';
+require_once __DIR__ . '/school_roles.php';
 
 if (!function_exists('jalali_now')) {
     function jalali_now() { return jdate('Y/m/d H:i'); }
@@ -12,7 +13,9 @@ if (!function_exists('exam_teacher_class_design_enabled')) {
         if (!is_array($exam) || ($exam['exam_kind'] ?? '') !== 'class') return true;
         if (function_exists('is_admin_logged_in') && is_admin_logged_in()) return true;
         if (function_exists('current_teacher_is_executive') && current_teacher_is_executive()) return true;
-        return !array_key_exists('teacher_design_enabled', $exam) || (int)$exam['teacher_design_enabled'] === 1;
+        // One school-wide switch controls new class-exam design by every teacher.
+        // Per-exam legacy flags are intentionally ignored so prior activations/designs remain intact.
+        return get_setting('class_exam_design_enabled', '1') !== '0';
     }
 }
 
@@ -67,15 +70,12 @@ if (!function_exists('ensure_exams_schema')) {
             question_file varchar(255) DEFAULT NULL,
             header_config text DEFAULT NULL,
             is_active tinyint(1) NOT NULL DEFAULT 1,
-            teacher_design_enabled tinyint(1) NOT NULL DEFAULT 1,
             created_at_jalali varchar(30) NOT NULL,
             PRIMARY KEY(id), KEY idx_year_class (academic_year,class_name), KEY idx_date (exam_date_jalali)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN exam_month varchar(50) DEFAULT NULL"); } catch (Exception $e) {}
         try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN exam_day_name varchar(30) DEFAULT NULL"); } catch (Exception $e) {}
         try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN is_active tinyint(1) NOT NULL DEFAULT 1"); } catch (Exception $e) {}
-        // v4.189.0: class-exam design availability is an admin-controlled flag, independent of exam activation.
-        try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN teacher_design_enabled tinyint(1) NOT NULL DEFAULT 1"); } catch (Exception $e) {}
         try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN is_printed tinyint(1) NOT NULL DEFAULT 0"); } catch (Exception $e) {}
         try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN exam_kind varchar(30) NOT NULL DEFAULT 'official'"); } catch (Exception $e) {}
 
@@ -157,6 +157,14 @@ if (!function_exists('exam_can_design')) {
             return $exam && (int)$exam['teacher_id'] === (int)$_SESSION['teacher_id'];
         }
         return false;
+    }
+}
+if (!function_exists('exam_can_view_design')) {
+    // Executives may open existing exam designs for review/printing, but the
+    // save API still requires exam_can_design() and therefore remains read-only.
+    function exam_can_view_design($examId) {
+        if (function_exists('current_teacher_is_executive') && current_teacher_is_executive()) return true;
+        return exam_can_design($examId);
     }
 }
 if (!function_exists('exam_year_students_sql')) {

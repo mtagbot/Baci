@@ -268,9 +268,14 @@ ok('موتور دسکتاپ هم پرچم صریح و لحظهٔ تأیید را
   String((deskEngine.match(/desk_sync_verified_at/g) || []).length));
 ok('موتور دسکتاپ پس از probe موفق هم اثبات ثبت می‌کند',
   /setCfg\('desk_sync_ping_last'[\s\S]{0,900}setCfg\('desk_sync_verified_at'/.test(deskEngine));
-ok('موتور دسکتاپ عمداً مسیر endpoint را بازنویسی نمی‌کند',
-  !deskEngine.includes('class-exam-sync-api.php') && engine.includes('class-exam-sync-api.php'),
-  'نسخهٔ سایت مسیر را به class-exam-sync-api.php عوض می‌کند و آن فایل روی سایت‌های نصب‌شده نیست');
+ok('موتور دسکتاپ URL تنظیم‌شده را حفظ می‌کند و فقط پس از HTTP 403 به endpoint جفت‌شده می‌رود',
+  !/\$url\s*=\s*preg_replace[^;]*class-exam-sync-api/.test(deskEngine)
+  && deskEngine.includes('alternateSyncEndpoint') && deskEngine.includes('$code === 403'));
+ok('نسخهٔ سایت نیز fallback محدود به 403 را نگه می‌دارد',
+  engine.includes('alternateSyncEndpoint') && engine.includes('$code === 403'));
+ok('خطای 403 علت‌یابی‌شده و بدون افشای بدنهٔ خام گزارش می‌شود',
+  deskEngine.includes('diagnose403Response') && deskEngine.includes('Cloudflare')
+  && deskEngine.includes('کلید نادرست پاسخ HTTP 200 می‌دهد') && deskEngine.includes('access/error/WAF log'));
 const rel = read('scripts/release-v4.183.0.py');
 ok('بستهٔ دسکتاپ V4.183.0 همین نسخهٔ موتور را بسته‌بندی می‌کند',
   /\('includes\/desk_sync\.php', 'desktop-app-v2\/patch\/includes-desk-sync\.php'/.test(rel));

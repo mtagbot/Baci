@@ -136,6 +136,29 @@ class DeskSync {
 
     /* ---------------- HTTP ---------------- */
 
+    private static function alternateSyncEndpoint($url) {
+        if (preg_match('~(^|/)desk-sync-api\.php(?=\?|$)~i', $url))
+            return preg_replace('~(^|/)desk-sync-api\.php(?=\?|$)~i', '$1class-exam-sync-api.php', $url, 1);
+        if (preg_match('~(^|/)class-exam-sync-api\.php(?=\?|$)~i', $url))
+            return preg_replace('~(^|/)class-exam-sync-api\.php(?=\?|$)~i', '$1desk-sync-api.php', $url, 1);
+        return null;
+    }
+
+    private static function diagnose403Response($body) {
+        $body = (string)$body;
+        if (trim($body) === '') return 'بدنهٔ پاسخ خالی است';
+        $plain = strtolower(strip_tags($body));
+        if (strpos($plain, 'cloudflare') !== false || strpos($plain, 'cf-ray') !== false || strpos($plain, 'ray id') !== false)
+            return 'نشانه‌های صفحهٔ Cloudflare یا WAF دیده شد';
+        if (strpos($plain, 'mod_security') !== false || strpos($plain, 'modsecurity') !== false || strpos($plain, 'mod security') !== false)
+            return 'نشانه‌های ModSecurity دیده شد';
+        if (preg_match('~access denied|403 forbidden|request blocked|not authorized~i', $plain))
+            return 'متن پاسخ شبیه صفحهٔ منع دسترسی وب‌سرور است';
+        $json = json_decode($body, true);
+        if (is_array($json) && isset($json['error'])) return 'پاسخ JSON با وضعیت 403 از برنامه یا پراکسی دریافت شد';
+        return 'پاسخ 403 غیر JSON از وب‌سرور یا واسط دریافت شد';
+    }
+
     private static function call($action, $payload = [], $fast = false) {
         /* v2.11.0: $fast = lightweight probes (ping). When the internet is
            down, the old 10s-connect + 40s-total timeouts held the desktop's
@@ -186,6 +209,35 @@ class DeskSync {
             if ($body !== false) { $err = ''; $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); }
             curl_close($ch);
         }
+        // Some hosts whitelist only one of these legacy/companion endpoint filenames.
+        // On HTTP 403 try the paired filename once, preserving the scheme, query and same key.
+        $forbiddenBodies = $code === 403 ? [$body] : [];
+        if ($code === 403) {
+            $alternateUrl = self::alternateSyncEndpoint($url);
+            if ($alternateUrl && $alternateUrl !== $url) {
+                $ch = curl_init($alternateUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_CONNECTTIMEOUT => $connectT,
+                    CURLOPT_TIMEOUT => $totalT,
+                    CURLOPT_SSL_VERIFYPEER => $secureOutbox,
+                    CURLOPT_SSL_VERIFYHOST => $secureOutbox ? 2 : 0,
+                    CURLOPT_FOLLOWLOCATION => !$secureOutbox,
+                    CURLOPT_MAXREDIRS => 3,
+                ]);
+                $altBody = curl_exec($ch);
+                $altErr = curl_error($ch);
+                $altCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                if ($altCode === 403 && $altBody !== false) $forbiddenBodies[] = $altBody;
+                if ($altBody !== false && $altCode !== 403) {
+                    $body = $altBody; $err = $altErr; $code = $altCode; $url = $alternateUrl;
+                }
+            }
+        }
         if ($body === false) {
             $hint = '';
             if (stripos($err, 'resolve') !== false) {
@@ -194,7 +246,14 @@ class DeskSync {
             }
             throw new Exception('اتصال به سرور برقرار نشد: ' . $err . $hint);
         }
-        if ($code !== 200)   throw new Exception('پاسخ نامعتبر سرور (HTTP ' . $code . ')');
+        if ($code !== 200) {
+            $hint = '';
+            if ($code === 403) {
+                $diagnosis = self::diagnose403Response(implode("\n", $forbiddenBodies));
+                $hint = ' — هر دو مسیر همگام‌سازی (desk-sync-api.php و class-exam-sync-api.php) با HTTP 403 رد شدند. در APIهای فعلی، کلید نادرست پاسخ HTTP 200 می‌دهد؛ پس این 403 احتمالاً پیش از اجرای API از وب‌سرور/WAF/قواعد دسترسی آمده است (' . $diagnosis . '). از میزبان بخواهید درخواست‌های POST با Content-Type: application/json را در access/error/WAF log در زمان خطا بررسی کند؛ کلید را تغییر ندهید.';
+            }
+            throw new Exception('پاسخ نامعتبر سرور (HTTP ' . $code . ')' . $hint);
+        }
         $j = json_decode($body, true);
         if (!is_array($j))   throw new Exception('پاسخ سرور JSON نیست — آدرس desk-sync-api.php را بررسی کنید');
         if (empty($j['ok'])) throw new Exception('خطای سرور: ' . ($j['error'] ?? 'نامشخص'));

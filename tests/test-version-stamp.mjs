@@ -2,6 +2,8 @@
 // v4.179.0 — بج نسخه بنا به درخواست کاربر از فوتر حذف شد.
 // v4.180.0 — ویرایش آزمون کلاسی/ماهانه با توکن امضاشده در پنجرهٔ تازه (بدون نشست).
 // v4.189.0 — ذخیرهٔ پیش‌نویس جدا از ارسال برای چاپ، کنترل طراحی آزمون کلاسی، و جدول چاپ ماهانه.
+// v4.190.0 — سوئیچ سراسری طراحی کلاسی، فهرست خاکستریِ بدون طراحی، دسترسی مشاهدهٔ مدیر/معاون و fallback همگام‌سازی 403.
+// v4.191.0 — پنهان‌سازی کامل بخش طراحی کلاسی در پنل دبیر، ترتیب جدید جدول ماهانه و تشخیص امن 403.
 // v4.188.0 — جلوگیری از ثبت/طراحی برنامهٔ ناقص + پاکسازی orphan امن + نمایش خوانای ربات.
 // v4.184.0 — فهرست «گروه‌ها و کانال‌های ربات» و خروج از گروه از داخل سایت.
 // v4.183.0 — صداقت وضعیت همگام‌سازی + کلید به‌روزرسانی، راهنمای
@@ -31,8 +33,8 @@ let n = 0, skipped = 0;
 const check = (v, m) => { assert(v, m); n++; };
 const skip = (m) => { console.log('  ⏭  skip: ' + m); skipped++; };
 
-const SITE_VERSION = '4.189.0';
-const DESKTOP_VERSION = '2.113.0';
+const SITE_VERSION = '4.191.0';
+const DESKTOP_VERSION = '2.115.0';
 
 /* ═══════ ۱) فایل نسخه واقعاً با PHP خوانده می‌شود ═══════ */
 const meta = await run(String.raw`<?php
@@ -47,7 +49,7 @@ check(meta.out.includes('site=' + SITE_VERSION),
   'config/version.php reports the site version ' + SITE_VERSION + ': ' + meta.out.trim());
 check(meta.out.includes('desk=' + DESKTOP_VERSION),
   'config/version.php reports the desktop version ' + DESKTOP_VERSION);
-check(meta.out.includes('corr=V4.189.0'), 'the correction label is recorded');
+check(meta.out.includes('corr=V4.191.0'), 'the correction label is recorded');
 
 /* فایل نسخه نباید distribution داشته باشد — وگرنه همان ریسک release.php را دارد.
    این بررسی روی «آرایهٔ برگشتیِ واقعی» انجام می‌شود، نه روی متن فایل؛ وگرنه
@@ -107,6 +109,10 @@ for (const [name, prefix, wanted] of [
   ['SchoolDesk-FIX-v2.101.0.zip', 'SchoolDeskPro/www/', ['config/version.php', 'includes/footer.php']],
   ['MODIFIED-FILES-V4.189.0.zip', 'site-update-v4.152.0/', ['config/version.php', 'exam-print.php', 'exams.php']],
   ['SchoolDesk-FIX-v2.113.0.zip', 'SchoolDeskPro/www/', ['config/version.php', 'exam-print.php', 'exams.php']],
+  ['MODIFIED-FILES-V4.190.0.zip', 'site-update-v4.152.0/', ['config/version.php', 'settings.php', 'includes/exams_helper.php', 'includes/desk_sync.php']],
+  ['SchoolDesk-FIX-v2.114.0.zip', 'SchoolDeskPro/www/', ['config/version.php', 'settings.php', 'includes/exams_helper.php', 'includes/desk_sync.php']],
+  ['MODIFIED-FILES-V4.191.0.zip', 'site-update-v4.152.0/', ['config/version.php', 'teacher-panel.php', 'includes/desk_sync.php']],
+  ['SchoolDesk-FIX-v2.115.0.zip', 'SchoolDeskPro/www/', ['config/version.php', 'teacher-panel.php', 'includes/desk_sync.php']],
 ]) {
   const list = zipList(name);
   if (!list) { skip(name + ' ساخته نشده — بسته‌بندی هنوز اجرا نشده'); continue; }

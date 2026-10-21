@@ -50,24 +50,38 @@ const depBefore=await exams();await request('exams.php',{session:deputy,post:{cs
 await remove(fixture.legacy,deputy,{return_to:'management'});assert.equal((await exams()).find(e=>e.id===fixture.legacy).exam_kind,'class_deleted');assert(!(await api(canonical,'load')).ok);assert((await designs()).some(d=>d.exam_id===canonical));checks++;
 const restarted=await request('class-exam-group.php',{post:{csrf_token:csrf,mode:'fresh',year:'1404/1405',grade:'هفتم',subject:'ریاضی'}});assert(restarted.redirect.includes('grade_all=1'));assert(!restarted.redirect.includes('exam_id='+canonical+'&'));checks++;
 
-// v4.189: admin-controlled class design availability is enforced at the page and API boundaries.
+// v4.190: one global design switch controls all teachers, while active exams/data remain untouched.
 const toggleExam=Number(await code(`<?php require '/www/includes/class_exam_groups.php';$id=ceg_insert_exam(801,'1404/1405','هشتم','ریاضی','هشتم1');echo $id;`));
-await code(`<?php require '/www/includes/db.php';DB::execute('UPDATE exam_schedules SET teacher_design_enabled=0 WHERE id=?',[${toggleExam}]);`);
+const toggleBefore=(await db('SELECT * FROM exam_schedules WHERE id='+toggleExam))[0];
+await code(`<?php require '/www/includes/functions.php';set_setting('class_exam_design_enabled','0');`);
+assert.equal((await db('SELECT is_active FROM exam_schedules WHERE id='+toggleExam))[0].is_active,toggleBefore.is_active);
 assert(!(await api(toggleExam,'save',{design:{questions:[]}})).ok);checks++;
 const blockedClassEditor=await request('exam-print.php',{session:sid,query:'type=questions&exam_id='+toggleExam});
-assert(blockedClassEditor.page.includes('طراحی آزمون‌های کلاسی در حال حاضر توسط مدیریت غیرفعال شده است'),blockedClassEditor.page.slice(-700));checks++;
+assert(blockedClassEditor.page.includes('طراحی آزمون‌های کلاسی در حال حاضر توسط مدیریت غیرفعال شده است'));checks++;
 const teacherClassPage=await request('teacher-panel.php',{session:sid,query:'tab=exams&year=1404%2F1405'});
-const teacherClassTable=table(teacherClassPage.page,'teacherClassExams');
-const disabledRow=teacherClassTable.match(/<tr class="class-exam-row" data-class="هشتم1" data-subject="ریاضی">[\s\S]*?<\/tr>/)?.[0]??'';
-assert(disabledRow.includes('طراحی آزمون کلاسی توسط مدیریت غیرفعال است'));assert(!disabledRow.includes('class-exam-create.php?'));checks++;
-const adminTogglePage=await request('exams.php',{session:admin,query:'tab=class&year=1404%2F1405'});
-assert(table(adminTogglePage.page,'adminClassExams').includes('name="set_class_design_enabled"'));
-const executiveTogglePage=await request('exams.php',{session:exec,query:'tab=class&year=1404%2F1405'});
-assert(!table(executiveTogglePage.page,'adminClassExams').includes('name="set_class_design_enabled"'));checks++;
-await request('exams.php',{session:admin,post:{csrf_token:csrf,set_class_design_enabled:1,exam_id:toggleExam,teacher_design_enabled:1}});
-assert.equal((await db('SELECT teacher_design_enabled FROM exam_schedules WHERE id='+toggleExam))[0].teacher_design_enabled,1);checks++;
-await request('exams.php',{session:exec,post:{csrf_token:csrf,set_class_design_enabled:1,exam_id:toggleExam,teacher_design_enabled:0}});
-assert.equal((await db('SELECT teacher_design_enabled FROM exam_schedules WHERE id='+toggleExam))[0].teacher_design_enabled,1);checks++;
+assert(!teacherClassPage.page.includes('id="teacherClassExams"'));
+assert(!teacherClassPage.page.includes('آزمون‌های کلاسی دبیر')&&!teacherClassPage.page.includes('class-exam-create.php?'));
+const teacherMonthlyTable=table(teacherClassPage.page,'teacherMonthlyExams');
+assert(teacherMonthlyTable.includes('MONTHLY_SENTINEL'));
+const monthlyHeaders=[...teacherMonthlyTable.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)].map(m=>m[1].replace(/<[^>]*>/g,'').trim());
+assert.deepEqual(monthlyHeaders,['کلاس/پایه','طراحی','طراحی پایه‌ای (مشترک کلاس‌های پایه)','تاریخ','درس','سال/ماه','ساعت']);
+assert(!teacherClassPage.page.includes('دبیر می‌تواند از بانک سوالات استفاده کند'));
+checks++;
+const adminPage=await request('exams.php',{session:admin,query:'tab=class&year=1404%2F1405'});
+const adminClassTable=table(adminPage.page,'adminClassExams');
+assert(!adminClassTable.includes('set_class_design_enabled'));
+assert(adminClassTable.includes('مشاهده/چاپ')&&adminClassTable.includes('هشتم1'));
+assert(/<tr class="exam-no-design">[\s\S]*?هشتم1[\s\S]*?مشاهده\/چاپ/.test(adminClassTable));
+const execView=await request('exam-print.php',{session:exec,query:'type=questions&exam_id='+toggleExam});
+assert(!execView.page.includes('شما مجاز به مشاهدهٔ سوالات این آزمون نیستید')&&!execView.page.includes('طراحی آزمون‌های کلاسی در حال حاضر توسط مدیریت غیرفعال شده است'),execView.page.slice(-1000));
+const execSave=await request('exam-design-api.php',{session:exec,query:'exam_id='+toggleExam+'&action=save',raw:{design:{questions:[]}}});assert(!JSON.parse(execSave.page).ok);checks++;
+const settingPage=await request('settings.php',{session:admin});
+assert(settingPage.page.includes('name="class_exam_design_enabled"')&&!settingPage.page.includes('name="class_exam_design_enabled" value="1" checked'));
+checks++;
+await code(`<?php require '/www/includes/functions.php';set_setting('class_exam_design_enabled','1');`);
+const enabledPage=await request('settings.php',{session:admin});
+assert(enabledPage.page.includes('name="class_exam_design_enabled" value="1" checked'));
+assert.equal((await db('SELECT is_active FROM exam_schedules WHERE id='+toggleExam))[0].is_active,toggleBefore.is_active);checks++;
 
 // Monthly print rows are nearest-upcoming first, show saved-design dates/countdowns, and mark unsaved rows.
 const futureMonthly=Number(await code(`<?php require '/www/includes/class_exam_groups.php';$id=ceg_insert_exam(801,'1404/1405','هفتم','FUTURE_SENTINEL','هفتم1');DB::execute("UPDATE exam_schedules SET exam_kind='official',exam_month='FUTURE_SENTINEL',exam_date_jalali='1406/01/01',start_time='08:00',duration_minutes=90 WHERE id=?",[$id]);DB::execute('INSERT INTO exam_designs (exam_id,design_json,designer_name,updated_at_jalali) VALUES (?,?,?,?)',[$id,'{}','دبیر آزمون','1405/02/03']);echo $id;`));

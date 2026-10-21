@@ -271,6 +271,8 @@ $tab = $_GET['tab'] ?? 'schedule';
          * قرار بگیرند تا خانه مشترک «طراحی پایه‌ای» با rowspan روی همه ردیف‌های
          * گروه بنشیند. */
         $teacherExams = DB::fetchAll("SELECT * FROM exam_schedules WHERE teacher_id = ? AND is_active = 1 AND COALESCE(exam_kind,'official') NOT IN ('class','class_deleted') AND TRIM(COALESCE(academic_year,''))<>'' AND TRIM(COALESCE(subject_name,''))<>'' AND TRIM(COALESCE(exam_date_jalali,''))<>'' AND TRIM(COALESCE(start_time,''))<>'' AND duration_minutes>0 ORDER BY academic_year DESC, exam_month ASC, grade_level ASC, subject_name ASC, class_name ASC, exam_date_jalali ASC, start_time ASC", [$teacherId]);
+        // This UI gate intentionally does not use the manager/deputy bypass in the design helper.
+        $classExamDesignEnabled = get_setting('class_exam_design_enabled', '1') !== '0';
         // شمارش اعضای هر گروه: سال|ماه|پایه|درس
         $tpGroupCounts = [];
         foreach ($teacherExams as $tex) {
@@ -278,6 +280,7 @@ $tab = $_GET['tab'] ?? 'schedule';
             $tpGroupCounts[$gk] = ($tpGroupCounts[$gk] ?? 0) + 1;
         }
         $tpSeenGroups = [];
+        if ($classExamDesignEnabled) {
         // One row per assignment. Keep legacy/inactive/unassigned exams editable too.
         $classRows = [];
         foreach (class_exam_assignments($teacherId,$teacherYear) as $as) {
@@ -289,20 +292,23 @@ $tab = $_GET['tab'] ?? 'schedule';
             if (!isset($classRows[$key])) $classRows[$key] = ['class_name'=>$ce['class_name'],'subject_name'=>$ce['subject_name'],'academic_year'=>$ce['academic_year'],'grade_level'=>$ce['grade_level'],'assigned'=>false,'exams'=>[]];
             $classRows[$key]['exams'][] = $ce;
         }
+        }
 
     ?>
     <div class="card shadow-lg">
-        <h3 class="font-bold mb-4"><svg data-ui-icon="exam" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 2h6v4H9Zm0 8h6m-6 4h3m-3 4h6"/></svg> آزمون‌های فعال من و طراحی سوالات</h3>
-        <?php if(teacher_has_deputy($teacherId) || current_teacher_is_executive()): ?><a class="btn btn-outline" href="exams.php?tab=class&amp;year=<?php echo urlencode($teacherYear); ?>">آزمون‌های کلاسی دبیران — مشاهده، چاپ و حذف</a><?php endif; ?>
-        <?php include __DIR__.'/includes/teacher_class_exams.php'; ?>
+        <h3 class="font-bold mb-4"><svg data-ui-icon="exam" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 2h6v4H9Zm0 8h6m-6 4h3m-3 4h6"/></svg> آزمون‌های فعال من</h3>
+        <?php if($classExamDesignEnabled): ?>
+            <?php if(teacher_has_deputy($teacherId) || current_teacher_is_executive()): ?><a class="btn btn-outline" href="exams.php?tab=class&amp;year=<?php echo urlencode($teacherYear); ?>">آزمون‌های کلاسی دبیران — مشاهده، چاپ و حذف</a><?php endif; ?>
+            <?php include __DIR__.'/includes/teacher_class_exams.php'; ?>
+        <?php endif; ?>
         <h3 class="font-bold mt-4 mb-3">آزمون‌های ماهانه فعال‌شده توسط مدرسه</h3>
-        <div class="table-container"><table id="teacherMonthlyExams"><thead><tr><th>سال/ماه</th><th>کلاس/پایه</th><th>درس</th><th>تاریخ</th><th>ساعت</th><th>طراحی</th><th>طراحی پایه‌ای (مشترک کلاس‌های پایه)</th></tr></thead><tbody>
+        <div class="table-container"><table id="teacherMonthlyExams"><thead><tr><th>کلاس/پایه</th><th>طراحی</th><th>طراحی پایه‌ای (مشترک کلاس‌های پایه)</th><th>تاریخ</th><th>درس</th><th>سال/ماه</th><th>ساعت</th></tr></thead><tbody>
         <?php foreach($teacherExams as $ex):
             $gk = $ex['academic_year'] . '|' . $ex['exam_month'] . '|' . trim($ex['grade_level'] ?? '') . '|' . trim($ex['subject_name'] ?? '');
             $gCount = $tpGroupCounts[$gk] ?? 1;
             $gFirst = empty($tpSeenGroups[$gk]); $tpSeenGroups[$gk] = true;
             $exGrade = trim($ex['grade_level'] ?? '') ?: infer_grade_from_class_name($ex['class_name'] ?? '');
-        ?><tr><td><?php echo clean($ex['academic_year'].' / '.$ex['exam_month']); ?></td><td><?php echo clean($ex['grade_level'].' '.$ex['class_name']); ?></td><td class="font-bold"><?php echo clean($ex['subject_name']); ?></td><td><?php echo tr_num($ex['exam_date_jalali'],'fa'); ?></td><td><?php echo tr_num($ex['start_time'],'fa'); ?></td><td><a class="btn btn-primary text-xs" target="_blank" href="exam-print.php?type=questions&exam_id=<?php echo $ex['id']; ?>&dt=<?php echo urlencode(make_exam_design_token($ex['id'], 'teacher', $teacherId)); ?>">ویرایش آزمون ماهانه</a></td>
+        ?><tr><td><?php echo clean($ex['grade_level'].' '.$ex['class_name']); ?></td><td><a class="btn btn-primary text-xs" target="_blank" href="exam-print.php?type=questions&exam_id=<?php echo $ex['id']; ?>&dt=<?php echo urlencode(make_exam_design_token($ex['id'], 'teacher', $teacherId)); ?>">ویرایش آزمون ماهانه</a></td>
         <?php if ($gFirst): /* v4.70.0: یک خانه مشترک با rowspan برای همه کلاس‌های پایه/درس یکسان */ ?>
             <td rowspan="<?php echo (int)$gCount; ?>" class="text-center align-middle" style="background:rgba(16,185,129,.06);vertical-align:middle">
                 <?php if ($gCount > 1 && $exGrade !== ''): ?>
@@ -312,11 +318,11 @@ $tab = $_GET['tab'] ?? 'schedule';
                 <?php else: ?><span class="text-xs text-muted">—</span><?php endif; ?>
             </td>
         <?php endif; ?>
+        <td><?php echo tr_num($ex['exam_date_jalali'],'fa'); ?></td><td class="font-bold"><?php echo clean($ex['subject_name']); ?></td><td><?php echo clean($ex['academic_year'].' / '.$ex['exam_month']); ?></td><td><?php echo tr_num($ex['start_time'],'fa'); ?></td>
         </tr><?php endforeach; if(!$teacherExams): ?><tr><td colspan="7" class="text-center text-muted">آزمون فعالی برای شما ثبت نشده است.</td></tr><?php endif; ?>
         </tbody></table></div>
 
         <p class="text-xs text-muted mt-2">ستون «طراحی پایه‌ای»: برای درس‌های یکسان با پایه همسان، یک خانه مشترک بین همه ردیف‌های آن گروه است — طراحی یک‌بار انجام می‌شود و برای تمام دانش‌آموزان همه کلاس‌های آن پایه تکثیر و چاپ می‌گردد.</p>
-        <p class="text-xs text-muted mt-3">دبیر می‌تواند از بانک سوالات استفاده کند و سوال درج‌شده روی برگه آزمون خود را ویرایش کند؛ ویرایش مستقیم بانک اطلاعاتی سوالات فقط برای مدیر سیستم فعال است.</p>
     </div>
 
     <script>

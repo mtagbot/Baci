@@ -17,14 +17,6 @@ $tab=$classDeputyOnly?'class':($_GET['tab']??'schedule');
 if (!function_exists('exams_teacher_label')) { function exams_teacher_label($n){ $n=trim((string)$n); if($n==='') return $n; return is_admin_logged_in() ? $n : teacher_family_name($n); } } $year=resolve_academic_year_request($_GET['year']??get_current_academic_year()); // v4.38.0 unified
 if ($_SERVER['REQUEST_METHOD']==='POST') {
  if(!verify_csrf($_POST['csrf_token']??'')){set_flash_message('error','خطای CSRF');redirect('exams.php');}
- if(isset($_POST['set_class_design_enabled'])){
-  if(!is_admin_logged_in()){set_flash_message('error','فقط مدیر می‌تواند دسترسی طراحی آزمون کلاسی را تغییر دهد.');redirect('exams.php?tab=class&year='.urlencode($year));}
-  $designExamId=(int)($_POST['exam_id']??0); $designEnabled=(int)($_POST['teacher_design_enabled']??0)===1?1:0;
-  $designExam=DB::fetch("SELECT id,exam_kind FROM exam_schedules WHERE id=?",[$designExamId]);
-  if(!$designExam || ($designExam['exam_kind']??'')!=='class'){set_flash_message('error','آزمون کلاسی معتبر یافت نشد؛ تغییری انجام نشد.');}
-  else {DB::execute('UPDATE exam_schedules SET teacher_design_enabled=? WHERE id=?',[$designEnabled,$designExamId]);set_flash_message('success',$designEnabled?'طراحی این آزمون کلاسی برای دبیر فعال شد.':'طراحی این آزمون کلاسی برای دبیر غیرفعال شد.');}
-  redirect('exams.php?tab=class&year='.urlencode($year));
- }
  if(isset($_POST['mark_printed'])){ DB::execute('UPDATE exam_schedules SET is_printed=? WHERE id=?', [isset($_POST['is_printed'])?1:0, (int)$_POST['exam_id']]); set_flash_message('success','وضعیت چاپ آزمون ذخیره شد.'); $pfQS=''; if(($_POST['pf_month']??'')!=='') $pfQS.='&pf_month='.urlencode($_POST['pf_month']); if(($_POST['pf_printed']??'')!=='') $pfQS.='&pf_printed='.urlencode($_POST['pf_printed']); redirect('exams.php?tab=print&year='.urlencode($year).$pfQS); }
  if(isset($_POST['copy_class_design'])){
   $src=(int)($_POST['source_exam_id']??0); $target=explode('|', $_POST['target_assignment']??'');
@@ -170,6 +162,7 @@ if(isset($_GET['delete'])){
   if(function_exists('exam_archive_design_before_source_change')){try{exam_archive_design_before_source_change($delId);}catch(Exception $e){}}
   DB::execute('DELETE FROM exam_schedules WHERE id=?',[$delId]);DB::execute('DELETE FROM exam_assignments WHERE exam_id=?',[$delId]);set_flash_message('success','امتحان حذف شد.');redirect('exams.php');}
 require_once __DIR__ . '/includes/header.php';
+echo '<style>tr.exam-no-design{background:#f1f5f9!important;color:#64748b!important;opacity:.68}</style>';
 $exams=DB::fetchAll("SELECT es.*, COALESCE(t.full_name, es.teacher_name) t_name, (SELECT MAX(ed.updated_at_jalali) FROM exam_designs ed WHERE ed.exam_id=es.id) AS design_updated_at FROM exam_schedules es LEFT JOIN teachers t ON t.id=es.teacher_id WHERE es.academic_year=? AND COALESCE(es.exam_kind,'official') NOT IN ('class','class_deleted') ORDER BY es.exam_date_jalali, es.start_time",[$year]);
 $classes=get_unified_class_options($year); $grades=get_unified_grade_options($year); $teachers=DB::fetchAll('SELECT id,full_name FROM teachers WHERE status=1'); usort($teachers, fn($a,$b)=>persian_compare($a['full_name'],$b['full_name']));
 $edit=isset($_GET['edit'])?DB::fetch('SELECT * FROM exam_schedules WHERE id=?',[(int)$_GET['edit']]):null; $selectedExam=(int)($_GET['exam_id']??($exams[0]['id']??0));
@@ -273,7 +266,7 @@ foreach ($printExams as $pe) {
     $pxGroupCounts[$pk] = ($pxGroupCounts[$pk] ?? 0) + 1;
 }
 $pxSeen = [];
-?><style>tr.exam-no-design{background:#f1f5f9!important;color:#64748b!important;opacity:.68}</style><h3 class="font-bold">آزمون‌های ماهانه مدرسه</h3><div class="table-container"><table id="adminMonthlyExams"><thead><tr><th>امتحان</th><th>برنامه جدولی</th><th>طراحی سوال کلاس</th><th>آخرین ذخیرهٔ طراحی</th><th>تا آزمون</th><th>چاپ پایه‌ای (مشترک کلاس‌های پایه)</th><th>چاپ شده؟</th></tr></thead><tbody><?php foreach($printExams as $e):
+?><h3 class="font-bold">آزمون‌های ماهانه مدرسه</h3><div class="table-container"><table id="adminMonthlyExams"><thead><tr><th>امتحان</th><th>برنامه جدولی</th><th>طراحی سوال کلاس</th><th>آخرین ذخیرهٔ طراحی</th><th>تا آزمون</th><th>چاپ پایه‌ای (مشترک کلاس‌های پایه)</th><th>چاپ شده؟</th></tr></thead><tbody><?php foreach($printExams as $e):
     $eGradeLevel = trim($e['grade_level'] ?? '') ?: infer_grade_from_class_name($e['class_name'] ?? '');
     $pk = ($e['exam_month'] ?? '') . '|' . $eGradeLevel . '|' . trim($e['subject_name'] ?? '');
     $pCount = $pxGroupCounts[$pk] ?? 1;
