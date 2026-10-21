@@ -7,6 +7,47 @@ if (!function_exists('jalali_now')) {
     function jalali_now() { return jdate('Y/m/d H:i'); }
 }
 
+if (!function_exists('exam_teacher_class_design_enabled')) {
+    function exam_teacher_class_design_enabled($exam) {
+        if (!is_array($exam) || ($exam['exam_kind'] ?? '') !== 'class') return true;
+        if (function_exists('is_admin_logged_in') && is_admin_logged_in()) return true;
+        if (function_exists('current_teacher_is_executive') && current_teacher_is_executive()) return true;
+        return !array_key_exists('teacher_design_enabled', $exam) || (int)$exam['teacher_design_enabled'] === 1;
+    }
+}
+
+if (!function_exists('exam_jalali_date_parts')) {
+    function exam_jalali_date_parts($value) {
+        $value = trim(tr_num((string)$value, 'en'));
+        if (!preg_match('~^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$~', $value, $m)) return null;
+        $year=(int)$m[1]; $month=(int)$m[2]; $day=(int)$m[3];
+        if ($year < 1300 || $year > 1600 || $month < 1 || $month > 12 || $day < 1 || $day > 31) return null;
+        return [$year,$month,$day];
+    }
+}
+
+if (!function_exists('exam_jalali_date_sort_key')) {
+    function exam_jalali_date_sort_key($value) {
+        $p=exam_jalali_date_parts($value);
+        return $p ? ($p[0]*10000 + $p[1]*100 + $p[2]) : PHP_INT_MAX;
+    }
+}
+
+if (!function_exists('exam_jalali_days_until')) {
+    function exam_jalali_days_until($value) {
+        $p=exam_jalali_date_parts($value);
+        if (!$p || !function_exists('jalali_to_gregorian')) return null;
+        $g=jalali_to_gregorian($p[0],$p[1],$p[2]);
+        $today=exam_jalali_date_parts(jdate('Y/m/d'));
+        if (!is_array($g) || count($g)<3 || !$today) return null;
+        $tg=jalali_to_gregorian($today[0],$today[1],$today[2]);
+        if (!is_array($tg) || count($tg)<3) return null;
+        $eventTs=gmmktime(12,0,0,(int)$g[1],(int)$g[2],(int)$g[0]);
+        $todayTs=gmmktime(12,0,0,(int)$tg[1],(int)$tg[2],(int)$tg[0]);
+        return (int)(($eventTs-$todayTs)/86400);
+    }
+}
+
 if (!function_exists('ensure_exams_schema')) {
     function ensure_exams_schema() {
         DB::execute("CREATE TABLE IF NOT EXISTS exam_schedules (
@@ -26,12 +67,15 @@ if (!function_exists('ensure_exams_schema')) {
             question_file varchar(255) DEFAULT NULL,
             header_config text DEFAULT NULL,
             is_active tinyint(1) NOT NULL DEFAULT 1,
+            teacher_design_enabled tinyint(1) NOT NULL DEFAULT 1,
             created_at_jalali varchar(30) NOT NULL,
             PRIMARY KEY(id), KEY idx_year_class (academic_year,class_name), KEY idx_date (exam_date_jalali)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN exam_month varchar(50) DEFAULT NULL"); } catch (Exception $e) {}
         try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN exam_day_name varchar(30) DEFAULT NULL"); } catch (Exception $e) {}
         try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN is_active tinyint(1) NOT NULL DEFAULT 1"); } catch (Exception $e) {}
+        // v4.189.0: class-exam design availability is an admin-controlled flag, independent of exam activation.
+        try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN teacher_design_enabled tinyint(1) NOT NULL DEFAULT 1"); } catch (Exception $e) {}
         try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN is_printed tinyint(1) NOT NULL DEFAULT 0"); } catch (Exception $e) {}
         try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN exam_kind varchar(30) NOT NULL DEFAULT 'official'"); } catch (Exception $e) {}
 

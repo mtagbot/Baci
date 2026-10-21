@@ -124,6 +124,7 @@ $exam = DB::fetch('SELECT es.*, COALESCE(t.full_name, es.teacher_name) t_name, t
 if (!$exam) app_page_error('امتحان یافت نشد');
 if(($exam['exam_kind']??'')==='class_deleted')app_page_error('این آزمون کلاسی حذف شده و قابل ویرایش یا چاپ نیست.');
 if (in_array($type,['questions','questions_editor'],true) && !exam_schedule_design_ready($exam)) app_page_error('این برنامهٔ امتحانی ناقص است و برای طراحی آزمون در دسترس نیست؛ ابتدا تاریخ و ساعت را کامل کنید.');
+if (in_array($type,['questions','questions_editor'],true) && !exam_teacher_class_design_enabled($exam)) app_page_error('طراحی آزمون‌های کلاسی در حال حاضر توسط مدیریت غیرفعال شده است.');
 $designToken = $_GET['dt'] ?? '';
 $designTokenOk = verify_exam_design_token($designToken, $examId);
 if (($type === 'questions' || $type === 'questions_editor') && !$designTokenOk && !exam_can_design($examId)) app_page_error('شما مجاز به طراحی سوالات این آزمون نیستید.');
@@ -463,7 +464,8 @@ body.modal-open{overflow:hidden}
 .pagepick-chip:hover{border-color:var(--brand)}
 .pagepick-chip input{accent-color:var(--brand)}
 .pagepick-chip:has(input:checked){background:#e0e9ff;border-color:var(--brand);font-weight:700}
-@media print{.toolbar,.editor-panel,.bank-panel,.q-actions,.exam-zoom-modal,.q-modal,#uiToast,.img-resize-box{display:none!important}.eq-slot{border:0!important;outline:0!important;min-width:0!important;padding:0!important}.page{margin:0;width:210mm;height:297mm;break-after:page}body{background:white}.qwrap{overflow:hidden}.source-file iframe{height:65mm!important}.drawCanvas{pointer-events:none}}
+.save-choice-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.62);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px}.save-choice-card{width:min(480px,96vw);background:#fff;border-radius:14px;padding:20px;box-shadow:0 22px 70px rgba(0,0,0,.3);font-family:Vazirmatn,Tahoma,sans-serif}.save-choice-card h3{margin:0 0 8px;font-size:18px}.save-choice-card p{margin:0 0 16px;color:#475569;line-height:1.8}.save-choice-actions{display:flex;flex-wrap:wrap;gap:8px}.save-choice-actions button{min-height:40px;padding:7px 12px;border:0;border-radius:8px;cursor:pointer;font-family:inherit}.save-choice-actions .btn-soft{background:#e2e8f0;color:#0f172a}
+@media print{.save-choice-backdrop,.toolbar,.editor-panel,.bank-panel,.q-actions,.exam-zoom-modal,.q-modal,#uiToast,.img-resize-box{display:none!important}.eq-slot{border:0!important;outline:0!important;min-width:0!important;padding:0!important}.page{margin:0;width:210mm;height:297mm;break-after:page}body{background:white}.qwrap{overflow:hidden}.source-file iframe{height:65mm!important}.drawCanvas{pointer-events:none}}
 /* v4.77.0: render pages lazily on screen — old/weak systems keep scrolling smooth
    even with hundreds of print pages; ignored harmlessly by very old browsers.
    Print media is unaffected: all pages always render fully on paper. */
@@ -478,7 +480,13 @@ body.modal-open{overflow:hidden}
   <span class="tb-sep"></span>
   <div class="tb-group"><span class="tb-title">دست‌نویس</span><label class="tb-color" title="رنگ قلم"><input type="color" id="penColor" value="#111111"></label><button id="toolBtnPen" onclick="setTool('pen')">قلم</button><button id="toolBtnEraser" onclick="setTool('eraser')">پاک‌کن</button><button id="toolBtnOff" class="tool-active" onclick="setTool('off')">خاموش</button><button onclick="clearDrawings()">پاک‌کردن</button></div>
   <span class="tb-spacer"></span>
-  <div class="tb-group tb-actions"><?php if($groupScope!==''): ?><b class="group-design-notice">آزمون مشترک پایه — <?php $noticeClasses=[]; foreach(($ownedClasses??ceg_classes($classGroup)) as $c)$noticeClasses[norm_class_str($c)]=$c; echo clean(implode('، ',array_values($noticeClasses))); ?></b><?php elseif($classGroup && $classGroup['excluded']): ?><b class="independent-design-notice">آزمون مستقل این کلاس — <?php echo clean($exam['class_name']); ?></b><?php endif; ?><button class="btn-save" onclick="saveDesign()">ذخیره طراحی</button><button class="btn-print" onclick="prepareAllAndPrint()">چاپ نهایی</button></div>
+  <div class="tb-group tb-actions"><?php if($groupScope!==''): ?><b class="group-design-notice">آزمون مشترک پایه — <?php $noticeClasses=[]; foreach(($ownedClasses??ceg_classes($classGroup)) as $c)$noticeClasses[norm_class_str($c)]=$c; echo clean(implode('، ',array_values($noticeClasses))); ?></b><?php elseif($classGroup && $classGroup['excluded']): ?><b class="independent-design-notice">آزمون مستقل این کلاس — <?php echo clean($exam['class_name']); ?></b><?php endif; ?><button class="btn-save" onclick="openSaveChoiceModal()">ذخیره طراحی</button><button class="btn-print" onclick="prepareAllAndPrint()">چاپ نهایی</button></div>
+</div>
+<div class="save-choice-backdrop" id="saveChoiceModal" role="dialog" aria-modal="true" aria-labelledby="saveChoiceTitle" aria-hidden="true" style="display:none">
+  <section class="save-choice-card"><h3 id="saveChoiceTitle">ذخیره طراحی</h3>
+    <p>نوع ذخیره را انتخاب کنید. ذخیرهٔ معمولی فقط طرح را نگه می‌دارد؛ ارسال برای چاپ، معاون اجرایی را مطلع می‌کند.</p>
+    <div class="save-choice-actions"><button type="button" class="btn-save" onclick="confirmSaveChoice(false)">ذخیرهٔ معمولی</button><button type="button" class="btn-print" onclick="confirmSaveChoice(true)">ذخیره و ارسال برای چاپ</button><button type="button" class="btn-soft" onclick="closeSaveChoiceModal()">انصراف</button></div>
+  </section>
 </div>
 <div class="editor-panel collapsed" id="questionEditorPanel">
   <div class="panel-head"><b>تنظیمات برگه</b><button type="button" class="panel-close" onclick="toggleEditor()" aria-label="بستن">×</button></div>
@@ -1191,7 +1199,7 @@ function installMobileEditorChrome(){
     '<button type="button" class="mobile-dock-zoom" onclick="setMobilePageZoom(-.1)" aria-label="کوچک‌نمایی">−</button>'+
     '<output id="mobilePageZoom" aria-live="polite" onclick="fitMobilePage()" title="اندازه مناسب صفحه">—</output>'+
     '<button type="button" class="mobile-dock-zoom" onclick="setMobilePageZoom(.1)" aria-label="بزرگ‌نمایی">+</button>'+
-    '<button type="button" class="mobile-dock-save" onclick="saveDesign()">ذخیره</button>'+
+    '<button type="button" class="mobile-dock-save" onclick="openSaveChoiceModal()">ذخیره</button>'+
     '<button type="button" class="mobile-dock-print" onclick="prepareAllAndPrint()">چاپ</button>';
   /* v4.163.0: پس‌زمینهٔ ورقه‌ها — با لمسِ بیرونِ پنل، پنل بسته می‌شود. */
   if(!document.getElementById('mobileSheetBackdrop')){const bd=document.createElement('div'); bd.id='mobileSheetBackdrop'; bd.className='mobile-sheet-backdrop'; bd.setAttribute('aria-hidden','true'); bd.addEventListener('click',()=>{const e=document.getElementById('questionEditorPanel'),b=document.getElementById('bankPanel'); if(e&&!e.classList.contains('collapsed'))toggleEditor(); else if(b&&!b.classList.contains('collapsed'))toggleBank();}); document.body.appendChild(bd);}
@@ -1253,7 +1261,10 @@ function designPayload(){
   /* v4.163.0: نشانهٔ داخلی memo (_normSrc) هرگز در فایل طراحی ذخیره نمی‌شود. */
   return {questions:qItems.map(it=>{const{_normSrc,...rest}=it;return rest;}),headerFields,drawings:drawingsData,sourceCrops,sourceOrder,style:pageStyle,printNote,academicYear:'<?php echo addslashes($exam['academic_year'] ?? ''); ?>',examMonth:'<?php echo addslashes($exam['exam_month'] ?? ''); ?>',updatedAt:new Date().toISOString()};
 }
-function saveDesign(silent=false){const payload=designPayload(); autosaveLocal(); return fetch('exam-design-api.php?group_member='+classGroupMember+'&action=save&exam_id='+examId+'&dt='+encodeURIComponent(designToken),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({design:payload})}).then(r=>r.json()).then(j=>{if(!silent){if(j.ok)showToast(j.message||'طراحی ذخیره شد'); else alert(j.error||'خطا در ذخیره');} return j;});}
+function openSaveChoiceModal(){const m=document.getElementById('saveChoiceModal');if(!m)return; m.style.display='flex';m.setAttribute('aria-hidden','false');m.querySelector('button')?.focus();}
+function closeSaveChoiceModal(){const m=document.getElementById('saveChoiceModal');if(!m)return;m.style.display='none';m.setAttribute('aria-hidden','true');}
+function confirmSaveChoice(sendForPrint){closeSaveChoiceModal();saveDesign(false,!!sendForPrint);}
+function saveDesign(silent=false,sendForPrint=false){const payload=designPayload(); autosaveLocal(); return fetch('exam-design-api.php?group_member='+classGroupMember+'&action=save&exam_id='+examId+'&dt='+encodeURIComponent(designToken),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({design:payload,send_for_print:!!sendForPrint})}).then(r=>r.json()).then(j=>{if(!silent){if(j.ok)showToast(j.message||'طراحی ذخیره شد'); else alert(j.error||'خطا در ذخیره');} return j;});}
 function loadDesignAndBank(){
   const url='exam-design-api.php?group_member='+classGroupMember+'&action=load&catalog=design&exam_id='+examId+'&dt='+encodeURIComponent(designToken);
   fetch(url).then(r=>r.json()).then(j=>{

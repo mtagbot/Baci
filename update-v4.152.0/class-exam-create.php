@@ -51,6 +51,10 @@ if ($requestedExamId) {
     redirect($back);
 }
 $exam = DB::fetch('SELECT * FROM exam_schedules WHERE id=?',[$examId]);
+$designGroup=$exam?ceg_for_exam($exam):null;
+$designTargetId=($designGroup && empty($designGroup['excluded']))?(int)$designGroup['design_exam_id']:$examId;
+$designTarget=$designTargetId===$examId?$exam:DB::fetch('SELECT * FROM exam_schedules WHERE id=?',[$designTargetId]);
+if ($designTarget && !exam_teacher_class_design_enabled($designTarget)) { set_flash_message('error','طراحی آزمون‌های کلاسی در حال حاضر توسط مدیریت غیرفعال شده است.'); redirect($back); }
 if ($gradeAll && !class_exam_grade_classes($exam)) { set_flash_message('error','کلاس تخصیص‌یافته‌ای برای طراحی این پایه و درس یافت نشد.'); redirect($back); }
 $token = make_exam_design_token($examId,'teacher',$teacherId);
 redirect('exam-print.php?type=questions&exam_id='.$examId.($gradeAll ? '&grade_all=1' : '').'&dt='.urlencode($token));

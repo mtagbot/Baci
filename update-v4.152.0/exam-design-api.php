@@ -219,10 +219,12 @@ $exam = DB::fetch("SELECT es.*, COALESCE(t.full_name, es.teacher_name) AS t_name
 if (!$exam) json_out(false, ['error'=>'آزمون یافت نشد']);
 if(($exam['exam_kind']??'')==='class_deleted')json_out(false,['error'=>'این آزمون کلاسی حذف شده است.']);
 if (in_array($action,['save','import_design'],true) && !exam_schedule_design_ready($exam)) json_out(false,['error'=>'برنامهٔ امتحانی ناقص است؛ طراحی آزمون ذخیره نشد.']);
+if (!exam_teacher_class_design_enabled($exam)) json_out(false,['error'=>'طراحی آزمون‌های کلاسی در حال حاضر توسط مدیریت غیرفعال شده است.']);
 if(in_array($action,['save','import_design'],true))ceg_write_begin($exam);
 $exam=DB::fetch('SELECT es.*,COALESCE(t.full_name,es.teacher_name) t_name FROM exam_schedules es LEFT JOIN teachers t ON t.id=es.teacher_id WHERE es.id=?',[$examId]);
 if(($exam['exam_kind']??'')==='class_deleted')json_out(false,['error'=>'این آزمون کلاسی حذف شده است.']);
 if (in_array($action,['save','import_design'],true) && !exam_schedule_design_ready($exam)) json_out(false,['error'=>'برنامهٔ امتحانی ناقص است؛ طراحی آزمون ذخیره نشد.']);
+if (!exam_teacher_class_design_enabled($exam)) json_out(false,['error'=>'طراحی آزمون‌های کلاسی در حال حاضر توسط مدیریت غیرفعال شده است.']);
 $boundGroup=ceg_for_exam($exam);
 if(ceg_pending_sync($exam,$boundGroup))json_out(false,['error'=>'اطلاعات گروه هنوز همگام نشده است.']);
 if($boundGroup && !$boundGroup['excluded'] && (int)$boundGroup['design_exam_id']!==$examId) json_out(false,['error'=>'این کلاس اکنون عضو آزمون پایه است؛ صفحه را تازه‌سازی کنید.']);
@@ -702,6 +704,7 @@ if ($action === 'save') {
     $payload = json_decode($raw, true);
     if (!$payload) json_out(false, ['error'=>'داده نامعتبر']);
     $design = $payload['design'] ?? [];
+    $sendForPrint = !empty($payload['send_for_print']);
     $questions = $design['questions'] ?? [];
     $designerTeacherId = !empty($_SESSION['teacher_id']) ? (int)$_SESSION['teacher_id'] : ($exam['teacher_id'] ?: null);
     $designerName = $exam['t_name'] ?: ($_SESSION['teacher_name'] ?? '');
@@ -745,13 +748,16 @@ if ($action === 'save') {
     try {
         if (function_exists('exam_replicate_design_to_grade_siblings')) $replicated = (int)exam_replicate_design_to_grade_siblings($examId);
     } catch (Exception $e) { error_log('grade design replicate failed: ' . $e->getMessage()); }
-    /* v4.87.0: alert executive deputies on both bots (subject, term, date,
-       designer, print note + «دریافت نسخه PDF» button). Debounced inside. */
-    try {
-        require_once __DIR__ . '/includes/bot_role_engine.php';
-        bot_notify_exam_design_saved($examId);
-    } catch (Exception $e) { error_log('exec design notify failed: ' . $e->getMessage()); }
-    json_out(true, ['message'=>'طراحی آزمون و سوالات در بانک اطلاعاتی ذخیره شد.' . ($replicated > 0 ? ' (برای ' . tr_num($replicated, 'fa') . ' کلاس دیگر همین پایه هم اعمال شد)' : '')]);
+    /* v4.189.0: ordinary saves remain private drafts; only the explicit
+       send-for-print choice notifies executive deputies. */
+    if ($sendForPrint) {
+        try {
+            require_once __DIR__ . '/includes/bot_role_engine.php';
+            bot_notify_exam_design_saved($examId);
+        } catch (Exception $e) { error_log('exec design notify failed: ' . $e->getMessage()); }
+    }
+    $saveMessage = $sendForPrint ? 'طراحی ذخیره و برای چاپ به معاون اجرایی ارسال شد.' : 'طراحی ذخیره شد؛ این ذخیره به‌عنوان پیش‌نویس باقی می‌ماند.';
+    json_out(true, ['message'=>$saveMessage . ($replicated > 0 ? ' (برای ' . tr_num($replicated, 'fa') . ' کلاس دیگر همین پایه هم اعمال شد)' : '')]);
 }
 
 if ($action === 'delete_bank') {

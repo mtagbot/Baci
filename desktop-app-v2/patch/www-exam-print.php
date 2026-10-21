@@ -1,6 +1,7 @@
 <?php
 // File: exam-print.php
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__.'/includes/page_navigation.php';
 require_once __DIR__ . '/includes/class_exam_groups.php';
 ensure_exams_schema(); ceg_schema();
 $type = $_GET['type'] ?? 'schedule';
@@ -90,7 +91,7 @@ function exam_pdf_pages_to_images_unlocked($pdfRelPath, $examId, $declaredPages 
 // For mini-apps (Bale/Telegram) a signed dt token may authorize the design page even if it opens in another browser.
 $earlyExamId = (int)($_GET['exam_id'] ?? 0);
 $earlyTokenOk = $earlyExamId ? verify_exam_design_token($_GET['dt'] ?? '', $earlyExamId) : false;
-if (!$earlyTokenOk && !is_admin_logged_in() && !is_student_logged_in() && empty($_SESSION['teacher_id'])) die('غیرمجاز');
+if (!$earlyTokenOk && !is_admin_logged_in() && !is_student_logged_in() && empty($_SESSION['teacher_id'])) app_page_error('غیرمجاز');
 
 if ($type === 'seatcards') {
     $year = trim($_GET['year'] ?? get_setting('current_academic_year','1404/1405'));
@@ -101,11 +102,11 @@ if ($type === 'seatcards') {
         JOIN (SELECT MAX(id) mid FROM exam_student_seating WHERE academic_year=? GROUP BY student_id) x ON x.mid=seat.id
         JOIN students s ON s.id=seat.student_id
         ORDER BY seat.exam_room, CAST(seat.seat_number AS UNSIGNED), s.class_name, s.last_name", [$year]);
-?><!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><title>ویرایشگر کارت صندلی</title>
+?><!DOCTYPE html><html lang="fa" dir="rtl"><head><meta name=viewport content="width=device-width, initial-scale=1"><meta charset="UTF-8"><title>ویرایشگر کارت صندلی</title>
 <style>
 @page{size:A4;margin:var(--pageMargin,7mm)} @font-face{font-family:Vazirmatn;src:url('uploads/Vazirmatn/Vazirmatn-Regular.woff2')}*{box-sizing:border-box}body{font-family:Vazirmatn,Tahoma,sans-serif;margin:0;background:#e5e7eb}.seat-toolbar{position:fixed;top:0;inset-inline:0;background:#111827;color:#fff;z-index:20;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px;font-size:12px}.seat-toolbar input,.seat-toolbar select{width:80px}.sheet{--cols:2;--gap:3mm;--cardH:53mm;--photo:27mm;--font:11px;--seatFont:25px;display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:var(--gap);padding:var(--pageMargin,7mm);margin:52px auto 0;background:#fff;width:210mm;min-height:297mm}.card{border:1.8px solid #000;border-radius:5px;padding:3mm;display:grid;grid-template-columns:1fr var(--photo);gap:3mm;min-height:var(--cardH);page-break-inside:avoid;font-size:var(--font);cursor:move}.info{line-height:2}.seatbox{border:2px solid #000;display:flex;align-items:center;justify-content:center;font-size:var(--seatFont);font-weight:900;min-height:18mm;margin-top:2mm}.photo{width:var(--photo);height:calc(var(--photo) * 4 / 3);border:1px solid #333;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:9px}.photo img{width:100%;height:100%;object-fit:cover}.empty-seat{border-style:dashed;opacity:.6}@media print{.seat-toolbar{display:none}.sheet{margin:0;break-after:page}.card{cursor:default}}
-</style></head><body>
-<div class="seat-toolbar">تعداد کارت <input type="range" min="4" max="12" value="10" oninput="setCardsPerPage(this.value)"> ستون <input type="range" min="1" max="3" value="2" oninput="setSeatVar('--cols',this.value)"> فاصله <input type="range" min="1" max="8" value="3" oninput="setSeatVar('--gap',this.value+'mm')"> ارتفاع کارت <input type="range" min="35" max="80" value="53" oninput="setSeatVar('--cardH',this.value+'mm')"> عکس <input type="range" min="16" max="38" value="27" oninput="setSeatVar('--photo',this.value+'mm')"> فونت <input type="range" min="8" max="16" value="11" oninput="setSeatVar('--font',this.value+'px')"> شماره <input type="range" min="18" max="42" value="25" oninput="setSeatVar('--seatFont',this.value+'px')"> حاشیه <input type="range" min="0" max="15" value="7" oninput="setSeatVar('--pageMargin',this.value+'mm')"><select id="gradeMix" onchange="filterSeatCards()"><option value="all">همه پایه‌ها</option><option value="هفتم">هفتم</option><option value="هشتم">هشتم</option><option value="نهم">نهم</option><option value="هفتم,هشتم">هفتم+هشتم</option><option value="هشتم,نهم">هشتم+نهم</option><option value="نهم,هفتم">نهم+هفتم</option></select><button onclick="addEmptySeat()">صندلی خالی</button><button onclick="window.print()">چاپ نهایی</button></div>
+</style><?php echo app_appearance_head(); ?><link rel=stylesheet href=assets/css/school-ui.css?v20260917d><script defer src=assets/js/school-icons.js?v20260917d></script><script defer src=assets/js/school-ui.js?v20260917d></script></head><body data-school-return="preview">
+<div class="seat-toolbar">تعداد کارت <input type="range" min="4" max="12" value="10" oninput="setCardsPerPage(this.value)"> ستون <input type="range" min="1" max="3" value="2" oninput="setSeatVar('--cols',this.value)"> فاصله <input type="range" min="1" max="8" value="3" oninput="setSeatVar('--gap',this.value+'mm')"> ارتفاع کارت <input type="range" min="35" max="80" value="53" oninput="setSeatVar('--cardH',this.value+'mm')"> عکس <input type="range" min="16" max="38" value="27" oninput="setSeatVar('--photo',this.value+'mm')"> فونت <input type="range" min="8" max="16" value="11" oninput="setSeatVar('--font',this.value+'px')"> شماره <input type="range" min="18" max="42" value="25" oninput="setSeatVar('--seatFont',this.value+'px')"> حاشیه <input type="range" min="0" max="15" value="7" oninput="setSeatVar('--pageMargin',this.value+'mm')"><select id="gradeMix" onchange="filterSeatCards()"><option value="all">همه پایه‌ها</option><option value="هفتم">هفتم</option><option value="هشتم">هشتم</option><option value="نهم">نهم</option><option value="هفتم,هشتم">هفتم+هشتم</option><option value="هشتم,نهم">هشتم+نهم</option><option value="نهم,هفتم">نهم+هفتم</option></select><button onclick="addEmptySeat()">صندلی خالی</button><button onclick="appPrint()">چاپ نهایی</button></div>
 <div class="sheet" id="seatSheet">
 <?php foreach($rows as $r): ?>
   <div class="card" draggable="true" data-grade="<?php echo clean($r['grade_level']); ?>"><div class="info"><b>نام دانش‌آموز:</b> <?php echo clean($r['first_name'].' '.$r['last_name']); ?><br><b>کلاس دانش‌آموز:</b> <?php echo clean($r['class_name']); ?><br><b>کلاس امتحانی:</b> <?php echo clean($r['exam_room']); ?><div class="seatbox"><?php echo tr_num($r['seat_number'],'fa'); ?></div></div><div><div class="photo"><?php if(!empty($r['photo_url'])): ?><img src="<?php echo clean($r['photo_url']); ?>"><?php else: ?>عکس<?php endif; ?></div></div></div>
@@ -120,29 +121,30 @@ function enableDrag(){document.querySelectorAll('.card').forEach(card=>{card.ond
 
 $examId = (int)($_GET['exam_id'] ?? 0);
 $exam = DB::fetch('SELECT es.*, COALESCE(t.full_name, es.teacher_name) t_name, t.last_name t_last FROM exam_schedules es LEFT JOIN teachers t ON t.id=es.teacher_id WHERE es.id=?',[$examId]);
-if (!$exam) die('امتحان یافت نشد');
-if(($exam['exam_kind']??'')==='class_deleted')die('این آزمون کلاسی حذف شده و قابل ویرایش یا چاپ نیست.');
-if (in_array($type,['questions','questions_editor'],true) && !exam_schedule_design_ready($exam)) die('این برنامهٔ امتحانی ناقص است و برای طراحی آزمون در دسترس نیست؛ ابتدا تاریخ و ساعت را کامل کنید.');
+if (!$exam) app_page_error('امتحان یافت نشد');
+if(($exam['exam_kind']??'')==='class_deleted')app_page_error('این آزمون کلاسی حذف شده و قابل ویرایش یا چاپ نیست.');
+if (in_array($type,['questions','questions_editor'],true) && !exam_schedule_design_ready($exam)) app_page_error('این برنامهٔ امتحانی ناقص است و برای طراحی آزمون در دسترس نیست؛ ابتدا تاریخ و ساعت را کامل کنید.');
+if (in_array($type,['questions','questions_editor'],true) && !exam_teacher_class_design_enabled($exam)) app_page_error('طراحی آزمون‌های کلاسی در حال حاضر توسط مدیریت غیرفعال شده است.');
 $designToken = $_GET['dt'] ?? '';
 $designTokenOk = verify_exam_design_token($designToken, $examId);
-if (($type === 'questions' || $type === 'questions_editor') && !$designTokenOk && !exam_can_design($examId)) die('شما مجاز به طراحی سوالات این آزمون نیستید.');
-if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['upload_question_source']))ceg_write_begin($exam);
+if (($type === 'questions' || $type === 'questions_editor') && !$designTokenOk && !exam_can_design($examId)) app_page_error('شما مجاز به طراحی سوالات این آزمون نیستید.');
+if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['upload_question_source'])){ceg_write_begin($exam);$fresh=DB::fetch('SELECT exam_kind FROM exam_schedules WHERE id=?',[$examId]);if(!$fresh || $fresh['exam_kind']==='class_deleted')app_page_error('این آزمون کلاسی حذف شده است.');}
 $classGroup=ceg_for_exam($exam);
-if(ceg_pending_sync($exam,$classGroup))die('اطلاعات گروه هنوز همگام نشده است؛ پس از تکمیل همگام‌سازی صفحه را باز کنید.');
+if(ceg_pending_sync($exam,$classGroup))app_page_error('اطلاعات گروه هنوز همگام نشده است؛ پس از تکمیل همگام‌سازی صفحه را باز کنید.');
 if ($classGroup && !$classGroup['excluded'] && (int)$classGroup['design_exam_id']!==$examId && in_array($type,['questions','questions_editor'],true)) {
-    if($_SERVER['REQUEST_METHOD']==='POST')die('این کلاس عضو آزمون پایه شده است؛ صفحه را تازه‌سازی کنید.');
+    if($_SERVER['REQUEST_METHOD']==='POST')app_page_error('این کلاس عضو آزمون پایه شده است؛ صفحه را تازه‌سازی کنید.');
     $qs=$_GET; $qs['exam_id']=(int)$classGroup['design_exam_id'];
     if(empty($_GET['grade_all']))$qs['class_only']=(int)$classGroup['member_exam_id']; else unset($qs['class_only']);
     $qs['dt']=make_exam_design_token($qs['exam_id'],'teacher',(int)$classGroup['teacher_id']);
     redirect('exam-print.php?'.http_build_query($qs));
 }
 if($classGroup && $classGroup['excluded'] && (int)$classGroup['member_exam_id']===$examId && !empty($classGroup['detached_exam_id']) && in_array($type,['questions','questions_editor'],true)) {
-    if($_SERVER['REQUEST_METHOD']==='POST')die('این کلاس مستثنی شده است؛ صفحهٔ طراحی مستقل را باز کنید.');
+    if($_SERVER['REQUEST_METHOD']==='POST')app_page_error('این کلاس مستثنی شده است؛ صفحهٔ طراحی مستقل را باز کنید.');
     $fork=(int)$classGroup['detached_exam_id'];
     redirect('exam-print.php?type=questions&exam_id='.$fork.'&dt='.urlencode(make_exam_design_token($fork,'teacher',(int)$classGroup['teacher_id'])));
 }
 if($classGroup && !$classGroup['excluded'] && !empty($_GET['class_only'])) {
-    if(!ceg_validate_member($classGroup,(int)$_GET['class_only']))die('این کلاس دیگر عضو فعال آزمون پایه نیست.');
+    if(!ceg_validate_member($classGroup,(int)$_GET['class_only']))app_page_error('این کلاس دیگر عضو فعال آزمون پایه نیست.');
 }
 $groupScope = ($classGroup && !$classGroup['excluded']) ? ceg_scope($classGroup) : '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_question_source']) && ($designTokenOk || exam_can_design($examId))) {
@@ -176,17 +178,17 @@ if (is_student_logged_in()) {
         $ownedClasses=ceg_classes($classGroup);
         if(!empty($_GET['class_only'])) {
             $m=DB::fetch('SELECT * FROM class_exam_group_members WHERE group_id=? AND exam_id=? AND excluded=0',[$classGroup['id'],(int)$_GET['class_only']]);
-            if(!$m || !in_array($m['class_name'],$ownedClasses,true))die('این کلاس عضو فعال آزمون پایه نیست.');
+            if(!$m || !in_array($m['class_name'],$ownedClasses,true))app_page_error('این کلاس عضو فعال آزمون پایه نیست.');
             $wanted=norm_class_str($m['class_name']);
             $ownedClasses=array_values(array_filter($ownedClasses,function($c)use($wanted){return norm_class_str($c)===$wanted;}));
         }
-        if(!$ownedClasses)die('هیچ کلاس فعالی در این آزمون پایه باقی نمانده است.');
+        if(!$ownedClasses)app_page_error('هیچ کلاس فعالی در این آزمون پایه باقی نمانده است.');
         $marks=implode(',',array_fill(0,count($ownedClasses),'?'));
         $students=DB::fetchAll("SELECT s.id,s.first_name,s.last_name,s.class_name,s.grade_level,s.photo_url FROM students s WHERE s.status='active' AND s.class_name IN ($marks) AND $exySql",array_merge($ownedClasses,$exyParams));
     } elseif ($gradeAll && ($exam['exam_kind'] ?? '') === 'class') {
         require_once __DIR__ . '/includes/class_exam_helpers.php';
         $ownedClasses = class_exam_grade_classes($exam);
-        if (!$ownedClasses) die('برای این درس و پایه، کلاسی به دبیر آزمون تخصیص ندارد.');
+        if (!$ownedClasses) app_page_error('برای این درس و پایه، کلاسی به دبیر آزمون تخصیص ندارد.');
         $marks = implode(',',array_fill(0,count($ownedClasses),'?'));
         $students = DB::fetchAll("SELECT s.id,s.first_name,s.last_name,s.class_name,s.grade_level,s.photo_url FROM students s WHERE s.status='active' AND s.class_name IN ($marks) AND $exySql",array_merge($ownedClasses,$exyParams));
     } elseif ($gradeAll && $targetGrade !== '') {
@@ -216,9 +218,9 @@ if ($students && in_array($type, ['schedule','questions','questions_editor'], tr
 }
 
 if ($type === 'schedule') {
-?><!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><title>برنامه امتحانی</title><style>@page{size:A4;margin:10mm}@font-face{font-family:Vazirmatn;src:url('uploads/Vazirmatn/Vazirmatn-Regular.woff2')}body{font-family:Vazirmatn,Tahoma,sans-serif;margin:0}table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;padding:7px;text-align:center;font-size:12px}th{background:#eee}.head{text-align:center;margin-bottom:10px}</style></head><body><div class="head"><b><?php echo clean($school); ?></b><br>جدول برنامه امتحانی</div><table><thead><tr><th>نام دانش‌آموز</th><th>کلاس</th><th>درس</th><th>تاریخ</th><th>روز</th><th>ساعت</th><th>مدت</th><th>کلاس امتحانی</th><th>صندلی</th></tr></thead><tbody>
+?><!DOCTYPE html><html lang="fa" dir="rtl"><head><meta name=viewport content="width=device-width, initial-scale=1"><meta charset="UTF-8"><title>برنامه امتحانی</title><style>@page{size:A4;margin:10mm}@font-face{font-family:Vazirmatn;src:url('uploads/Vazirmatn/Vazirmatn-Regular.woff2')}body{font-family:Vazirmatn,Tahoma,sans-serif;margin:0}table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;padding:7px;text-align:center;font-size:12px}th{background:#eee}.head{text-align:center;margin-bottom:10px}</style><?php echo app_appearance_head(); ?><link rel=stylesheet href=assets/css/school-ui.css?v20260917d><script defer src=assets/js/school-icons.js?v20260917d></script><script defer src=assets/js/school-ui.js?v20260917d></script></head><body data-school-return="preview"><div class="head"><b><?php echo clean($school); ?></b><br>جدول برنامه امتحانی</div><table><thead><tr><th>نام دانش‌آموز</th><th>کلاس</th><th>درس</th><th>تاریخ</th><th>روز</th><th>ساعت</th><th>مدت</th><th>کلاس امتحانی</th><th>صندلی</th></tr></thead><tbody>
 <?php foreach($students as $s): $seat=$studentSeats[(int)$s['id']] ?? []; ?><tr><td><?php echo clean($s['first_name'].' '.$s['last_name']); ?></td><td><?php echo clean($s['class_name']); ?></td><td><?php echo clean($exam['subject_name']); ?></td><td><?php echo tr_num($exam['exam_date_jalali'],'fa'); ?></td><td><?php echo clean($exam['exam_day_name']); ?></td><td><?php echo tr_num($exam['start_time'],'fa'); ?></td><td><?php echo tr_num($exam['duration_minutes'],'fa'); ?></td><td><?php echo clean(($seat['exam_room']??'') ?: $exam['exam_room_default']); ?></td><td><?php echo tr_num($seat['seat_number']??'---','fa'); ?></td></tr><?php endforeach; ?>
-</tbody></table><script>window.print()</script></body></html><?php exit; }
+</tbody></table><script>appPrint()</script></body></html><?php exit; }
 
 if ($type === 'questions') { $type = 'questions_editor'; }
 if ($type === 'questions_editor') {
@@ -273,7 +275,7 @@ if ($type === 'questions_editor') {
         'sourcePages' => $sourcePages,
         'pdfNeedsServerConversion' => $pdfNeedsServerConversion,
     ];
-?><!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><title>ویرایشگر چاپ سوالات</title>
+?><!DOCTYPE html><html lang="fa" dir="rtl"><head><meta name=viewport content="width=device-width, initial-scale=1"><meta charset="UTF-8"><title>ویرایشگر چاپ سوالات</title>
 <style>
 @page{size:A4;margin:0}@font-face{font-family:Vazirmatn;src:url('uploads/Vazirmatn/Vazirmatn-Regular.woff2')}@font-face{font-family:BTitr;src:url('uploads/B-Titr/B-Titr.ttf')}@font-face{font-family:Yekan;src:url('uploads/Yekan/Yekan.ttf')}@font-face{font-family:Sahel;src:url('uploads/Sahel/Sahel.ttf')}*{box-sizing:border-box}
 :root{--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--line2:#cbd5e1;--bg:#eef1f6;--card:#ffffff;--brand:#2563eb;--brand2:#1d4ed8;--ok:#16a34a;--ok2:#15803d;--warn:#f59e0b;--danger:#ef4444;--radius:12px;--shadow:0 10px 30px rgba(15,23,42,.12);--shadow-lg:0 24px 70px rgba(15,23,42,.28);--focus:0 0 0 3px rgba(37,99,235,.35)}
@@ -462,12 +464,13 @@ body.modal-open{overflow:hidden}
 .pagepick-chip:hover{border-color:var(--brand)}
 .pagepick-chip input{accent-color:var(--brand)}
 .pagepick-chip:has(input:checked){background:#e0e9ff;border-color:var(--brand);font-weight:700}
-@media print{.toolbar,.editor-panel,.bank-panel,.q-actions,.exam-zoom-modal,.q-modal,#uiToast,.img-resize-box{display:none!important}.eq-slot{border:0!important;outline:0!important;min-width:0!important;padding:0!important}.page{margin:0;width:210mm;height:297mm;break-after:page}body{background:white}.qwrap{overflow:hidden}.source-file iframe{height:65mm!important}.drawCanvas{pointer-events:none}}
+.save-choice-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.62);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px}.save-choice-card{width:min(480px,96vw);background:#fff;border-radius:14px;padding:20px;box-shadow:0 22px 70px rgba(0,0,0,.3);font-family:Vazirmatn,Tahoma,sans-serif}.save-choice-card h3{margin:0 0 8px;font-size:18px}.save-choice-card p{margin:0 0 16px;color:#475569;line-height:1.8}.save-choice-actions{display:flex;flex-wrap:wrap;gap:8px}.save-choice-actions button{min-height:40px;padding:7px 12px;border:0;border-radius:8px;cursor:pointer;font-family:inherit}.save-choice-actions .btn-soft{background:#e2e8f0;color:#0f172a}
+@media print{.save-choice-backdrop,.toolbar,.editor-panel,.bank-panel,.q-actions,.exam-zoom-modal,.q-modal,#uiToast,.img-resize-box{display:none!important}.eq-slot{border:0!important;outline:0!important;min-width:0!important;padding:0!important}.page{margin:0;width:210mm;height:297mm;break-after:page}body{background:white}.qwrap{overflow:hidden}.source-file iframe{height:65mm!important}.drawCanvas{pointer-events:none}}
 /* v4.77.0: render pages lazily on screen — old/weak systems keep scrolling smooth
    even with hundreds of print pages; ignored harmlessly by very old browsers.
    Print media is unaffected: all pages always render fully on paper. */
 @media screen{.page{content-visibility:auto;contain-intrinsic-size:210mm 297mm}}
-</style><link rel="stylesheet" href="assets/css/exam-designer-mobile.css?v=4.183.0"></head><body>
+</style><?php echo app_appearance_head(); ?><link rel=stylesheet href=assets/css/school-ui.css?v20260917d><link rel="stylesheet" href="assets/css/exam-designer-mobile.css?v=4.183.0"><script defer src=assets/js/school-icons.js?v20260917d></script><script defer src=assets/js/school-ui.js?v20260917d></script></head><body data-school-return="preview">
 <div class="toolbar" id="mainToolbar">
   <div class="tb-group no-ajax"><span class="tb-title">فایل منبع</span><button type="button" onclick="openSourceUploadModal()">بارگذاری PDF/تصویر</button><button type="button" onclick="deleteLiveSource()">حذف/تغییر</button></div>
   <span class="tb-sep"></span>
@@ -477,7 +480,13 @@ body.modal-open{overflow:hidden}
   <span class="tb-sep"></span>
   <div class="tb-group"><span class="tb-title">دست‌نویس</span><label class="tb-color" title="رنگ قلم"><input type="color" id="penColor" value="#111111"></label><button id="toolBtnPen" onclick="setTool('pen')">قلم</button><button id="toolBtnEraser" onclick="setTool('eraser')">پاک‌کن</button><button id="toolBtnOff" class="tool-active" onclick="setTool('off')">خاموش</button><button onclick="clearDrawings()">پاک‌کردن</button></div>
   <span class="tb-spacer"></span>
-  <div class="tb-group tb-actions"><?php if($groupScope!==''): ?><b class="group-design-notice">آزمون مشترک پایه — تغییرات برای همهٔ اعضای گروه است</b><?php endif; ?><button class="btn-save" onclick="saveDesign()">ذخیره طراحی</button><button class="btn-print" onclick="prepareAllAndPrint()">چاپ نهایی</button></div>
+  <div class="tb-group tb-actions"><?php if($groupScope!==''): ?><b class="group-design-notice">آزمون مشترک پایه — <?php $noticeClasses=[]; foreach(($ownedClasses??ceg_classes($classGroup)) as $c)$noticeClasses[norm_class_str($c)]=$c; echo clean(implode('، ',array_values($noticeClasses))); ?></b><?php elseif($classGroup && $classGroup['excluded']): ?><b class="independent-design-notice">آزمون مستقل این کلاس — <?php echo clean($exam['class_name']); ?></b><?php endif; ?><button class="btn-save" onclick="openSaveChoiceModal()">ذخیره طراحی</button><button class="btn-print" onclick="prepareAllAndPrint()">چاپ نهایی</button></div>
+</div>
+<div class="save-choice-backdrop" id="saveChoiceModal" role="dialog" aria-modal="true" aria-labelledby="saveChoiceTitle" aria-hidden="true" style="display:none">
+  <section class="save-choice-card"><h3 id="saveChoiceTitle">ذخیره طراحی</h3>
+    <p>نوع ذخیره را انتخاب کنید. ذخیرهٔ معمولی فقط طرح را نگه می‌دارد؛ ارسال برای چاپ، معاون اجرایی را مطلع می‌کند.</p>
+    <div class="save-choice-actions"><button type="button" class="btn-save" onclick="confirmSaveChoice(false)">ذخیرهٔ معمولی</button><button type="button" class="btn-print" onclick="confirmSaveChoice(true)">ذخیره و ارسال برای چاپ</button><button type="button" class="btn-soft" onclick="closeSaveChoiceModal()">انصراف</button></div>
+  </section>
 </div>
 <div class="editor-panel collapsed" id="questionEditorPanel">
   <div class="panel-head"><b>تنظیمات برگه</b><button type="button" class="panel-close" onclick="toggleEditor()" aria-label="بستن">×</button></div>
@@ -665,6 +674,7 @@ setTimeout(syncToolbarOffset,1200);
 const studentsData=<?php echo json_encode($studentsData, JSON_UNESCAPED_UNICODE); ?>;
 const examData=<?php echo json_encode($examData, JSON_UNESCAPED_UNICODE); ?>;
 const examId=<?php echo (int)$examId; ?>;
+const isClassExam=<?php echo ($exam['exam_kind']??'')==='class'?'true':'false'; ?>;
 const classGroupMember=<?php echo (int)($_GET['class_only']??0); ?>;
 const classGroupScope=<?php echo json_encode($groupScope); ?>;
 const designToken=<?php echo json_encode($designToken, JSON_UNESCAPED_UNICODE); ?>;
@@ -744,7 +754,7 @@ function pageHtml(st,pageNo){return `<div class="page ${pageNo%2===0?'no-header'
 function ensurePages(n){const activeStudents=previewOnly?[studentsData[0]]:studentsData; activeStudents.forEach(st=>{let count=document.querySelectorAll(`.page[data-student-id="${st.id}"]`).length; const root=document.getElementById('pagesRoot'); while(count<n){const html=pageHtml(st,count+1); const pages=[...document.querySelectorAll(`.page[data-student-id="${st.id}"]`)]; const last=pages[pages.length-1]; if(last) last.insertAdjacentHTML('afterend',html); else root.insertAdjacentHTML('beforeend',html); count++;}}); renderHeaders(); resizeCanvases();}
 function sourcePageCount(){return Math.max(1,(sourceOrder.length?sourceOrder.length:(examData.sourcePages||[]).length));}
 function rerenderPages(){document.getElementById('pagesRoot').innerHTML=''; ensurePages(sourcePageCount()); renderQuestions();}
-function questionRow(it){return `<tr class="question-row" draggable="true" data-qid="${it.id}"><td class="q-no">${it.no}</td><td class="q-content" style="height:${it.height}mm;font-family:${it.font};font-size:${it.fontSize}px">${it.html}<div class="q-actions"><button onclick="editQuestion('${it.id}')">ویرایش</button><button class="q-move" onclick="moveQuestion('${it.id}',-1)" title="یک سوال بالاتر">↑ بالا</button><button class="q-move" onclick="moveQuestion('${it.id}',1)" title="یک سوال پایین‌تر">↓ پایین</button><button onclick="deleteQuestion('${it.id}')">حذف</button></div><div class="q-h-grip" title="کشیدن برای تنظیم ارتفاع سوال" onpointerdown="qHeightGripDown(event,'${it.id}')"></div></td><td class="q-score">${it.score}</td></tr>`;}
+function questionRow(it){return `<tr class="question-row" draggable="true" data-qid="${it.id}"><td class="q-no">${it.no}</td><td class="q-content" style="height:${it.height}mm;font-family:${it.font}!important;font-size:${it.fontSize}px">${it.html}<div class="q-actions"><button onclick="editQuestion('${it.id}')">ویرایش</button><button class="q-move" onclick="moveQuestion('${it.id}',-1)" title="یک سوال بالاتر">↑ بالا</button><button class="q-move" onclick="moveQuestion('${it.id}',1)" title="یک سوال پایین‌تر">↓ پایین</button><button onclick="deleteQuestion('${it.id}')">حذف</button></div><div class="q-h-grip" title="کشیدن برای تنظیم ارتفاع سوال" onpointerdown="qHeightGripDown(event,'${it.id}')"></div></td><td class="q-score">${it.score}</td></tr>`;}
 /* ============ v4.115.0: تنظیم ارتفاع سوال با کشیدن حاشیه پایین ============ */
 let qHeightDrag=null;
 function qHeightGripDown(e,qid){
@@ -832,7 +842,7 @@ function renderQuestionPreviewNow(){
   const c=document.getElementById('qPrevContent'),ed=document.getElementById('qText'); if(!c||!ed)return;
   syncQuestionPlaceholder();
   const html=normalizeQuestionHtml(ed.innerHTML); c.innerHTML=html||`<span class="preview-empty">متن سوال را وارد کنید...</span>`;
-  c.style.fontFamily=document.getElementById('qFont').value; c.style.fontSize=document.getElementById('qFontSize').value+'px'; c.style.height=document.getElementById('qHeight').value+'mm';
+  c.style.setProperty('font-family',document.getElementById('qFont').value,'important'); c.style.fontSize=document.getElementById('qFontSize').value+'px'; c.style.height=document.getElementById('qHeight').value+'mm';
   document.getElementById('qPrevNo').textContent=document.getElementById('qNumber').value||'۱'; document.getElementById('qPrevScore').textContent=document.getElementById('qScore').value||'';
   const fv=document.getElementById('qFontSizeVal');if(fv)fv.textContent=(+document.getElementById('qFontSize').value).toLocaleString('fa-IR');const hv=document.getElementById('qHeightVal');if(hv)hv.textContent=(+document.getElementById('qHeight').value).toLocaleString('fa-IR');
 }
@@ -1187,9 +1197,9 @@ function installMobileEditorChrome(){
     '<button type="button" data-mobile-control="newq" onclick="openQuestionModal()" aria-label="ثبت سوال جدید">سوال<br>جدید</button>'+
     '<button type="button" data-mobile-control="editor" onclick="toggleEditor()" aria-expanded="false">تنظیمات<br>برگه</button>'+
     '<button type="button" class="mobile-dock-zoom" onclick="setMobilePageZoom(-.1)" aria-label="کوچک‌نمایی">−</button>'+
-    '<output id="mobilePageZoom" aria-live="polite">—</output>'+
+    '<output id="mobilePageZoom" aria-live="polite" onclick="fitMobilePage()" title="اندازه مناسب صفحه">—</output>'+
     '<button type="button" class="mobile-dock-zoom" onclick="setMobilePageZoom(.1)" aria-label="بزرگ‌نمایی">+</button>'+
-    '<button type="button" class="mobile-dock-save" onclick="saveDesign()">ذخیره</button>'+
+    '<button type="button" class="mobile-dock-save" onclick="openSaveChoiceModal()">ذخیره</button>'+
     '<button type="button" class="mobile-dock-print" onclick="prepareAllAndPrint()">چاپ</button>';
   /* v4.163.0: پس‌زمینهٔ ورقه‌ها — با لمسِ بیرونِ پنل، پنل بسته می‌شود. */
   if(!document.getElementById('mobileSheetBackdrop')){const bd=document.createElement('div'); bd.id='mobileSheetBackdrop'; bd.className='mobile-sheet-backdrop'; bd.setAttribute('aria-hidden','true'); bd.addEventListener('click',()=>{const e=document.getElementById('questionEditorPanel'),b=document.getElementById('bankPanel'); if(e&&!e.classList.contains('collapsed'))toggleEditor(); else if(b&&!b.classList.contains('collapsed'))toggleBank();}); document.body.appendChild(bd);}
@@ -1251,7 +1261,10 @@ function designPayload(){
   /* v4.163.0: نشانهٔ داخلی memo (_normSrc) هرگز در فایل طراحی ذخیره نمی‌شود. */
   return {questions:qItems.map(it=>{const{_normSrc,...rest}=it;return rest;}),headerFields,drawings:drawingsData,sourceCrops,sourceOrder,style:pageStyle,printNote,academicYear:'<?php echo addslashes($exam['academic_year'] ?? ''); ?>',examMonth:'<?php echo addslashes($exam['exam_month'] ?? ''); ?>',updatedAt:new Date().toISOString()};
 }
-function saveDesign(silent=false){const payload=designPayload(); autosaveLocal(); return fetch('exam-design-api.php?group_member='+classGroupMember+'&action=save&exam_id='+examId+'&dt='+encodeURIComponent(designToken),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({design:payload})}).then(r=>r.json()).then(j=>{if(!silent){if(j.ok)showToast(j.message||'طراحی ذخیره شد'); else alert(j.error||'خطا در ذخیره');} return j;});}
+function openSaveChoiceModal(){const m=document.getElementById('saveChoiceModal');if(!m)return; m.style.display='flex';m.setAttribute('aria-hidden','false');m.querySelector('button')?.focus();}
+function closeSaveChoiceModal(){const m=document.getElementById('saveChoiceModal');if(!m)return;m.style.display='none';m.setAttribute('aria-hidden','true');}
+function confirmSaveChoice(sendForPrint){closeSaveChoiceModal();saveDesign(false,!!sendForPrint);}
+function saveDesign(silent=false,sendForPrint=false){const payload=designPayload(); autosaveLocal(); return fetch('exam-design-api.php?group_member='+classGroupMember+'&action=save&exam_id='+examId+'&dt='+encodeURIComponent(designToken),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({design:payload,send_for_print:!!sendForPrint})}).then(r=>r.json()).then(j=>{if(!silent){if(j.ok)showToast(j.message||'طراحی ذخیره شد'); else alert(j.error||'خطا در ذخیره');} return j;});}
 function loadDesignAndBank(){
   const url='exam-design-api.php?group_member='+classGroupMember+'&action=load&catalog=design&exam_id='+examId+'&dt='+encodeURIComponent(designToken);
   fetch(url).then(r=>r.json()).then(j=>{
@@ -1490,7 +1503,7 @@ function prepareAllStudentsAsync(assetMap,onProgress,cb){
   step();
 }
 function waitForPrintReady(cb,maxMs){
-  // v4.77.0: never fire window.print() on a half-rendered DOM (the old fixed
+  // v4.77.0: never fire appPrint() on a half-rendered DOM (the old fixed
   // 550ms timer produced blank/garbled pages and printer-spooler overload on
   // slow systems). Wait until every image is decoded — capped so a broken
   // image can never hang the print button.
@@ -1542,7 +1555,7 @@ function designedPageCount(){
   return Math.max(1,n,sourcePageCount());
 }
 function checkClassGroupScope(){
-  if(!classGroupScope)return Promise.resolve(true);
+  if(!classGroupScope && !isClassExam)return Promise.resolve(true);
   return fetch('exam-design-api.php?group_member='+classGroupMember+'&action=group_scope&exam_id='+examId+'&dt='+encodeURIComponent(designToken)).then(r=>r.json()).then(j=>{
     if(!j.ok || j.scope!==classGroupScope){alert('اعضای آزمون پایه تغییر کرده‌اند؛ پیش از چاپ صفحه را تازه‌سازی کنید. کلاس مستثنی‌شده باید از طراحی مستقل باز شود.');return false;}return true;
   }).catch(()=>{alert('بررسی اعضای گروه ممکن نشد؛ دوباره تلاش کنید.');return false;});
@@ -1566,7 +1579,7 @@ function startQualityPrintChecked(){
     prepareAllStudentsAsync(assetMap,(d,t)=>pqProgress('ساخت صفحات چاپ... ('+Math.min(d*perStudent,totalPages)+' از '+totalPages+' صفحه)',40+Math.round(d/Math.max(1,t)*45)),()=>{
       // مرحله ۳: انتظار برای decode شدن تصاویر (سقف زمان متناسب با حجم کار).
       pqProgress('آماده‌سازی نهایی برای چاپ...',88);
-      waitForPrintReady(()=>{pqProgress('ارسال به چاپگر...',100); restore(); closePrintQualityModal(); checkClassGroupScope().then(ok=>{if(ok)window.print();});}, Math.min(120000, 15000+totalPages*150));
+      waitForPrintReady(()=>{pqProgress('ارسال به چاپگر...',100); restore(); closePrintQualityModal(); checkClassGroupScope().then(ok=>{if(ok)appPrint();});}, Math.min(120000, 15000+totalPages*150));
     });
   });
 }
