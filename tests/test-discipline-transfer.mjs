@@ -16,15 +16,17 @@ DB::execute("INSERT INTO class_schedules (academic_year,class_name,subject_name,
 DB::execute("INSERT INTO reports (student_id,class_name,academic_year,term,report_month,total_score,gpa,discipline_score) VALUES (9911,'هفتم1','1404/1405','نوبت اول','آبان',16,16,18),(9912,'هفتم1','1404/1405','نوبت اول','آبان',14,14,17),(9911,'هفتم1','1405/1406','نوبت اول','آبان',0,0,NULL)");
 DB::execute("INSERT INTO report_grades (report_id,subject_name,score,max_score,coefficient,status) SELECT id,'ریاضی',16,20,1,'passed' FROM reports WHERE student_id=9911 AND academic_year='1404/1405'");
 DB::execute("INSERT INTO report_grades (report_id,subject_name,score,max_score,coefficient,status) SELECT id,'ریاضی',14,20,1,'passed' FROM reports WHERE student_id=9912 AND academic_year='1404/1405'");
-DB::execute("INSERT INTO student_discipline_records (student_id,title_text,occurred_at_jalali) VALUES (9911,'تاخیر آزمایشی','1404/07/01')");`);
+DB::execute("INSERT INTO student_discipline_records (student_id,title_text,occurred_at_jalali) VALUES (9911,'تاخیر آزمایشی','پنجشنبه 1405/07/16')");`);
 
 async function request(file,{method='GET',query='',post={}}={}){
  const {res,stderr}=await req('',{file,query,sid,method,post});
  assert(!res.fatal,`${file}: ${res.fatal||''}`);assert(!stderr,stderr);return res;
 }
 const discipline=await request('discipline-report-management.php',{query:'embedded=1&year=1404%2F1405&month=%D8%A2%D8%A8%D8%A7%D9%86&grade=%D9%87%D9%81%D8%AA%D9%85&class=%D9%87%D9%81%D8%AA%D9%851'});
-check(discipline.page.includes('تاخیر آزمایشی')&&discipline.page.includes('سال‌های گذشته'),'Discipline list shows item and relative age');
+check(discipline.page.includes('تاخیر آزمایشی')&&discipline.page.includes('روز پیش')&&!discipline.page.includes('تاریخ نامشخص'),'Weekday-prefixed attendance date is parsed to relative age');
 check(discipline.page.includes('name="scores[9911]"')&&discipline.page.includes('مدیریت انضباطی کارنامه'),'Discipline score is editable in roster');
+check(discipline.page.includes('id="drmRepeatScore"')&&!discipline.page.includes('name="drmRepeatScore"')&&discipline.page.includes('querySelectorAll(\'.drm-score:not(:disabled)\')'),'Repeat score prefills editable rows without becoming a submitted value');
+check(discipline.page.includes('پایه:')&&discipline.page.includes('کلاس:')&&discipline.page.includes('drm-student-meta'),'Student name and class are clearly separated');
 const disciplineCsrf=(discipline.page.match(/name="csrf_token" value="([^"]+)"/)||[])[1];
 check(!!disciplineCsrf,'Discipline form has CSRF token');
 await request('discipline-report-management.php',{method:'POST',post:{csrf_token:disciplineCsrf,save_discipline_scores:'1',embedded:'1',year:'1404/1405',month:'آبان',grade:'هفتم',class:'هفتم1',scores:{9911:'19.5'}}});

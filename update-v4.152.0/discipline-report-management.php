@@ -26,9 +26,12 @@ function drm_score($value) {
 }
 function drm_age_label($jalaliDate) {
     $date = trim(tr_num((string)$jalaliDate, 'en'));
-    if (!preg_match('~^(\d{4})[/-](\d{1,2})[/-](\d{1,2})~', $date, $m)) return 'تاریخ نامشخص';
+    // Attendance entries may prefix the Jalali date with a weekday, e.g. "پنجشنبه 1405/07/16".
+    if (!preg_match('~(\d{4})[/-](\d{1,2})[/-](\d{1,2})~u', $date, $m)) return 'تاریخ نامشخص';
     if (!function_exists('jalali_to_gregorian')) return 'تاریخ نامشخص';
-    $g = jalali_to_gregorian((int)$m[1], (int)$m[2], (int)$m[3]);
+    $jy=(int)$m[1];$jm=(int)$m[2];$jd=(int)$m[3];
+    if($jm<1||$jm>12||$jd<1||$jd>31)return 'تاریخ نامشخص';
+    $g = jalali_to_gregorian($jy, $jm, $jd);
     $event = mktime(12, 0, 0, (int)$g[1], (int)$g[2], (int)$g[0]);
     $nowParts = explode('/', tr_num(jdate('Y/m/d'), 'en'));
     if (count($nowParts) !== 3) return 'تاریخ نامشخص';
@@ -167,9 +170,14 @@ require_once __DIR__ . '/includes/header.php';
     <form method="POST" action="discipline-report-management.php<?php echo $embedded?'?embedded=1':''; ?>">
         <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>"><input type="hidden" name="save_discipline_scores" value="1">
         <input type="hidden" name="embedded" value="<?php echo $embedded?'1':'0'; ?>"><input type="hidden" name="year" value="<?php echo clean($year); ?>"><input type="hidden" name="month" value="<?php echo clean($month); ?>"><input type="hidden" name="grade" value="<?php echo clean($grade); ?>"><input type="hidden" name="class" value="<?php echo clean($class); ?>">
+        <div class="card drm-repeat-card">
+            <label for="drmRepeatScore" class="font-bold">تکرار نمره برای همهٔ دانش‌آموزان</label>
+            <input id="drmRepeatScore" class="form-input drm-repeat-score" type="number" min="0" max="21" step="0.25" placeholder="یک نمره وارد کنید">
+            <small class="text-muted">این فیلد فقط نمره را در ورودی‌های دانش‌آموزانِ قابل‌ویرایش قرار می‌دهد و خودش ذخیره نمی‌شود؛ سپس می‌توانید نمرهٔ هر دانش‌آموز را جداگانه تغییر دهید.</small>
+        </div>
         <div class="card table-container"><table id="disciplineReportTable"><thead><tr><th>دانش‌آموز</th><th>موارد انضباطی</th><th>نمرهٔ انضباط</th></tr></thead><tbody>
         <?php foreach($studentRows as $s): $sid=(int)$s['id'];$rep=$reportMap[$sid]??null; ?>
-        <tr data-student-id="<?php echo $sid; ?>"><td><b><?php echo clean(trim($s['first_name'].' '.$s['last_name'])); ?></b><small class="block text-muted"><?php echo clean(($s['grade_level']??'').' / '.($s['class_name']??'')); ?></small></td><td class="drm-items">
+        <tr data-student-id="<?php echo $sid; ?>"><td><b class="drm-student-name"><?php echo clean(trim($s['first_name'].' '.$s['last_name'])); ?></b><span class="drm-student-meta"><span>پایه: <?php echo clean($s['grade_level']??'—'); ?></span><span>کلاس: <?php echo clean($s['class_name']??'—'); ?></span></span></td><td class="drm-items">
             <?php if(!empty($disciplineMap[$sid])): foreach($disciplineMap[$sid] as $item): ?><div class="drm-item"><span><?php echo clean($item['title_text']); ?></span> <small class="text-muted">— <?php echo clean(drm_age_label($item['occurred_at_jalali'])); ?></small></div><?php endforeach; else: ?><span class="text-muted">موردی ثبت نشده است.</span><?php endif; ?>
         </td><td><input class="form-input drm-score" type="number" min="0" max="21" step="0.25" name="scores[<?php echo $sid; ?>]" value="<?php echo clean($rep['discipline_score']??''); ?>" placeholder="—" <?php echo !empty($rep['is_locked'])?'disabled title="کارنامه قفل است"':''; ?>></td></tr>
         <?php endforeach; if(!$studentRows): ?><tr><td colspan="3" class="text-center text-muted">دانش‌آموزی با این فیلترها یافت نشد.</td></tr><?php endif; ?>
@@ -177,5 +185,16 @@ require_once __DIR__ . '/includes/header.php';
         <div class="flex justify-end mt-3"><button class="btn btn-success px-8" type="submit">ثبت</button></div>
     </form>
 </div>
-<style>.drm-wrap .drm-items{min-width:300px;line-height:1.9}.drm-wrap .drm-item{padding:2px 0;border-bottom:1px dashed #e2e8f0}.drm-wrap .drm-item:last-child{border-bottom:0}.drm-wrap .drm-score{max-width:130px}</style>
+<style>.drm-wrap .drm-items{min-width:300px;line-height:1.9}.drm-wrap .drm-item{padding:2px 0;border-bottom:1px dashed #e2e8f0}.drm-wrap .drm-item:last-child{border-bottom:0}.drm-wrap .drm-score{max-width:130px}.drm-wrap .drm-repeat-card{display:grid;gap:8px;margin-bottom:12px}.drm-wrap .drm-repeat-score{max-width:180px}.drm-wrap .drm-student-meta{display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:6px;padding-inline-start:4px;line-height:1.8;color:#64748b;font-size:.85em}</style>
+<script>
+(function(){
+    const repeat=document.getElementById('drmRepeatScore');
+    const table=document.getElementById('disciplineReportTable');
+    if(!repeat||!table)return;
+    repeat.addEventListener('input',function(){
+        if(repeat.value===''||!repeat.checkValidity())return;
+        table.querySelectorAll('.drm-score:not(:disabled)').forEach(function(field){field.value=repeat.value;});
+    });
+})();
+</script>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
