@@ -10,6 +10,8 @@ function school_management_hubs() {
         'reports'=>['title'=>'مدیریت کارنامه‌ها','tabs'=>[
             'reports'=>['کارنامه‌ها','reports.php?embedded=1'],
             'columns'=>['مدیریت ستونی','grade-columns.php?embedded=1'],
+            'discipline'=>['مدیریت انضباطی','discipline-report-management.php?embedded=1'],
+            'grade-transfer'=>['انتقال نمرات','report-grade-transfer.php?embedded=1'],
             'wizard'=>['ایمپورت Wizard','import.php?embedded=1'],
             'analytics'=>['تحلیل و مقایسه','analytics.php?embedded=1'],
             'grades'=>['مدیریت ثبت نمره','grade-entry-management.php?embedded=1'],
