@@ -24,6 +24,12 @@ function drm_score($value) {
     $score = (float)$value;
     return ($score >= 0 && $score <= 21) ? round($score, 2) : false;
 }
+function drm_is_attendance_entry($internalNote) {
+    $note = trim((string)$internalNote);
+    if ($note === '') return false;
+    return stripos($note, 'ثبت‌شده از سوابق حضور و غیاب') !== false
+        || preg_match('/(?:\\[)?att#\\d+(?:\\])?/i', $note) === 1;
+}
 function drm_age_label($jalaliDate) {
     $date = trim(tr_num((string)$jalaliDate, 'en'));
     // Attendance entries may prefix the Jalali date with a weekday, e.g. "پنجشنبه 1405/07/16".
@@ -152,7 +158,7 @@ if ($ids) {
         if ($wantedClass !== '' && norm_class_str((string)$r['class_name']) !== norm_class_str($wantedClass)) continue;
         $reportMap[(int)$r['student_id']] = $r;
     }
-    foreach (DB::fetchAll("SELECT student_id,title_text,occurred_at_jalali FROM student_discipline_records WHERE student_id IN ($marks) ORDER BY occurred_at_jalali DESC,id DESC",$ids) as $r) $disciplineMap[(int)$r['student_id']][] = $r;
+    foreach (DB::fetchAll("SELECT student_id,title_text,internal_note,occurred_at_jalali FROM student_discipline_records WHERE student_id IN ($marks) ORDER BY occurred_at_jalali DESC,id DESC",$ids) as $r) $disciplineMap[(int)$r['student_id']][] = $r;
 }
 require_once __DIR__ . '/includes/header.php';
 ?>
@@ -178,7 +184,7 @@ require_once __DIR__ . '/includes/header.php';
         <div class="card table-container"><table id="disciplineReportTable"><thead><tr><th>دانش‌آموز</th><th>موارد انضباطی</th><th>نمرهٔ انضباط</th></tr></thead><tbody>
         <?php foreach($studentRows as $s): $sid=(int)$s['id'];$rep=$reportMap[$sid]??null; ?>
         <tr data-student-id="<?php echo $sid; ?>"><td><b class="drm-student-name"><?php echo clean(trim($s['first_name'].' '.$s['last_name'])); ?></b><span class="drm-student-meta"><span>پایه: <?php echo clean($s['grade_level']??'—'); ?></span><span>کلاس: <?php echo clean($s['class_name']??'—'); ?></span></span></td><td class="drm-items">
-            <?php if(!empty($disciplineMap[$sid])): foreach($disciplineMap[$sid] as $item): ?><div class="drm-item"><span><?php echo clean($item['title_text']); ?></span> <small class="text-muted">— <?php echo clean(drm_age_label($item['occurred_at_jalali'])); ?></small></div><?php endforeach; else: ?><span class="text-muted">موردی ثبت نشده است.</span><?php endif; ?>
+            <?php if(!empty($disciplineMap[$sid])): foreach($disciplineMap[$sid] as $item): $internalNote=trim((string)($item['internal_note']??'')); $attendanceEntry=drm_is_attendance_entry($internalNote); ?><div class="drm-item"><small class="text-muted"><?php echo clean(drm_age_label($item['occurred_at_jalali'])); ?></small> — <span><?php echo clean($item['title_text']); ?></span><?php if($internalNote!==''&&!$attendanceEntry): ?> — <span class="drm-internal-note"><?php echo nl2br(clean($internalNote)); ?></span><?php endif; ?></div><?php endforeach; else: ?><span class="text-muted">موردی ثبت نشده است.</span><?php endif; ?>
         </td><td><input class="form-input drm-score" type="number" min="0" max="21" step="0.25" name="scores[<?php echo $sid; ?>]" value="<?php echo clean($rep['discipline_score']??''); ?>" placeholder="—" <?php echo !empty($rep['is_locked'])?'disabled title="کارنامه قفل است"':''; ?>></td></tr>
         <?php endforeach; if(!$studentRows): ?><tr><td colspan="3" class="text-center text-muted">دانش‌آموزی با این فیلترها یافت نشد.</td></tr><?php endif; ?>
         </tbody></table></div>
@@ -186,15 +192,5 @@ require_once __DIR__ . '/includes/header.php';
     </form>
 </div>
 <style>.drm-wrap .drm-items{min-width:300px;line-height:1.9}.drm-wrap .drm-item{padding:2px 0;border-bottom:1px dashed #e2e8f0}.drm-wrap .drm-item:last-child{border-bottom:0}.drm-wrap .drm-score{max-width:130px}.drm-wrap .drm-repeat-card{display:grid;gap:8px;margin-bottom:12px}.drm-wrap .drm-repeat-score{max-width:180px}.drm-wrap .drm-student-meta{display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:6px;padding-inline-start:4px;line-height:1.8;color:#64748b;font-size:.85em}</style>
-<script>
-(function(){
-    const repeat=document.getElementById('drmRepeatScore');
-    const table=document.getElementById('disciplineReportTable');
-    if(!repeat||!table)return;
-    repeat.addEventListener('input',function(){
-        if(repeat.value===''||!repeat.checkValidity())return;
-        table.querySelectorAll('.drm-score:not(:disabled)').forEach(function(field){field.value=repeat.value;});
-    });
-})();
-</script>
+<script defer src="assets/js/discipline-report-management.js?v=4.194.0"></script>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
