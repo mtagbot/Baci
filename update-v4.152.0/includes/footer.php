@@ -32,7 +32,7 @@ $showConnection=$footerDesk&&empty($isEmbedded);
 </div></footer>
 
 <?php if(!empty($needsCharts)||in_array(basename($_SERVER['PHP_SELF']??''),['analytics.php','student-panel.php','report-view.php'],true)): ?>
-<script defer src="assets/vendor/chart.umd.min.js"></script>
+<script defer src="assets/vendor/chart.umd.min.js?v=4.6.1"></script>
 <?php endif; ?>
 <script defer src="assets/js/main.js"></script>
 <script defer src="assets/js/ui-modern.js?v=20261005a"></script>
