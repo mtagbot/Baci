@@ -47,6 +47,11 @@ const moved=await db("SELECT g.score,r.student_id FROM report_grades g JOIN repo
 check(moved.length===1&&moved[0].student_id===9911&&moved[0].score===16,'Move keeps destination grade');
 const remaining=await db("SELECT g.score,r.student_id FROM report_grades g JOIN reports r ON r.id=g.report_id WHERE r.academic_year='1404/1405'");
 check(remaining.length===1&&remaining[0].student_id===9912,'Move removes source only after matching target save; unmatched source remains');
+const compactCss=readFileSync(`${REPO}/update-v4.152.0/assets/css/management-hub.css`,'utf8');
+check(compactCss.includes('.compact-filter-grid-5{grid-template-columns:repeat(5')&&compactCss.includes('html.hub-embedded .school-app .grid.compact-filter-grid-5'),'Compact grids override the embedded single-column rule');
+for(const [file,marker] of [['discipline-report-management.php','drm-filters'],['report-grade-transfer.php','compact-filter-grid-5'],['analytics.php','compact-filter-grid-5'],['grade-entry-management.php','compact-filter-grid-6'],['reports.php','compact-filter-grid-5'],['exams.php','compact-filter-grid-5'],['online-exams.php','compact-filter-grid-5']]){
+ const source=readFileSync(`${REPO}/update-v4.152.0/${file}`,'utf8');check(source.includes(marker),`${file} uses compact filter layout`);
+}
 const hub=readFileSync(`${REPO}/update-v4.152.0/includes/management_hub.php`,'utf8');
 const columns=hub.indexOf('مدیریت ستونی'),disc=hub.indexOf('مدیریت انضباطی'),gradeTransfer=hub.indexOf('انتقال نمرات');
 check(columns>=0&&disc>columns&&gradeTransfer>disc,'Management tabs appear after columns in requested order');

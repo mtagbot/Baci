@@ -434,7 +434,7 @@ else:
 
     <!-- Hierarchical Filter & Live Search Bar -->
     <div class="card p-4 shadow-md">
-        <form method="GET" class="grid grid-cols-5 gap-3 items-end">
+        <form method="GET" class="grid compact-filter-grid compact-filter-grid-5 items-end">
             <div>
                 <label class="block text-xs font-semibold mb-1">۱. سال تحصیلی</label>
                 <select name="year" class="form-select text-xs font-bold" onchange="this.form.submit()">

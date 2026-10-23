@@ -76,3 +76,23 @@ html.hub-embedded .school-app .card form.grid{max-height:none!important;overflow
 @media screen{@supports selector(:focus-visible){.school-management-hub .hub-tab:focus:not(:focus-visible){outline:none!important}}}
 
 @media screen and (max-width:900px){html.hub-embedded .school-app .btn-outline:hover{color:#173a65!important;background:#eaf0f7!important}}
+
+/* Compact filter rows: opt in only for filter bars that should use the freed width. */
+@media screen{
+.school-app .grid.compact-filter-grid{display:grid!important;gap:10px!important;align-items:end}
+.school-app .grid.compact-filter-grid-4{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.school-app .grid.compact-filter-grid-5{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+.school-app .grid.compact-filter-grid-6{grid-template-columns:repeat(6,minmax(0,1fr))!important}
+.school-app .grid.compact-filter-grid>*{min-width:0!important;margin:0!important}
+.school-app .grid.compact-filter-grid .form-input,.school-app .grid.compact-filter-grid .form-select{width:100%;min-width:0}
+html.hub-embedded .school-app .grid.compact-filter-grid{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:8px!important}
+html.hub-embedded .school-app .grid.compact-filter-grid-4{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+html.hub-embedded .school-app .grid.compact-filter-grid-5{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+html.hub-embedded .school-app .grid.compact-filter-grid-6{grid-template-columns:repeat(6,minmax(0,1fr))!important}
+}
+@media screen and (max-width:640px){
+.school-app .grid.compact-filter-grid,html.hub-embedded .school-app .grid.compact-filter-grid,
+.school-app .grid.compact-filter-grid-4,html.hub-embedded .school-app .grid.compact-filter-grid-4,
+.school-app .grid.compact-filter-grid-5,html.hub-embedded .school-app .grid.compact-filter-grid-5,
+.school-app .grid.compact-filter-grid-6,html.hub-embedded .school-app .grid.compact-filter-grid-6{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}

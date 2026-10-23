@@ -82,7 +82,7 @@ foreach($yearAvgRaw as $r){$yearAvgLabels[]=$r['academic_year']; $yearAvgData[]=
 
     <!-- Filter Bar -->
     <div class="card p-4 shadow-md">
-        <form method="GET" class="grid grid-cols-5 gap-4 items-end">
+        <form method="GET" class="grid compact-filter-grid compact-filter-grid-5 items-end">
             <div>
                 <label class="block text-xs font-semibold mb-1">۱. سال تحصیلی</label>
                 <select name="year" class="form-select font-bold text-xs" onchange="this.form.submit()">

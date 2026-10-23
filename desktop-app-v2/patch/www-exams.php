@@ -209,7 +209,7 @@ if ($selectedGrade !== '') $students = array_values(array_filter($students, fn($
 if ($selectedClassFilter !== '') $students = array_values(array_filter($students, fn($s)=>$s['class_name']===$selectedClassFilter));
 if ($sortMode==='class') persian_usort_classes($students,'class_name','grade_level'); else persian_usort_students($students);
 ?>
-<div class="card"><form method="GET" class="grid grid-cols-6 gap-3 items-end"><input type="hidden" name="tab" value="assign"><div><label class="text-xs">سال تحصیلی (انتخابی)</label><select name="year" class="form-select font-bold" onchange="this.form.submit()">
+<div class="card"><form method="GET" class="grid compact-filter-grid compact-filter-grid-5 items-end"><input type="hidden" name="tab" value="assign"><div><label class="text-xs">سال تحصیلی (انتخابی)</label><select name="year" class="form-select font-bold" onchange="this.form.submit()">
                         <?php foreach(get_academic_years_for_filter() as $yy): ?>
                             <option value="<?php echo clean($yy['academic_year']); ?>" <?php echo $year===$yy['academic_year']?'selected':''; ?>><?php echo clean($yy['academic_year']); ?></option>
                         <?php endforeach; ?>

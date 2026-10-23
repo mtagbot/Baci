@@ -30,6 +30,13 @@ function drm_is_attendance_entry($internalNote) {
     return stripos($note, 'ثبت‌شده از سوابق حضور و غیاب') !== false
         || preg_match('/(?:\\[)?att#\\d+(?:\\])?/i', $note) === 1;
 }
+function drm_jalali_sort_key($jalaliDate) {
+    $date=tr_num((string)$jalaliDate,'en');
+    if(!preg_match('~(\\d{4})[/-](\\d{1,2})[/-](\\d{1,2})~u',$date,$m))return '';
+    $year=(int)$m[1];$month=(int)$m[2];$day=(int)$m[3];
+    if($month<1||$month>12||$day<1||$day>31)return '';
+    return sprintf('%04d%02d%02d',$year,$month,$day);
+}
 function drm_age_label($jalaliDate) {
     $date = trim(tr_num((string)$jalaliDate, 'en'));
     // Attendance entries may prefix the Jalali date with a weekday, e.g. "پنجشنبه 1405/07/16".
@@ -158,14 +165,20 @@ if ($ids) {
         if ($wantedClass !== '' && norm_class_str((string)$r['class_name']) !== norm_class_str($wantedClass)) continue;
         $reportMap[(int)$r['student_id']] = $r;
     }
-    foreach (DB::fetchAll("SELECT student_id,title_text,internal_note,occurred_at_jalali FROM student_discipline_records WHERE student_id IN ($marks) ORDER BY occurred_at_jalali DESC,id DESC",$ids) as $r) $disciplineMap[(int)$r['student_id']][] = $r;
+    $disciplineRows=DB::fetchAll("SELECT id,student_id,title_text,internal_note,occurred_at_jalali FROM student_discipline_records WHERE student_id IN ($marks)",$ids);
+    usort($disciplineRows,static function($a,$b){
+        $ak=drm_jalali_sort_key($a['occurred_at_jalali']??'');$bk=drm_jalali_sort_key($b['occurred_at_jalali']??'');
+        if($ak!==$bk)return strcmp($bk,$ak);
+        return (int)$b['id']<=>(int)$a['id'];
+    });
+    foreach($disciplineRows as $r)$disciplineMap[(int)$r['student_id']][]=$r;
 }
 require_once __DIR__ . '/includes/header.php';
 ?>
 <div class="space-y-4 drm-wrap">
     <h2 class="font-bold text-lg">مدیریت انضباطی کارنامه</h2>
     <p class="text-xs text-muted">برای هر دانش‌آموز، موارد انضباطی ثبت‌شده و زمان گذشته از ثبت نمایش داده می‌شود. نمرهٔ انضباط در کارنامهٔ ماه انتخاب‌شده ذخیره خواهد شد.</p>
-    <form method="GET" class="card grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+    <form method="GET" class="card grid compact-filter-grid compact-filter-grid-5 drm-filters">
         <?php if($embedded): ?><input type="hidden" name="embedded" value="1"><?php endif; ?>
         <label>سال تحصیلی<select name="year" class="form-select" required><?php foreach($years as $y): ?><option value="<?php echo clean($y); ?>" <?php echo $year===$y?'selected':''; ?>><?php echo clean($y); ?></option><?php endforeach; ?></select></label>
         <label>ماه<select name="month" class="form-select" required><?php foreach($months as $m): ?><option value="<?php echo clean($m); ?>" <?php echo $month===$m?'selected':''; ?>><?php echo clean($m); ?></option><?php endforeach; ?></select></label>
@@ -173,7 +186,7 @@ require_once __DIR__ . '/includes/header.php';
         <label>کلاس<select name="class" class="form-select"><option value="">همهٔ کلاس‌ها</option><?php foreach($classes as $key=>$row): if($grade!=='' && $row['grade']!==$grade)continue; ?><option value="<?php echo clean($row['name']); ?>" <?php echo norm_class_str($class)===$key?'selected':''; ?>><?php echo clean($row['name']); ?></option><?php endforeach; ?></select></label>
         <button class="btn btn-primary">اعمال فیلترها</button>
     </form>
-    <form method="POST" action="discipline-report-management.php<?php echo $embedded?'?embedded=1':''; ?>">
+    <form method="POST" action="discipline-report-management.php<?php echo $embedded?'?embedded=1':''; ?>" class="drm-save-form">
         <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>"><input type="hidden" name="save_discipline_scores" value="1">
         <input type="hidden" name="embedded" value="<?php echo $embedded?'1':'0'; ?>"><input type="hidden" name="year" value="<?php echo clean($year); ?>"><input type="hidden" name="month" value="<?php echo clean($month); ?>"><input type="hidden" name="grade" value="<?php echo clean($grade); ?>"><input type="hidden" name="class" value="<?php echo clean($class); ?>">
         <div class="card drm-repeat-card">
@@ -181,7 +194,7 @@ require_once __DIR__ . '/includes/header.php';
             <input id="drmRepeatScore" class="form-input drm-repeat-score" type="number" min="0" max="21" step="0.25" placeholder="یک نمره وارد کنید">
             <small class="text-muted">این فیلد فقط نمره را در ورودی‌های دانش‌آموزانِ قابل‌ویرایش قرار می‌دهد و خودش ذخیره نمی‌شود؛ سپس می‌توانید نمرهٔ هر دانش‌آموز را جداگانه تغییر دهید.</small>
         </div>
-        <div class="card table-container"><table id="disciplineReportTable"><thead><tr><th>دانش‌آموز</th><th>موارد انضباطی</th><th>نمرهٔ انضباط</th></tr></thead><tbody>
+        <div class="card table-container drm-table-container"><table id="disciplineReportTable"><thead><tr><th>دانش‌آموز</th><th>موارد انضباطی</th><th>نمرهٔ انضباط</th></tr></thead><tbody>
         <?php foreach($studentRows as $s): $sid=(int)$s['id'];$rep=$reportMap[$sid]??null; ?>
         <tr data-student-id="<?php echo $sid; ?>"><td><b class="drm-student-name"><?php echo clean(trim($s['first_name'].' '.$s['last_name'])); ?></b><span class="drm-student-meta"><span>پایه: <?php echo clean($s['grade_level']??'—'); ?></span><span>کلاس: <?php echo clean($s['class_name']??'—'); ?></span></span></td><td class="drm-items">
             <?php if(!empty($disciplineMap[$sid])): foreach($disciplineMap[$sid] as $item): $internalNote=trim((string)($item['internal_note']??'')); $attendanceEntry=drm_is_attendance_entry($internalNote); ?><div class="drm-item"><small class="text-muted"><?php echo clean(drm_age_label($item['occurred_at_jalali'])); ?></small> — <span><?php echo clean($item['title_text']); ?></span><?php if($internalNote!==''&&!$attendanceEntry): ?> — <span class="drm-internal-note"><?php echo nl2br(clean($internalNote)); ?></span><?php endif; ?></div><?php endforeach; else: ?><span class="text-muted">موردی ثبت نشده است.</span><?php endif; ?>
@@ -191,6 +204,6 @@ require_once __DIR__ . '/includes/header.php';
         <div class="flex justify-end mt-3"><button class="btn btn-success px-8" type="submit">ثبت</button></div>
     </form>
 </div>
-<style>.drm-wrap .drm-items{min-width:300px;line-height:1.9}.drm-wrap .drm-item{padding:2px 0;border-bottom:1px dashed #e2e8f0}.drm-wrap .drm-item:last-child{border-bottom:0}.drm-wrap .drm-score{max-width:130px}.drm-wrap .drm-repeat-card{display:grid;gap:8px;margin-bottom:12px}.drm-wrap .drm-repeat-score{max-width:180px}.drm-wrap .drm-student-meta{display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:6px;padding-inline-start:4px;line-height:1.8;color:#64748b;font-size:.85em}</style>
-<script defer src="assets/js/discipline-report-management.js?v=4.194.0"></script>
+<style>.drm-wrap{display:flex;flex-direction:column;gap:12px}html.hub-embedded .drm-wrap{min-height:calc(100vh - 32px)}.drm-wrap .drm-filters{flex:none}.drm-wrap .drm-save-form{display:flex;flex:1 1 auto;flex-direction:column;gap:12px;min-height:420px}.drm-wrap .drm-table-container{flex:1 1 auto;min-height:320px;max-height:none!important;overflow:auto}.drm-wrap .drm-items{min-width:300px;line-height:1.9}.drm-wrap .drm-item{padding:2px 0;border-bottom:1px dashed #e2e8f0}.drm-wrap .drm-item:last-child{border-bottom:0}.drm-wrap .drm-score{max-width:130px}.drm-wrap .drm-repeat-card{display:grid;gap:8px;margin-bottom:12px}.drm-wrap .drm-repeat-score{max-width:180px}.drm-wrap .drm-student-meta{display:flex;flex-wrap:wrap;gap:2px 12px;margin-top:6px;padding-inline-start:4px;line-height:1.8;color:#64748b;font-size:.85em}</style>
+<script defer src="assets/js/discipline-report-management.js?v=4.195.0"></script>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

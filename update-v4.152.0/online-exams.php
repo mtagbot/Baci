@@ -166,7 +166,7 @@ require_once __DIR__ . '/includes/header.php';
     <?php endif; ?>
 
     <div class="card">
-        <form method="GET" class="grid grid-cols-5 gap-3 items-end">
+        <form method="GET" class="grid compact-filter-grid compact-filter-grid-5 items-end">
             <div>
                 <label class="text-xs">سال تحصیلی (شمسی)</label>
                 <select name="year" class="form-select">
