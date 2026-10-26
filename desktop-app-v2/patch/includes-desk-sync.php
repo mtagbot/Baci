@@ -136,8 +136,8 @@ class DeskSync {
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE),
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS     => http_build_query(['payload' => json_encode($payload, JSON_UNESCAPED_UNICODE)], '', '&', PHP_QUERY_RFC3986),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded; charset=utf-8'],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CONNECTTIMEOUT => $connectT,
             CURLOPT_TIMEOUT        => $totalT,
@@ -178,8 +178,8 @@ class DeskSync {
                 $ch = curl_init($alternateUrl);
                 curl_setopt_array($ch, [
                     CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_POSTFIELDS => http_build_query(['payload' => json_encode($payload, JSON_UNESCAPED_UNICODE)], '', '&', PHP_QUERY_RFC3986),
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded; charset=utf-8'],
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_CONNECTTIMEOUT => $connectT,
                     CURLOPT_TIMEOUT => $totalT,
@@ -198,6 +198,32 @@ class DeskSync {
                 }
             }
         }
+        // A legacy endpoint may still parse only raw JSON and return its normal
+        // application-level "bad request" JSON (HTTP 200) to the form envelope.
+        // Retry that specific compatibility signal with the original JSON format.
+        if (!$secureOutbox && $body !== false && $code === 200) {
+            $firstReply = json_decode($body, true);
+            if (is_array($firstReply) && strtolower((string)($firstReply['error'] ?? '')) === 'bad request') {
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_CONNECTTIMEOUT => $connectT,
+                    CURLOPT_TIMEOUT => $totalT,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => 0,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_MAXREDIRS => 3,
+                ]);
+                $legacyBody = curl_exec($ch);
+                $legacyErr = curl_error($ch);
+                $legacyCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                if ($legacyBody !== false) { $body = $legacyBody; $err = $legacyErr; $code = $legacyCode; }
+            }
+        }
         if ($body === false) {
             $hint = '';
             if (stripos($err, 'resolve') !== false) {
@@ -210,7 +236,7 @@ class DeskSync {
             $hint = '';
             if ($code === 403) {
                 $diagnosis = self::diagnose403Response(implode("\n", $forbiddenBodies));
-                $hint = ' — هر دو مسیر همگام‌سازی (desk-sync-api.php و class-exam-sync-api.php) با HTTP 403 رد شدند. در APIهای فعلی، کلید نادرست پاسخ HTTP 200 می‌دهد؛ پس این 403 احتمالاً پیش از اجرای API از وب‌سرور/WAF/قواعد دسترسی آمده است (' . $diagnosis . '). از میزبان بخواهید درخواست‌های POST با Content-Type: application/json را در access/error/WAF log در زمان خطا بررسی کند؛ کلید را تغییر ندهید.';
+                $hint = ' — هر دو مسیر همگام‌سازی (desk-sync-api.php و class-exam-sync-api.php) با HTTP 403 رد شدند. در APIهای فعلی، کلید نادرست پاسخ HTTP 200 می‌دهد؛ پس این 403 احتمالاً پیش از اجرای API از وب‌سرور/WAF/قواعد دسترسی آمده است (' . $diagnosis . '). از میزبان بخواهید درخواست‌های POST با Content-Type: application/x-www-form-urlencoded را در access/error/WAF log بررسی کند؛ کلید را تغییر ندهید.';
             }
             throw new Exception('پاسخ نامعتبر سرور (HTTP ' . $code . ')' . $hint);
         }

@@ -42,7 +42,20 @@ function pk_col($t) { return $t === 'settings' ? 'key_name' : 'id'; }
 function jout($data) { echo json_encode($data, JSON_UNESCAPED_UNICODE); exit; }
 function jfail($msg) { jout(['ok' => false, 'error' => $msg]); }
 
-$in = json_decode(file_get_contents('php://input'), true);
+$rawRequest = file_get_contents('php://input');
+$in = json_decode($rawRequest, true); // Keep backward compatibility with existing JSON clients.
+if (!is_array($in)) {
+    // WAF/hosting compatibility: some hosts reject application/json POSTs before PHP.
+    // The desktop client can tunnel the exact same JSON document as one form field,
+    // avoiding max_input_vars truncation of large sync batches.
+    $formPayload = $_POST['payload'] ?? null;
+    if (!is_string($formPayload) && $rawRequest !== '') {
+        $form = [];
+        parse_str($rawRequest, $form); // Covers hosts that do not populate $_POST.
+        $formPayload = $form['payload'] ?? null;
+    }
+    if (is_string($formPayload)) $in = json_decode($formPayload, true);
+}
 if (!is_array($in)) jfail('bad request');
 if (strpos(DESK_SYNC_KEY, 'CHANGE-ME') === 0 || strlen(DESK_SYNC_KEY) < 16) jfail('server key not configured — edit desk-sync-api.php');
 if (!hash_equals(DESK_SYNC_KEY, (string)($in['key'] ?? ''))) { http_response_code(200); jfail('invalid key'); }
