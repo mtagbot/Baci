@@ -77,5 +77,5 @@
 
 | نام فایل | حجم (بایت) | هش SHA-256 |
 |---|---:|---|
-| `MODIFIED-FILES-V4.206.0.zip` | `72,574` | `4a4522d65db2d4899905d5bc4a6bd31b60e734568d158388bf7a0dfe9c11a250` |
-| `SchoolDesk-FIX-v2.130.0.zip` | `172,838` | `31f7e3c4dc6329e3f6be11b6d4b7787e73dc09cc96955d6168ac73d7809021cc` |
+| `MODIFIED-FILES-V4.206.0.zip` | `73,006` | `b8a722881875f74556fedad44d1a9fdaafd0d93abfeb73dfe0f04157d79e58ba` |
+| `SchoolDesk-FIX-v2.130.0.zip` | `173,414` | `d6f9207ef49b1b14e83df5e6607a920d5fb2f0360bbc7804eb5d4a174402165a` |

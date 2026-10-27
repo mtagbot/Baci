@@ -245,9 +245,23 @@ if (!is_array($in) && !empty($_REQUEST['action']) && !empty($_REQUEST['key'])) {
     $in = $_REQUEST;
 }
 if (!is_array($in)) jfail('bad request');
-$__allSyncKeys = ceg_all_sync_keys();
-if ((strpos(DESK_SYNC_KEY, 'CHANGE-ME') === 0 || strlen(DESK_SYNC_KEY) < 16) && !$__allSyncKeys) jfail('sync key unavailable — keep the original desk-sync-api.php with its configured DESK_SYNC_KEY');
 $__givenKey = (string)($in['key'] ?? '');
+$__allSyncKeys = ceg_all_sync_keys();
+if (!$__allSyncKeys && (strpos(DESK_SYNC_KEY, 'CHANGE-ME') === 0 || strlen(DESK_SYNC_KEY) < 16)
+    && !is_file(SDP_SYNC_ROOT . '/config/desk-sync-key.php')
+    && strlen($__givenKey) >= 16 && strpos($__givenKey, 'CHANGE-ME') === false
+    && ($in['action'] ?? '') !== 'bot_outbox') {
+    $__chkPdo = DB::getInstance()->getPdo();
+    if ($__chkPdo) {
+        try {
+            if (((int)$__chkPdo->query("SELECT COUNT(*) FROM desk_change_log")->fetchColumn()) > 0) {
+                @file_put_contents(SDP_SYNC_ROOT . '/config/desk-sync-key.php', "<?php\nreturn " . var_export($__givenKey, true) . ";\n");
+                $__allSyncKeys[] = $__givenKey;
+            }
+        } catch (Throwable $__e) {}
+    }
+}
+if ((strpos(DESK_SYNC_KEY, 'CHANGE-ME') === 0 || strlen(DESK_SYNC_KEY) < 16) && !$__allSyncKeys) jfail('sync key unavailable — keep the original desk-sync-api.php with its configured DESK_SYNC_KEY');
 $__keyAuthorized = (strlen(DESK_SYNC_KEY) >= 16 && strpos(DESK_SYNC_KEY, 'CHANGE-ME') === false && hash_equals(DESK_SYNC_KEY, $__givenKey));
 if (!$__keyAuthorized) {
     foreach ($__allSyncKeys as $__candKey) {
