@@ -23,13 +23,50 @@ if ($action === 'delete' && $reportId > 0) {
     redirect('reports.php');
 }
 
+// Unlock a pre-locked month/class rule directly from the active locks banner
+if ($action === 'unlock_rule' && isset($_GET['lock_id'])) {
+    ensure_report_locks_schema();
+    $lockId = (int)$_GET['lock_id'];
+    $rule = DB::fetch("SELECT * FROM report_locks WHERE id = ?", [$lockId]);
+    if ($rule) {
+        set_report_bulk_lock(
+            $rule['academic_year'] ?? '',
+            $rule['report_month'] ?? '',
+            $rule['class_name'] ?? '',
+            (int)($rule['student_id'] ?? 0),
+            0,
+            ''
+        );
+        DB::execute("DELETE FROM report_locks WHERE id = ?", [$lockId]);
+        unset($GLOBALS['__sdp_report_locks_cache']);
+        log_activity($_SESSION['admin_id'] ?? null, 'رفع مسدودیت پیشینی کارنامه', "قانون مسدودسازی #{$lockId} ({$rule['report_month']}) آزاد شد.");
+        set_flash_message('success', 'مسدودسازی کارنامه برای ماه/کلاس انتخاب‌شده برطرف شد و کارنامه‌ها برای دانش‌آموزان قابل مشاهده گردید.');
+    }
+    redirect('reports.php');
+}
+
 // Toggle Lock single report via standard request
 if ($action === 'toggle_lock' && $reportId > 0) {
-    $rep = DB::fetch("SELECT is_locked FROM reports WHERE id = ?", [$reportId]);
+    $rep = DB::fetch("SELECT * FROM reports WHERE id = ?", [$reportId]);
     if ($rep) {
-        $newLock = $rep['is_locked'] ? 0 : 1;
+        ensure_report_locks_schema();
+        $currentlyLocked = is_report_locked_for_student($rep);
+        $newLock = $currentlyLocked ? 0 : 1;
         DB::execute("UPDATE reports SET is_locked = ? WHERE id = ?", [$newLock, $reportId]);
-        log_activity($_SESSION['admin_id'], 'تغییر قفل کارنامه', "کارنامه $reportId وضعیت مسدودسازی به $newLock شد.");
+        $repYears = report_year_variants($rep['academic_year'] ?? '');
+        $yMarks = implode(',', array_fill(0, count($repYears), '?'));
+        DB::execute(
+            "DELETE FROM report_locks WHERE student_id = ? AND report_month = ? AND academic_year IN ($yMarks)",
+            array_merge([(int)$rep['student_id'], (string)$rep['report_month']], $repYears)
+        );
+        if ($newLock === 0 && is_report_prelocked($rep['academic_year'] ?? '', $rep['report_month'] ?? '', $rep['class_name'] ?? '', 0)) {
+            DB::execute(
+                "INSERT INTO report_locks (academic_year, term, report_month, class_name, student_id, is_locked, reason) VALUES (?, ?, ?, ?, ?, 0, '')",
+                [$rep['academic_year'], $rep['term'], $rep['report_month'], $rep['class_name'], (int)$rep['student_id']]
+            );
+        }
+        unset($GLOBALS['__sdp_report_locks_cache']);
+        log_activity($_SESSION['admin_id'] ?? null, 'تغییر قفل کارنامه', "کارنامه $reportId وضعیت مسدودسازی به $newLock شد.");
         set_flash_message('success', 'وضعیت مسدودسازی کارنامه تغییر یافت.');
     }
     redirect('reports.php');
@@ -100,8 +137,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_report'])) {
         log_activity($_SESSION['admin_id'] ?? null, 'ویرایش کارنامه', "کارنامه ID: $reportId ویرایش شد.");
         set_flash_message('success', 'کارنامه با موفقیت ویرایش و محاسبه شد.');
     } else {
-        DB::execute("INSERT INTO reports (student_id, class_name, academic_year, term, report_month, total_score, gpa, discipline_score, teacher_comments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [$studentId, $student['class_name'], $year, $term, $month, $totalWeighted, $gpa, $disciplineScore, $comments]);
+        $initLock = is_report_prelocked($year, $month, $student['class_name'], $studentId) ? 1 : 0;
+        DB::execute("INSERT INTO reports (student_id, class_name, academic_year, term, report_month, total_score, gpa, discipline_score, teacher_comments, is_locked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [$studentId, $student['class_name'], $year, $term, $month, $totalWeighted, $gpa, $disciplineScore, $comments, $initLock]);
         $newRepId = DB::lastInsertId();
         foreach ($gradesData as $g) {
             DB::execute("INSERT INTO report_grades (report_id, subject_name, score, max_score, coefficient, status) VALUES (?, ?, ?, ?, ?, ?)",
@@ -411,9 +449,51 @@ else:
 
     $whereSql = implode(' AND ', $where);
     $reports = DB::fetchAll("SELECT r.*, s.first_name, s.last_name, s.national_id FROM reports r JOIN students s ON r.student_id = s.id WHERE $whereSql ORDER BY r.id DESC LIMIT 100", $params);
-    $classes = DB::fetchAll("SELECT DISTINCT class_name FROM reports");
-    $years = get_academic_years_for_filter(); // Unified - only from master table
-    $months  = DB::fetchAll("SELECT DISTINCT report_month FROM reports");
+
+    $classSet = [];
+    foreach (DB::fetchAll("SELECT DISTINCT name AS class_name FROM classes WHERE name IS NOT NULL AND name <> ''") ?: [] as $cr) {
+        $cn = trim((string)$cr['class_name']); if ($cn !== '') $classSet[norm_class_str($cn)] = ['class_name' => $cn];
+    }
+    foreach (DB::fetchAll("SELECT DISTINCT class_name FROM students WHERE class_name IS NOT NULL AND class_name <> ''") ?: [] as $cr) {
+        $cn = trim((string)$cr['class_name']); if ($cn !== '' && !isset($classSet[norm_class_str($cn)])) $classSet[norm_class_str($cn)] = ['class_name' => $cn];
+    }
+    foreach (DB::fetchAll("SELECT DISTINCT class_name FROM class_schedules WHERE class_name IS NOT NULL AND class_name <> ''") ?: [] as $cr) {
+        $cn = trim((string)$cr['class_name']); if ($cn !== '' && !isset($classSet[norm_class_str($cn)])) $classSet[norm_class_str($cn)] = ['class_name' => $cn];
+    }
+    foreach (DB::fetchAll("SELECT DISTINCT class_name FROM reports WHERE class_name IS NOT NULL AND class_name <> ''") ?: [] as $cr) {
+        $cn = trim((string)$cr['class_name']); if ($cn !== '' && !isset($classSet[norm_class_str($cn)])) $classSet[norm_class_str($cn)] = ['class_name' => $cn];
+    }
+    $classes = array_values($classSet);
+    if (function_exists('persian_usort_by')) persian_usort_by($classes, ['class_name']);
+
+    $currentDefaultYear = get_setting('current_academic_year', '1404/1405');
+    $years = get_academic_years_for_filter();
+    $hasCurrYear = false;
+    foreach ($years as $yrRow) {
+        if (in_array($currentDefaultYear, report_year_variants($yrRow['academic_year'] ?? ''), true)) { $hasCurrYear = true; break; }
+    }
+    if (!$hasCurrYear && $currentDefaultYear !== '') {
+        array_unshift($years, ['academic_year' => $currentDefaultYear]);
+    }
+    if (empty($years)) {
+        $years = [['academic_year' => '1404/1405'], ['academic_year' => '1403/1404']];
+    }
+
+    $standardMonths = ['مهر','آبان','آذر','دی','بهمن','اسفند','فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','نوبت اول','نوبت دوم'];
+    $monthMap = [];
+    foreach ($standardMonths as $sm) $monthMap[$sm] = ['report_month' => $sm];
+    foreach (DB::fetchAll("SELECT DISTINCT report_month FROM reports WHERE report_month IS NOT NULL AND report_month <> ''") ?: [] as $mr) {
+        $mn = trim((string)$mr['report_month']);
+        if ($mn !== '' && !isset($monthMap[$mn])) $monthMap[$mn] = ['report_month' => $mn];
+    }
+    ensure_report_locks_schema();
+    $activePreLocks = DB::fetchAll("SELECT rl.*, s.first_name, s.last_name FROM report_locks rl LEFT JOIN students s ON rl.student_id = s.id WHERE rl.is_locked = 1 ORDER BY rl.id DESC") ?: [];
+    foreach ($activePreLocks as $apl) {
+        $mn = trim((string)($apl['report_month'] ?? ''));
+        if ($mn !== '' && !isset($monthMap[$mn])) $monthMap[$mn] = ['report_month' => $mn];
+    }
+    $months = array_values($monthMap);
+
     $students = DB::fetchAll("SELECT id, first_name, last_name, national_id, class_name FROM students WHERE status='active'");
     persian_usort_by($students, ['last_name','first_name']);   // v4.77.0: آ قبل از ا
 ?>
@@ -421,16 +501,44 @@ else:
     <div class="flex justify-between items-center">
         <div>
             <h2 class="text-2xl font-bold">مدیریت و نظارت بر کارنامه‌ها</h2>
-            <p class="text-sm text-muted">مشاهده، مسدودسازی گروهی یا تکی، خروجی اکسل و ثبت کارنامه</p>
+            <p class="text-sm text-muted">مشاهده، مسدودسازی پیشینی یا گروهی ماه‌ها، خروجی اکسل و ثبت کارنامه</p>
         </div>
         <div class="flex gap-2">
             <a href="bulk-print.php" class="btn btn-primary gap-1 shadow text-xs"><svg data-ui-icon="print" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 8V3h10v5M7 17H3V9h18v8h-4M7 14h10v8H7ZM17 11h.1"/></svg> چاپ گروهی انتخابی (۱، ۲ یا ۴ در صفحه)</a>
-            <button onclick="document.getElementById('bulkLockModal').style.display='flex'" class="btn btn-outline border-amber-500 text-amber-700 text-xs"><svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg> مسدودسازی گروهی</button>
+            <button onclick="document.getElementById('bulkLockModal').style.display='flex'" class="btn btn-outline border-amber-500 text-amber-700 text-xs"><svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg> مسدودسازی پیشینی / گروهی ماه</button>
             <a href="reports.php?action=new" class="btn btn-success gap-1 text-xs">
                 <span>+ ثبت دستی کارنامه</span>
             </a>
         </div>
     </div>
+
+    <?php if (!empty($activePreLocks)): ?>
+    <div class="card p-4 border-amber-300 bg-amber-50 space-y-2">
+        <div class="flex justify-between items-center flex-wrap gap-2">
+            <h3 class="font-bold text-sm text-amber-900 flex items-center gap-1">
+                <svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg>
+                ماه‌ها و کلاس‌های دارای مسدودسازی فعال برای دانش‌آموزان (دبیران همچنان می‌توانند نمرات را ثبت کنند):
+            </h3>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <?php foreach ($activePreLocks as $apl):
+                $scopeLbl = 'سال ' . ($apl['academic_year'] ?: 'همه سال‌ها') . ' — ماه «' . ($apl['report_month'] ?: 'همه ماه‌ها') . '»';
+                $scopeLbl .= !empty($apl['class_name']) ? (' — کلاس ' . $apl['class_name']) : ' — همه کلاس‌ها';
+                if (!empty($apl['student_id'])) {
+                    $scopeLbl .= ' — دانش‌آموز: ' . trim(($apl['first_name'] ?? '') . ' ' . ($apl['last_name'] ?? ''));
+                }
+            ?>
+            <div class="flex items-center gap-2 bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-xs shadow-sm">
+                <span class="font-bold text-amber-900"><?php echo clean($scopeLbl); ?></span>
+                <?php if (!empty($apl['reason'])): ?>
+                    <span class="text-muted">(<?php echo clean($apl['reason']); ?>)</span>
+                <?php endif; ?>
+                <a href="reports.php?action=unlock_rule&lock_id=<?php echo (int)$apl['id']; ?>" class="btn btn-secondary text-xs px-2 py-0.5 text-green-700 font-bold" onclick="return confirm('آیا مسدودیت این ماه/کلاس برای دانش‌آموزان برداشته شود؟')">آزادسازی 🔓</a>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Hierarchical Filter & Live Search Bar -->
     <div class="card p-4 shadow-md">
@@ -491,7 +599,9 @@ else:
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($reports as $rep): ?>
+                    <?php foreach ($reports as $rep):
+                        $repLocked = is_report_locked_for_student($rep);
+                    ?>
                     <tr>
                         <td class="font-mono text-xs">#<?php echo $rep['id']; ?></td>
                         <td class="font-bold"><?php echo clean($rep['first_name'] . ' ' . $rep['last_name']); ?></td>
@@ -499,7 +609,7 @@ else:
                         <td><?php echo clean($rep['term'] . ' (' . $rep['report_month'] . ')'); ?></td>
                         <td><span class="badge badge-info text-sm"><?php echo format_score($rep['gpa']); ?></span></td>
                         <td>
-                            <?php if ($rep['is_locked']): ?>
+                            <?php if ($repLocked): ?>
                                 <span class="badge badge-danger">مسدود برای دانش‌آموز <svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg></span>
                             <?php else: ?>
                                 <span class="badge badge-success">آزاد و قابل مشاهده <svg data-ui-icon="unlock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0M12 15v3"/></svg></span>
@@ -511,7 +621,7 @@ else:
                                 <a href="export-excel.php?id=<?php echo $rep['id']; ?>" class="btn btn-outline text-xs px-2 py-1 text-green-700">Excel</a>
                                 <a href="export-pdf.php?id=<?php echo $rep['id']; ?>" class="btn btn-outline text-xs px-2 py-1 text-red-600">PDF</a>
                                 <a href="reports.php?action=toggle_lock&id=<?php echo $rep['id']; ?>" class="btn btn-secondary text-xs px-2 py-1">
-                                    <?php echo $rep['is_locked'] ? 'رفع مسدودیت' : 'مسدود کردن'; ?>
+                                    <?php echo $repLocked ? 'رفع مسدودیت' : 'مسدود کردن'; ?>
                                 </a>
                                 <a href="reports.php?action=edit&id=<?php echo $rep['id']; ?>" class="btn btn-secondary text-xs px-2 py-1">ویرایش</a>
                                 <a href="reports.php?action=delete&id=<?php echo $rep['id']; ?>" onclick="return confirm('حذف این کارنامه؟')" class="btn btn-danger text-xs px-2 py-1">حذف</a>
@@ -530,8 +640,8 @@ else:
 <!-- Bulk Lock Modal -->
 <div id="bulkLockModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
     <div class="card max-w-md w-full p-6 shadow-xl">
-        <h3 class="font-bold text-lg mb-4 text-amber-700"><svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg> مسدودسازی یا آزادسازی گروهی کارنامه‌ها</h3>
-        <p class="text-xs text-muted mb-4">با این ابزار می‌توانید مشاهده یا دریافت کارنامه را برای کل یک کلاس در یک ماه یا نوبت خاص مسدود کنید (مثلاً به دلیل عدم تسویه بدهی مالی).</p>
+        <h3 class="font-bold text-lg mb-4 text-amber-700"><svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg> مسدودسازی پیشینی یا آزادسازی گروهی کارنامه‌ها</h3>
+        <p class="text-xs text-muted mb-4">می‌توانید حتی <b>پیش از ثبت نمرات توسط دبیران</b> و پیش از ساخته شدن کارنامه‌ها، ماه مورد نظر (مثلاً آبان) را برای همه کلاس‌ها یا یک کلاس مسدود کنید تا دبیران به مرور نمرات را ثبت کنند و پس از تکمیل تمام نمرات، کارنامه آن ماه را برای دانش‌آموزان آزاد نمایید.</p>
         <form id="bulkLockForm" data-no-ajax="1" onsubmit="submitBulkLock(event)">
             <div class="mb-4">
                 <label class="block text-xs font-semibold mb-1">انتخاب کلاس</label>
@@ -572,13 +682,13 @@ else:
             <div class="mb-4">
                 <label class="block text-xs font-semibold mb-1">عملیات مورد نظر</label>
                 <select id="bulkIsLocked" class="form-select">
-                    <option value="1">مسدود کردن مشاهده کارنامه 🔒</option>
+                    <option value="1">مسدود کردن مشاهده کارنامه (پیشینی / گروهی) 🔒</option>
                     <option value="0">آزادسازی و رفع مسدودیت 🔓</option>
                 </select>
             </div>
             <div class="mb-6">
-                <label class="block text-xs font-semibold mb-1">علت مسدودسازی (جهت نمایش به اولیا)</label>
-                <input type="text" id="bulkReason" class="form-input" value="نقص پرونده یا عدم تسویه حساب مالی">
+                <label class="block text-xs font-semibold mb-1">علت مسدودسازی (جهت نمایش به دانش‌آموز / اولیا)</label>
+                <input type="text" id="bulkReason" class="form-input" value="در حال تکمیل نمرات توسط دبیران">
             </div>
             <div class="flex justify-end gap-2">
                 <button type="button" onclick="document.getElementById('bulkLockModal').style.display='none'" class="btn btn-secondary">انصراف</button>

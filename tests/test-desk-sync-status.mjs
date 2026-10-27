@@ -282,6 +282,22 @@ ok('بستهٔ دسکتاپ V4.183.0 همین نسخهٔ موتور را بست�
 ok('بستهٔ سایت نسخهٔ سایت را می‌فرستد و هر دو نشانهٔ تازه دارند',
   /\('includes\/desk_sync\.php', 'update-v4\.152\.0\/includes\/desk_sync\.php'/.test(rel)
   && (rel.match(/desk_sync_verified_at/g) || []).length >= 2);
+ok('موتور دسکتاپ شامل relayBotNotifications، گروه‌های آزمون کلاسی، توکن sdp_z و بازنشانی backoff پس از موفقیت است',
+  deskEngine.includes('relayBotNotifications')
+  && deskEngine.includes("'class_exam_groups'")
+  && deskEngine.includes('encodeSyncToken')
+  && deskEngine.includes('candidateSyncEndpoints')
+  && deskEngine.includes('tryFallbackTransports')
+  && deskEngine.includes("self::setCfg('desk_sync_fails', '0')")
+  && deskEngine.includes("self::setCfg('desk_sync_next_try', '0')"));
+const deskPrepend = read('desktop-app-v2/patch/www-desk-prepend.php');
+const deskSyncPage = read('desktop-app-v2/patch/www-desk-sync.php');
+ok('کارگر پس‌زمینه و prepend دسکتاپ، فایل‌های استخراج‌شده در www را به reports ادغام می‌کنند و دیمون قدیمی را پس از آپدیت بازنشسته می‌کنند',
+  daemon.includes('filemtime($engineFile)')
+  && deskPrepend.includes('sync-engine-mtime.txt')
+  && deskPrepend.includes("DIRECTORY_SEPARATOR . 'www'")
+  && deskSyncPage.includes('session_write_close()')
+  && deskSyncPage.includes('sync-heartbeat.json'));
 
 console.log(`\n──── نتیجه: ${pass} ✅ / ${fail} ❌ ────`);
 process.exit(fail ? 1 : 0);

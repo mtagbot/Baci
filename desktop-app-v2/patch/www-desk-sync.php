@@ -22,15 +22,66 @@ if (!function_exists('desk_update_badge')) {
     }
 }
 
+/* AJAX: browser-direct sync bridge (when php.exe libcurl is blocked by host WAF/JA3/proxy with 403) */
+if (isset($_GET['ajax']) && strpos((string)$_GET['ajax'], 'bridge_') === 0) {
+    header('Content-Type: application/json; charset=utf-8');
+    if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+    $op = (string)$_GET['ajax'];
+    try {
+        if ($op === 'bridge_init') {
+            echo json_encode(DeskSync::bridgeInit(), JSON_UNESCAPED_UNICODE);
+        } elseif ($op === 'bridge_next_pull') {
+            echo json_encode(DeskSync::bridgeNextPull(), JSON_UNESCAPED_UNICODE);
+        } elseif ($op === 'bridge_apply_pull') {
+            $raw = json_decode((string)($_POST['res'] ?? ''), true);
+            if (!is_array($raw)) throw new Exception('پاسخ دریافتی نامعتبر است');
+            echo json_encode(DeskSync::bridgeApplyPull($raw), JSON_UNESCAPED_UNICODE);
+        } elseif ($op === 'bridge_next_push') {
+            echo json_encode(DeskSync::bridgeNextPush(), JSON_UNESCAPED_UNICODE);
+        } elseif ($op === 'bridge_ack_push') {
+            echo json_encode(DeskSync::bridgeAckPush((int)($_POST['max_id'] ?? 0), (int)($_POST['count'] ?? 0)), JSON_UNESCAPED_UNICODE);
+        } elseif ($op === 'bridge_finish') {
+            $fin = DeskSync::bridgeFinish((string)($_POST['warn'] ?? ''));
+            $hbFile = dirname(__DIR__) . '/data/sync-heartbeat.json';
+            $engMtime = ((int)@filemtime(__DIR__ . '/includes/desk_sync.php')) . ':' . ((int)@filemtime(__DIR__ . '/desk-sync-daemon.php'));
+            @file_put_contents($hbFile, json_encode([
+                'phase' => 'settled', 'ts' => time(), 'daemon' => 1, 'ok' => true,
+                'engine_mtime' => $engMtime, 'server_verified' => true,
+                'fails' => 0, 'alert' => false, 'retry_in' => 0,
+                'pending' => $fin['pending'], 'pushed' => (int)($_POST['pushed'] ?? 0),
+                'pulled' => (int)($_POST['pulled'] ?? 0), 'update' => desk_update_badge(), 'error' => '',
+            ], JSON_UNESCAPED_UNICODE), LOCK_EX);
+            echo json_encode($fin, JSON_UNESCAPED_UNICODE);
+        } else {
+            echo json_encode(['ok' => false, 'error' => 'unknown bridge op'], JSON_UNESCAPED_UNICODE);
+        }
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 /* AJAX: run one sync cycle now (also used by the background timer) */
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'run') {
     header('Content-Type: application/json; charset=utf-8');
+    if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
     ignore_user_abort(true);
     set_time_limit(300);
     $res = isset($_GET['force']) ? DeskSync::run(true) : DeskSync::runIfDue();
     $res['status'] = DeskSync::status();
     $res['pending'] = DeskSync::pendingCount();
     $res['update'] = desk_update_badge();
+    if (!empty($res['ok']) && empty($res['skipped'])) {
+        $hbFile = dirname(__DIR__) . '/data/sync-heartbeat.json';
+        $engMtime = ((int)@filemtime(__DIR__ . '/includes/desk_sync.php')) . ':' . ((int)@filemtime(__DIR__ . '/desk-sync-daemon.php'));
+        @file_put_contents($hbFile, json_encode([
+            'phase' => 'settled', 'ts' => time(), 'daemon' => 1, 'ok' => true,
+            'engine_mtime' => $engMtime, 'server_verified' => true,
+            'fails' => 0, 'alert' => false, 'retry_in' => 0,
+            'pending' => $res['pending'], 'pushed' => $res['pushed'] ?? 0, 'pulled' => $res['pulled'] ?? 0,
+            'update' => $res['update'], 'error' => '',
+        ], JSON_UNESCAPED_UNICODE), LOCK_EX);
+    }
     echo json_encode($res, JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -88,9 +139,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_sync'])) {
         if (!preg_match('#^https?://#i', $url)) $url = 'https://' . ltrim($url, '/');
         if (!preg_match('#/desk-sync-api\.php$#', $url)) $url = rtrim($url, '/') . '/desk-sync-api.php';
     }
+    $wasInitDone = DeskSync::isInitialSyncCompleted();
     DeskSync::setCfg('desk_sync_url', $url);
     DeskSync::setCfg('desk_sync_key', trim($_POST['sync_key'] ?? ''));
-    DeskSync::setCfg('desk_sync_enabled', isset($_POST['sync_enabled']) ? '1' : '0');
+    DeskSync::setCfg('desk_sync_enabled', (!$wasInitDone || isset($_POST['sync_enabled'])) ? '1' : '0');
     DeskSync::setCfg('desk_sync_mode', ($_POST['desk_sync_mode'] ?? 'full') === 'event' ? 'event' : 'full');
     if (isset($_POST['reset_state'])) {
         DeskSync::setCfg('desk_sync_snapshot_done', '0');
@@ -99,11 +151,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_sync'])) {
         DeskSync::setCfg('desk_sync_err', '');
     }
     set_flash_message('success', 'تنظیمات همگام‌سازی ذخیره شد.');
+    if (!DeskSync::isInitialSyncCompleted() && $url !== '' && strlen(trim($_POST['sync_key'] ?? '')) >= 16) {
+        redirect('desk-sync.php?auto_run_initial=1');
+    }
     redirect('desk-sync.php');
 }
 
 $st = DeskSync::status();
 $upd = desk_update_badge();
+$initialSyncPending = !DeskSync::isInitialSyncCompleted();
 require_once __DIR__ . '/includes/header.php';
 
 function fa_ago($ts) {
@@ -128,6 +184,16 @@ $syncLine = !$st['enabled']
         : 'داده‌ها: هنوز تبادل موفقی با سایت ثبت نشده است.');
 ?>
 <div class="max-w-3xl mx-auto">
+    <?php if (!empty($initialSyncPending)): ?>
+    <div id="deskInitialSyncLockBanner" class="card p-5 mb-6 border-2 border-amber-500 bg-amber-50 text-amber-900 shadow">
+        <div class="font-extrabold text-base mb-1">🔒 راه‌اندازی اولیهٔ نرم‌افزار دسکتاپ: همگام‌سازی با سرور سایت الزامی است</div>
+        <p class="text-xs leading-6">
+            برای فعال‌سازی و استفاده از امکانات نرم‌افزار دسکتاپ، ابتدا باید آن را به سرور سایت مدرسه متصل کرده و اولین همگام‌سازی را انجام دهید.
+            لطفاً در پنل سایت مدرسه به <b>تنظیمات دیگر &larr; تب همگام‌سازی با سایت</b> بروید، <b>«آدرس سرور»</b> و <b>«کلید همگام‌سازی»</b> نمایش‌داده‌شده در آن صفحه را کپی کرده و در کادرهای زیر وارد نمایید.
+            تا زمان تکمیل اولین همگام‌سازی موفق با سرور، دسترسی به سایر بخش‌های نرم‌افزار قفل است.
+        </p>
+    </div>
+    <?php endif; ?>
     <div id="deskUpdateStatus" data-code="<?php echo clean($upd['code']); ?>"
          class="card p-4 mb-6 border-r-4 <?php echo $updTone; ?>" role="status" aria-live="polite">
         <div class="font-bold" id="deskUpdateLabel"><?php echo clean($upd['label']); ?></div>
@@ -139,21 +205,15 @@ $syncLine = !$st['enabled']
         <p class="text-sm mb-4 text-muted">
             برنامه به‌صورت خودکار و لحظه‌ای تغییرات را با سایت شما رد و بدل می‌کند
             (دوطرفه: هم تغییرات اینجا به سایت می‌رود، هم تغییرات سایت به اینجا می‌آید).
-            همگام‌سازی در پس‌زمینه و در یک پردازه جدا انجام می‌شود؛ بنابراین حتی وقتی
-            اینترنت قطع است برنامه با همان سرعت همیشگی کار می‌کند و همه تغییرات شما
+            همگام‌سازی در پس‌زمینه و در یک پردازه جدا انجام می‌شود؛ بنابراین پس از انجام اولین همگام‌سازی اولیه با سرور،
+            حتی وقتی اینترنت قطع است برنامه با همان سرعت همیشگی کار می‌کند و همه تغییرات شما
             در بانک اطلاعاتی داخلی محفوظ می‌ماند تا به محض اتصال، خودکار ارسال شود.
             علاوه بر ارسال و دریافت رویدادها، در هر همگام‌سازی دستی (و خودکار ساعتی)
             محتوای جدول‌های دسکتاپ با سایت «مقایسه کامل» می‌شود و اگر جدولی ناهمسان
             باشد، عین داده سایت دوباره دریافت می‌شود تا دو بانک همیشه همسان بمانند.
             نسخهٔ نرم‌افزار هم خودکار است: برنامه در همین همگام‌سازی، نسخهٔ منتشرشده در سایت را
-            بررسی می‌کند و اگر تازه‌تر باشد آن را خودش دریافت و نصب می‌کند — نیاز به دانلود یا
-            نصب دستی بسته نیست (فقط اگر نسخهٔ فایل اجرایی هم عوض شده باشد، یک‌بار بستن و بازکردن
-            برنامه لازم است).
-            برای فعال‌سازی: فایل <code dir="ltr">desk-sync-api.php</code> (داخل پوشه server همین بسته)
-            را در پوشه‌ای از سایت که سامانه در آن نصب است آپلود کنید (کنار index.php).
-            کلید اتصال از قبل در فایل و در برنامه تنظیم شده و نیازی به تغییر ندارد.
-            سپس آدرس همان پوشه را در پایین وارد کنید — مثلا اگر سامانه در
-            <code dir="ltr">example.com/reports</code> نصب است، همان را بنویسید.
+            بررسی می‌کند و اگر تازه‌تر باشد آن را خودش دریافت و نصب می‌کند.
+            <br><b class="text-emerald-700">تنظیم خودکار بدون نیاز به ویرایش فایل:</b> در نسخهٔ جدید، درگاه‌ها و کلید همگام‌سازی روی سرور سایت به‌صورت کاملاً خودکار تنظیم شده‌اند و هیچ نیازی به کپی دستی کلید در فایل <code dir="ltr">desk-sync-api.php</code> نیست. کافی است در پنل سایت به تب «همگام‌سازی با سایت» مراجعه کرده و آدرس سرور و کلید همگام‌سازی را در کادرهای زیر وارد نمایید.
         </p>
         <form method="POST" action="desk-sync.php">
             <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
@@ -202,7 +262,7 @@ $syncLine = !$st['enabled']
     </div>
 
     <div class="card p-6">
-        <h4 class="font-bold mb-3">وضعیت</h4>
+        <h4 class="font-bold mb-3">وضعیت <span class="text-xs font-normal text-muted">(موتور همگام‌سازی دسکتاپ: v2.130.0)</span></h4>
         <table class="w-full text-sm" id="syncStatusTable">
             <tr><td class="py-1 text-muted w-48">وضعیت</td>
                 <td><?php echo $st['enabled'] ? '<span class="text-green-600 font-bold">فعال</span>' : '<span class="text-red-600 font-bold">غیرفعال</span>'; ?></td></tr>
@@ -212,7 +272,7 @@ $syncLine = !$st['enabled']
             <tr><td class="py-1 text-muted">مجموع ارسال‌شده</td><td><?php echo tr_num((string)$st['pushed'], 'fa'); ?> رکورد</td></tr>
             <tr><td class="py-1 text-muted">مجموع دریافت‌شده</td><td><?php echo tr_num((string)$st['pulled'], 'fa'); ?> رکورد</td></tr>
             <?php if ($st['last_err']): ?>
-            <tr><td class="py-1 text-muted">آخرین خطا</td><td class="text-red-600"><?php echo clean($st['last_err']); ?></td></tr>
+            <tr><td class="py-1 text-muted">آخرین خطا</td><td class="text-red-600" id="syncLastErrCell"><?php echo clean($st['last_err']); ?></td></tr>
             <?php endif; ?>
         </table>
         <div id="syncRunResult" class="mt-3 text-sm"></div>
@@ -241,31 +301,250 @@ $syncLine = !$st['enabled']
     setInterval(refresh, 30000);
     refresh();
 })();
-document.getElementById('syncNowBtn').addEventListener('click', function () {
-    var btn = this, out = document.getElementById('syncRunResult');
+
+var sdpBridgeFrame = null;
+var sdpBridgeReady = false;
+var sdpBridgePending = {};
+var sdpBridgeReqSeq = 0;
+
+window.addEventListener('message', function (ev) {
+    var d = ev.data;
+    if (!d || typeof d !== 'object') return;
+    if (d.sdp_bridge_ready) {
+        sdpBridgeReady = true;
+    } else if (d.sdp_bridge_reply && d.id && sdpBridgePending[d.id]) {
+        var cb = sdpBridgePending[d.id];
+        delete sdpBridgePending[d.id];
+        cb(d.res);
+    }
+});
+
+function ensureBridgeFrame(bridgeUrl) {
+    return new Promise(function (resolve) {
+        if (sdpBridgeFrame && sdpBridgeReady) { resolve(true); return; }
+        if (!sdpBridgeFrame) {
+            sdpBridgeFrame = document.createElement('iframe');
+            sdpBridgeFrame.style.cssText = 'width:1px;height:1px;position:fixed;bottom:0;left:0;opacity:0.01;pointer-events:none;border:0';
+            sdpBridgeFrame.src = bridgeUrl + (bridgeUrl.indexOf('?') === -1 ? '?' : '&') + '_t=' + Date.now();
+            document.body.appendChild(sdpBridgeFrame);
+        }
+        var waited = 0;
+        var iv = setInterval(function () {
+            waited += 150;
+            if (sdpBridgeReady) { clearInterval(iv); resolve(true); }
+            else if (waited >= 4500) { clearInterval(iv); resolve(false); }
+        }, 150);
+    });
+}
+
+function callViaBridgeFrame(bridgeUrl, sdpZ, rawPayload) {
+    return ensureBridgeFrame(bridgeUrl).then(function (ready) {
+        if (!ready || !sdpBridgeFrame || !sdpBridgeFrame.contentWindow) return null;
+        return new Promise(function (resolve) {
+            var id = ++sdpBridgeReqSeq;
+            var timer = setTimeout(function () {
+                if (sdpBridgePending[id]) { delete sdpBridgePending[id]; resolve(null); }
+            }, 15000);
+            sdpBridgePending[id] = function (res) {
+                clearTimeout(timer);
+                if (res && res.ok && res.data && typeof res.data.ok === 'boolean') resolve(res.data);
+                else resolve(null);
+            };
+            try {
+                sdpBridgeFrame.contentWindow.postMessage({ sdp_bridge_req: true, id: id, sdp_z: sdpZ, payload: rawPayload }, '*');
+            } catch (e) {
+                clearTimeout(timer);
+                delete sdpBridgePending[id];
+                resolve(null);
+            }
+        });
+    });
+}
+
+async function callRemoteViaBrowser(info, sdpZ, rawPayload) {
+    var eps = info.endpoints || [];
+    // 1) Try CORS Simple POST with compressed URL-safe token (sdp_sync=1&sdp_z=...)
+    for (var i = 0; i < eps.length; i++) {
+        var ep = eps[i];
+        try {
+            var r = await fetch(ep, {
+                method: 'POST',
+                mode: 'cors',
+                credentials: 'omit',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                body: 'sdp_sync=1&sdp_z=' + encodeURIComponent(sdpZ)
+            });
+            if (r.status === 200) {
+                var j = await r.json();
+                if (j && typeof j.ok === 'boolean' && !(j.ok === false && j.error === 'bad request')) {
+                    if (!j.ok) throw new Error('خطای سرور: ' + (j.error || 'نامشخص'));
+                    return j;
+                }
+            }
+        } catch (e) {
+            if (e && String(e.message || '').indexOf('خطای سرور:') === 0) throw e;
+        }
+    }
+    // 2) Try CORS Simple POST with form payload=...
+    for (var m = 0; m < eps.length; m++) {
+        var ep2 = eps[m];
+        try {
+            var r2 = await fetch(ep2, {
+                method: 'POST',
+                mode: 'cors',
+                credentials: 'omit',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                body: 'payload=' + encodeURIComponent(rawPayload)
+            });
+            if (r2.status === 200) {
+                var j2 = await r2.json();
+                if (j2 && typeof j2.ok === 'boolean' && !(j2.ok === false && j2.error === 'bad request')) {
+                    if (!j2.ok) throw new Error('خطای سرور: ' + (j2.error || 'نامشخص'));
+                    return j2;
+                }
+            }
+        } catch (e2) {
+            if (e2 && String(e2.message || '').indexOf('خطای سرور:') === 0) throw e2;
+        }
+    }
+    // 3) Try CORS GET (single or chunked) across candidate endpoints
+    for (var g = eps.length - 1; g >= 0; g--) {
+        var ep3 = eps[g];
+        try {
+            var sep = ep3.indexOf('?') === -1 ? '?' : '&';
+            if (sdpZ.length <= 1800) {
+                var r3 = await fetch(ep3 + sep + 'sdp_sync=1&sdp_z=' + encodeURIComponent(sdpZ) + '&_t=' + Date.now(), {
+                    method: 'GET', mode: 'cors', credentials: 'omit'
+                });
+                if (r3.status === 200) {
+                    var j3 = await r3.json();
+                    if (j3 && typeof j3.ok === 'boolean' && !(j3.ok === false && j3.error === 'bad request')) {
+                        if (!j3.ok) throw new Error('خطای سرور: ' + (j3.error || 'نامشخص'));
+                        return j3;
+                    }
+                }
+            } else {
+                var parts = [];
+                for (var k = 0; k < sdpZ.length; k += 1800) parts.push(sdpZ.slice(k, k + 1800));
+                var cid = Math.random().toString(16).slice(2, 10) + Math.random().toString(16).slice(2, 10);
+                var okAll = true, lastJ = null;
+                for (var idx = 0; idx < parts.length; idx++) {
+                    var rc = await fetch(ep3 + sep + 'sdp_sync=1&sdp_cid=' + cid + '&sdp_ci=' + idx + '&sdp_cn=' + parts.length + '&sdp_cp=' + encodeURIComponent(parts[idx]) + '&_t=' + Date.now(), {
+                        method: 'GET', mode: 'cors', credentials: 'omit'
+                    });
+                    if (rc.status !== 200) { okAll = false; break; }
+                    lastJ = await rc.json();
+                    if (!lastJ || !lastJ.ok) { okAll = false; break; }
+                }
+                if (okAll && lastJ && typeof lastJ.ok === 'boolean') return lastJ;
+            }
+        } catch (e3) {
+            if (e3 && String(e3.message || '').indexOf('خطای سرور:') === 0) throw e3;
+        }
+    }
+    // 4) Try Same-Origin Iframe postMessage Bridge (solves SameSite WAF cookies & localhost Origin blocks)
+    if (info.bridge_url) {
+        var bRes = await callViaBridgeFrame(info.bridge_url, sdpZ, rawPayload);
+        if (bRes && typeof bRes.ok === 'boolean') {
+            if (!bRes.ok) throw new Error('خطای سرور: ' + (bRes.error || 'نامشخص'));
+            return bRes;
+        }
+    }
+    return null;
+}
+
+async function runBrowserBridgeSync(out, btn, phpErrorMsg) {
+    try {
+        out.innerHTML = '<span class="text-blue-600">در حال همگام‌سازی مستقیم از طریق مرورگر (عبور از فایروال)...</span>';
+        var initRes = await fetch('desk-sync.php?ajax=bridge_init');
+        var info = await initRes.json();
+        if (!info || !info.ok) throw new Error((info && info.error) || phpErrorMsg || 'خطا در آماده‌سازی پل مرورگر');
+
+        var hs = await callRemoteViaBrowser(info, info.handshake_z, info.handshake_payload);
+        if (!hs || !hs.ok) {
+            out.innerHTML = '<span class="text-red-600">' + (phpErrorMsg || 'پاسخ نامعتبر سرور') + '</span>';
+            btn.disabled = false;
+            return false;
+        }
+
+        var totalPulled = 0, totalPushed = 0;
+        for (var pullGuard = 0; pullGuard < 60; pullGuard++) {
+            var np = await (await fetch('desk-sync.php?ajax=bridge_next_pull')).json();
+            if (!np || !np.ok) break;
+            var pullReply = await callRemoteViaBrowser(info, np.sdp_z, np.payload);
+            if (!pullReply || !pullReply.ok) throw new Error('خطا در دریافت تغییرات از سایت');
+            var ap = await (await fetch('desk-sync.php?ajax=bridge_apply_pull', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                body: 'res=' + encodeURIComponent(JSON.stringify(pullReply))
+            })).json();
+            if (!ap || !ap.ok) throw new Error((ap && ap.error) || 'خطا در ثبت تغییرات دریافتی');
+            totalPulled += (ap.pulled || 0);
+            if (!ap.more) break;
+        }
+
+        for (var pushGuard = 0; pushGuard < 60; pushGuard++) {
+            var npush = await (await fetch('desk-sync.php?ajax=bridge_next_push')).json();
+            if (!npush || !npush.ok || npush.done || !npush.count) break;
+            var pushReply = await callRemoteViaBrowser(info, npush.sdp_z, npush.payload);
+            if (!pushReply || !pushReply.ok) throw new Error('خطا در ارسال تغییرات به سایت');
+            var ack = await (await fetch('desk-sync.php?ajax=bridge_ack_push', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                body: 'max_id=' + encodeURIComponent(npush.max_id) + '&count=' + encodeURIComponent(npush.count)
+            })).json();
+            if (!ack || !ack.ok) throw new Error('خطا در تایید ارسال تغییرات');
+            totalPushed += (npush.count || 0);
+        }
+
+        await fetch('desk-sync.php?ajax=bridge_finish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+            body: 'pushed=' + totalPushed + '&pulled=' + totalPulled
+        });
+        out.innerHTML = '<span class="text-green-600 font-bold">انجام شد (از طریق پل مرورگر) — ارسال: '
+            + totalPushed + '، دریافت: ' + totalPulled + '</span>';
+        setTimeout(function () { location.reload(); }, 900);
+        return true;
+    } catch (err) {
+        out.innerHTML = '<span class="text-red-600">' + (phpErrorMsg || (err && err.message) || 'خطا') + '</span>';
+        btn.disabled = false;
+        return false;
+    }
+}
+
+function triggerSyncNow() {
+    var btn = document.getElementById('syncNowBtn'), out = document.getElementById('syncRunResult');
+    if (!btn || !out || btn.disabled) return;
     btn.disabled = true;
     out.textContent = 'در حال همگام‌سازی...';
     fetch('desk-sync.php?ajax=run&force=1')
         .then(function (r) { return r.json(); })
         .then(function (j) {
-            if (j.ok) {
-                out.innerHTML = '<span class="text-green-600">انجام شد — ارسال: '
+            if (j.ok && !j.skipped) {
+                out.innerHTML = '<span class="text-green-600 font-bold">انجام شد — ارسال: '
                     + (j.pushed || 0) + '، دریافت: ' + (j.pulled || 0) + '</span>';
                 if (j.update && j.update.code === 'restart-required') {
                     out.innerHTML += '<div class="mt-2 text-amber-700 font-bold">نسخهٔ تازهٔ برنامه نصب شد؛ برای تکمیل، برنامه را یک‌بار ببندید و باز کنید.</div>';
                 }
                 if (j.warning) {
                     out.innerHTML += '<div class="mt-2 text-orange-600 font-bold">⚠ ' + j.warning + '</div>';
-                    btn.disabled = false; // stay on page so the warning is read
+                    btn.disabled = false;
                 } else {
-                    setTimeout(function () { location.reload(); }, 1200);
+                    setTimeout(function () { location.reload(); }, 1000);
                 }
             } else {
-                out.innerHTML = '<span class="text-red-600">' + (j.error || j.skipped || 'خطا') + '</span>';
-                btn.disabled = false;
+                runBrowserBridgeSync(out, btn, j.error || j.skipped || 'خطا');
             }
         })
-        .catch(function (e) { out.textContent = 'خطا: ' + e; btn.disabled = false; });
-});
+        .catch(function (e) {
+            runBrowserBridgeSync(out, btn, String(e));
+        });
+}
+
+document.getElementById('syncNowBtn').addEventListener('click', triggerSyncNow);
+<?php if ((!empty($st['last_err']) && strpos((string)$st['last_err'], '403') !== false) || !empty($_GET['auto_run_initial'])): ?>
+setTimeout(triggerSyncNow, 500);
+<?php endif; ?>
 </script>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

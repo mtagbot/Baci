@@ -86,6 +86,18 @@ function release_install(array $raw): void {
         $input = release_validate($raw);
         $desktop = release_distribution()==='desktop';
         $opts = [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC];
+        $requireDesktopSync = $desktop && (isset($raw['sync_url']) || isset($raw['sync_key']) || (PHP_SAPI === 'cli-server' && !is_file($root.'/config/install-access.php')));
+        $syncUrl = '';
+        $syncKey = '';
+        if ($requireDesktopSync) {
+            $syncUrl = trim((string)($raw['sync_url'] ?? ''));
+            $syncKey = trim((string)($raw['sync_key'] ?? ''));
+            if ($syncUrl === '' || strlen($syncKey) < 16 || strpos($syncKey, 'CHANGE-ME') !== false) {
+                throw new RuntimeException('برای راه‌اندازی اولیهٔ نرم‌افزار دسکتاپ، وارد کردن آدرس سرور سایت و کلید همگام‌سازی معتبر الزامی است.');
+            }
+            if (!preg_match('#^https?://#i', $syncUrl)) $syncUrl = 'https://' . ltrim($syncUrl, '/');
+            if (!preg_match('#/desk-sync-api\.php$#i', $syncUrl)) $syncUrl = rtrim($syncUrl, '/') . '/desk-sync-api.php';
+        }
         if ($desktop) {
             $path = dirname($root).'/data/school.sqlite';
             if (file_exists($path)) throw new RuntimeException('فایل دیتابیس موجود است؛ روی اطلاعات قبلی نصب نمی‌شود. از پوشهٔ خالی جدید استفاده کنید.');
@@ -113,14 +125,34 @@ function release_install(array $raw): void {
         $db->beginTransaction();
         try {
             DB::execute('INSERT INTO admins (username,password,name,role,permissions,status) VALUES (?,?,?,?,?,1)', [$input['admin_username'], password_hash($input['admin_password'], PASSWORD_DEFAULT), $input['admin_name'], 'super_admin', null]);
-            foreach (['school_name'=>$input['school_name'], 'school_phone'=>'', 'school_address'=>'', 'school_logo'=>'', 'current_academic_year'=>$input['academic_year'], 'desk_sync_key'=>'', 'desk_sync_url'=>'', 'release_version'=>'Release_V1.0'] as $key=>$value) set_setting($key,$value);
+            foreach (['school_name'=>$input['school_name'], 'school_phone'=>'', 'school_address'=>'', 'school_logo'=>'', 'current_academic_year'=>$input['academic_year'], 'desk_sync_key'=>$requireDesktopSync ? $syncKey : '', 'desk_sync_url'=>$requireDesktopSync ? $syncUrl : '', 'release_version'=>'Release_V1.0'] as $key=>$value) set_setting($key,$value);
             DB::execute('INSERT INTO academic_years (year_name,is_default,status) VALUES (?,1,1)',[$input['academic_year']]);
             $db->commit();
         } catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); throw $e; }
+        if ($requireDesktopSync) {
+            set_setting('desk_sync_enabled', '1');
+            set_setting('desk_require_initial_sync', '1');
+            if (is_file($root . '/includes/desk_sync.php')) {
+                require_once $root . '/includes/desk_sync.php';
+                $syncRes = DeskSync::run(true);
+                if (empty($syncRes['ok'])) {
+                    $errMsg = trim((string)($syncRes['error'] ?? '')) ?: 'عدم دسترسی به سرور یا نامعتبر بودن کلید همگام‌سازی';
+                    $db = null;
+                    $pdo = null;
+                    if (isset($path) && is_file($path)) @unlink($path);
+                    throw new RuntimeException('اتصال و همگام‌سازی اولیه با سرور سایت انجام نشد (' . $errMsg . '). راه‌اندازی اولیهٔ نرم‌افزار دسکتاپ منوط به همگام‌سازی موفق با یک سرور سایت معتبر است.');
+                }
+                $existingAdmin = DB::fetch('SELECT id FROM admins WHERE username = ? LIMIT 1', [$input['admin_username']]);
+                if (!$existingAdmin) {
+                    DB::execute('INSERT INTO admins (username,password,name,role,permissions,status) VALUES (?,?,?,?,?,1)', [$input['admin_username'], password_hash($input['admin_password'], PASSWORD_DEFAULT), $input['admin_name'], 'super_admin', null]);
+                }
+            }
+        }
         // Portable desktop paths must be evaluated on the user's machine, not frozen at install time.
         $phpConfig = $desktop ? "<?php\nreturn ['driver'=>'sqlite','database'=>dirname(__DIR__,2).'/data/school.sqlite'];\n" : "<?php\nreturn ".var_export($config,true).";\n";
         release_write_new($root.'/config/database.php', $phpConfig);
-        release_write_new($root.'/config/desk-sync-key.php', "<?php\nreturn '".bin2hex(random_bytes(32))."';\n");
+        $generatedSyncKey = $requireDesktopSync ? $syncKey : bin2hex(random_bytes(32));
+        release_write_new($root.'/config/desk-sync-key.php', "<?php\nreturn '".$generatedSyncKey."';\n");
         release_write_new($root.'/config/installed.lock', "Release_V1.0\n".gmdate('c')."\n");
         unset($_SESSION['release_csrf']);
         session_regenerate_id(true);

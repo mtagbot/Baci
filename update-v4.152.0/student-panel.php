@@ -61,7 +61,7 @@ $examItems = exam_student_schedule($studentId);
 $chartLabels = [];
 $chartGpas   = [];
 foreach (array_reverse($reports) as $rep) {
-    if (!$rep['is_locked']) {
+    if (!is_report_locked_for_student($rep)) {
         $chartLabels[] = clean($rep['term'] . ' (' . $rep['report_month'] . ')');
         $chartGpas[]   = (float)$rep['gpa'];
     }
@@ -205,28 +205,31 @@ foreach (array_reverse($reports) as $rep) {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($reports as $rep): ?>
+                    <?php foreach ($reports as $rep):
+                        $repLockReason = '';
+                        $repLocked = is_report_locked_for_student($rep, $repLockReason);
+                    ?>
                     <tr>
                         <td class="font-bold"><?php echo clean($rep['academic_year']); ?></td>
                         <td><?php echo clean($rep['term'] . ' (' . $rep['report_month'] . ')'); ?></td>
-                        <td><?php echo format_score($rep['total_score']); ?></td>
+                        <td><?php echo $repLocked ? '<span class="text-muted">---</span>' : format_score($rep['total_score']); ?></td>
                         <td>
-                            <?php if ($rep['is_locked']): ?>
+                            <?php if ($repLocked): ?>
                                 <span class="text-muted">---</span>
                             <?php else: ?>
                                 <span class="badge badge-info text-sm"><?php echo format_score($rep['gpa']); ?></span>
                             <?php endif; ?>
                         </td>
                         <td>
-                            <?php if ($rep['is_locked']): ?>
+                            <?php if ($repLocked): ?>
                                 <span class="badge badge-danger">مشاهده مسدود است <svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg></span>
                             <?php else: ?>
                                 <span class="badge badge-success">آزاد و قابل دریافت <svg data-ui-icon="unlock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0M12 15v3"/></svg></span>
                             <?php endif; ?>
                         </td>
                         <td>
-                            <?php if ($rep['is_locked']): ?>
-                                <span class="text-xs text-red-600">به دلیل امور اداری/مالی مسدود است.</span>
+                            <?php if ($repLocked): ?>
+                                <span class="text-xs text-red-600"><?php echo clean($repLockReason ?: 'به دلیل امور اداری/مالی یا تکمیل نمرات مسدود است.'); ?></span>
                             <?php else: ?>
                                 <div class="flex gap-2 justify-end">
                                     <a href="report-view.php?id=<?php echo $rep['id']; ?>" class="btn btn-primary text-xs px-3 py-1">مشاهده کارنامه</a>

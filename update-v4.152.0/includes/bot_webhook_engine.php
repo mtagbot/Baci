@@ -145,6 +145,7 @@ if ($callbackQuery) {
     if ($chatId !== '' && strpos($data, 'pdfrep_') === 0) {
         $repId = (int)substr($data, 7);
         $report = DB::fetch("SELECT r.*, s.first_name, s.last_name FROM reports r JOIN students s ON r.student_id = s.id WHERE r.id = ? AND r.is_locked = 0", [$repId]);
+        if ($report && is_report_locked_for_student($report)) $report = null;
         if ($report) {
             $linked = DB::fetch("SELECT id FROM `$userTable` WHERE `$chatCol` = ? AND student_id = ?", [$chatId, $report['student_id']]);
             if ($linked) {
@@ -182,6 +183,7 @@ if ($callbackQuery) {
     if ($chatId !== '' && strpos($data, 'rep_') === 0) {
         $repId = (int)substr($data, 4);
         $report = DB::fetch("SELECT r.*, s.first_name, s.last_name FROM reports r JOIN students s ON r.student_id = s.id WHERE r.id = ? AND r.is_locked = 0", [$repId]);
+        if ($report && is_report_locked_for_student($report)) $report = null;
         if ($report) {
             $linked = DB::fetch("SELECT id FROM `$userTable` WHERE `$chatCol` = ? AND student_id = ?", [$chatId, $report['student_id']]);
             if ($linked) {
@@ -428,7 +430,11 @@ if ($text === $btnReports) {
         foreach ($links as $st) {
             $latestSt = get_latest_student_by_id($st['id']);
             $effectiveId = $latestSt ? $latestSt['id'] : $st['id'];
-            $reps = DB::fetchAll("SELECT id, term, report_month, academic_year FROM reports WHERE student_id = ? AND is_locked = 0 ORDER BY id DESC", [$effectiveId]);
+            $repsRaw = DB::fetchAll("SELECT id, student_id, class_name, term, report_month, academic_year, is_locked FROM reports WHERE student_id = ? AND is_locked = 0 ORDER BY id DESC", [$effectiveId]);
+            $reps = [];
+            foreach ($repsRaw as $rw) {
+                if (!is_report_locked_for_student($rw)) $reps[] = $rw;
+            }
             if (!$reps) {
                 bot_webhook_safe_send($platform, $chatId, bot_text($platform, 'no_report', ['student_name' => trim($st['first_name'] . ' ' . $st['last_name'])]), bot_main_keyboard($platform));
                 continue;

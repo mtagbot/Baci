@@ -63,6 +63,25 @@ $logoUrl    = get_setting('logo_url', '');
 $isEmbedded = isset($_GET['embedded']) && $_GET['embedded'] === '1';
 $headerRelease=is_file(dirname(__DIR__).'/config/release.php')?require dirname(__DIR__).'/config/release.php':[];
 $isDeskRuntime=($headerRelease['distribution']??(PHP_SAPI==='cli-server'?'desktop':'site'))==='desktop';
+$isDeskInitialSyncRequired = false;
+if ($isDeskRuntime && (PHP_SAPI === 'cli-server' || !empty($_SERVER['SDP_ENFORCE_INITIAL_SYNC']) || get_setting('desk_require_initial_sync', '') === '1')) {
+    $syncUrlCfg = trim((string)get_setting('desk_sync_url', ''));
+    $syncKeyCfg = trim((string)get_setting('desk_sync_key', ''));
+    $syncDoneOk = (get_setting('desk_sync_snapshot_done', '0') === '1') || ((int)get_setting('desk_sync_last_ok', '0') > 0);
+    if ($syncUrlCfg === '' || strlen($syncKeyCfg) < 16 || !$syncDoneOk) {
+        $isDeskInitialSyncRequired = true;
+        $curScript = basename($_SERVER['PHP_SELF'] ?? $_SERVER['SCRIPT_NAME'] ?? '');
+        if (!in_array($curScript, ['desk-sync.php', 'admin-login.php', 'logout.php', 'installer.php'], true)) {
+            if (is_admin_logged_in()) {
+                set_flash_message('warning', 'برای راه‌اندازی اولیه و استفاده از نرم‌افزار دسکتاپ، ابتدا باید همگام‌سازی با سرور سایت مدرسه را تکمیل نمایید.');
+                redirect('desk-sync.php?initial_sync=1');
+            } else {
+                set_flash_message('warning', 'نرم‌افزار دسکتاپ هنوز با سرور سایت همگام‌سازی نشده است. لطفاً ابتدا با حساب مدیریت وارد شده و همگام‌سازی اولیه با سرور را انجام دهید.');
+                redirect('admin-login.php?initial_sync=1');
+            }
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl" class="school-shell<?php echo $isEmbedded?' hub-embedded':''; ?>">

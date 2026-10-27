@@ -9,7 +9,8 @@ if (!ob_get_level()) {
     ob_start();
 }
 
-if (session_status() === PHP_SESSION_NONE) {
+$__isSdpSyncRelay = !defined('SDP_SYNC_ACTIVE') && (!empty($_REQUEST['sdp_sync']) || !empty($_REQUEST['sdp_z']) || !empty($_REQUEST['sdp_cid']) || !empty($_REQUEST['sdp_bridge']) || !empty($_SERVER['HTTP_X_SDP_Z']));
+if (!$__isSdpSyncRelay && session_status() === PHP_SESSION_NONE) {
     // Keep authenticated users signed in until they explicitly click logout.
     // The cookie is persistent and renewed on each request; logout.php/index?action=logout still destroys it.
     $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
@@ -852,8 +853,418 @@ if (!function_exists('password_store_hash')) {
     }
 }
 
+if (!function_exists('report_year_variants')) {
+    /**
+     * واریانت‌های معادل یک سال تحصیلی (مثلاً 1404/1405 و 1404-1405) را برمی‌گرداند.
+     */
+    function report_year_variants($year): array {
+        $raw = trim((string)$year);
+        if ($raw === '') return [''];
+        $en = tr_num($raw, 'en');
+        $norm = preg_replace('#/+#', '/', str_replace(['-', '–', '—', ' '], ['/', '/', '/', ''], $en));
+        $norm = trim($norm, '/');
+        $dash = str_replace('/', '-', $norm);
+        return array_values(array_unique(array_filter([$raw, $en, $norm, $dash], function ($v) {
+            return $v !== '';
+        })));
+    }
+}
+
+if (!function_exists('report_student_grade_level')) {
+    /**
+     * پایهٔ تحصیلی دانش‌آموز این کارنامه را از اطلاعات کارنامه، جدول دانش‌آموزان یا نام کلاس استخراج می‌کند.
+     */
+    function report_student_grade_level(array $report): string {
+        $g = trim((string)($report['grade_level'] ?? ''));
+        $c = trim((string)($report['class_name'] ?? ''));
+        if ($g === '' && !empty($report['student_id']) && class_exists('DB')) {
+            try {
+                $st = DB::fetch("SELECT grade_level, class_name FROM students WHERE id = ?", [(int)$report['student_id']]);
+                if ($st) {
+                    $g = trim((string)($st['grade_level'] ?? ''));
+                    if ($c === '') $c = trim((string)($st['class_name'] ?? ''));
+                }
+            } catch (Throwable $e) {}
+        }
+        if ($g === '' && $c !== '' && function_exists('infer_grade_from_class_name')) {
+            $g = trim((string)infer_grade_from_class_name($c));
+        }
+        return $g;
+    }
+}
+
+if (!function_exists('fetch_report_rank_scope')) {
+    /**
+     * لیست کارنامه‌های هم‌دوره (کلاس یا پایه) را صرفاً در همان سال تحصیلی و از میان دانش‌آموزان همان پایه/کلاس برمی‌گرداند.
+     */
+    function fetch_report_rank_scope(array $report, string $scope = 'grade'): array {
+        if (!class_exists('DB')) return [];
+        $years = report_year_variants($report['academic_year'] ?? '');
+        $yMarks = implode(',', array_fill(0, count($years), '?'));
+        $month = trim((string)($report['report_month'] ?? ''));
+        $term = trim((string)($report['term'] ?? ''));
+        $params = array_merge($years, $years);
+        $where = [
+            "r.academic_year IN ($yMarks)",
+            "(s.academic_year IS NULL OR s.academic_year = '' OR s.academic_year IN ($yMarks))"
+        ];
+        if ($month !== '') {
+            $where[] = "r.report_month = ?";
+            $params[] = $month;
+        } else {
+            $where[] = "r.term = ?";
+            $params[] = $term;
+        }
+        if ($scope === 'class') {
+            $cls = trim((string)($report['class_name'] ?? ''));
+            $normCls = function_exists('norm_class_str') ? norm_class_str($cls) : $cls;
+            $where[] = "(COALESCE(NULLIF(r.class_name, ''), s.class_name) = ? OR REPLACE(REPLACE(COALESCE(NULLIF(r.class_name, ''), s.class_name), ' ', ''), '‌', '') = ?)";
+            $params[] = $cls;
+            $params[] = $normCls;
+        } else {
+            $grade = report_student_grade_level($report);
+            if ($grade !== '') {
+                $where[] = "(s.grade_level = ? OR ((s.grade_level IS NULL OR s.grade_level = '') AND (r.class_name LIKE ? OR s.class_name LIKE ?)))";
+                $params[] = $grade;
+                $params[] = $grade . '%';
+                $params[] = $grade . '%';
+            } else {
+                $cls = trim((string)($report['class_name'] ?? ''));
+                $where[] = "r.class_name = ?";
+                $params[] = $cls;
+            }
+        }
+        $sql = "SELECT r.id, r.student_id, r.gpa FROM reports r JOIN students s ON r.student_id = s.id WHERE " . implode(' AND ', $where) . " ORDER BY r.id DESC";
+        $rows = DB::fetchAll($sql, $params);
+        $byStudent = [];
+        $targetRepId = (int)($report['id'] ?? 0);
+        $targetStuId = (int)($report['student_id'] ?? 0);
+        foreach ($rows as $r) {
+            $sid = (int)$r['student_id'];
+            if (!isset($byStudent[$sid]) || ((int)$r['id'] === $targetRepId)) {
+                $byStudent[$sid] = [
+                    'student_id' => $sid,
+                    'gpa' => ($sid === $targetStuId && isset($report['gpa'])) ? (float)$report['gpa'] : (float)$r['gpa']
+                ];
+            }
+        }
+        $list = array_values($byStudent);
+        usort($list, function ($a, $b) use ($targetStuId) {
+            $diff = (float)$b['gpa'] <=> (float)$a['gpa'];
+            if (abs((float)$b['gpa'] - (float)$a['gpa']) < 0.0001) {
+                if ((int)$a['student_id'] === $targetStuId) return -1;
+                if ((int)$b['student_id'] === $targetStuId) return 1;
+                return (int)$a['student_id'] <=> (int)$b['student_id'];
+            }
+            return $diff;
+        });
+        return $list;
+    }
+}
+
+if (!function_exists('fetch_subject_rank_scope')) {
+    /**
+     * لیست نمرات یک درس در همان ماه و همان سال تحصیلی (در سطح کلاس یا پایه) را بدون احتساب غیبت (نمره ۲۱) برمی‌گرداند.
+     */
+    function fetch_subject_rank_scope(array $report, string $subjectName, string $scope = 'grade'): array {
+        if (!class_exists('DB')) return [];
+        $subjectName = trim($subjectName);
+        if ($subjectName === '') return [];
+        $years = report_year_variants($report['academic_year'] ?? '');
+        $yMarks = implode(',', array_fill(0, count($years), '?'));
+        $month = trim((string)($report['report_month'] ?? ''));
+        $term = trim((string)($report['term'] ?? ''));
+        $params = array_merge($years, $years);
+        $where = [
+            "r.academic_year IN ($yMarks)",
+            "(s.academic_year IS NULL OR s.academic_year = '' OR s.academic_year IN ($yMarks))",
+            "rg.subject_name = ?",
+            "rg.score != 21"
+        ];
+        $params[] = $subjectName;
+        if ($month !== '') {
+            $where[] = "r.report_month = ?";
+            $params[] = $month;
+        } else {
+            $where[] = "r.term = ?";
+            $params[] = $term;
+        }
+        if ($scope === 'class') {
+            $cls = trim((string)($report['class_name'] ?? ''));
+            $normCls = function_exists('norm_class_str') ? norm_class_str($cls) : $cls;
+            $where[] = "(COALESCE(NULLIF(r.class_name, ''), s.class_name) = ? OR REPLACE(REPLACE(COALESCE(NULLIF(r.class_name, ''), s.class_name), ' ', ''), '‌', '') = ?)";
+            $params[] = $cls;
+            $params[] = $normCls;
+        } else {
+            $grade = report_student_grade_level($report);
+            if ($grade !== '') {
+                $where[] = "(s.grade_level = ? OR ((s.grade_level IS NULL OR s.grade_level = '') AND (r.class_name LIKE ? OR s.class_name LIKE ?)))";
+                $params[] = $grade;
+                $params[] = $grade . '%';
+                $params[] = $grade . '%';
+            } else {
+                $cls = trim((string)($report['class_name'] ?? ''));
+                $where[] = "r.class_name = ?";
+                $params[] = $cls;
+            }
+        }
+        $sql = "SELECT r.id AS report_id, r.student_id, rg.score FROM report_grades rg JOIN reports r ON rg.report_id = r.id JOIN students s ON r.student_id = s.id WHERE " . implode(' AND ', $where) . " ORDER BY r.id DESC";
+        $rows = DB::fetchAll($sql, $params);
+        $byStudent = [];
+        $targetRepId = (int)($report['id'] ?? 0);
+        $targetStuId = (int)($report['student_id'] ?? 0);
+        foreach ($rows as $r) {
+            $sid = (int)$r['student_id'];
+            if (!isset($byStudent[$sid]) || ((int)$r['report_id'] === $targetRepId)) {
+                $byStudent[$sid] = [
+                    'student_id' => $sid,
+                    'score' => (float)$r['score']
+                ];
+            }
+        }
+        $list = array_values($byStudent);
+        usort($list, function ($a, $b) use ($targetStuId) {
+            $diff = (float)$b['score'] <=> (float)$a['score'];
+            if (abs((float)$b['score'] - (float)$a['score']) < 0.0001) {
+                if ((int)$a['student_id'] === $targetStuId) return -1;
+                if ((int)$b['student_id'] === $targetStuId) return 1;
+                return (int)$a['student_id'] <=> (int)$b['student_id'];
+            }
+            return $diff;
+        });
+        return $list;
+    }
+}
+
+if (!function_exists('ensure_report_locks_schema')) {
+    function ensure_report_locks_schema(): void {
+        static $done = false;
+        if ($done || !class_exists('DB')) return;
+        $done = true;
+        try {
+            $pdo = DB::getInstance()->getPdo();
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'sqlite') {
+                $pdo->exec('CREATE TABLE IF NOT EXISTS "report_locks" (
+                    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+                    "academic_year" TEXT DEFAULT NULL,
+                    "term" TEXT DEFAULT NULL,
+                    "report_month" TEXT DEFAULT NULL,
+                    "class_name" TEXT DEFAULT NULL,
+                    "student_id" INTEGER DEFAULT NULL,
+                    "is_locked" INTEGER NOT NULL DEFAULT 1,
+                    "reason" TEXT DEFAULT \'در حال تکمیل نمرات توسط دبیران\',
+                    "created_at" TEXT DEFAULT (datetime(\'now\',\'localtime\'))
+                )');
+            } else {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS `report_locks` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `academic_year` varchar(20) DEFAULT NULL,
+                    `term` varchar(50) DEFAULT NULL,
+                    `report_month` varchar(50) DEFAULT NULL,
+                    `class_name` varchar(100) DEFAULT NULL,
+                    `student_id` int(11) DEFAULT NULL,
+                    `is_locked` tinyint(1) NOT NULL DEFAULT 1,
+                    `reason` varchar(255) DEFAULT 'در حال تکمیل نمرات توسط دبیران',
+                    `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            }
+        } catch (Throwable $e) {}
+    }
+}
+
+if (!function_exists('get_all_report_locks')) {
+    function get_all_report_locks(bool $refresh = false): array {
+        if (!$refresh && isset($GLOBALS['__sdp_report_locks_cache']) && is_array($GLOBALS['__sdp_report_locks_cache'])) {
+            return $GLOBALS['__sdp_report_locks_cache'];
+        }
+        if (!class_exists('DB')) return [];
+        ensure_report_locks_schema();
+        try {
+            $GLOBALS['__sdp_report_locks_cache'] = DB::fetchAll("SELECT * FROM report_locks ORDER BY id DESC") ?: [];
+        } catch (Throwable $e) {
+            $GLOBALS['__sdp_report_locks_cache'] = [];
+        }
+        return $GLOBALS['__sdp_report_locks_cache'];
+    }
+}
+
+if (!function_exists('is_report_prelocked')) {
+    /**
+     * بررسی می‌کند آیا کارنامهٔ یک ماه/کلاس/دانش‌آموز به‌صورت پیشینی یا گروهی در جدول report_locks مسدود شده است یا خیر.
+     * این مسدودسازی صرفاً نمایش کارنامه به دانش‌آموز را می‌بندد و مانع ثبت نمره توسط دبیران نمی‌شود.
+     */
+    function is_report_prelocked($academicYear, $reportMonth, $className = '', $studentId = 0, &$reasonOut = null): bool {
+        $locks = get_all_report_locks();
+        if (!$locks) return false;
+        $targetYears = report_year_variants($academicYear);
+        $targetMonth = trim((string)$reportMonth);
+        $targetClass = function_exists('norm_class_str') ? norm_class_str((string)$className) : trim((string)$className);
+        $targetStudent = (int)$studentId;
+
+        foreach ($locks as $rule) {
+            $rYear = trim((string)($rule['academic_year'] ?? ''));
+            if ($rYear !== '' && !array_intersect($targetYears, report_year_variants($rYear))) continue;
+
+            $rMonth = trim((string)($rule['report_month'] ?? ''));
+            if ($rMonth !== '' && $targetMonth !== '' && $rMonth !== $targetMonth) continue;
+            if ($rMonth !== '' && $targetMonth === '') continue;
+
+            $rClass = trim((string)($rule['class_name'] ?? ''));
+            $rClassNorm = function_exists('norm_class_str') ? norm_class_str($rClass) : $rClass;
+            if ($rClassNorm !== '' && $targetClass !== '' && $rClassNorm !== $targetClass) continue;
+            if ($rClassNorm !== '' && $targetClass === '') continue;
+
+            $rStudent = (int)($rule['student_id'] ?? 0);
+            if ($rStudent > 0 && $rStudent !== $targetStudent) continue;
+
+            // اولین قانون منطبق (جدیدترین): اگر برای دانش‌آموز خاص آزادسازی ثبت شده باشد (is_locked=0) اولویت دارد
+            if ((int)($rule['is_locked'] ?? 1) === 1) {
+                $reasonOut = trim((string)($rule['reason'] ?? '')) ?: 'کارنامهٔ این ماه تا تکمیل ثبت نمرات توسط دبیران مسدود است.';
+                return true;
+            } else {
+                return false;
+            }
+        }
+        return false;
+    }
+}
+
+if (!function_exists('is_report_locked_for_student')) {
+    /**
+     * آیا مشاهده/چاپ/دریافت این کارنامه برای دانش‌آموز مسدود است؟
+     */
+    function is_report_locked_for_student(array $report, &$reasonOut = null): bool {
+        $reasonOut = 'به دلیل امور اداری/مالی یا تکمیل نمرات مسدود است.';
+        $preReason = null;
+        $preLocked = is_report_prelocked(
+            $report['academic_year'] ?? '',
+            $report['report_month'] ?? '',
+            $report['class_name'] ?? '',
+            (int)($report['student_id'] ?? 0),
+            $preReason
+        );
+        if ($preReason) $reasonOut = $preReason;
+        if (!empty($report['is_locked']) && (int)$report['is_locked'] === 1) {
+            return true;
+        }
+        return $preLocked;
+    }
+}
+
+if (!function_exists('set_report_bulk_lock')) {
+    /**
+     * اعمال مسدودسازی یا آزادسازی پیشینی/گروهی کارنامه برای یک سال، ماه، کلاس یا دانش‌آموز
+     * حتی زمانی که هنوز هیچ کارنامه‌ای برای آن ماه صادر نشده است.
+     */
+    function set_report_bulk_lock($academicYear, $reportMonth, $className = '', $studentId = 0, $isLocked = 1, $reason = ''): void {
+        if (!class_exists('DB')) return;
+        ensure_report_locks_schema();
+        $year = function_exists('unify_academic_year') ? unify_academic_year(trim((string)$academicYear)) : trim((string)$academicYear);
+        $years = report_year_variants($year);
+        $yMarks = implode(',', array_fill(0, count($years), '?'));
+        $month = trim((string)$reportMonth);
+        $className = trim((string)$className);
+        $normClass = function_exists('norm_class_str') ? norm_class_str($className) : $className;
+        $studentId = max(0, (int)$studentId);
+        $isLocked = (int)$isLocked ? 1 : 0;
+        $reason = trim((string)$reason) ?: 'تا زمان تکمیل نمرات توسط دبیران یا تسویه امور اداری مسدود است';
+
+        // ۱) به‌روزرسانی کارنامه‌های موجود منطبق (در صورت وجود)
+        $where = ["academic_year IN ($yMarks)"];
+        $params = $years;
+        if ($month !== '') { $where[] = "report_month = ?"; $params[] = $month; }
+        if ($className !== '') {
+            $where[] = "(class_name = ? OR REPLACE(REPLACE(class_name, ' ', ''), '‌', '') = ?)";
+            $params[] = $className;
+            $params[] = $normClass;
+        }
+        if ($studentId > 0) { $where[] = "student_id = ?"; $params[] = $studentId; }
+        DB::execute("UPDATE reports SET is_locked = ? WHERE " . implode(' AND ', $where), array_merge([$isLocked], $params));
+
+        // ۲) ثبت یا حذف قانون مسدودسازی پیشینی در report_locks
+        $lockWhere = ["academic_year IN ($yMarks)"];
+        $lockParams = $years;
+        if ($month !== '') { $lockWhere[] = "report_month = ?"; $lockParams[] = $month; }
+        if ($className !== '') {
+            $lockWhere[] = "(class_name = ? OR REPLACE(REPLACE(class_name, ' ', ''), '‌', '') = ?)";
+            $lockParams[] = $className;
+            $lockParams[] = $normClass;
+        } elseif ($studentId === 0 && $isLocked === 0) {
+            // آزادسازی کل کلاس‌ها در آن ماه → همهٔ قوانین کلاسی و کلی آن ماه پاک شوند
+        } else {
+            $lockWhere[] = "(class_name IS NULL OR class_name = '')";
+        }
+        if ($studentId > 0) {
+            $lockWhere[] = "student_id = ?";
+            $lockParams[] = $studentId;
+        } elseif ($isLocked === 1) {
+            $lockWhere[] = "(student_id IS NULL OR student_id = 0)";
+        }
+
+        DB::execute("DELETE FROM report_locks WHERE " . implode(' AND ', $lockWhere), $lockParams);
+
+        if ($isLocked === 1) {
+            DB::execute(
+                "INSERT INTO report_locks (academic_year, term, report_month, class_name, student_id, is_locked, reason) VALUES (?, ?, ?, ?, ?, 1, ?)",
+                [$year, $month ?: null, $month, $className, $studentId > 0 ? $studentId : null, $reason]
+            );
+        } elseif ($className !== '' && $studentId === 0) {
+            // اگر قبلاً کل کلاس‌ها (class_name='') برای این ماه مسدود بوده و مدیر فقط یک کلاس را آزاد کرده، استثنای آزادسازی برای این کلاس ثبت شود
+            $globalLocks = DB::fetchAll(
+                "SELECT id FROM report_locks WHERE academic_year IN ($yMarks) AND (report_month = ? OR report_month IS NULL OR report_month = '') AND (class_name IS NULL OR class_name = '') AND is_locked = 1",
+                array_merge($years, [$month])
+            );
+            if ($globalLocks) {
+                DB::execute(
+                    "INSERT INTO report_locks (academic_year, term, report_month, class_name, student_id, is_locked, reason) VALUES (?, ?, ?, ?, NULL, 0, '')",
+                    [$year, $month ?: null, $month, $className]
+                );
+            }
+        }
+        unset($GLOBALS['__sdp_report_locks_cache']);
+    }
+}
+
 // Session revocation must run before request handlers, not only while rendering the header.
 require_once __DIR__.'/session_tracker.php';
-st_bootstrap();
+if (empty($__isSdpSyncRelay)) st_bootstrap();
 
 require_once __DIR__.'/appearance.php';
+
+foreach (['desk-sync-api.php', 'class-exam-sync-api.php'] as $__sdpEpName) {
+    $__sdpEpFile = dirname(__DIR__) . '/' . $__sdpEpName;
+    if (is_file($__sdpEpFile)) {
+        if (((@fileperms($__sdpEpFile) & 0777) < 0600)) @chmod($__sdpEpFile, 0644);
+        if ($__sdpEpName === 'desk-sync-api.php' && is_file(__DIR__ . '/desk_sync_endpoint.php')) {
+            $__oldApiSrc = (string)@file_get_contents($__sdpEpFile);
+            if (strpos($__oldApiSrc, 'const SYNC_TABLES') !== false
+                && (strpos($__oldApiSrc, 'class_exam_groups') === false || strpos($__oldApiSrc, 'rubika_bot_users') === false)) {
+                $__newApiSrc = (string)@file_get_contents(__DIR__ . '/desk_sync_endpoint.php');
+                if ($__newApiSrc !== '') {
+                    if (preg_match("~define\\s*\\(\\s*['\"]DESK_SYNC_KEY['\"]\\s*,\\s*['\"]((?:[^'\"\\\\]|\\\\.){16,200})['\"]\\s*\\)~", $__oldApiSrc, $__km)) {
+                        $__legKey = stripcslashes($__km[1]);
+                        $__keyCfg = dirname(__DIR__) . '/config/desk-sync-key.php';
+                        if (!is_file($__keyCfg)) {
+                            @file_put_contents($__keyCfg, "<?php\nreturn " . var_export($__legKey, true) . ";\n");
+                        }
+                        $__newApiSrc = preg_replace('/^<\?php\s*/', "<?php\nif (!defined('DESK_SYNC_KEY')) define('DESK_SYNC_KEY', " . var_export($__legKey, true) . ");\n", $__newApiSrc, 1);
+                    }
+                    @file_put_contents($__sdpEpFile, $__newApiSrc);
+                    @chmod($__sdpEpFile, 0644);
+                }
+            }
+        }
+    }
+}
+if (!empty($__isSdpSyncRelay) && !defined('SDP_SYNC_ACTIVE')) {
+    if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+    $__sdpHandler = is_file(__DIR__ . '/desk_sync_endpoint.php')
+        ? (__DIR__ . '/desk_sync_endpoint.php')
+        : (dirname(__DIR__) . '/class-exam-sync-api.php');
+    if (is_file($__sdpHandler)) {
+        require $__sdpHandler;
+        exit;
+    }
+}

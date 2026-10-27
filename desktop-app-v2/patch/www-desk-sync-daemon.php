@@ -31,9 +31,11 @@ require __DIR__ . '/includes/desk_sync.php';
 $lockFh = @fopen($dataDir . '/sync-daemon.lock', 'c');
 if (!$lockFh || !@flock($lockFh, LOCK_EX | LOCK_NB)) exit(0);
 
-$hbFile    = $dataDir . '/sync-heartbeat.json';
-$aliveFile = $dataDir . '/app-alive.txt';
-$kickFile  = $dataDir . '/sync-kick.txt';
+$hbFile     = $dataDir . '/sync-heartbeat.json';
+$aliveFile  = $dataDir . '/app-alive.txt';
+$kickFile   = $dataDir . '/sync-kick.txt';
+$engineFile = __DIR__ . '/includes/desk_sync.php';
+$bootMtime  = ((int)@filemtime($engineFile)) . ':' . ((int)@filemtime(__FILE__));
 
 function desk_write_heartbeat($file,$value) {
     $temp=$file.'.'.getmypid().'.tmp';
@@ -42,8 +44,11 @@ function desk_write_heartbeat($file,$value) {
     }
 }
 while (true) {
+    clearstatcache(true, $engineFile);
+    clearstatcache(true, __FILE__);
+    if ((((int)@filemtime($engineFile)) . ':' . ((int)@filemtime(__FILE__))) !== $bootMtime) break;
     // Publish actual worker activity before potentially slow remote I/O.
-    desk_write_heartbeat($hbFile,['phase'=>'syncing','ts'=>time(),'daemon'=>1]);
+    desk_write_heartbeat($hbFile,['phase'=>'syncing','ts'=>time(),'daemon'=>1,'engine_mtime'=>$bootMtime]);
     $res = ['ok' => false];
     try {
         $res = DeskSync::tick();
@@ -80,10 +85,16 @@ while (true) {
     $res['ts']     = time();
     $res['daemon'] = 1;
     $res['phase']='settled';
+    $res['engine_mtime'] = $bootMtime;
     desk_write_heartbeat($hbFile,$res);
 
     // app closed? (no page request refreshed app-alive for 15 minutes) → stop
     if (!is_file($aliveFile) || time() - (int)@filemtime($aliveFile) > 900) break;
+
+    // engine or daemon file updated on disk? → exit so a fresh worker loads the new code
+    clearstatcache(true, $engineFile);
+    clearstatcache(true, __FILE__);
+    if ((((int)@filemtime($engineFile)) . ':' . ((int)@filemtime(__FILE__))) !== $bootMtime) break;
 
     /* v2.12.0: sync must follow EVERY change immediately. Any page request
        that modified data touches sync-kick.txt (see desk-prepend.php);

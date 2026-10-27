@@ -129,10 +129,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_discipline_score
                 } else {
                     $report = DB::fetch('SELECT id,is_locked FROM reports WHERE student_id=? AND academic_year=? AND report_month=? ORDER BY id DESC LIMIT 1', [$sid,$year,$month]);
                 }
-                if ($report && (int)$report['is_locked'] === 1) { $locked++; continue; }
+                if ($report && (int)$report['is_locked'] === 1 && !is_report_prelocked($year, $month, $reportClass, $sid)) { $locked++; continue; }
                 if (!$report) {
-                    DB::execute('INSERT INTO reports (student_id,class_name,academic_year,term,report_month,total_score,gpa) VALUES (?,?,?,?,?,0,0)', [$sid,$reportClass,$year,drm_term_for_month($month),$month]);
+                    $initLock = is_report_prelocked($year, $month, $reportClass, $sid) ? 1 : 0;
+                    DB::execute('INSERT INTO reports (student_id,class_name,academic_year,term,report_month,total_score,gpa,is_locked) VALUES (?,?,?,?,?,0,0,?)', [$sid,$reportClass,$year,drm_term_for_month($month),$month,$initLock]);
                     $report = ['id'=>(int)DB::lastInsertId()];
+                } elseif (is_report_prelocked($year, $month, $reportClass, $sid)) {
+                    DB::execute('UPDATE reports SET is_locked=1 WHERE id=?', [(int)$report['id']]);
                 }
                 DB::execute('UPDATE reports SET discipline_score=? WHERE id=?', [$score,(int)$report['id']]);
                 $saved++;
@@ -198,7 +201,7 @@ require_once __DIR__ . '/includes/header.php';
         <?php foreach($studentRows as $s): $sid=(int)$s['id'];$rep=$reportMap[$sid]??null; ?>
         <tr data-student-id="<?php echo $sid; ?>"><td><b class="drm-student-name"><?php echo clean(trim($s['first_name'].' '.$s['last_name'])); ?></b><span class="drm-student-meta"><span>پایه: <?php echo clean($s['grade_level']??'—'); ?></span><span>کلاس: <?php echo clean($s['class_name']??'—'); ?></span></span></td><td class="drm-items">
             <?php if(!empty($disciplineMap[$sid])): foreach($disciplineMap[$sid] as $item): $internalNote=trim((string)($item['internal_note']??'')); $attendanceEntry=drm_is_attendance_entry($internalNote); ?><div class="drm-item"><small class="text-muted"><?php echo clean(drm_age_label($item['occurred_at_jalali'])); ?></small> — <span><?php echo clean($item['title_text']); ?></span><?php if($internalNote!==''&&!$attendanceEntry): ?> — <span class="drm-internal-note"><?php echo nl2br(clean($internalNote)); ?></span><?php endif; ?></div><?php endforeach; else: ?><span class="text-muted">موردی ثبت نشده است.</span><?php endif; ?>
-        </td><td><input class="form-input drm-score" type="number" min="0" max="21" step="0.25" name="scores[<?php echo $sid; ?>]" value="<?php echo clean($rep['discipline_score']??''); ?>" placeholder="—" <?php echo !empty($rep['is_locked'])?'disabled title="کارنامه قفل است"':''; ?>></td></tr>
+        </td><td><?php $rowHardLocked = !empty($rep['is_locked']) && !is_report_prelocked($year, $month, $s['class_name'] ?? '', $sid); ?><input class="form-input drm-score" type="number" min="0" max="21" step="0.25" name="scores[<?php echo $sid; ?>]" value="<?php echo clean($rep['discipline_score']??''); ?>" placeholder="—" <?php echo $rowHardLocked?'disabled title="کارنامه قفل است"':''; ?>></td></tr>
         <?php endforeach; if(!$studentRows): ?><tr><td colspan="3" class="text-center text-muted">دانش‌آموزی با این فیلترها یافت نشد.</td></tr><?php endif; ?>
         </tbody></table></div>
         <div class="flex justify-end mt-3"><button class="btn btn-success px-8" type="submit">ثبت</button></div>

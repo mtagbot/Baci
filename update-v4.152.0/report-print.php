@@ -18,7 +18,11 @@ if (!$report) {
 
 $staffFileAccess = current_teacher_has_student_file_access();
 $printTokenOk = verify_report_print_token($_GET['pt'] ?? '', $reportId, $report['student_id']);
-if (!$printTokenOk && is_student_logged_in() && ($report['student_id'] != $_SESSION['student_id'] || $report['is_locked'])) {
+$isLockedForStu = is_report_locked_for_student($report);
+if (!is_admin_logged_in() && !$staffFileAccess && $isLockedForStu) {
+    app_page_error('غیرمجاز یا مسدود.');
+}
+if (!$printTokenOk && is_student_logged_in() && ($report['student_id'] != $_SESSION['student_id'] || $isLockedForStu)) {
     app_page_error('غیرمجاز یا مسدود.');
 }
 if (!$printTokenOk && !is_student_logged_in() && !is_admin_logged_in() && !$staffFileAccess) {
@@ -36,16 +40,14 @@ if ($parsedData['count'] > 0 && abs((float)$report['gpa'] - (float)$computedGpa)
     $report['gpa'] = $computedGpa;
 }
 
-// Compute overall ranks
-$classReports = DB::fetchAll("SELECT id FROM reports WHERE academic_year = ? AND term = ? AND report_month = ? AND class_name = ? ORDER BY gpa DESC",
-    [$report['academic_year'], $report['term'], $report['report_month'], $report['class_name']]);
+// Compute overall ranks (strictly within the same academic year and same grade/class)
+$classReports = fetch_report_rank_scope($report, 'class');
 $classRank = 1;
-foreach ($classReports as $idx => $cr) { if ($cr['id'] == $reportId) { $classRank = $idx + 1; break; } }
+foreach ($classReports as $idx => $cr) { if ((int)$cr['student_id'] === (int)$report['student_id']) { $classRank = $idx + 1; break; } }
 
-$gradeReports = DB::fetchAll("SELECT id FROM reports WHERE academic_year = ? AND term = ? AND report_month = ? ORDER BY gpa DESC",
-    [$report['academic_year'], $report['term'], $report['report_month']]);
+$gradeReports = fetch_report_rank_scope($report, 'grade');
 $gradeRank = 1;
-foreach ($gradeReports as $idx => $gr) { if ($gr['id'] == $reportId) { $gradeRank = $idx + 1; break; } }
+foreach ($gradeReports as $idx => $gr) { if ((int)$gr['student_id'] === (int)$report['student_id']) { $gradeRank = $idx + 1; break; } }
 
 $rLine1 = get_setting('report_header_line1', 'بسمه تعالی');
 $rLine2 = get_setting('report_header_line2', 'دبیرستان غیردولتی بصیرت');
@@ -125,16 +127,18 @@ $rLine2 = get_setting('report_header_line2', 'دبیرستان غیردولتی 
         </thead>
         <tbody>
             <?php foreach ($grades as $idx => $g): 
-                // Subject ranks
-                $sClassReps = DB::fetchAll("SELECT rg.score FROM report_grades rg JOIN reports r ON rg.report_id = r.id WHERE r.academic_year = ? AND r.term = ? AND r.report_month = ? AND r.class_name = ? AND rg.subject_name = ? ORDER BY rg.score DESC",
-                    [$report['academic_year'], $report['term'], $report['report_month'], $report['class_name'], $g['subject_name']]);
+                // Subject ranks (strictly within the same academic year and same grade/class, excluding absence score 21)
+                $sClassReps = fetch_subject_rank_scope($report, (string)$g['subject_name'], 'class');
                 $sClsRank = 1;
-                foreach ($sClassReps as $si => $scr) { if ((float)$scr['score'] <= (float)$g['score']) { $sClsRank = $si + 1; break; } }
+                if ((float)$g['score'] != 21.0) {
+                    foreach ($sClassReps as $si => $scr) { if ((int)$scr['student_id'] === (int)$report['student_id'] || (float)$scr['score'] <= (float)$g['score']) { $sClsRank = $si + 1; break; } }
+                }
 
-                $sGradeReps = DB::fetchAll("SELECT rg.score FROM report_grades rg JOIN reports r ON rg.report_id = r.id WHERE r.academic_year = ? AND r.term = ? AND r.report_month = ? AND rg.subject_name = ? ORDER BY rg.score DESC",
-                    [$report['academic_year'], $report['term'], $report['report_month'], $g['subject_name']]);
+                $sGradeReps = fetch_subject_rank_scope($report, (string)$g['subject_name'], 'grade');
                 $sGrdRank = 1;
-                foreach ($sGradeReps as $si => $sgr) { if ((float)$sgr['score'] <= (float)$g['score']) { $sGrdRank = $si + 1; break; } }
+                if ((float)$g['score'] != 21.0) {
+                    foreach ($sGradeReps as $si => $sgr) { if ((int)$sgr['student_id'] === (int)$report['student_id'] || (float)$sgr['score'] <= (float)$g['score']) { $sGrdRank = $si + 1; break; } }
+                }
             ?>
             <tr>
                 <td><?php echo tr_num($idx + 1, 'fa'); ?></td>

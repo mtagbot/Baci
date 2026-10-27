@@ -97,15 +97,13 @@ if (isset($_GET['print'])) {
             DB::execute("UPDATE reports SET gpa = ?, total_score = ? WHERE id = ?", [$computedGpa, $computedGpa * $parsedData['count'], $report['id']]);
             $report['gpa'] = $computedGpa;
         }
-        $classReports = DB::fetchAll("SELECT id FROM reports WHERE academic_year = ? AND term = ? AND report_month = ? AND class_name = ? ORDER BY gpa DESC",
-            [$report['academic_year'], $report['term'], $report['report_month'], $report['class_name']]);
+        $classReports = fetch_report_rank_scope($report, 'class');
         $classRank = 1;
-        foreach ($classReports as $ci => $cr) { if ($cr['id'] == $report['id']) { $classRank = $ci + 1; break; } }
+        foreach ($classReports as $ci => $cr) { if ((int)$cr['student_id'] === (int)$report['student_id']) { $classRank = $ci + 1; break; } }
         
-        $gradeReports = DB::fetchAll("SELECT id FROM reports WHERE academic_year = ? AND term = ? AND report_month = ? ORDER BY gpa DESC",
-            [$report['academic_year'], $report['term'], $report['report_month']]);
+        $gradeReports = fetch_report_rank_scope($report, 'grade');
         $gradeRank = 1;
-        foreach ($gradeReports as $gi => $gr) { if ($gr['id'] == $report['id']) { $gradeRank = $gi + 1; break; } }
+        foreach ($gradeReports as $gi => $gr) { if ((int)$gr['student_id'] === (int)$report['student_id']) { $gradeRank = $gi + 1; break; } }
     ?>
     <div class="report-card">
         <div>
@@ -150,15 +148,17 @@ if (isset($_GET['print'])) {
                 </thead>
                 <tbody>
                     <?php foreach ($grades as $g): 
-                        $sClassReps = DB::fetchAll("SELECT score FROM report_grades rg JOIN reports r ON rg.report_id = r.id WHERE r.academic_year = ? AND r.term = ? AND r.report_month = ? AND r.class_name = ? AND rg.subject_name = ? ORDER BY rg.score DESC",
-                            [$report['academic_year'], $report['term'], $report['report_month'], $report['class_name'], $g['subject_name']]);
+                        $sClassReps = fetch_subject_rank_scope($report, (string)$g['subject_name'], 'class');
                         $sClsRank = 1;
-                        foreach ($sClassReps as $si => $scr) { if ((float)$scr['score'] <= (float)$g['score']) { $sClsRank = $si + 1; break; } }
+                        if ((float)$g['score'] != 21.0) {
+                            foreach ($sClassReps as $si => $scr) { if ((int)$scr['student_id'] === (int)$report['student_id'] || (float)$scr['score'] <= (float)$g['score']) { $sClsRank = $si + 1; break; } }
+                        }
 
-                        $sGradeReps = DB::fetchAll("SELECT score FROM report_grades rg JOIN reports r ON rg.report_id = r.id WHERE r.academic_year = ? AND r.term = ? AND r.report_month = ? AND rg.subject_name = ? ORDER BY rg.score DESC",
-                            [$report['academic_year'], $report['term'], $report['report_month'], $g['subject_name']]);
+                        $sGradeReps = fetch_subject_rank_scope($report, (string)$g['subject_name'], 'grade');
                         $sGrdRank = 1;
-                        foreach ($sGradeReps as $si => $sgr) { if ((float)$sgr['score'] <= (float)$g['score']) { $sGrdRank = $si + 1; break; } }
+                        if ((float)$g['score'] != 21.0) {
+                            foreach ($sGradeReps as $si => $sgr) { if ((int)$sgr['student_id'] === (int)$report['student_id'] || (float)$sgr['score'] <= (float)$g['score']) { $sGrdRank = $si + 1; break; } }
+                        }
                     ?>
                     <tr>
                         <td style="font-weight:bold;"><?php echo clean($g['subject_name']); ?></td>

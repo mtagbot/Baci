@@ -108,18 +108,66 @@ if (!function_exists('get_report_analysis_data')) {
         $report['gpa'] = $parsed['count'] ? $parsed['calculated_gpa'] : (float)$report['gpa'];
         $report['discipline_score'] = $parsed['discipline_score'];
         $className = $report['class_name'] ?: $report['student_class'];
-        $classAvg = DB::fetch("SELECT AVG(gpa) AS avg_gpa, COUNT(*) AS cnt FROM reports WHERE class_name = ? AND academic_year = ? AND term = ? AND report_month = ? AND is_locked = 0", [$className, $report['academic_year'], $report['term'], $report['report_month']]);
-        $rankRow = DB::fetch("SELECT COUNT(*) + 1 AS rank_calc FROM reports WHERE class_name = ? AND academic_year = ? AND term = ? AND report_month = ? AND is_locked = 0 AND gpa > ?", [$className, $report['academic_year'], $report['term'], $report['report_month'], $report['gpa']]);
-        $progress = DB::fetchAll("SELECT report_month, term, gpa FROM reports WHERE student_id = ? AND is_locked = 0 ORDER BY id ASC LIMIT 12", [$report['student_id']]);
+        $report['class_name'] = $className;
+        $report['grade_level'] = report_student_grade_level($report);
+        $years = report_year_variants($report['academic_year'] ?? '');
+        $yMarks = implode(',', array_fill(0, count($years), '?'));
+
+        $classReports = fetch_report_rank_scope($report, 'class');
+        $classRankVal = 1;
+        $gpaSum = 0.0;
+        foreach ($classReports as $ci => $cr) {
+            $gpaSum += (float)$cr['gpa'];
+            if ((int)$cr['student_id'] === (int)$report['student_id']) $classRankVal = $ci + 1;
+        }
+        $classCount = count($classReports);
+        $classAvgVal = $classCount > 0 ? round($gpaSum / $classCount, 2) : null;
+
+        $gradeReports = fetch_report_rank_scope($report, 'grade');
+        $gradeRankVal = 1;
+        foreach ($gradeReports as $gi => $gr) {
+            if ((int)$gr['student_id'] === (int)$report['student_id']) { $gradeRankVal = $gi + 1; break; }
+        }
+
+        $progress = DB::fetchAll("SELECT report_month, term, gpa FROM reports WHERE student_id = ? AND academic_year IN ($yMarks) AND is_locked = 0 ORDER BY id ASC LIMIT 12", array_merge([(int)$report['student_id']], $years));
         $subjectAvgs = []; $subjectRanks = [];
         foreach ($parsed['regular_grades'] as $g) {
-            $row = DB::fetch("SELECT AVG(rg.score) AS avg_score FROM report_grades rg JOIN reports r ON r.id = rg.report_id WHERE r.class_name = ? AND r.academic_year = ? AND r.term = ? AND r.report_month = ? AND rg.subject_name = ? AND r.is_locked = 0", [$className, $report['academic_year'], $report['term'], $report['report_month'], $g['subject_name']]);
-            $subjectAvgs[$g['subject_name']] = $row && $row['avg_score'] !== null ? round((float)$row['avg_score'], 2) : null;
-            $classRank = DB::fetch("SELECT COUNT(*)+1 rnk FROM report_grades rg JOIN reports r ON r.id=rg.report_id WHERE r.class_name=? AND r.academic_year=? AND r.term=? AND r.report_month=? AND rg.subject_name=? AND rg.score > ?", [$className,$report['academic_year'],$report['term'],$report['report_month'],$g['subject_name'],(float)$g['score']]);
-            $gradeRank = DB::fetch("SELECT COUNT(*)+1 rnk FROM report_grades rg JOIN reports r ON r.id=rg.report_id JOIN students s ON s.id=r.student_id WHERE s.grade_level=? AND r.academic_year=? AND r.term=? AND r.report_month=? AND rg.subject_name=? AND rg.score > ?", [$report['grade_level'],$report['academic_year'],$report['term'],$report['report_month'],$g['subject_name'],(float)$g['score']]);
-            $subjectRanks[$g['subject_name']] = ['class'=>(int)($classRank['rnk']??0), 'grade'=>(int)($gradeRank['rnk']??0)];
+            $sClassList = fetch_subject_rank_scope($report, (string)$g['subject_name'], 'class');
+            $sGradeList = fetch_subject_rank_scope($report, (string)$g['subject_name'], 'grade');
+            $sSum = 0.0;
+            $sClsRnk = 1;
+            foreach ($sClassList as $si => $scr) {
+                $sSum += (float)$scr['score'];
+                if ((float)$g['score'] != 21.0 && ((int)$scr['student_id'] === (int)$report['student_id'] || (float)$scr['score'] <= (float)$g['score'])) {
+                    if ($sClsRnk === 1 && $si > 0) $sClsRnk = $si + 1;
+                }
+            }
+            if ((float)$g['score'] != 21.0) {
+                $sClsRnk = 1;
+                foreach ($sClassList as $si => $scr) {
+                    if ((int)$scr['student_id'] === (int)$report['student_id'] || (float)$scr['score'] <= (float)$g['score']) { $sClsRnk = $si + 1; break; }
+                }
+            }
+            $sGrdRnk = 1;
+            if ((float)$g['score'] != 21.0) {
+                foreach ($sGradeList as $si => $sgr) {
+                    if ((int)$sgr['student_id'] === (int)$report['student_id'] || (float)$sgr['score'] <= (float)$g['score']) { $sGrdRnk = $si + 1; break; }
+                }
+            }
+            $subjectAvgs[$g['subject_name']] = count($sClassList) > 0 ? round($sSum / count($sClassList), 2) : null;
+            $subjectRanks[$g['subject_name']] = ['class' => $sClsRnk, 'grade' => $sGrdRnk];
         }
-        return ['report'=>$report,'grades'=>$parsed['regular_grades'],'class_avg'=>$classAvg && $classAvg['avg_gpa']!==null?round((float)$classAvg['avg_gpa'],2):null,'class_count'=>(int)($classAvg['cnt']??0),'rank'=>$report['rank_in_class'] ?: (int)($rankRow['rank_calc']??0),'progress'=>$progress,'subject_avgs'=>$subjectAvgs,'subject_ranks'=>$subjectRanks];
+        return [
+            'report' => $report,
+            'grades' => $parsed['regular_grades'],
+            'class_avg' => $classAvgVal,
+            'class_count' => $classCount,
+            'rank' => $classRankVal,
+            'grade_rank' => $gradeRankVal,
+            'progress' => $progress,
+            'subject_avgs' => $subjectAvgs,
+            'subject_ranks' => $subjectRanks
+        ];
     }
 }
 
@@ -158,7 +206,7 @@ if (!function_exists('generate_report_card_image')) {
         $y=505; imagefilledrectangle($im,80,$y,$w-80,$y+64,$primary); gd_text($im,'درس',$w-135,$y+42,20,$white,true); gd_text($im,'نمره',690,$y+42,20,$white,true,'center'); gd_text($im,'میانگین کلاس',520,$y+42,18,$white,true,'center'); gd_text($im,'رتبه کلاس',365,$y+42,18,$white,true,'center'); gd_text($im,'رتبه پایه',240,$y+42,18,$white,true,'center'); gd_text($im,'وضعیت',125,$y+42,18,$white,true,'center'); $y+=64;
         foreach($grades as $i=>$g){$bg=$i%2?$soft:$white; imagefilledrectangle($im,80,$y,$w-80,$y+74,$bg); imageline($im,80,$y+74,$w-80,$y+74,$line); $score=(float)($g['score']??0); $avg=$data['subject_avgs'][$g['subject_name']]??null; $rank=$data['subject_ranks'][$g['subject_name']]??['class'=>0,'grade'=>0]; $scoreColor = ($score == 21.0) ? $muted : ($score < 10 ? $red : ($score < 15 ? $gold : $green)); $statusText = ($score == 21.0) ? 'غیبت' : ($score < 10 ? 'نیازمند تلاش' : ($score < 15 ? 'قابل قبول' : 'قبول'));
             gd_text($im,$g['subject_name'],$w-135,$y+48,19,$ink,true); gd_text($im,display_score($score),690,$y+48,20,$scoreColor,true,'center'); gd_text($im,$avg!==null?format_score($avg):'---',520,$y+48,18,$muted,false,'center'); gd_text($im,$rank['class']?:'---',365,$y+48,18,$ink,false,'center'); gd_text($im,$rank['grade']?:'---',240,$y+48,18,$ink,false,'center'); gd_text($im,$statusText,125,$y+48,17,$scoreColor,true,'center'); $y+=74; }
-        $y+=35; imagefilledrectangle($im,80,$y,$w-80,$y+340,imagecolorallocate($im,249,250,251)); imagerectangle($im,80,$y,$w-80,$y+340,$line); gd_text($im,'تحلیل نموداری عملکرد',$w-115,$y+46,24,$primary,true); gd_text($im,'رتبه در کلاس: '.($data['rank']?:'---').' از '.($data['class_count']?:'---'),$w-115,$y+98,21,$ink,true); gd_text($im,'میانگین کلاس: '.($data['class_avg']!==null?format_score($data['class_avg']):'---'),$w-115,$y+145,21,$muted);
+        $y+=35; imagefilledrectangle($im,80,$y,$w-80,$y+340,imagecolorallocate($im,249,250,251)); imagerectangle($im,80,$y,$w-80,$y+340,$line); gd_text($im,'تحلیل نموداری عملکرد',$w-115,$y+46,24,$primary,true); gd_text($im,'رتبه در کلاس: '.($data['rank']?:'---').' از '.($data['class_count']?:'---'),$w-115,$y+98,21,$ink,true); gd_text($im,'رتبه در پایه: '.(($data['grade_rank']??0)?:'---'),$w-115,$y+142,20,$ink,true); gd_text($im,'میانگین کلاس: '.($data['class_avg']!==null?format_score($data['class_avg']):'---'),$w-115,$y+186,21,$muted);
         $barX=650; $barY=$y+88; $barW=300; $barH=28; gd_text($im,'مقایسه معدل',800,$y+52,20,$ink,true,'center'); imagefilledrectangle($im,$barX,$barY,$barX+$barW,$barY+$barH,$line); imagefilledrectangle($im,$barX,$barY,$barX+(int)($barW*min(20,max(0,$r['gpa']))/20),$barY+$barH,$green); gd_text($im,'دانش‌آموز',$barX-15,$barY+22,15,$muted,false,'right'); $barY+=50; imagefilledrectangle($im,$barX,$barY,$barX+$barW,$barY+$barH,$line); imagefilledrectangle($im,$barX,$barY,$barX+(int)($barW*min(20,max(0,(float)$data['class_avg']))/20),$barY+$barH,$gold); gd_text($im,'کلاس',$barX-15,$barY+22,15,$muted,false,'right');
         $chartX=130; $chartY=$y+78; $chartW=410; $chartH=180; gd_text($im,'روند پیشرفت معدل',$chartX+$chartW/2,$y+52,20,$ink,true,'center'); imagerectangle($im,$chartX,$chartY,$chartX+$chartW,$chartY+$chartH,$line); for($i=1;$i<4;$i++) imageline($im,$chartX,$chartY+$i*45,$chartX+$chartW,$chartY+$i*45,$line); $prog=$data['progress']; $prev=null; $n=max(1,count($prog)-1); foreach($prog as $i=>$p){$px=$chartX+(int)(($chartW-30)*$i/$n)+15; $py=$chartY+$chartH-(int)(min(20,max(0,(float)$p['gpa']))/20*($chartH-20))-10; imagefilledellipse($im,$px,$py,10,10,$primary); if($prev) imageline($im,$prev[0],$prev[1],$px,$py,$primary); $prev=[$px,$py]; gd_text($im,$p['report_month']?:$p['term'],$px,$chartY+$chartH+32,13,$muted,false,'center');}
         if(!empty($r['teacher_comments'])){ $y+=375; gd_text($im,'نظر مشاور / پشتیبان: '.$r['teacher_comments'],$w-90,$y,20,$ink,false); }

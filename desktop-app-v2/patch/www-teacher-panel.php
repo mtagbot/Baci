@@ -58,11 +58,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_grades'])) {
         // Ensure report exists
         
         if (!$rep) {
-            DB::execute("INSERT INTO reports (student_id, class_name, academic_year, term, report_month, total_score, gpa) VALUES (?, ?, ?, ?, ?, 0, 0)",
-                [$stId, $cname, $year, $month, $month]);
+            $initLock = is_report_prelocked($year, $month, $cname, $stId) ? 1 : 0;
+            DB::execute("INSERT INTO reports (student_id, class_name, academic_year, term, report_month, total_score, gpa, is_locked) VALUES (?, ?, ?, ?, ?, 0, 0, ?)",
+                [$stId, $cname, $year, $month, $month, $initLock]);
             $repId = DB::lastInsertId();
         } else {
             $repId = $rep['id'];
+            if (is_report_prelocked($year, $month, $cname, $stId)) {
+                DB::execute("UPDATE reports SET is_locked = 1 WHERE id = ?", [$repId]);
+            }
         }
 
         // Update or insert report_grades

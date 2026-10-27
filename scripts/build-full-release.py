@@ -22,9 +22,9 @@ SITE_CORRECTIVE_PREFIX = 'site-update-v4.152.0/'
 # through the whole corrective chain up to 4.177.1/2.100.0, so a fresh install
 # could not tell what it actually contained. config/version.php now carries the
 # code version for existing installs too; release.php keeps describing the bundle.
-RELEASE_NAME = 'Release_V1.1'
-SITE_VERSION = '4.178.0'
-DESKTOP_VERSION = '2.101.0'
+RELEASE_NAME = 'Release_V1.3'
+SITE_VERSION = '4.207.0'
+DESKTOP_VERSION = '2.131.0'
 # Correctives published after the V1.0 rebuild, in installation order. From
 # v4.170.0 on, packages are version-numbered instead of feature-slugged, and
 # V4.170.0 / v2.92.0 are cumulative for v4.161..v4.169.
@@ -39,6 +39,36 @@ VERSIONED_CORRECTIVES = [
     ('MODIFIED-FILES-V4.177.0.zip', 'SchoolDesk-FIX-v2.99.0.zip'),
     ('MODIFIED-FILES-V4.177.1.zip', 'SchoolDesk-FIX-v2.100.0.zip'),
     ('MODIFIED-FILES-V4.178.0.zip', 'SchoolDesk-FIX-v2.101.0.zip'),
+    ('MODIFIED-FILES-V4.179.0.zip', 'SchoolDesk-FIX-v2.102.0.zip'),
+    (None,                          'SchoolDesk-FIX-v2.103.0.zip'),
+    ('MODIFIED-FILES-V4.180.0.zip', 'SchoolDesk-FIX-v2.104.0.zip'),
+    ('MODIFIED-FILES-V4.181.0.zip', 'SchoolDesk-FIX-v2.105.0.zip'),
+    ('MODIFIED-FILES-V4.182.0.zip', 'SchoolDesk-FIX-v2.106.0.zip'),
+    ('MODIFIED-FILES-V4.183.0.zip', 'SchoolDesk-FIX-v2.107.0.zip'),
+    ('MODIFIED-FILES-V4.184.0.zip', 'SchoolDesk-FIX-v2.108.0.zip'),
+    ('MODIFIED-FILES-V4.185.0.zip', 'SchoolDesk-FIX-v2.109.0.zip'),
+    ('MODIFIED-FILES-V4.186.0.zip', 'SchoolDesk-FIX-v2.110.0.zip'),
+    ('MODIFIED-FILES-V4.187.0.zip', 'SchoolDesk-FIX-v2.111.0.zip'),
+    ('MODIFIED-FILES-V4.188.0.zip', 'SchoolDesk-FIX-v2.112.0.zip'),
+    ('MODIFIED-FILES-V4.189.0.zip', 'SchoolDesk-FIX-v2.113.0.zip'),
+    ('MODIFIED-FILES-V4.190.0.zip', 'SchoolDesk-FIX-v2.114.0.zip'),
+    ('MODIFIED-FILES-V4.191.0.zip', 'SchoolDesk-FIX-v2.115.0.zip'),
+    ('MODIFIED-FILES-V4.192.0.zip', 'SchoolDesk-FIX-v2.116.0.zip'),
+    ('MODIFIED-FILES-V4.193.0.zip', 'SchoolDesk-FIX-v2.117.0.zip'),
+    ('MODIFIED-FILES-V4.194.0.zip', 'SchoolDesk-FIX-v2.118.0.zip'),
+    ('MODIFIED-FILES-V4.195.0.zip', 'SchoolDesk-FIX-v2.119.0.zip'),
+    ('MODIFIED-FILES-V4.196.0.zip', 'SchoolDesk-FIX-v2.120.0.zip'),
+    ('MODIFIED-FILES-V4.197.0.zip', 'SchoolDesk-FIX-v2.121.0.zip'),
+    ('MODIFIED-FILES-V4.198.0.zip', 'SchoolDesk-FIX-v2.122.0.zip'),
+    ('MODIFIED-FILES-V4.199.0.zip', 'SchoolDesk-FIX-v2.123.0.zip'),
+    ('MODIFIED-FILES-V4.200.0.zip', 'SchoolDesk-FIX-v2.124.0.zip'),
+    ('MODIFIED-FILES-V4.201.0.zip', 'SchoolDesk-FIX-v2.125.0.zip'),
+    ('MODIFIED-FILES-V4.202.0.zip', 'SchoolDesk-FIX-v2.126.0.zip'),
+    ('MODIFIED-FILES-V4.203.0.zip', 'SchoolDesk-FIX-v2.127.0.zip'),
+    ('MODIFIED-FILES-V4.204.0.zip', 'SchoolDesk-FIX-v2.128.0.zip'),
+    ('MODIFIED-FILES-V4.205.0.zip', 'SchoolDesk-FIX-v2.129.0.zip'),
+    ('MODIFIED-FILES-V4.206.0.zip', 'SchoolDesk-FIX-v2.130.0.zip'),
+    ('MODIFIED-FILES-V4.207.0.zip', 'SchoolDesk-FIX-v2.131.0.zip'),
 ]
 def sha(b): return hashlib.sha256(b).hexdigest()
 def run(*args): return subprocess.check_output(args, text=True)
@@ -68,6 +98,11 @@ def clean_sql(path):
 
 def vendors():
     root=CACHE/'vendor/tcpdf'
+    if not root.is_dir() and (ROOT/'Release_V1.2-Desktop.zip').is_file():
+        with zipfile.ZipFile(ROOT/'Release_V1.2-Desktop.zip') as z:
+            for n in z.namelist():
+                if n.startswith('SchoolDeskPro/www/vendor/tcpdf/') and not n.endswith('/'):
+                    put_bytes(z.read(n), root/n[len('SchoolDeskPro/www/vendor/tcpdf/'):])
     def fetch(x):
         p=root/x['path']
         if p.is_file():
@@ -89,13 +124,20 @@ def vendors():
     return root,chart
 
 def launcher():
+    exe=CACHE/'SchoolDeskPro.exe'
     zig=os.environ.get('ZIG') or shutil.which('zig') or str(CACHE/'compiler/ziglang/zig')
-    if not Path(zig).is_file():raise SystemExit('Install Zig 0.14.1 or set ZIG. See release-v1.0/BUILD.md')
-    if run(zig,'version').strip()!='0.14.1':raise SystemExit('Reproducible build requires Zig 0.14.1')
-    exe=CACHE/'SchoolDeskPro.exe';res=CACHE/'app.res'
-    subprocess.run([zig,'rc','/fo',str(res),'desktop-app-v2/launcher/res/app.rc'],check=True)
-    subprocess.run([zig,'cc','-target','x86_64-windows-gnu','-O2','-s','desktop-app-v2/launcher/launcher.c',str(res),'-lws2_32','-ladvapi32','-lshell32','-luser32','-lgdi32','-Wl,--subsystem,windows','-o',str(exe)],check=True)
-    return exe
+    if Path(zig).is_file():
+        if run(zig,'version').strip()!='0.14.1':raise SystemExit('Reproducible build requires Zig 0.14.1')
+        res=CACHE/'app.res'
+        subprocess.run([zig,'rc','/fo',str(res),'desktop-app-v2/launcher/res/app.rc'],check=True)
+        subprocess.run([zig,'cc','-target','x86_64-windows-gnu','-O2','-s','desktop-app-v2/launcher/launcher.c',str(res),'-lws2_32','-ladvapi32','-lshell32','-luser32','-lgdi32','-Wl,--subsystem,windows','-o',str(exe)],check=True)
+        return exe
+    if not exe.is_file() and (ROOT/'Release_V1.2-Desktop.zip').is_file():
+        with zipfile.ZipFile(ROOT/'Release_V1.2-Desktop.zip') as z:
+            put_bytes(z.read('SchoolDeskPro/SchoolDeskPro.exe'), exe)
+    if exe.is_file():
+        return exe
+    raise SystemExit('Install Zig 0.14.1 or set ZIG. See release-v1.0/BUILD.md')
 
 def corrective_payload(platform):
     """Return (packages, {web-relative path: bytes}, {package-relative path: bytes}, {web-relative path: package}).
@@ -115,7 +157,7 @@ def corrective_payload(platform):
             names.append('MODIFIED-FILES-V4.160.0.zip' if platform=='site' else 'SchoolDesk-FIX-v2.90.0.zip')
         else:
             names.append(f'SITE-FIX-v4.152.0-{slug}.zip' if platform=='site' else f'SchoolDeskPro-FIX-v2.83.0-{slug}.zip')
-    names += [site if platform=='site' else desk for site, desk in VERSIONED_CORRECTIVES]
+    names += [pkg for pkg in (site if platform=='site' else desk for site, desk in VERSIONED_CORRECTIVES) if pkg]
     for name in names:
         path=ROOT/name
         if not path.is_file():raise SystemExit('Missing corrective package: '+name)
@@ -124,6 +166,7 @@ def corrective_payload(platform):
             if not entries:raise SystemExit('Empty corrective package: '+name)
             for n in entries:
                 rel=n
+                if rel.startswith('README') and rel.endswith('.txt'):continue
                 if platform=='site':
                     if not rel.startswith(SITE_CORRECTIVE_PREFIX):raise ValueError(f'{name}: unexpected entry {n}')
                     rel=rel[len(SITE_CORRECTIVE_PREFIX):]
@@ -227,7 +270,8 @@ def assemble():
         # Chart.js's upstream UMD build is already minified; preserve the version/license header.
         chartfile=chart/'dist/chart.umd.min.js'
         if not chartfile.exists():chartfile=chart/'dist/chart.umd.js'
-        copy(chartfile,web/'assets/vendor/chart.umd.min.js');copy(chart/'LICENSE.md',web/'assets/vendor/Chart.js-LICENSE.md')
+        if not (web/'assets/vendor/chart.umd.min.js').is_file():copy(chartfile,web/'assets/vendor/chart.umd.min.js')
+        copy(chart/'LICENSE.md',web/'assets/vendor/Chart.js-LICENSE.md')
         functions=web/'includes/functions.php'
         text=functions.read_text();text=text.replace('<?php',"<?php\nrequire_once __DIR__.'/install_guard.php';",1);functions.write_text(text)
         footer=web/'includes/footer.php'
@@ -246,8 +290,10 @@ def assemble():
         text=sync_source
         text=re.sub(r"define\('DESK_SYNC_KEY',\s*'[^']+'\);", "require_once __DIR__.'/config/config.php';\ndefine('DESK_SYNC_KEY', require __DIR__.'/config/desk-sync-key.php');",text,count=1)
         text=text.replace('edit desk-sync-api.php','check config/desk-sync-key.php');(web/'desk-sync-api.php').write_text(text)
-        path=web/'class-exam-sync-api.php';text=path.read_text();a=text.index('function ceg_existing_sync_key()');b=text.index("require_once __DIR__ . '/config/config.php';",a)
-        text=text[:a]+"function ceg_existing_sync_key() {\n    $path=__DIR__.'/config/desk-sync-key.php';\n    $key=is_file($path) ? require $path : '';\n    return is_string($key) && preg_match('/^[a-f0-9]{64}$/D',$key) ? $key : '';\n}\n\n"+text[b:];path.write_text(text)
+        path=web/'class-exam-sync-api.php';text=path.read_text()
+        if "config/desk-sync-key.php" not in text:
+            a=text.index('function ceg_existing_sync_key()');b=text.index("require_once __DIR__ . '/config/config.php';",a)
+            text=text[:a]+"function ceg_existing_sync_key() {\n    $path=__DIR__.'/config/desk-sync-key.php';\n    $key=is_file($path) ? require $path : '';\n    return is_string($key) && preg_match('/^[a-f0-9]{64}$/D',$key) ? $key : '';\n}\n\n"+text[b:];path.write_text(text)
         copy(SOURCE/'README-FA.md',web/'README-FA.md')
         copy(SOURCE/'THIRD-PARTY.md',web/'THIRD-PARTY.md')
     # Never ship a previous school's data, browser profile, session, pairing credentials or logs.
