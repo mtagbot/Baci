@@ -9,7 +9,7 @@ if (!ob_get_level()) {
     ob_start();
 }
 
-$__isSdpSyncRelay = !defined('SDP_SYNC_ACTIVE') && (!empty($_REQUEST['sdp_sync']) || !empty($_REQUEST['sdp_z']) || !empty($_REQUEST['sdp_cid']) || !empty($_SERVER['HTTP_X_SDP_Z']));
+$__isSdpSyncRelay = !defined('SDP_SYNC_ACTIVE') && (!empty($_REQUEST['sdp_sync']) || !empty($_REQUEST['sdp_z']) || !empty($_REQUEST['sdp_cid']) || !empty($_REQUEST['sdp_bridge']) || !empty($_SERVER['HTTP_X_SDP_Z']));
 if (!$__isSdpSyncRelay && session_status() === PHP_SESSION_NONE) {
     // Keep authenticated users signed in until they explicitly click logout.
     // The cookie is persistent and renewed on each request; logout.php/index?action=logout still destroys it.

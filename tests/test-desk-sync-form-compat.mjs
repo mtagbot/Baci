@@ -126,19 +126,40 @@ echo json_encode(['before' => $before, 'after' => $after]);
 assert.deepEqual(healOut.before, [0, 0]);
 assert.deepEqual(healOut.after, [0o644, 0o644], 'includes/functions.php must auto-heal 0000 permissions back to 0644');
 
-// 6) Built SchoolDesk-FIX-v2.129.0.zip passes site & desktop update validators
+// 6) Built SchoolDesk-FIX-v2.130.0.zip passes site & desktop update validators and Browser Bridge works
 php.writeFile('/www/includes/desk_update.php', readFileSync('desktop-app-v2/patch/includes-desk_update.php'));
-php.writeFile('/tmp/fix2129.zip', readFileSync('SchoolDesk-FIX-v2.129.0.zip'));
+php.writeFile('/www/includes/desk_sync.php', readFileSync('desktop-app-v2/patch/includes-desk-sync.php'));
+php.writeFile('/tmp/fix2130.zip', readFileSync('SchoolDesk-FIX-v2.130.0.zip'));
 const pkgCheck = JSON.parse((await run(`<?php
+require_once '/www/includes/functions.php';
 require_once '/www/includes/desk_updates_store.php';
 require_once '/www/includes/desk_update.php';
-$rep = desk_updates_report('/tmp/fix2129.zip');
-$plan = desk_update_plan('/tmp/fix2129.zip');
-echo json_encode(['report_ok' => $rep['ok'] ?? false, 'files' => $rep['files'] ?? 0, 'plan_count' => count($plan['web'] ?? [])]);
+require_once '/www/includes/desk_sync.php';
+DeskSync::setCfg('desk_sync_url', 'https://school.example.ir/desk-sync-api.php');
+DeskSync::setCfg('desk_sync_key', '${SDP_KEY}');
+$rep = desk_updates_report('/tmp/fix2130.zip');
+$plan = desk_update_plan('/tmp/fix2130.zip');
+$bInit = DeskSync::bridgeInit();
+$bPull = DeskSync::bridgeNextPull();
+$bPush = DeskSync::bridgeNextPush();
+echo json_encode([
+    'report_ok' => $rep['ok'] ?? false,
+    'files' => $rep['files'] ?? 0,
+    'plan_count' => count($plan['web'] ?? []),
+    'bridge_init_ok' => $bInit['ok'] ?? false,
+    'bridge_pull_ok' => $bPull['ok'] ?? false,
+    'bridge_push_ok' => $bPush['ok'] ?? false,
+]);
 `)).out.trim());
-assert.equal(pkgCheck.report_ok, true, 'SchoolDesk-FIX-v2.129.0.zip must be accepted by desk_updates_report()');
-assert.equal(pkgCheck.files, 12, 'SchoolDesk-FIX-v2.129.0.zip must contain 12 web files');
-assert.equal(pkgCheck.plan_count, 12, 'SchoolDesk-FIX-v2.129.0.zip must plan 12 web files in desk_update_plan()');
+assert.equal(pkgCheck.report_ok, true, 'SchoolDesk-FIX-v2.130.0.zip must be accepted by desk_updates_report()');
+assert.equal(pkgCheck.files, 24, 'SchoolDesk-FIX-v2.130.0.zip must contain 24 web files (12 reports + 12 www)');
+assert.equal(pkgCheck.plan_count, 24, 'SchoolDesk-FIX-v2.130.0.zip must plan 24 entries in desk_update_plan()');
+assert.equal(pkgCheck.bridge_init_ok, true, 'DeskSync::bridgeInit() must succeed');
+assert.equal(pkgCheck.bridge_pull_ok, true, 'DeskSync::bridgeNextPull() must succeed');
+assert.equal(pkgCheck.bridge_push_ok, true, 'DeskSync::bridgeNextPush() must succeed');
+
+const bridgeHtml = await req(null, { method: 'GET', file: 'index.php', query: 'sdp_sync=1&sdp_bridge=1' });
+assert.equal(bridgeHtml.res.page.includes('sdp_bridge_ready'), true, 'index.php?sdp_sync=1&sdp_bridge=1 must serve Same-Origin bridge HTML');
 
 console.log('✅ Sync clients & endpoints pass form, sdp_z, GET, chunked-GET, multi-endpoint relay, dual-key, permission self-heal, and package validation checks.');
 process.exit(0);

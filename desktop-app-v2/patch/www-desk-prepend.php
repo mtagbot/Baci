@@ -72,77 +72,82 @@ if (PHP_SAPI === 'cli-server') {
      * Cost per request here: one filemtime check.
      */
     $sdpBase = dirname(__DIR__);
-    if (basename(__DIR__) === 'reports' && @is_dir($sdpBase . DIRECTORY_SEPARATOR . 'www')) {
-        $sdpMerge = function (string $src, string $dst) use (&$sdpMerge): void {
-            if (!@is_dir($dst)) @mkdir($dst, 0777, true);
-            foreach (@scandir($src) ?: [] as $entry) {
-                if ($entry === '.' || $entry === '..') continue;
-                $s = $src . DIRECTORY_SEPARATOR . $entry;
-                $d = $dst . DIRECTORY_SEPARATOR . $entry;
-                if (@is_dir($s)) { $sdpMerge($s, $d); @rmdir($s); }
-                else { @copy($s, $d); @unlink($s); }
-            }
-        };
+    $sdpMerge = function (string $src, string $dst) use (&$sdpMerge): void {
+        if (!@is_dir($dst)) @mkdir($dst, 0777, true);
+        foreach (@scandir($src) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..') continue;
+            $s = $src . DIRECTORY_SEPARATOR . $entry;
+            $d = $dst . DIRECTORY_SEPARATOR . $entry;
+            if (@is_dir($s)) { $sdpMerge($s, $d); @rmdir($s); }
+            else { @copy($s, $d); @unlink($s); }
+        }
+    };
+    if (basename(__DIR__) === 'reports' && @is_dir($sdpBase . DIRECTORY_SEPARATOR . 'www')
+        && !is_file($sdpBase . DIRECTORY_SEPARATOR . 'www' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'installed.lock')) {
         $sdpMerge($sdpBase . DIRECTORY_SEPARATOR . 'www', __DIR__);
         @rmdir($sdpBase . DIRECTORY_SEPARATOR . 'www');
+    } elseif (basename(__DIR__) === 'www' && @is_dir($sdpBase . DIRECTORY_SEPARATOR . 'reports')
+        && !is_file($sdpBase . DIRECTORY_SEPARATOR . 'reports' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'installed.lock')) {
+        $sdpMerge($sdpBase . DIRECTORY_SEPARATOR . 'reports', __DIR__);
+        @rmdir($sdpBase . DIRECTORY_SEPARATOR . 'reports');
     }
     $sdpData = $sdpBase . DIRECTORY_SEPARATOR . 'data';
     $sdpAlive = $sdpData . DIRECTORY_SEPARATOR . 'app-alive.txt';
     $sdpHb = $sdpData . DIRECTORY_SEPARATOR . 'sync-heartbeat.json';
     $sdpEngStampFile = $sdpData . DIRECTORY_SEPARATOR . 'sync-engine-mtime.txt';
-    $sdpRetireFile   = $sdpData . DIRECTORY_SEPARATOR . 'sync-daemon-retire.txt';
-    $sdpCurEngMtime  = (string)(int)@filemtime(__DIR__ . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'desk_sync.php');
-    $sdpPrevEngMtime = is_file($sdpEngStampFile) ? trim((string)@file_get_contents($sdpEngStampFile)) : '';
-    if ($sdpCurEngMtime !== '0' && $sdpCurEngMtime !== $sdpPrevEngMtime) {
-        @file_put_contents($sdpEngStampFile, $sdpCurEngMtime);
-        if ($sdpPrevEngMtime !== '') {
-            @file_put_contents($sdpRetireFile, (string)(time() + 3));
-            @unlink($sdpAlive);
-            @touch($sdpData . DIRECTORY_SEPARATOR . 'sync-kick.txt');
+    $sdpCurEngMtime  = ((int)@filemtime(__DIR__ . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'desk_sync.php'))
+                     . ':' . ((int)@filemtime(__DIR__ . DIRECTORY_SEPARATOR . 'desk-sync-daemon.php'));
+    @file_put_contents($sdpEngStampFile, $sdpCurEngMtime);
+
+    $sdpLockFile = $sdpData . DIRECTORY_SEPARATOR . 'sync-daemon.lock';
+    $sdpLockFh = @fopen($sdpLockFile, 'c');
+    $sdpDaemonRunning = false;
+    if ($sdpLockFh) {
+        if (@flock($sdpLockFh, LOCK_EX | LOCK_NB)) {
+            @flock($sdpLockFh, LOCK_UN);
+        } else {
+            $sdpDaemonRunning = true;
         }
+        @fclose($sdpLockFh);
     }
-    $sdpRetireUntil = is_file($sdpRetireFile) ? (int)@file_get_contents($sdpRetireFile) : 0;
-    if ($sdpRetireUntil > 0 && time() <= $sdpRetireUntil) {
+    $sdpHbData = is_file($sdpHb) ? json_decode((string)@file_get_contents($sdpHb), true) : null;
+    $sdpRunningMtime = is_array($sdpHbData) ? (string)($sdpHbData['engine_mtime'] ?? '') : '';
+
+    if ($sdpDaemonRunning && $sdpRunningMtime !== $sdpCurEngMtime) {
+        // Old daemon from a prior version is still running in memory: keep app-alive.txt
+        // unlinked and kick its sleep loop so it exits as soon as its current tick finishes.
         @unlink($sdpAlive);
         @touch($sdpData . DIRECTORY_SEPARATOR . 'sync-kick.txt');
     } else {
-        if ($sdpRetireUntil > 0) {
-            @unlink($sdpRetireFile);
-            @unlink($sdpHb);
-            @unlink($sdpData . DIRECTORY_SEPARATOR . 'sync-daemon.start');
-        }
         @touch($sdpAlive);
-    }
-    if (($sdpRetireUntil === 0 || time() > $sdpRetireUntil) && (!is_file($sdpHb) || time() - (int)@filemtime($sdpHb) > 30)) {
-        /* daemon not running (first start, or it exited/crashed) → spawn it.
-           A stale-start guard avoids double-spawn from parallel requests. */
-        $sdpSpawn = $sdpData . DIRECTORY_SEPARATOR . 'sync-daemon.start';
-        if (!is_file($sdpSpawn) || time() - (int)@filemtime($sdpSpawn) > 30) {
-            @touch($sdpSpawn);
-            $sdpPhp    = PHP_BINARY;                    // the bundled php.exe
-            $sdpPhpDir = dirname($sdpPhp);
-            $sdpScript = __DIR__ . DIRECTORY_SEPARATOR . 'desk-sync-daemon.php';
-            // pass ini/ext explicitly — the daemon must load the same
-            // extensions (pdo_sqlite, curl, mbstring...) as the launcher does
-            $sdpArgs = '';
-            $sdpIni  = php_ini_loaded_file();           // exactly what THIS process loaded
-            if (!$sdpIni && is_file($sdpPhpDir . DIRECTORY_SEPARATOR . 'php.ini'))
-                $sdpIni = $sdpPhpDir . DIRECTORY_SEPARATOR . 'php.ini';
-            if ($sdpIni) $sdpArgs .= ' -c ' . escapeshellarg($sdpIni);
-            $sdpExt = (string) ini_get('extension_dir'); // inherit the live extension dir
-            if ($sdpExt === '' && is_dir($sdpPhpDir . DIRECTORY_SEPARATOR . 'ext'))
-                $sdpExt = $sdpPhpDir . DIRECTORY_SEPARATOR . 'ext';
-            if ($sdpExt !== '') $sdpArgs .= ' -d extension_dir=' . escapeshellarg($sdpExt);
-            $sdpArgs .= ' -d error_log=' . escapeshellarg($sdpData . DIRECTORY_SEPARATOR . 'php-error.log');
-            if (is_file($sdpPhpDir . DIRECTORY_SEPARATOR . 'cacert.pem')) {
-                $sdpArgs .= ' -d curl.cainfo=' . escapeshellarg($sdpPhpDir . DIRECTORY_SEPARATOR . 'cacert.pem')
-                          . ' -d openssl.cafile=' . escapeshellarg($sdpPhpDir . DIRECTORY_SEPARATOR . 'cacert.pem');
-            }
-            if (DIRECTORY_SEPARATOR === '\\') {
-                // Windows: start detached + hidden (popen returns immediately)
-                @pclose(@popen('start /B "" ' . escapeshellarg($sdpPhp) . $sdpArgs . ' ' . escapeshellarg($sdpScript), 'r'));
-            } else {
-                @exec(escapeshellarg($sdpPhp) . $sdpArgs . ' ' . escapeshellarg($sdpScript) . ' > /dev/null 2>&1 &');
+        if (!$sdpDaemonRunning || !is_file($sdpHb) || time() - (int)@filemtime($sdpHb) > 30) {
+            /* daemon not running (first start, or old daemon just exited) → spawn it.
+               A stale-start guard avoids double-spawn from parallel requests. */
+            $sdpSpawn = $sdpData . DIRECTORY_SEPARATOR . 'sync-daemon.start';
+            if (!$sdpDaemonRunning || !is_file($sdpSpawn) || time() - (int)@filemtime($sdpSpawn) > 10) {
+                @touch($sdpSpawn);
+                $sdpPhp    = PHP_BINARY;                    // the bundled php.exe
+                $sdpPhpDir = dirname($sdpPhp);
+                $sdpScript = __DIR__ . DIRECTORY_SEPARATOR . 'desk-sync-daemon.php';
+                $sdpArgs = '';
+                $sdpIni  = php_ini_loaded_file();
+                if (!$sdpIni && is_file($sdpPhpDir . DIRECTORY_SEPARATOR . 'php.ini'))
+                    $sdpIni = $sdpPhpDir . DIRECTORY_SEPARATOR . 'php.ini';
+                if ($sdpIni) $sdpArgs .= ' -c ' . escapeshellarg($sdpIni);
+                $sdpExt = (string) ini_get('extension_dir');
+                if ($sdpExt === '' && is_dir($sdpPhpDir . DIRECTORY_SEPARATOR . 'ext'))
+                    $sdpExt = $sdpPhpDir . DIRECTORY_SEPARATOR . 'ext';
+                if ($sdpExt !== '') $sdpArgs .= ' -d extension_dir=' . escapeshellarg($sdpExt);
+                $sdpArgs .= ' -d error_log=' . escapeshellarg($sdpData . DIRECTORY_SEPARATOR . 'php-error.log');
+                if (is_file($sdpPhpDir . DIRECTORY_SEPARATOR . 'cacert.pem')) {
+                    $sdpArgs .= ' -d curl.cainfo=' . escapeshellarg($sdpPhpDir . DIRECTORY_SEPARATOR . 'cacert.pem')
+                              . ' -d openssl.cafile=' . escapeshellarg($sdpPhpDir . DIRECTORY_SEPARATOR . 'cacert.pem');
+                }
+                if (DIRECTORY_SEPARATOR === '\\') {
+                    @pclose(@popen('start /B "" ' . escapeshellarg($sdpPhp) . $sdpArgs . ' ' . escapeshellarg($sdpScript), 'r'));
+                } else {
+                    @exec(escapeshellarg($sdpPhp) . $sdpArgs . ' ' . escapeshellarg($sdpScript) . ' > /dev/null 2>&1 &');
+                }
             }
         }
     }

@@ -71,6 +71,74 @@ require_once SDP_SYNC_ROOT . '/config/config.php';
 require_once SDP_SYNC_ROOT . '/includes/db.php';
 if(!defined('DESK_SYNC_KEY'))define('DESK_SYNC_KEY',ceg_existing_sync_key());
 
+$__sdpOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (!headers_sent()) {
+    header('Access-Control-Allow-Origin: ' . ($__sdpOrigin !== '' ? $__sdpOrigin : '*'));
+    if ($__sdpOrigin !== '') header('Access-Control-Allow-Credentials: true');
+    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Accept, X-Requested-With, X-SDP-Z');
+}
+if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+if (!defined('SDP_SYNC_LIB_ONLY') && isset($_GET['sdp_bridge']) && (string)$_GET['sdp_bridge'] === '1') {
+    if (!headers_sent()) {
+        header('Content-Type: text/html; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+    }
+    echo '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>پل ارتباطی همگام‌سازی</title></head>'
+       . '<body style="font-family:Tahoma,sans-serif;background:#f0fdf4;color:#166534;padding:16px;text-align:center;font-size:13px">'
+       . '<div id="st">پل همگام‌سازی مرورگر آماده است...</div><script>'
+       . '(function(){'
+       . 'var tgt=window.opener||window.parent;'
+       . 'function post(m){try{if(tgt&&tgt!==window)tgt.postMessage(m,"*");}catch(e){}}'
+       . 'async function callSameOrigin(msg){'
+       . '  var eps=[location.pathname,"index.php","desk-connection-status.php","csrf-refresh.php","class-exam-sync-api.php","desk-sync-api.php"];'
+       . '  var seen={};'
+       . '  for(var i=0;i<eps.length;i++){'
+       . '    var ep=eps[i]; if(!ep||seen[ep])continue; seen[ep]=1;'
+       . '    try{'
+       . '      var r=await fetch(ep,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},body:"sdp_sync=1&sdp_z="+encodeURIComponent(msg.sdp_z||"")});'
+       . '      if(r.status===200){var j=await r.json();if(j&&typeof j.ok==="boolean"&&!(j.ok===false&&j.error==="bad request"))return {ok:true,data:j,ep:ep,mode:"post_z"};}'
+       . '    }catch(e){}'
+       . '    if(msg.payload){try{'
+       . '      var r2=await fetch(ep,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},body:"payload="+encodeURIComponent(msg.payload)});'
+       . '      if(r2.status===200){var j2=await r2.json();if(j2&&typeof j2.ok==="boolean")return {ok:true,data:j2,ep:ep,mode:"form"};}'
+       . '    }catch(e){}}'
+       . '    if(msg.sdp_z){try{'
+       . '      var z=String(msg.sdp_z);'
+       . '      if(z.length<=1800){'
+       . '        var sep=ep.indexOf("?")===-1?"?":"&";'
+       . '        var r3=await fetch(ep+sep+"sdp_sync=1&sdp_z="+encodeURIComponent(z)+"&_t="+Date.now(),{method:"GET",credentials:"same-origin"});'
+       . '        if(r3.status===200){var j3=await r3.json();if(j3&&typeof j3.ok==="boolean")return {ok:true,data:j3,ep:ep,mode:"get_z"};}'
+       . '      }else{'
+       . '        var parts=[];for(var k=0;k<z.length;k+=1800)parts.push(z.slice(k,k+1800));'
+       . '        var cid=Math.random().toString(16).slice(2,10)+Math.random().toString(16).slice(2,10);'
+       . '        var sep2=ep.indexOf("?")===-1?"?":"&";'
+       . '        var okAll=true,lastJ=null;'
+       . '        for(var idx=0;idx<parts.length;idx++){'
+       . '          var rc=await fetch(ep+sep2+"sdp_sync=1&sdp_cid="+cid+"&sdp_ci="+idx+"&sdp_cn="+parts.length+"&sdp_cp="+encodeURIComponent(parts[idx])+"&_t="+Date.now(),{method:"GET",credentials:"same-origin"});'
+       . '          if(rc.status!==200){okAll=false;break;}'
+       . '          lastJ=await rc.json();if(!lastJ||!lastJ.ok){okAll=false;break;}'
+       . '        }'
+       . '        if(okAll&&lastJ&&typeof lastJ.ok==="boolean")return {ok:true,data:lastJ,ep:ep,mode:"get_z_chunked"};'
+       . '      }'
+       . '    }catch(e){}}'
+       . '  }'
+       . '  return {ok:false,error:"same-origin bridge failed across all endpoints"};'
+       . '}'
+       . 'window.addEventListener("message",async function(ev){'
+       . '  var d=ev.data; if(!d||!d.sdp_bridge_req)return;'
+       . '  var res=await callSameOrigin(d);'
+       . '  post({sdp_bridge_reply:true,id:d.id,res:res});'
+       . '});'
+       . 'post({sdp_bridge_ready:true,href:location.href});'
+       . 'setInterval(function(){post({sdp_bridge_ready:true,href:location.href});},1500);'
+       . '})();</script></body></html>';
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate');
 

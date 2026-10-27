@@ -44,8 +44,11 @@ function desk_write_heartbeat($file,$value) {
     }
 }
 while (true) {
+    clearstatcache(true, $engineFile);
+    clearstatcache(true, __FILE__);
+    if ((((int)@filemtime($engineFile)) . ':' . ((int)@filemtime(__FILE__))) !== $bootMtime) break;
     // Publish actual worker activity before potentially slow remote I/O.
-    desk_write_heartbeat($hbFile,['phase'=>'syncing','ts'=>time(),'daemon'=>1]);
+    desk_write_heartbeat($hbFile,['phase'=>'syncing','ts'=>time(),'daemon'=>1,'engine_mtime'=>$bootMtime]);
     $res = ['ok' => false];
     try {
         $res = DeskSync::tick();
@@ -82,6 +85,7 @@ while (true) {
     $res['ts']     = time();
     $res['daemon'] = 1;
     $res['phase']='settled';
+    $res['engine_mtime'] = $bootMtime;
     desk_write_heartbeat($hbFile,$res);
 
     // app closed? (no page request refreshed app-alive for 15 minutes) → stop
