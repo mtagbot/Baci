@@ -10,6 +10,7 @@ SUMS = 'V4.206.0-SHA256SUMS.txt'
 VERSION = ('config/version.php', 'update-v4.152.0/config/version.php')
 SITE_FILES = [
     (*VERSION, b"'4.206.0'"),
+    ('desk-sync-api.php', 'update-v4.152.0/class-exam-sync-api.php', b'sdp_bridge'),
     ('class-exam-sync-api.php', 'update-v4.152.0/class-exam-sync-api.php', b'sdp_bridge'),
     ('includes/desk_sync_endpoint.php', 'update-v4.152.0/includes/desk_sync_endpoint.php', b'sdp_bridge'),
     ('includes/desk_sync.php', 'update-v4.152.0/includes/desk_sync.php', b'bridgeInit'),

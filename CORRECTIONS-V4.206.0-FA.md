@@ -43,13 +43,14 @@
 
 ## ۳. راهنمای نصب سریع و اطمینان از جایگزینی صحیح
 
-### گام اول: بروزرسانی سایت (`MODIFIED-FILES-V4.206.0.zip`)
-محتویات پوشهٔ `site-update-v4.152.0/` داخل فایل `MODIFIED-FILES-V4.206.0.zip` (شامل ۹ فایل زیر) را در ریشهٔ سایت (`public_html`) آپلود و جایگزین (`Overwrite`) کنید:
-- `config/version.php`
+### گام اول: بروزرسانی سایت (`MODIFIED-FILES-V4.206.0.zip`) — رفع هشدار جدول‌های `class_exam_groups` و `rubika_bot_users`
+محتویات پوشهٔ `site-update-v4.152.0/` داخل فایل `MODIFIED-FILES-V4.206.0.zip` (شامل ۱۰ فایل زیر، از جمله **`desk-sync-api.php`** و **`class-exam-sync-api.php`**) را در ریشهٔ سایت (`public_html`) آپلود و جایگزین (`Overwrite`) کنید:
+- `desk-sync-api.php` *(دارای هر ۴۰ جدول از جمله `class_exam_groups`، `class_exam_group_members` و `rubika_bot_users` — کلید همگام‌سازی شما از `config/desk-sync-key.php` خوانده می‌شود و تغییر نمی‌کند)*
 - `class-exam-sync-api.php`
+- `config/version.php`
 - `includes/desk_sync_endpoint.php`
 - `includes/desk_sync.php`
-- `includes/functions.php`
+- `includes/functions.php` *(در صورت قدیمی بودن `desk-sync-api.php` روی هاست، به‌طور خودکار آن را با حفظ کلید به نسخهٔ ۴۰ جدولی ارتقا می‌دهد)*
 - `desk-connection-status.php`
 - `desk-update-api.php`
 - `csrf-refresh.php`
@@ -76,5 +77,5 @@
 
 | نام فایل | حجم (بایت) | هش SHA-256 |
 |---|---:|---|
-| `MODIFIED-FILES-V4.206.0.zip` | `61,871` | `6186a2f2b71792245d31abfe26932c17aff16f0d23eaf508375228c7e0d661c5` |
-| `SchoolDesk-FIX-v2.130.0.zip` | `171,296` | `d5bc32f2fdb76cdb15cb108eb439e40c7414e2ce61db6e4e19b95cf9c3164990` |
+| `MODIFIED-FILES-V4.206.0.zip` | `72,574` | `4a4522d65db2d4899905d5bc4a6bd31b60e734568d158388bf7a0dfe9c11a250` |
+| `SchoolDesk-FIX-v2.130.0.zip` | `172,838` | `31f7e3c4dc6329e3f6be11b6d4b7787e73dc09cc96955d6168ac73d7809021cc` |

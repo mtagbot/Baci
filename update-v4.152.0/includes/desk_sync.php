@@ -317,7 +317,9 @@ class DeskSync {
 
     private static function tryFallbackTransports(string $baseUrl, array $payload, string $sdpZ, int $connectT, int $totalT, bool $secureOutbox, array &$forbiddenBodies, bool &$siteUnpatched, array &$epStats = []): ?array {
         $candidates = self::candidateSyncEndpoints($baseUrl);
-        // 1) Try WAF-safe compressed alphanumeric POST (`sdp_sync=1&sdp_z=z1...`) across all candidate endpoints.
+        $legacyBadReq = [];
+        // 1) Try WAF-safe compressed alphanumeric POST (`sdp_sync=1&sdp_z=z1...`) across ALL candidate endpoints first,
+        //    so an updated relay (e.g. desk-connection-status.php / index.php) is preferred over an unpatched desk-sync-api.php.
         foreach ($candidates as $ep) {
             $shortName = basename((string)parse_url($ep, PHP_URL_PATH));
             $res = self::execSyncHttp($ep, 'post_z', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
@@ -327,20 +329,7 @@ class DeskSync {
                 $j = json_decode((string)$res['body'], true);
                 if (is_array($j) && array_key_exists('ok', $j)) {
                     if (empty($j['ok']) && strtolower((string)($j['error'] ?? '')) === 'bad request') {
-                        // Server endpoint is reachable with Chrome headers, but older than v4.205.0 (does not know sdp_z).
-                        $fRes = self::execSyncHttp($ep, 'form', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
-                        if ($fRes['body'] !== false && $fRes['code'] === 200 && self::isSyncJson($fRes['body'])) {
-                            $fj = json_decode((string)$fRes['body'], true);
-                            if (empty($fj['ok']) && strtolower((string)($fj['error'] ?? '')) === 'bad request' && !$secureOutbox) {
-                                $jRes = self::execSyncHttp($ep, 'json', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
-                                if ($jRes['body'] !== false && $jRes['code'] === 200 && self::isSyncJson($jRes['body'])) {
-                                    self::$workingEndpoint = $ep; self::$workingMode = 'json'; self::$workingBaseUrl = $baseUrl;
-                                    return $jRes + ['url' => $ep];
-                                }
-                            }
-                            self::$workingEndpoint = $ep; self::$workingMode = 'form'; self::$workingBaseUrl = $baseUrl;
-                            return $fRes + ['url' => $ep];
-                        }
+                        $legacyBadReq[] = $ep;
                     } else {
                         self::$workingEndpoint = $ep; self::$workingMode = 'post_z'; self::$workingBaseUrl = $baseUrl;
                         return $res + ['url' => $ep];
@@ -387,6 +376,23 @@ class DeskSync {
                         self::$workingEndpoint = $ep; self::$workingMode = 'get_z'; self::$workingBaseUrl = $baseUrl;
                         return $res + ['url' => $ep];
                     }
+                }
+            }
+        }
+        // 3) If no endpoint accepted sdp_z (site patch not uploaded yet), fall back to form / raw JSON on reachable legacy endpoints.
+        foreach ($legacyBadReq as $ep) {
+            $fRes = self::execSyncHttp($ep, 'form', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+            if ($fRes['body'] !== false && $fRes['code'] === 200 && self::isSyncJson($fRes['body'])) {
+                $fj = json_decode((string)$fRes['body'], true);
+                if (empty($fj['ok']) && strtolower((string)($fj['error'] ?? '')) === 'bad request' && !$secureOutbox) {
+                    $jRes = self::execSyncHttp($ep, 'json', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+                    if ($jRes['body'] !== false && $jRes['code'] === 200 && self::isSyncJson($jRes['body'])) {
+                        self::$workingEndpoint = $ep; self::$workingMode = 'json'; self::$workingBaseUrl = $baseUrl;
+                        return $jRes + ['url' => $ep];
+                    }
+                } else {
+                    self::$workingEndpoint = $ep; self::$workingMode = 'form'; self::$workingBaseUrl = $baseUrl;
+                    return $fRes + ['url' => $ep];
                 }
             }
         }
@@ -568,6 +574,33 @@ class DeskSync {
         $j = json_decode($body, true);
         if (!is_array($j))   throw new Exception('پاسخ سرور JSON نیست — آدرس desk-sync-api.php را بررسی کنید');
         if (empty($j['ok'])) throw new Exception('خطای سرور: ' . ($j['error'] ?? 'نامشخص'));
+        if ($action === 'handshake' && isset($j['tables']) && is_array($j['tables'])) {
+            $expectedTables = json_decode(DESK_SYNC_TABLES, true) ?: [];
+            $missingPrimary = array_diff($expectedTables, $j['tables']);
+            if ($missingPrimary) {
+                $baseForCand = self::getCfg('desk_sync_url');
+                $baseForCand = preg_replace('~[^/?]+\.php(?=\?|$)~', 'class-exam-sync-api.php', $baseForCand);
+                foreach (self::candidateSyncEndpoints($baseForCand) as $candEp) {
+                    if ($candEp === $url) continue;
+                    foreach (['post_z', 'get_z', 'form'] as $tryMode) {
+                        $altRes = self::execSyncHttp($candEp, $tryMode, $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+                        if ($altRes['body'] !== false && $altRes['code'] === 200 && self::isSyncJson($altRes['body'])) {
+                            $altJ = json_decode((string)$altRes['body'], true);
+                            if (!empty($altJ['ok']) && isset($altJ['tables']) && is_array($altJ['tables'])) {
+                                $altMissing = array_diff($expectedTables, $altJ['tables']);
+                                if (count($altMissing) < count($missingPrimary)) {
+                                    self::$workingEndpoint = $candEp;
+                                    self::$workingMode     = $tryMode;
+                                    self::$workingBaseUrl  = $baseForCand;
+                                    return $altJ;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         return $j;
     }
 

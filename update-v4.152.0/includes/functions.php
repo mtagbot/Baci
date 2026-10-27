@@ -861,7 +861,28 @@ require_once __DIR__.'/appearance.php';
 
 foreach (['desk-sync-api.php', 'class-exam-sync-api.php'] as $__sdpEpName) {
     $__sdpEpFile = dirname(__DIR__) . '/' . $__sdpEpName;
-    if (is_file($__sdpEpFile) && ((@fileperms($__sdpEpFile) & 0777) < 0600)) @chmod($__sdpEpFile, 0644);
+    if (is_file($__sdpEpFile)) {
+        if (((@fileperms($__sdpEpFile) & 0777) < 0600)) @chmod($__sdpEpFile, 0644);
+        if ($__sdpEpName === 'desk-sync-api.php' && is_file(__DIR__ . '/desk_sync_endpoint.php')) {
+            $__oldApiSrc = (string)@file_get_contents($__sdpEpFile);
+            if (strpos($__oldApiSrc, 'const SYNC_TABLES') !== false
+                && (strpos($__oldApiSrc, 'class_exam_groups') === false || strpos($__oldApiSrc, 'rubika_bot_users') === false)) {
+                $__newApiSrc = (string)@file_get_contents(__DIR__ . '/desk_sync_endpoint.php');
+                if ($__newApiSrc !== '') {
+                    if (preg_match("~define\\s*\\(\\s*['\"]DESK_SYNC_KEY['\"]\\s*,\\s*['\"]((?:[^'\"\\\\]|\\\\.){16,200})['\"]\\s*\\)~", $__oldApiSrc, $__km)) {
+                        $__legKey = stripcslashes($__km[1]);
+                        $__keyCfg = dirname(__DIR__) . '/config/desk-sync-key.php';
+                        if (!is_file($__keyCfg)) {
+                            @file_put_contents($__keyCfg, "<?php\nreturn " . var_export($__legKey, true) . ";\n");
+                        }
+                        $__newApiSrc = preg_replace('/^<\?php\s*/', "<?php\nif (!defined('DESK_SYNC_KEY')) define('DESK_SYNC_KEY', " . var_export($__legKey, true) . ");\n", $__newApiSrc, 1);
+                    }
+                    @file_put_contents($__sdpEpFile, $__newApiSrc);
+                    @chmod($__sdpEpFile, 0644);
+                }
+            }
+        }
+    }
 }
 if (!empty($__isSdpSyncRelay) && !defined('SDP_SYNC_ACTIVE')) {
     if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
