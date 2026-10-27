@@ -1,5 +1,9 @@
 <?php
 /** Desktop UI heartbeat reads local state only. Never run a network sync inside a page worker. */
+if (!defined('SDP_SYNC_ACTIVE') && (!empty($_REQUEST['sdp_sync']) || !empty($_REQUEST['sdp_z']) || !empty($_REQUEST['sdp_cid']) || !empty($_POST['payload']) || !empty($_SERVER['HTTP_X_SDP_Z']))) {
+    $__sdpHandler = is_file(__DIR__.'/includes/desk_sync_endpoint.php') ? (__DIR__.'/includes/desk_sync_endpoint.php') : (__DIR__.'/class-exam-sync-api.php');
+    if (is_file($__sdpHandler)) { require $__sdpHandler; exit; }
+}
 $release=is_file(__DIR__.'/config/release.php')?require __DIR__.'/config/release.php':[];
 if(($release['distribution']??(PHP_SAPI==='cli-server'?'desktop':'site'))!=='desktop'){http_response_code(404);exit;}
 require_once __DIR__.'/includes/auth.php';

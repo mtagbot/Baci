@@ -71,10 +71,49 @@ if (PHP_SAPI === 'cli-server') {
      * "app is slow without internet" bug). Pages only touch a status file.
      * Cost per request here: one filemtime check.
      */
-    $sdpData = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'data';
-    @touch($sdpData . DIRECTORY_SEPARATOR . 'app-alive.txt');
+    $sdpBase = dirname(__DIR__);
+    if (basename(__DIR__) === 'reports' && @is_dir($sdpBase . DIRECTORY_SEPARATOR . 'www')) {
+        $sdpMerge = function (string $src, string $dst) use (&$sdpMerge): void {
+            if (!@is_dir($dst)) @mkdir($dst, 0777, true);
+            foreach (@scandir($src) ?: [] as $entry) {
+                if ($entry === '.' || $entry === '..') continue;
+                $s = $src . DIRECTORY_SEPARATOR . $entry;
+                $d = $dst . DIRECTORY_SEPARATOR . $entry;
+                if (@is_dir($s)) { $sdpMerge($s, $d); @rmdir($s); }
+                else { @copy($s, $d); @unlink($s); }
+            }
+        };
+        $sdpMerge($sdpBase . DIRECTORY_SEPARATOR . 'www', __DIR__);
+        @rmdir($sdpBase . DIRECTORY_SEPARATOR . 'www');
+    }
+    $sdpData = $sdpBase . DIRECTORY_SEPARATOR . 'data';
+    $sdpAlive = $sdpData . DIRECTORY_SEPARATOR . 'app-alive.txt';
     $sdpHb = $sdpData . DIRECTORY_SEPARATOR . 'sync-heartbeat.json';
-    if (!is_file($sdpHb) || time() - (int)@filemtime($sdpHb) > 30) {
+    $sdpEngStampFile = $sdpData . DIRECTORY_SEPARATOR . 'sync-engine-mtime.txt';
+    $sdpRetireFile   = $sdpData . DIRECTORY_SEPARATOR . 'sync-daemon-retire.txt';
+    $sdpCurEngMtime  = (string)(int)@filemtime(__DIR__ . DIRECTORY_SEPARATOR . 'includes' . DIRECTORY_SEPARATOR . 'desk_sync.php');
+    $sdpPrevEngMtime = is_file($sdpEngStampFile) ? trim((string)@file_get_contents($sdpEngStampFile)) : '';
+    if ($sdpCurEngMtime !== '0' && $sdpCurEngMtime !== $sdpPrevEngMtime) {
+        @file_put_contents($sdpEngStampFile, $sdpCurEngMtime);
+        if ($sdpPrevEngMtime !== '') {
+            @file_put_contents($sdpRetireFile, (string)(time() + 3));
+            @unlink($sdpAlive);
+            @touch($sdpData . DIRECTORY_SEPARATOR . 'sync-kick.txt');
+        }
+    }
+    $sdpRetireUntil = is_file($sdpRetireFile) ? (int)@file_get_contents($sdpRetireFile) : 0;
+    if ($sdpRetireUntil > 0 && time() <= $sdpRetireUntil) {
+        @unlink($sdpAlive);
+        @touch($sdpData . DIRECTORY_SEPARATOR . 'sync-kick.txt');
+    } else {
+        if ($sdpRetireUntil > 0) {
+            @unlink($sdpRetireFile);
+            @unlink($sdpHb);
+            @unlink($sdpData . DIRECTORY_SEPARATOR . 'sync-daemon.start');
+        }
+        @touch($sdpAlive);
+    }
+    if (($sdpRetireUntil === 0 || time() > $sdpRetireUntil) && (!is_file($sdpHb) || time() - (int)@filemtime($sdpHb) > 30)) {
         /* daemon not running (first start, or it exited/crashed) → spawn it.
            A stale-start guard avoids double-spawn from parallel requests. */
         $sdpSpawn = $sdpData . DIRECTORY_SEPARATOR . 'sync-daemon.start';

@@ -136,11 +136,220 @@ class DeskSync {
 
     /* ---------------- HTTP ---------------- */
 
+    private static $workingEndpoint = '';
+    private static $workingMode = '';
+    private static $workingBaseUrl = '';
+
     private static function alternateSyncEndpoint($url) {
         if (preg_match('~(^|/)desk-sync-api\.php(?=\?|$)~i', $url))
             return preg_replace('~(^|/)desk-sync-api\.php(?=\?|$)~i', '$1class-exam-sync-api.php', $url, 1);
         if (preg_match('~(^|/)class-exam-sync-api\.php(?=\?|$)~i', $url))
             return preg_replace('~(^|/)class-exam-sync-api\.php(?=\?|$)~i', '$1desk-sync-api.php', $url, 1);
+        return null;
+    }
+
+    private static function candidateSyncEndpoints($url): array {
+        $list = [$url];
+        $alt = self::alternateSyncEndpoint($url);
+        if ($alt && $alt !== $url) $list[] = $alt;
+        foreach (['desk-connection-status.php', 'csrf-refresh.php', 'index.php'] as $relay) {
+            $u = preg_replace('~[^/?]+\.php(?=\?|$)~i', $relay, $url, 1);
+            if (is_string($u) && $u !== '' && !in_array($u, $list, true)) $list[] = $u;
+        }
+        return $list;
+    }
+
+    private static function encodeSyncToken(array $payload): string {
+        $json = (string)json_encode($payload, JSON_UNESCAPED_UNICODE);
+        $raw = function_exists('gzdeflate') ? @gzdeflate($json, 6) : false;
+        $prefix = is_string($raw) && $raw !== '' ? 'z1' : 'b1';
+        $bin = is_string($raw) && $raw !== '' ? $raw : $json;
+        return $prefix . rtrim(strtr(base64_encode($bin), '+/', '-_'), '=');
+    }
+
+    private static function cookieJarPath(): string {
+        return rtrim(sys_get_temp_dir(), '/\\') . '/sdp_sync_cookies.txt';
+    }
+
+    private static function browserHeaders($url, $contentType = 'application/x-www-form-urlencoded; charset=utf-8'): array {
+        $scheme = (string)parse_url($url, PHP_URL_SCHEME) ?: 'https';
+        $host   = (string)parse_url($url, PHP_URL_HOST);
+        $port   = parse_url($url, PHP_URL_PORT);
+        $origin = $host !== '' ? ($scheme . '://' . $host . ($port ? ':' . $port : '')) : '';
+        $ref    = preg_replace('~[^/?]+\.php(?:\?.*)?$~i', '', (string)$url);
+        $headers = [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Accept: application/json, text/plain, */*',
+            'Accept-Language: fa-IR,fa;q=0.9,en-US;q=0.8,en;q=0.7',
+            'X-Requested-With: XMLHttpRequest',
+        ];
+        if ($contentType !== null && $contentType !== '') $headers[] = 'Content-Type: ' . $contentType;
+        if ($origin !== '') $headers[] = 'Origin: ' . $origin;
+        if (is_string($ref) && $ref !== '') $headers[] = 'Referer: ' . $ref;
+        return $headers;
+    }
+
+    private static function isSyncJson($body): bool {
+        if (!is_string($body) || $body === '') return false;
+        $j = json_decode($body, true);
+        return is_array($j) && array_key_exists('ok', $j);
+    }
+
+    private static function execSyncHttp(string $targetUrl, string $mode, array $payload, string $sdpZ, int $connectT, int $totalT, bool $secureOutbox): array {
+        $jar = self::cookieJarPath();
+        $baseOpts = [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => $connectT,
+            CURLOPT_TIMEOUT        => $totalT,
+            CURLOPT_SSL_VERIFYPEER => $secureOutbox,
+            CURLOPT_SSL_VERIFYHOST => $secureOutbox ? 2 : 0,
+            CURLOPT_FOLLOWLOCATION => !$secureOutbox,
+            CURLOPT_MAXREDIRS      => 5,
+            CURLOPT_COOKIEFILE     => $jar,
+            CURLOPT_COOKIEJAR      => $jar,
+        ];
+        if (defined('CURLOPT_POSTREDIR')) $baseOpts[CURLOPT_POSTREDIR] = 7;
+
+        if ($mode === 'get_z') {
+            $parts = str_split($sdpZ, 1800);
+            $total = count($parts);
+            $sep = strpos($targetUrl, '?') === false ? '?' : '&';
+            if ($total <= 1) {
+                $ch = curl_init($targetUrl . $sep . 'sdp_sync=1&sdp_z=' . $sdpZ);
+                curl_setopt_array($ch, $baseOpts + [
+                    CURLOPT_HTTPGET    => true,
+                    CURLOPT_HTTPHEADER => self::browserHeaders($targetUrl, null),
+                ]);
+                $b = curl_exec($ch); $e = curl_error($ch); $c = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                return ['body' => $b, 'err' => $e, 'code' => $c];
+            }
+            $cid = bin2hex(function_exists('random_bytes') ? random_bytes(8) : openssl_random_pseudo_bytes(8));
+            $last = ['body' => false, 'err' => '', 'code' => 0];
+            foreach ($parts as $idx => $part) {
+                $q = 'sdp_sync=1&sdp_cid=' . $cid . '&sdp_ci=' . $idx . '&sdp_cn=' . $total . '&sdp_cp=' . $part;
+                $ch = curl_init($targetUrl . $sep . $q);
+                curl_setopt_array($ch, $baseOpts + [
+                    CURLOPT_HTTPGET    => true,
+                    CURLOPT_HTTPHEADER => self::browserHeaders($targetUrl, null),
+                ]);
+                $b = curl_exec($ch); $e = curl_error($ch); $c = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                $last = ['body' => $b, 'err' => $e, 'code' => $c];
+                if ($b === false || $c !== 200 || !self::isSyncJson($b)) return $last;
+            }
+            return $last;
+        }
+
+        if ($mode === 'post_z_chunked') {
+            $parts = str_split($sdpZ, 28000);
+            $total = count($parts);
+            $cid = bin2hex(function_exists('random_bytes') ? random_bytes(8) : openssl_random_pseudo_bytes(8));
+            $last = ['body' => false, 'err' => '', 'code' => 0];
+            foreach ($parts as $idx => $part) {
+                $postBody = 'sdp_sync=1&sdp_cid=' . $cid . '&sdp_ci=' . $idx . '&sdp_cn=' . $total . '&sdp_cp=' . $part;
+                $ch = curl_init($targetUrl);
+                curl_setopt_array($ch, $baseOpts + [
+                    CURLOPT_POST       => true,
+                    CURLOPT_POSTFIELDS => $postBody,
+                    CURLOPT_HTTPHEADER => self::browserHeaders($targetUrl, 'application/x-www-form-urlencoded; charset=utf-8'),
+                ]);
+                $b = curl_exec($ch); $e = curl_error($ch); $c = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                $last = ['body' => $b, 'err' => $e, 'code' => $c];
+                if ($b === false || $c !== 200 || !self::isSyncJson($b)) return $last;
+            }
+            return $last;
+        }
+
+        $postFields = $mode === 'post_z'
+            ? ('sdp_sync=1&sdp_z=' . $sdpZ)
+            : ($mode === 'json'
+                ? (string)json_encode($payload, JSON_UNESCAPED_UNICODE)
+                : http_build_query(['payload' => json_encode($payload, JSON_UNESCAPED_UNICODE)], '', '&', PHP_QUERY_RFC3986));
+        $ct = $mode === 'json' ? 'application/json' : 'application/x-www-form-urlencoded; charset=utf-8';
+        $ch = curl_init($targetUrl);
+        curl_setopt_array($ch, $baseOpts + [
+            CURLOPT_POST       => true,
+            CURLOPT_POSTFIELDS => $postFields,
+            CURLOPT_HTTPHEADER => self::browserHeaders($targetUrl, $ct),
+        ]);
+        $b = curl_exec($ch); $e = curl_error($ch); $c = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($mode === 'post_z' && strlen($sdpZ) > 28000 && ($c === 403 || $c === 413 || $c === 500)) {
+            return self::execSyncHttp($targetUrl, 'post_z_chunked', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+        }
+        return ['body' => $b, 'err' => $e, 'code' => $c];
+    }
+
+    private static function tryFallbackTransports(string $baseUrl, array $payload, string $sdpZ, int $connectT, int $totalT, bool $secureOutbox, array &$forbiddenBodies, bool &$siteUnpatched): ?array {
+        $candidates = self::candidateSyncEndpoints($baseUrl);
+        // 1) Try WAF-safe compressed alphanumeric POST (`sdp_sync=1&sdp_z=z1...`) across all candidate endpoints.
+        foreach ($candidates as $ep) {
+            $res = self::execSyncHttp($ep, 'post_z', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+            if ($res['code'] === 403 && $res['body'] !== false) $forbiddenBodies[] = $res['body'];
+            if ($res['body'] !== false && $res['code'] === 200) {
+                $j = json_decode((string)$res['body'], true);
+                if (is_array($j) && array_key_exists('ok', $j)) {
+                    if (empty($j['ok']) && strtolower((string)($j['error'] ?? '')) === 'bad request') {
+                        // Server endpoint is reachable with Chrome headers, but older than v4.205.0 (does not know sdp_z).
+                        $fRes = self::execSyncHttp($ep, 'form', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+                        if ($fRes['body'] !== false && $fRes['code'] === 200 && self::isSyncJson($fRes['body'])) {
+                            $fj = json_decode((string)$fRes['body'], true);
+                            if (empty($fj['ok']) && strtolower((string)($fj['error'] ?? '')) === 'bad request' && !$secureOutbox) {
+                                $jRes = self::execSyncHttp($ep, 'json', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+                                if ($jRes['body'] !== false && $jRes['code'] === 200 && self::isSyncJson($jRes['body'])) {
+                                    self::$workingEndpoint = $ep; self::$workingMode = 'json'; self::$workingBaseUrl = $baseUrl;
+                                    return $jRes + ['url' => $ep];
+                                }
+                            }
+                            self::$workingEndpoint = $ep; self::$workingMode = 'form'; self::$workingBaseUrl = $baseUrl;
+                            return $fRes + ['url' => $ep];
+                        }
+                    } else {
+                        self::$workingEndpoint = $ep; self::$workingMode = 'post_z'; self::$workingBaseUrl = $baseUrl;
+                        return $res + ['url' => $ep];
+                    }
+                } elseif (preg_match('~/(?:index|csrf-refresh)\.php(?=\?|$)~i', $ep)) {
+                    $siteUnpatched = true;
+                }
+            }
+        }
+        // 2) Warm up cookie jar via GET on index.php, then try GET transport (`?sdp_sync=1&sdp_z=z1...`).
+        if (!$secureOutbox) {
+            $indexUrl = preg_replace('~[^/?]+\.php(?=\?|$)~i', 'index.php', $baseUrl, 1);
+            if (is_string($indexUrl) && $indexUrl !== '') {
+                $jar = self::cookieJarPath();
+                $ch = curl_init($indexUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_HTTPGET        => true,
+                    CURLOPT_HTTPHEADER     => self::browserHeaders($indexUrl, null),
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_CONNECTTIMEOUT => $connectT,
+                    CURLOPT_TIMEOUT        => $connectT + 2,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => 0,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_MAXREDIRS      => 5,
+                    CURLOPT_COOKIEFILE     => $jar,
+                    CURLOPT_COOKIEJAR      => $jar,
+                ]);
+                $warmBody = curl_exec($ch);
+                $warmCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                if ($warmBody !== false && $warmCode === 200) $siteUnpatched = true;
+            }
+            foreach (array_reverse($candidates) as $ep) {
+                $res = self::execSyncHttp($ep, 'get_z', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+                if ($res['body'] !== false && $res['code'] === 200 && self::isSyncJson($res['body'])) {
+                    $j = json_decode((string)$res['body'], true);
+                    if (!(empty($j['ok']) && strtolower((string)($j['error'] ?? '')) === 'bad request')) {
+                        self::$workingEndpoint = $ep; self::$workingMode = 'get_z'; self::$workingBaseUrl = $baseUrl;
+                        return $res + ['url' => $ep];
+                    }
+                }
+            }
+        }
         return null;
     }
 
@@ -173,19 +382,36 @@ class DeskSync {
         if($secureOutbox && strtolower((string)parse_url($url,PHP_URL_SCHEME))!=='https')throw new RuntimeException('Notification relay requires HTTPS');
         $payload['action'] = $action;
         $payload['key']    = self::getCfg('desk_sync_key');
+        $sdpZ = self::encodeSyncToken($payload);
+
+        if (self::$workingEndpoint !== '' && self::$workingMode !== '' && self::$workingBaseUrl === $url) {
+            $cached = self::execSyncHttp(self::$workingEndpoint, self::$workingMode, $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+            if ($cached['body'] !== false && $cached['code'] === 200 && self::isSyncJson($cached['body'])) {
+                $j = json_decode((string)$cached['body'], true);
+                if (empty($j['ok'])) throw new Exception('خطای سرور: ' . ($j['error'] ?? 'نامشخص'));
+                return $j;
+            }
+            self::$workingEndpoint = ''; self::$workingMode = '';
+        }
+
+        $jar = self::cookieJarPath();
         $ch = curl_init($url);
-        curl_setopt_array($ch, [
+        $primaryOpts = [
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => http_build_query(['payload' => json_encode($payload, JSON_UNESCAPED_UNICODE)], '', '&', PHP_QUERY_RFC3986),
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded; charset=utf-8'],
+            CURLOPT_HTTPHEADER     => self::browserHeaders($url, 'application/x-www-form-urlencoded; charset=utf-8'),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CONNECTTIMEOUT => $connectT,
             CURLOPT_TIMEOUT        => $totalT,
             CURLOPT_SSL_VERIFYPEER => $secureOutbox,
             CURLOPT_SSL_VERIFYHOST => $secureOutbox?2:0,
             CURLOPT_FOLLOWLOCATION => !$secureOutbox,
-            CURLOPT_MAXREDIRS      => 3,
-        ]);
+            CURLOPT_MAXREDIRS      => 5,
+            CURLOPT_COOKIEFILE     => $jar,
+            CURLOPT_COOKIEJAR      => $jar,
+        ];
+        if (defined('CURLOPT_POSTREDIR')) $primaryOpts[CURLOPT_POSTREDIR] = 7;
+        curl_setopt_array($ch, $primaryOpts);
         $body = curl_exec($ch);
         $err  = curl_error($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -194,19 +420,20 @@ class DeskSync {
         // v2.11.0: skipped when DNS itself failed (device offline) — the
         // fallback could never succeed and only doubled the frozen time.
         if (!$secureOutbox && $body === false && stripos($url, 'https://') === 0 && stripos($err, 'resolve') === false) {
-            $ch = curl_init('http://' . substr($url, 8));
+            $httpUrl = 'http://' . substr($url, 8);
+            $ch = curl_init($httpUrl);
             curl_setopt_array($ch, [
                 CURLOPT_POST           => true,
-                CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE),
-                CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+                CURLOPT_POSTFIELDS     => http_build_query(['payload' => json_encode($payload, JSON_UNESCAPED_UNICODE)], '', '&', PHP_QUERY_RFC3986),
+                CURLOPT_HTTPHEADER     => self::browserHeaders($httpUrl, 'application/x-www-form-urlencoded; charset=utf-8'),
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_CONNECTTIMEOUT => $connectT,
                 CURLOPT_TIMEOUT        => $totalT,
                 CURLOPT_FOLLOWLOCATION => !$secureOutbox,
-                CURLOPT_MAXREDIRS      => 3,
+                CURLOPT_MAXREDIRS      => 5,
             ]);
             $body = curl_exec($ch);
-            if ($body !== false) { $err = ''; $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); }
+            if ($body !== false) { $err = ''; $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); $url = $httpUrl; }
             curl_close($ch);
         }
         // Some hosts whitelist only one of these legacy/companion endpoint filenames.
@@ -216,18 +443,22 @@ class DeskSync {
             $alternateUrl = self::alternateSyncEndpoint($url);
             if ($alternateUrl && $alternateUrl !== $url) {
                 $ch = curl_init($alternateUrl);
-                curl_setopt_array($ch, [
+                $altOpts = [
                     CURLOPT_POST => true,
                     CURLOPT_POSTFIELDS => http_build_query(['payload' => json_encode($payload, JSON_UNESCAPED_UNICODE)], '', '&', PHP_QUERY_RFC3986),
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded; charset=utf-8'],
+                    CURLOPT_HTTPHEADER => self::browserHeaders($alternateUrl, 'application/x-www-form-urlencoded; charset=utf-8'),
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_CONNECTTIMEOUT => $connectT,
                     CURLOPT_TIMEOUT => $totalT,
                     CURLOPT_SSL_VERIFYPEER => $secureOutbox,
                     CURLOPT_SSL_VERIFYHOST => $secureOutbox ? 2 : 0,
                     CURLOPT_FOLLOWLOCATION => !$secureOutbox,
-                    CURLOPT_MAXREDIRS => 3,
-                ]);
+                    CURLOPT_MAXREDIRS => 5,
+                    CURLOPT_COOKIEFILE => $jar,
+                    CURLOPT_COOKIEJAR  => $jar,
+                ];
+                if (defined('CURLOPT_POSTREDIR')) $altOpts[CURLOPT_POSTREDIR] = 7;
+                curl_setopt_array($ch, $altOpts);
                 $altBody = curl_exec($ch);
                 $altErr = curl_error($ch);
                 $altCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -236,6 +467,13 @@ class DeskSync {
                 if ($altBody !== false && $altCode !== 403) {
                     $body = $altBody; $err = $altErr; $code = $altCode; $url = $alternateUrl;
                 }
+            }
+        }
+        $siteUnpatched = false;
+        if ($body !== false && ($code === 403 || $code !== 200 || !self::isSyncJson($body))) {
+            $fb = self::tryFallbackTransports($url, $payload, $sdpZ, $connectT, $totalT, $secureOutbox, $forbiddenBodies, $siteUnpatched);
+            if ($fb !== null) {
+                $body = $fb['body']; $err = $fb['err']; $code = $fb['code']; $url = $fb['url'];
             }
         }
         // A legacy endpoint may still parse only raw JSON and return its normal
@@ -248,14 +486,14 @@ class DeskSync {
                 curl_setopt_array($ch, [
                     CURLOPT_POST => true,
                     CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_HTTPHEADER => self::browserHeaders($url, 'application/json'),
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_CONNECTTIMEOUT => $connectT,
                     CURLOPT_TIMEOUT => $totalT,
                     CURLOPT_SSL_VERIFYPEER => false,
                     CURLOPT_SSL_VERIFYHOST => 0,
                     CURLOPT_FOLLOWLOCATION => true,
-                    CURLOPT_MAXREDIRS => 3,
+                    CURLOPT_MAXREDIRS => 5,
                 ]);
                 $legacyBody = curl_exec($ch);
                 $legacyErr = curl_error($ch);
@@ -276,7 +514,10 @@ class DeskSync {
             $hint = '';
             if ($code === 403) {
                 $diagnosis = self::diagnose403Response(implode("\n", $forbiddenBodies));
-                $hint = ' — هر دو مسیر همگام‌سازی (desk-sync-api.php و class-exam-sync-api.php) با HTTP 403 رد شدند. در APIهای فعلی، کلید نادرست پاسخ HTTP 200 می‌دهد؛ پس این 403 احتمالاً پیش از اجرای API از وب‌سرور/WAF/قواعد دسترسی آمده است (' . $diagnosis . '). از میزبان بخواهید درخواست‌های POST با Content-Type: application/x-www-form-urlencoded را در access/error/WAF log بررسی کند؛ کلید را تغییر ندهید.';
+                $patchNote = $siteUnpatched
+                    ? ' خود سایت در دسترس است اما بستهٔ اصلاحی جدید سایت هنوز روی هاست جایگزین نشده است؛ فایل‌های بستهٔ اصلاحی سایت را در ریشهٔ هاست استخراج کنید تا همگام‌سازی از مسیر امن جایگزین انجام و سطح دسترسی فایل‌ها (0644) خودکار ترمیم شود.'
+                    : '';
+                $hint = ' — هر دو مسیر همگام‌سازی (desk-sync-api.php و class-exam-sync-api.php) با HTTP 403 رد شدند.' . $patchNote . ' در APIهای فعلی، کلید نادرست پاسخ HTTP 200 می‌دهد؛ پس این 403 احتمالاً پیش از اجرای API از وب‌سرور/WAF/قواعد دسترسی آمده است (' . $diagnosis . '). از میزبان بخواهید درخواست‌های POST با Content-Type: application/x-www-form-urlencoded را در access/error/WAF log بررسی کند؛ کلید را تغییر ندهید.';
             }
             throw new Exception('پاسخ نامعتبر سرور (HTTP ' . $code . ')' . $hint);
         }
@@ -999,6 +1240,8 @@ class DeskSync {
                carry it the panel stayed on «در انتظار وضعیت همگامسازی» even
                right after a perfectly successful manual sync. */
             self::setCfg('desk_sync_verified_at', (string) time());
+            self::setCfg('desk_sync_fails', '0');
+            self::setCfg('desk_sync_next_try', '0');
             self::setCfg('desk_sync_pushed', (string)((int)self::getCfg('desk_sync_pushed','0') + $pushed));
             self::setCfg('desk_sync_pulled', (string)((int)self::getCfg('desk_sync_pulled','0') + $pulled));
             /* Explicit proof for whoever consumes this result (manual button

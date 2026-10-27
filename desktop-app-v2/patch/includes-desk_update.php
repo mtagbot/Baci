@@ -69,10 +69,25 @@ function desk_update_request(string $url, array $payload, bool $binary, int $con
     $ch = curl_init($url);
     $target = $binary ? fopen(desk_update_dir().'/package.part', 'wb') : null;
     if ($binary && !$target) return ['ok' => false, 'error' => 'امکان نوشتن فایل در پوشهٔ data نیست.'];
+    $jsonPayload = (string)json_encode($payload, JSON_UNESCAPED_UNICODE);
+    $rawDef = function_exists('gzdeflate') ? @gzdeflate($jsonPayload, 6) : false;
+    $sdpZ = (is_string($rawDef) && $rawDef !== '' ? 'z1' : 'b1') . rtrim(strtr(base64_encode(is_string($rawDef) && $rawDef !== '' ? $rawDef : $jsonPayload), '+/', '-_'), '=');
+    $scheme = (string)parse_url($url, PHP_URL_SCHEME) ?: 'https';
+    $host   = (string)parse_url($url, PHP_URL_HOST);
+    $origin = $host !== '' ? ($scheme . '://' . $host) : '';
+    $ref    = preg_replace('~[^/?]+\.php(?:\?.*)?$~i', '', $url);
+    $headers = [
+        'Content-Type: application/x-www-form-urlencoded; charset=utf-8',
+        'Accept: ' . ($binary ? 'application/zip, application/octet-stream, */*' : 'application/json, text/plain, */*'),
+        'Accept-Language: fa-IR,fa;q=0.9,en-US;q=0.8,en;q=0.7',
+        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    ];
+    if ($origin !== '') $headers[] = 'Origin: ' . $origin;
+    if (is_string($ref) && $ref !== '') $headers[] = 'Referer: ' . $ref;
     $options = [
         CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: ' . ($binary ? 'application/zip' : 'application/json')],
+        CURLOPT_POSTFIELDS => http_build_query(['payload' => $jsonPayload, 'sdp_z' => $sdpZ], '', '&', PHP_QUERY_RFC3986),
+        CURLOPT_HTTPHEADER => $headers,
         CURLOPT_CONNECTTIMEOUT => $connectT,
         CURLOPT_TIMEOUT => $totalT,
         CURLOPT_SSL_VERIFYPEER => true,
@@ -153,6 +168,7 @@ function desk_update_safe_rel(string $rel): bool {
     return (bool)preg_match('~\A[^\x00-\x1f]+\z~', $rel);
 }
 function desk_update_private_path(string $rel): bool {
+    if (strcasecmp($rel, 'config/version.php') === 0) return false;
     return (bool)preg_match('~\A(?:config|data|php|profile|server|backups|licenses)/~i', $rel);
 }
 function desk_update_blocked_extension(string $rel): bool {

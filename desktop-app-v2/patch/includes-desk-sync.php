@@ -25,6 +25,7 @@ if (!defined('DESK_SYNC_TABLES')) {
         'academic_years','teachers','discipline_titles','classes','subjects',
         'class_schedules','students','student_discipline_records','reports',
         'report_grades','report_locks','exam_schedules','exam_designs',
+        'class_exam_groups','class_exam_group_members',
         'exam_question_bank','exam_design_archive','exam_assignments','exam_student_seating',
         'online_exam_categories','online_question_categories','online_question_bank',
         'online_exams','online_questions','online_exam_attempts','online_exam_answers',
@@ -44,13 +45,24 @@ class DeskSync {
 
     const ID_BASE = 5000000;      // desktop-created rows start here
     const BATCH   = 400;
-    const MIN_INTERVAL = 120;     // seconds between automatic runs
-    /* v2.107.0: the idle probe is throttled to 30s. Before this, a desktop
-       that had nothing to push pinged the site every 5 seconds (the daemon
-       loop interval) — twelve times a minute for nothing. */
-    const PING_INTERVAL = 30;     // seconds between idle site probes
+    // Safety cycle for when BOTH sides are quiet. The daemon loops every few
+    // seconds, so with a 120s cycle each system ran ~150 full cycles/day
+    // (handshake + pull + file checks) even on an empty school day. 300s
+    // keeps a 5-minute mirror guarantee while cutting those cycles 60%.
+    const MIN_INTERVAL = 300;     // seconds between automatic safety runs
     const LOCK_TTL     = 180;     // stale-lock takeover
     const RECON_INTERVAL = 3600;  // v2.11.0: mirror-reconcile at most once per hour
+    // Idle "any news on the site?" probe. One probe per daemon loop (≈5s) was
+    // ~2,900 empty requests/day per system carrying only a change counter;
+    // stretching it to 30s costs at most 25s of site→desktop visibility and
+    // removes ~80% of idle traffic. Desktop→site pushes stay immediate
+    // (kick file + pending>0 below), unaffected by this constant.
+    const PING_INTERVAL = 30;     // seconds between idle site probes
+    // "event" mode (desk_sync_mode='event', least-traffic option): no idle
+    // probes and no 5-minute safety cycle — this hourly mirror check is the
+    // only background work. Site-side edits still reach the desktop on the
+    // next local edit (full cycles are bidirectional) or by the hourly check.
+    const EVENT_SAFETY_INTERVAL = 3600;
 
     /* ---------------- settings helpers (raw, no cache) ---------------- */
 
@@ -87,6 +99,7 @@ class DeskSync {
     public static function status() {
         return [
             'enabled'   => self::enabled(),
+            'mode'      => self::getCfg('desk_sync_mode', 'full'),
             'url'       => self::getCfg('desk_sync_url'),
             'last_run'  => (int) self::getCfg('desk_sync_last', '0'),
             'last_ok'   => (int) self::getCfg('desk_sync_last_ok', '0'),
@@ -98,13 +111,245 @@ class DeskSync {
         ];
     }
 
+    /** Separate idempotent handoff. Never mirror outbox delivery state as ordinary rows. */
+    public static function relayBotNotifications() {
+        require_once __DIR__.'/bot_helpers.php';
+        if(!self::enabled())return;
+        $next=(int)self::getCfg('desk_bot_outbox_next','0');
+        if(time()<$next)return;
+        $jobs=bot_outbox_relay_jobs();
+        self::setCfg('desk_bot_outbox_next',(string)(time()+15));
+        // Empty queue is the NORMAL state. Handing an empty batch to the site
+        // was ~1,200 HTTP round-trips/day per system with nothing behind
+        // them. New jobs are picked up on the next 15s cycle; nothing lost.
+        if(!$jobs)return;
+        try {
+            $res=self::call('bot_outbox',['jobs'=>$jobs]);
+            bot_outbox_apply_receipts($jobs,$res['receipts']??null);
+            self::setCfg('desk_bot_outbox_error','');
+        } catch(Throwable $e) {
+            // Don't use bot API fallback: the server might already have accepted this batch.
+            self::setCfg('desk_bot_outbox_next',(string)(time()+30));
+            self::setCfg('desk_bot_outbox_error','تحویل صف اعلان به سایت انجام نشد؛ اتصال و نصب اصلاحی صف ربات روی سایت را بررسی کنید.');
+        }
+    }
+
     /* ---------------- HTTP ---------------- */
+
+    private static $workingEndpoint = '';
+    private static $workingMode = '';
+    private static $workingBaseUrl = '';
 
     private static function alternateSyncEndpoint($url) {
         if (preg_match('~(^|/)desk-sync-api\.php(?=\?|$)~i', $url))
             return preg_replace('~(^|/)desk-sync-api\.php(?=\?|$)~i', '$1class-exam-sync-api.php', $url, 1);
         if (preg_match('~(^|/)class-exam-sync-api\.php(?=\?|$)~i', $url))
             return preg_replace('~(^|/)class-exam-sync-api\.php(?=\?|$)~i', '$1desk-sync-api.php', $url, 1);
+        return null;
+    }
+
+    private static function candidateSyncEndpoints($url): array {
+        $list = [$url];
+        $alt = self::alternateSyncEndpoint($url);
+        if ($alt && $alt !== $url) $list[] = $alt;
+        foreach (['desk-connection-status.php', 'csrf-refresh.php', 'index.php'] as $relay) {
+            $u = preg_replace('~[^/?]+\.php(?=\?|$)~i', $relay, $url, 1);
+            if (is_string($u) && $u !== '' && !in_array($u, $list, true)) $list[] = $u;
+        }
+        return $list;
+    }
+
+    private static function encodeSyncToken(array $payload): string {
+        $json = (string)json_encode($payload, JSON_UNESCAPED_UNICODE);
+        $raw = function_exists('gzdeflate') ? @gzdeflate($json, 6) : false;
+        $prefix = is_string($raw) && $raw !== '' ? 'z1' : 'b1';
+        $bin = is_string($raw) && $raw !== '' ? $raw : $json;
+        return $prefix . rtrim(strtr(base64_encode($bin), '+/', '-_'), '=');
+    }
+
+    private static function cookieJarPath(): string {
+        return rtrim(sys_get_temp_dir(), '/\\') . '/sdp_sync_cookies.txt';
+    }
+
+    private static function browserHeaders($url, $contentType = 'application/x-www-form-urlencoded; charset=utf-8'): array {
+        $scheme = (string)parse_url($url, PHP_URL_SCHEME) ?: 'https';
+        $host   = (string)parse_url($url, PHP_URL_HOST);
+        $port   = parse_url($url, PHP_URL_PORT);
+        $origin = $host !== '' ? ($scheme . '://' . $host . ($port ? ':' . $port : '')) : '';
+        $ref    = preg_replace('~[^/?]+\.php(?:\?.*)?$~i', '', (string)$url);
+        $headers = [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Accept: application/json, text/plain, */*',
+            'Accept-Language: fa-IR,fa;q=0.9,en-US;q=0.8,en;q=0.7',
+            'X-Requested-With: XMLHttpRequest',
+        ];
+        if ($contentType !== null && $contentType !== '') $headers[] = 'Content-Type: ' . $contentType;
+        if ($origin !== '') $headers[] = 'Origin: ' . $origin;
+        if (is_string($ref) && $ref !== '') $headers[] = 'Referer: ' . $ref;
+        return $headers;
+    }
+
+    private static function isSyncJson($body): bool {
+        if (!is_string($body) || $body === '') return false;
+        $j = json_decode($body, true);
+        return is_array($j) && array_key_exists('ok', $j);
+    }
+
+    private static function execSyncHttp(string $targetUrl, string $mode, array $payload, string $sdpZ, int $connectT, int $totalT, bool $secureOutbox): array {
+        $jar = self::cookieJarPath();
+        $baseOpts = [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => $connectT,
+            CURLOPT_TIMEOUT        => $totalT,
+            CURLOPT_SSL_VERIFYPEER => $secureOutbox,
+            CURLOPT_SSL_VERIFYHOST => $secureOutbox ? 2 : 0,
+            CURLOPT_FOLLOWLOCATION => !$secureOutbox,
+            CURLOPT_MAXREDIRS      => 5,
+            CURLOPT_COOKIEFILE     => $jar,
+            CURLOPT_COOKIEJAR      => $jar,
+        ];
+        if (defined('CURLOPT_POSTREDIR')) $baseOpts[CURLOPT_POSTREDIR] = 7;
+
+        if ($mode === 'get_z') {
+            $parts = str_split($sdpZ, 1800);
+            $total = count($parts);
+            $sep = strpos($targetUrl, '?') === false ? '?' : '&';
+            if ($total <= 1) {
+                $ch = curl_init($targetUrl . $sep . 'sdp_sync=1&sdp_z=' . $sdpZ);
+                curl_setopt_array($ch, $baseOpts + [
+                    CURLOPT_HTTPGET    => true,
+                    CURLOPT_HTTPHEADER => self::browserHeaders($targetUrl, null),
+                ]);
+                $b = curl_exec($ch); $e = curl_error($ch); $c = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                return ['body' => $b, 'err' => $e, 'code' => $c];
+            }
+            $cid = bin2hex(function_exists('random_bytes') ? random_bytes(8) : openssl_random_pseudo_bytes(8));
+            $last = ['body' => false, 'err' => '', 'code' => 0];
+            foreach ($parts as $idx => $part) {
+                $q = 'sdp_sync=1&sdp_cid=' . $cid . '&sdp_ci=' . $idx . '&sdp_cn=' . $total . '&sdp_cp=' . $part;
+                $ch = curl_init($targetUrl . $sep . $q);
+                curl_setopt_array($ch, $baseOpts + [
+                    CURLOPT_HTTPGET    => true,
+                    CURLOPT_HTTPHEADER => self::browserHeaders($targetUrl, null),
+                ]);
+                $b = curl_exec($ch); $e = curl_error($ch); $c = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                $last = ['body' => $b, 'err' => $e, 'code' => $c];
+                if ($b === false || $c !== 200 || !self::isSyncJson($b)) return $last;
+            }
+            return $last;
+        }
+
+        if ($mode === 'post_z_chunked') {
+            $parts = str_split($sdpZ, 28000);
+            $total = count($parts);
+            $cid = bin2hex(function_exists('random_bytes') ? random_bytes(8) : openssl_random_pseudo_bytes(8));
+            $last = ['body' => false, 'err' => '', 'code' => 0];
+            foreach ($parts as $idx => $part) {
+                $postBody = 'sdp_sync=1&sdp_cid=' . $cid . '&sdp_ci=' . $idx . '&sdp_cn=' . $total . '&sdp_cp=' . $part;
+                $ch = curl_init($targetUrl);
+                curl_setopt_array($ch, $baseOpts + [
+                    CURLOPT_POST       => true,
+                    CURLOPT_POSTFIELDS => $postBody,
+                    CURLOPT_HTTPHEADER => self::browserHeaders($targetUrl, 'application/x-www-form-urlencoded; charset=utf-8'),
+                ]);
+                $b = curl_exec($ch); $e = curl_error($ch); $c = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                $last = ['body' => $b, 'err' => $e, 'code' => $c];
+                if ($b === false || $c !== 200 || !self::isSyncJson($b)) return $last;
+            }
+            return $last;
+        }
+
+        $postFields = $mode === 'post_z'
+            ? ('sdp_sync=1&sdp_z=' . $sdpZ)
+            : ($mode === 'json'
+                ? (string)json_encode($payload, JSON_UNESCAPED_UNICODE)
+                : http_build_query(['payload' => json_encode($payload, JSON_UNESCAPED_UNICODE)], '', '&', PHP_QUERY_RFC3986));
+        $ct = $mode === 'json' ? 'application/json' : 'application/x-www-form-urlencoded; charset=utf-8';
+        $ch = curl_init($targetUrl);
+        curl_setopt_array($ch, $baseOpts + [
+            CURLOPT_POST       => true,
+            CURLOPT_POSTFIELDS => $postFields,
+            CURLOPT_HTTPHEADER => self::browserHeaders($targetUrl, $ct),
+        ]);
+        $b = curl_exec($ch); $e = curl_error($ch); $c = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($mode === 'post_z' && strlen($sdpZ) > 28000 && ($c === 403 || $c === 413 || $c === 500)) {
+            return self::execSyncHttp($targetUrl, 'post_z_chunked', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+        }
+        return ['body' => $b, 'err' => $e, 'code' => $c];
+    }
+
+    private static function tryFallbackTransports(string $baseUrl, array $payload, string $sdpZ, int $connectT, int $totalT, bool $secureOutbox, array &$forbiddenBodies, bool &$siteUnpatched): ?array {
+        $candidates = self::candidateSyncEndpoints($baseUrl);
+        // 1) Try WAF-safe compressed alphanumeric POST (`sdp_sync=1&sdp_z=z1...`) across all candidate endpoints.
+        foreach ($candidates as $ep) {
+            $res = self::execSyncHttp($ep, 'post_z', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+            if ($res['code'] === 403 && $res['body'] !== false) $forbiddenBodies[] = $res['body'];
+            if ($res['body'] !== false && $res['code'] === 200) {
+                $j = json_decode((string)$res['body'], true);
+                if (is_array($j) && array_key_exists('ok', $j)) {
+                    if (empty($j['ok']) && strtolower((string)($j['error'] ?? '')) === 'bad request') {
+                        // Server endpoint is reachable with Chrome headers, but older than v4.205.0 (does not know sdp_z).
+                        $fRes = self::execSyncHttp($ep, 'form', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+                        if ($fRes['body'] !== false && $fRes['code'] === 200 && self::isSyncJson($fRes['body'])) {
+                            $fj = json_decode((string)$fRes['body'], true);
+                            if (empty($fj['ok']) && strtolower((string)($fj['error'] ?? '')) === 'bad request' && !$secureOutbox) {
+                                $jRes = self::execSyncHttp($ep, 'json', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+                                if ($jRes['body'] !== false && $jRes['code'] === 200 && self::isSyncJson($jRes['body'])) {
+                                    self::$workingEndpoint = $ep; self::$workingMode = 'json'; self::$workingBaseUrl = $baseUrl;
+                                    return $jRes + ['url' => $ep];
+                                }
+                            }
+                            self::$workingEndpoint = $ep; self::$workingMode = 'form'; self::$workingBaseUrl = $baseUrl;
+                            return $fRes + ['url' => $ep];
+                        }
+                    } else {
+                        self::$workingEndpoint = $ep; self::$workingMode = 'post_z'; self::$workingBaseUrl = $baseUrl;
+                        return $res + ['url' => $ep];
+                    }
+                } elseif (preg_match('~/(?:index|csrf-refresh)\.php(?=\?|$)~i', $ep)) {
+                    $siteUnpatched = true;
+                }
+            }
+        }
+        // 2) Warm up cookie jar via GET on index.php, then try GET transport (`?sdp_sync=1&sdp_z=z1...`).
+        if (!$secureOutbox) {
+            $indexUrl = preg_replace('~[^/?]+\.php(?=\?|$)~i', 'index.php', $baseUrl, 1);
+            if (is_string($indexUrl) && $indexUrl !== '') {
+                $jar = self::cookieJarPath();
+                $ch = curl_init($indexUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_HTTPGET        => true,
+                    CURLOPT_HTTPHEADER     => self::browserHeaders($indexUrl, null),
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_CONNECTTIMEOUT => $connectT,
+                    CURLOPT_TIMEOUT        => $connectT + 2,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => 0,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_MAXREDIRS      => 5,
+                    CURLOPT_COOKIEFILE     => $jar,
+                    CURLOPT_COOKIEJAR      => $jar,
+                ]);
+                $warmBody = curl_exec($ch);
+                $warmCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                if ($warmBody !== false && $warmCode === 200) $siteUnpatched = true;
+            }
+            foreach (array_reverse($candidates) as $ep) {
+                $res = self::execSyncHttp($ep, 'get_z', $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+                if ($res['body'] !== false && $res['code'] === 200 && self::isSyncJson($res['body'])) {
+                    $j = json_decode((string)$res['body'], true);
+                    if (!(empty($j['ok']) && strtolower((string)($j['error'] ?? '')) === 'bad request')) {
+                        self::$workingEndpoint = $ep; self::$workingMode = 'get_z'; self::$workingBaseUrl = $baseUrl;
+                        return $res + ['url' => $ep];
+                    }
+                }
+            }
+        }
         return null;
     }
 
@@ -131,21 +376,40 @@ class DeskSync {
         $connectT = $fast ? 4 : 6;
         $totalT   = $fast ? 6 : 40;
         $url = self::getCfg('desk_sync_url');
+        $secureOutbox=$action==='bot_outbox';
+        if($secureOutbox && strtolower((string)parse_url($url,PHP_URL_SCHEME))!=='https')throw new RuntimeException('Notification relay requires HTTPS');
         $payload['action'] = $action;
         $payload['key']    = self::getCfg('desk_sync_key');
+        $sdpZ = self::encodeSyncToken($payload);
+
+        if (self::$workingEndpoint !== '' && self::$workingMode !== '' && self::$workingBaseUrl === $url) {
+            $cached = self::execSyncHttp(self::$workingEndpoint, self::$workingMode, $payload, $sdpZ, $connectT, $totalT, $secureOutbox);
+            if ($cached['body'] !== false && $cached['code'] === 200 && self::isSyncJson($cached['body'])) {
+                $j = json_decode((string)$cached['body'], true);
+                if (empty($j['ok'])) throw new Exception('خطای سرور: ' . ($j['error'] ?? 'نامشخص'));
+                return $j;
+            }
+            self::$workingEndpoint = ''; self::$workingMode = '';
+        }
+
+        $jar = self::cookieJarPath();
         $ch = curl_init($url);
-        curl_setopt_array($ch, [
+        $primaryOpts = [
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => http_build_query(['payload' => json_encode($payload, JSON_UNESCAPED_UNICODE)], '', '&', PHP_QUERY_RFC3986),
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded; charset=utf-8'],
+            CURLOPT_HTTPHEADER     => self::browserHeaders($url, 'application/x-www-form-urlencoded; charset=utf-8'),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CONNECTTIMEOUT => $connectT,
             CURLOPT_TIMEOUT        => $totalT,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => 0,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS      => 3,
-        ]);
+            CURLOPT_SSL_VERIFYPEER => $secureOutbox,
+            CURLOPT_SSL_VERIFYHOST => $secureOutbox?2:0,
+            CURLOPT_FOLLOWLOCATION => !$secureOutbox,
+            CURLOPT_MAXREDIRS      => 5,
+            CURLOPT_COOKIEFILE     => $jar,
+            CURLOPT_COOKIEJAR      => $jar,
+        ];
+        if (defined('CURLOPT_POSTREDIR')) $primaryOpts[CURLOPT_POSTREDIR] = 7;
+        curl_setopt_array($ch, $primaryOpts);
         $body = curl_exec($ch);
         $err  = curl_error($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -153,20 +417,21 @@ class DeskSync {
         // https failed at connection level → retry once over plain http.
         // v2.11.0: skipped when DNS itself failed (device offline) — the
         // fallback could never succeed and only doubled the frozen time.
-        if ($body === false && stripos($url, 'https://') === 0 && stripos($err, 'resolve') === false) {
-            $ch = curl_init('http://' . substr($url, 8));
+        if (!$secureOutbox && $body === false && stripos($url, 'https://') === 0 && stripos($err, 'resolve') === false) {
+            $httpUrl = 'http://' . substr($url, 8);
+            $ch = curl_init($httpUrl);
             curl_setopt_array($ch, [
                 CURLOPT_POST           => true,
-                CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE),
-                CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+                CURLOPT_POSTFIELDS     => http_build_query(['payload' => json_encode($payload, JSON_UNESCAPED_UNICODE)], '', '&', PHP_QUERY_RFC3986),
+                CURLOPT_HTTPHEADER     => self::browserHeaders($httpUrl, 'application/x-www-form-urlencoded; charset=utf-8'),
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_CONNECTTIMEOUT => $connectT,
                 CURLOPT_TIMEOUT        => $totalT,
-                CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_MAXREDIRS      => 3,
+                CURLOPT_FOLLOWLOCATION => !$secureOutbox,
+                CURLOPT_MAXREDIRS      => 5,
             ]);
             $body = curl_exec($ch);
-            if ($body !== false) { $err = ''; $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); }
+            if ($body !== false) { $err = ''; $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); $url = $httpUrl; }
             curl_close($ch);
         }
         // Some hosts whitelist only one of these legacy/companion endpoint filenames.
@@ -176,18 +441,22 @@ class DeskSync {
             $alternateUrl = self::alternateSyncEndpoint($url);
             if ($alternateUrl && $alternateUrl !== $url) {
                 $ch = curl_init($alternateUrl);
-                curl_setopt_array($ch, [
+                $altOpts = [
                     CURLOPT_POST => true,
                     CURLOPT_POSTFIELDS => http_build_query(['payload' => json_encode($payload, JSON_UNESCAPED_UNICODE)], '', '&', PHP_QUERY_RFC3986),
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded; charset=utf-8'],
+                    CURLOPT_HTTPHEADER => self::browserHeaders($alternateUrl, 'application/x-www-form-urlencoded; charset=utf-8'),
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_CONNECTTIMEOUT => $connectT,
                     CURLOPT_TIMEOUT => $totalT,
-                    CURLOPT_SSL_VERIFYPEER => false,
-                    CURLOPT_SSL_VERIFYHOST => 0,
-                    CURLOPT_FOLLOWLOCATION => true,
-                    CURLOPT_MAXREDIRS => 3,
-                ]);
+                    CURLOPT_SSL_VERIFYPEER => $secureOutbox,
+                    CURLOPT_SSL_VERIFYHOST => $secureOutbox ? 2 : 0,
+                    CURLOPT_FOLLOWLOCATION => !$secureOutbox,
+                    CURLOPT_MAXREDIRS => 5,
+                    CURLOPT_COOKIEFILE => $jar,
+                    CURLOPT_COOKIEJAR  => $jar,
+                ];
+                if (defined('CURLOPT_POSTREDIR')) $altOpts[CURLOPT_POSTREDIR] = 7;
+                curl_setopt_array($ch, $altOpts);
                 $altBody = curl_exec($ch);
                 $altErr = curl_error($ch);
                 $altCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -196,6 +465,13 @@ class DeskSync {
                 if ($altBody !== false && $altCode !== 403) {
                     $body = $altBody; $err = $altErr; $code = $altCode; $url = $alternateUrl;
                 }
+            }
+        }
+        $siteUnpatched = false;
+        if ($body !== false && ($code === 403 || $code !== 200 || !self::isSyncJson($body))) {
+            $fb = self::tryFallbackTransports($url, $payload, $sdpZ, $connectT, $totalT, $secureOutbox, $forbiddenBodies, $siteUnpatched);
+            if ($fb !== null) {
+                $body = $fb['body']; $err = $fb['err']; $code = $fb['code']; $url = $fb['url'];
             }
         }
         // A legacy endpoint may still parse only raw JSON and return its normal
@@ -208,14 +484,14 @@ class DeskSync {
                 curl_setopt_array($ch, [
                     CURLOPT_POST => true,
                     CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_HTTPHEADER => self::browserHeaders($url, 'application/json'),
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_CONNECTTIMEOUT => $connectT,
                     CURLOPT_TIMEOUT => $totalT,
                     CURLOPT_SSL_VERIFYPEER => false,
                     CURLOPT_SSL_VERIFYHOST => 0,
                     CURLOPT_FOLLOWLOCATION => true,
-                    CURLOPT_MAXREDIRS => 3,
+                    CURLOPT_MAXREDIRS => 5,
                 ]);
                 $legacyBody = curl_exec($ch);
                 $legacyErr = curl_error($ch);
@@ -236,7 +512,10 @@ class DeskSync {
             $hint = '';
             if ($code === 403) {
                 $diagnosis = self::diagnose403Response(implode("\n", $forbiddenBodies));
-                $hint = ' — هر دو مسیر همگام‌سازی (desk-sync-api.php و class-exam-sync-api.php) با HTTP 403 رد شدند. در APIهای فعلی، کلید نادرست پاسخ HTTP 200 می‌دهد؛ پس این 403 احتمالاً پیش از اجرای API از وب‌سرور/WAF/قواعد دسترسی آمده است (' . $diagnosis . '). از میزبان بخواهید درخواست‌های POST با Content-Type: application/x-www-form-urlencoded را در access/error/WAF log بررسی کند؛ کلید را تغییر ندهید.';
+                $patchNote = $siteUnpatched
+                    ? ' خود سایت در دسترس است اما بستهٔ اصلاحی جدید سایت هنوز روی هاست جایگزین نشده است؛ فایل‌های بستهٔ اصلاحی سایت را در ریشهٔ هاست استخراج کنید تا همگام‌سازی از مسیر امن جایگزین انجام و سطح دسترسی فایل‌ها (0644) خودکار ترمیم شود.'
+                    : '';
+                $hint = ' — هر دو مسیر همگام‌سازی (desk-sync-api.php و class-exam-sync-api.php) با HTTP 403 رد شدند.' . $patchNote . ' در APIهای فعلی، کلید نادرست پاسخ HTTP 200 می‌دهد؛ پس این 403 احتمالاً پیش از اجرای API از وب‌سرور/WAF/قواعد دسترسی آمده است (' . $diagnosis . '). از میزبان بخواهید درخواست‌های POST با Content-Type: application/x-www-form-urlencoded را در access/error/WAF log بررسی کند؛ کلید را تغییر ندهید.';
             }
             throw new Exception('پاسخ نامعتبر سرور (HTTP ' . $code . ')' . $hint);
         }
@@ -329,6 +608,7 @@ class DeskSync {
             return;
         }
         $row  = $c['row'];
+        if(in_array($tbl,['class_exam_groups','class_exam_group_members'],true)){require_once __DIR__.'/class_exam_groups.php';if(ceg_sync_conflict($tbl,$row))throw new RuntimeException('تعارض گروه آزمون سایت و دسکتاپ؛ گروه‌های هم‌زمان خودکار ادغام یا حذف نمی‌شوند.');}
         $cols = array_values(array_intersect(self::columns($tbl), array_keys($row)));
         if (!$cols) return;
         $ph   = implode(',', array_fill(0, count($cols), '?'));
@@ -370,7 +650,9 @@ class DeskSync {
     public static function runIfDue() {
         if (!self::enabled()) return ['ok' => false, 'skipped' => 'disabled'];
         $last = (int) self::getCfg('desk_sync_last', '0');
-        if (time() - $last < self::MIN_INTERVAL) return ['ok' => true, 'skipped' => 'recent'];
+        $safety = self::getCfg('desk_sync_mode', 'full') === 'event'
+            ? self::EVENT_SAFETY_INTERVAL : self::MIN_INTERVAL;
+        if (time() - $last < $safety) return ['ok' => true, 'skipped' => 'recent'];
         return self::run();
     }
 
@@ -383,10 +665,11 @@ class DeskSync {
     }
 
     /**
-     * Real-time heartbeat (called every few seconds by the UI):
+     * Real-time heartbeat (called every few seconds by the daemon/UI):
      *  - pushes local changes IMMEDIATELY after any edit,
-     *  - pulls site changes within seconds (cheap `ping` checks the site's
-     *    change counter, a full cycle runs only when something is new),
+     *  - pulls site changes within ~30s (a throttled `ping` checks the site's
+     *    change counter; a full cycle runs only when something is new or the
+     *    5-minute safety interval has passed),
      *  - when offline, retries on the 10s/20s/60s ladder and keeps every
      *    change safely in the local change-log until the connection is back.
      */
@@ -403,42 +686,60 @@ class DeskSync {
         if ($fails > 0 && $now < $nextTry) return ['ok' => true, 'skipped' => 'backoff'] + $base;
 
         $due = $pending > 0 || self::getCfg('desk_sync_snapshot_done') !== '1';
+        // "event" mode: no idle probes at all — the desktop talks to the
+        // site only when something changed, plus the hourly mirror check
+        // below. (Mode selector lives on the sync settings page.)
+        $event = self::getCfg('desk_sync_mode', 'full') === 'event';
 
         // nothing to push → ask the site (cheap) whether IT has news.
-        // Throttled to PING_INTERVAL so the 5-second daemon loop does not hammer
-        // the site; the timestamp only advances on a GOOD answer, so the offline
-        // back-off ladder still owns retry timing.
-        if (!$due) {
+        // The probe is throttled to PING_INTERVAL (30s): the desktop→site
+        // direction is unaffected (pending>0 below runs a full cycle
+        // immediately, kicked within a second of any edit), and a change made
+        // ON THE SITE is still noticed within one probe. The success
+        // timestamp only advances on a GOOD probe, so the offline back-off
+        // ladder still controls retry timing after an outage.
+        if (!$due && !$event) {
             $lastPing = (int) self::getCfg('desk_sync_ping_last', '0');
             if ($now - $lastPing >= self::PING_INTERVAL) {
-            try {
-                $res = self::call('ping', [], true);
-                if (!isset($res['log_max']) || !is_numeric($res['log_max']) || $res['log_max'] < 0) throw new Exception('پاسخ بررسی سرور معتبر نیست');
-                self::setCfg('desk_sync_ping_last', (string)$now);
-                /* v2.107.0: a good answer IS proof that the site is reachable —
-                   record it so the connection panel stops sitting on
-                   «در انتظار وضعیت همگام‌سازی» between the (rare) full cycles. */
-                self::setCfg('desk_sync_verified_at', (string)$now);
-                $base['server_verified'] = true;
-                $base['fails'] = 0; $base['alert'] = false; $base['retry_in'] = 0;
-                if ((int)($res['log_max'] ?? 0) > (int) self::getCfg('desk_sync_cursor', '0')) $due = true;
-                if ($fails > 0) { self::setCfg('desk_sync_fails', '0'); self::setCfg('desk_sync_next_try', '0'); $fails = 0; }
-            } catch (Throwable $e) {
-                if (self::isOffline($e)) return self::noteFailure($now) + ['ok' => true, 'skipped' => 'offline', 'pending' => $pending];
-                // a rejected answer is not proof of a healthy link
-                $base['probe_failed'] = true;
-                // old server file (no ping action) → fall back to the periodic cycle
-                $due = ($now - (int) self::getCfg('desk_sync_last', '0')) >= self::MIN_INTERVAL;
-            }
+                try {
+                    $res = self::call('ping', [], true);
+                    if (!isset($res['log_max']) || !is_numeric($res['log_max']) || $res['log_max'] < 0) throw new Exception('پاسخ بررسی سرور معتبر نیست');
+                    self::setCfg('desk_sync_ping_last', (string)$now);
+                    /* v2.107.0: persist the proof of a *real* site answer.
+                       Only `run()` used to record it, and full cycles are rare
+                       (300s safety cycle), so the idle heartbeat carried
+                       server_verified=false almost always and the connection
+                       monitor flipped back to «در انتظار وضعیت همگامسازی»
+                       within seconds — while the site was perfectly reachable
+                       and the manual button worked. Now one good probe keeps
+                       the flag true for the next 60s (recency check below),
+                       i.e. for the whole 30s probe cadence. */
+                    self::setCfg('desk_sync_verified_at', (string)$now);
+                    $base['server_verified'] = true;
+                    $base['fails'] = 0; $base['alert'] = false; $base['retry_in'] = 0;
+                    if ((int)($res['log_max'] ?? 0) > (int) self::getCfg('desk_sync_cursor', '0')) $due = true;
+                    if ($fails > 0) { self::setCfg('desk_sync_fails', '0'); self::setCfg('desk_sync_next_try', '0'); $fails = 0; }
+                } catch (Throwable $e) {
+                    if (self::isOffline($e)) return self::noteFailure($now) + ['ok' => true, 'skipped' => 'offline', 'pending' => $pending];
+                    // A rejected/unsupported ping is not proof of a healthy connection.
+                    $base['probe_failed'] = true;
+                    // old server file (no ping action) → fall back to the periodic cycle
+                    $due = ($now - (int) self::getCfg('desk_sync_last', '0')) >= self::MIN_INTERVAL;
+                }
             }
         }
 
-        /* A probe or a full cycle that verified the site within the last minute
-           still counts, so the status does not flicker between two probes. */
+        // A probe or full cycle that verified the site within the last minute
+        // still counts as verified, so the 15s notification-handoff cadence
+        // does not have to wait for the next 30s probe. The guard remains:
+        // nothing is handed off without a recently verified mirror and zero
+        // unpushed local changes.
         if (!$base['server_verified'] && ($now - (int) self::getCfg('desk_sync_verified_at', '0')) < 60) $base['server_verified'] = true;
 
         // periodic safety cycle even when both sides look quiet
-        if (!$due && ($now - (int) self::getCfg('desk_sync_last', '0')) >= self::MIN_INTERVAL) $due = true;
+        // (event mode relaxes it to the hourly mirror check)
+        $safety = $event ? self::EVENT_SAFETY_INTERVAL : self::MIN_INTERVAL;
+        if (!$due && ($now - (int) self::getCfg('desk_sync_last', '0')) >= $safety) $due = true;
 
         if (!$due) return ['ok' => true, 'skipped' => 'idle'] + $base;
 
@@ -448,6 +749,9 @@ class DeskSync {
             self::setCfg('desk_sync_fails', '0');
             self::setCfg('desk_sync_next_try', '0');
             if (!isset($res['skipped'])) self::setCfg('desk_sync_verified_at', (string)$now);
+            /* A cycle that was skipped (e.g. another worker held the lock) is
+               not proof by itself, but a proof recorded moments ago stays
+               valid — the panel must not flash «در انتظار…» during a lock. */
             return $res + ['pending' => $pending, 'fails' => 0, 'alert' => false, 'retry_in' => 0,
                             'server_verified' => !isset($res['skipped']) || $base['server_verified']];
         }
@@ -725,6 +1029,8 @@ class DeskSync {
 
         $pushed = 0; $pulled = 0; $warn = ''; $out0 = '';
         try {
+            require_once __DIR__.'/class_exam_groups.php';
+            ensure_exams_schema();ceg_schema();
             self::ensureLocalTriggers();
             self::bumpSequences();
 
@@ -811,6 +1117,7 @@ class DeskSync {
                 // upgraded from a pre-2.4 install: everything except the
                 // bot tables was already imported by the original snapshot
                 $snapped = array_values(array_diff(json_decode(DESK_SYNC_TABLES, true), [
+                    'class_exam_groups','class_exam_group_members',
                     'bale_bot_users','telegram_bot_users','rubika_bot_users','bot_admin_sessions',
                     'bot_message_templates','bot_button_templates','bot_login_tokens','bot_message_logs',
                 ]));
@@ -923,14 +1230,22 @@ class DeskSync {
 
             self::setCfg('desk_sync_err', $warn);
             self::setCfg('desk_sync_last_ok', (string) time());
-            /* v2.107.0: the manual «همگام‌سازی همین حالا» button and every full
-               cycle record the moment the site was actually reached. The panel
-               reads this as proof, so a successful sync can never be reported
-               as «هنوز تأیید نشده». */
+            /* v2.107.0: «successful exchange» is recorded here, inside run(),
+               so it is written by EVERY path — the manual «همگامسازی همین حالا»
+               button (desk-sync.php?ajax=run&force) and the background daemon
+               alike. The connection monitor used to depend only on a flag in
+               the daemon heartbeat, so on installs whose heartbeat did not
+               carry it the panel stayed on «در انتظار وضعیت همگامسازی» even
+               right after a perfectly successful manual sync. */
             self::setCfg('desk_sync_verified_at', (string) time());
+            self::setCfg('desk_sync_fails', '0');
+            self::setCfg('desk_sync_next_try', '0');
             self::setCfg('desk_sync_pushed', (string)((int)self::getCfg('desk_sync_pushed','0') + $pushed));
             self::setCfg('desk_sync_pulled', (string)((int)self::getCfg('desk_sync_pulled','0') + $pulled));
-            $out = ['ok' => true, 'pushed' => $pushed, 'pulled' => $pulled];
+            /* Explicit proof for whoever consumes this result (manual button
+               JSON, daemon heartbeat, notification hand-off): the site really
+               answered a full cycle. */
+            $out = ['ok' => true, 'pushed' => $pushed, 'pulled' => $pulled, 'server_verified' => true];
             if (!empty($out0)) $out['reconciled'] = $out0;
             if ($warn !== '') $out['warning'] = $warn;
         } catch (Throwable $e) {

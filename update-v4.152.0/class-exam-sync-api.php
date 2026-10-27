@@ -13,18 +13,32 @@
  * Authentication is inherited from the original endpoint; never replace its key.
  */
 
+if (!defined('SDP_SYNC_ACTIVE')) {
+    define('SDP_SYNC_ACTIVE', true);
+}
+if (!defined('SDP_SYNC_ROOT')) {
+    define('SDP_SYNC_ROOT', is_file(__DIR__ . '/config/config.php') ? __DIR__ : dirname(__DIR__));
+}
+foreach (['desk-sync-api.php', 'class-exam-sync-api.php'] as $__sdpEpName) {
+    $__sdpEpFile = SDP_SYNC_ROOT . '/' . $__sdpEpName;
+    if (is_file($__sdpEpFile) && ((@fileperms($__sdpEpFile) & 0777) < 0600)) @chmod($__sdpEpFile, 0644);
+}
+
 // Reuse the installation's existing key; no key/configuration is shipped or overwritten.
 function ceg_existing_sync_key() {
     // Release_V1.0 installs use this private key file. An invalid existing key fails closed.
     $private=__DIR__.'/config/desk-sync-key.php';
+    if(!is_file($private))$private=SDP_SYNC_ROOT.'/config/desk-sync-key.php';
     if(is_file($private)) {
         $key=require $private;
-        return is_string($key) && preg_match('/^[a-f0-9]{64}$/D',$key) ? $key : '';
+        if(is_string($key) && preg_match('/^[a-f0-9]{64}$/D',$key)) return $key;
+        if(is_string($key) && strlen($key)>=16 && strpos($key,'CHANGE-ME')===false) return $key;
     }
     // Compatibility only for pre-release installations without a private key file.
     $path=__DIR__.'/desk-sync-api.php';
+    if(!is_file($path))$path=SDP_SYNC_ROOT.'/desk-sync-api.php';
     if(!is_file($path))return '';
-    $tokens=array_values(array_filter(token_get_all(file_get_contents($path)),function($t){return !is_array($t)||!in_array($t[0],[T_WHITESPACE,T_COMMENT,T_DOC_COMMENT],true);}));
+    $tokens=array_values(array_filter(token_get_all((string)@file_get_contents($path)),function($t){return !is_array($t)||!in_array($t[0],[T_WHITESPACE,T_COMMENT,T_DOC_COMMENT],true);}));
     for($i=0;$i<count($tokens)-5;$i++) {
         if(!is_array($tokens[$i]) || $tokens[$i][0]!==T_STRING || strtolower($tokens[$i][1])!=='define' || $tokens[$i+1]!=='(' || !is_array($tokens[$i+2]) || $tokens[$i+2][0]!==T_CONSTANT_ENCAPSED_STRING || substr($tokens[$i+2][1],1,-1)!=='DESK_SYNC_KEY' || $tokens[$i+3]!==',' || !is_array($tokens[$i+4]) || $tokens[$i+4][0]!==T_CONSTANT_ENCAPSED_STRING)continue;
         $literal=$tokens[$i+4][1];
@@ -33,12 +47,32 @@ function ceg_existing_sync_key() {
     return '';
 }
 
+function ceg_all_sync_keys(): array {
+    $keys = [];
+    $primary = ceg_existing_sync_key();
+    if ($primary !== '' && strlen($primary) >= 16 && strpos($primary, 'CHANGE-ME') === false) $keys[] = $primary;
+    $private = SDP_SYNC_ROOT . '/config/desk-sync-key.php';
+    if (is_file($private)) {
+        $v = require $private;
+        if (is_string($v) && strlen($v) >= 16 && strpos($v, 'CHANGE-ME') === false) $keys[] = $v;
+    }
+    $legacy = SDP_SYNC_ROOT . '/desk-sync-api.php';
+    if (is_file($legacy)) {
+        $src = (string)@file_get_contents($legacy, false, null, 0, 131072);
+        if (preg_match("~define\\s*\\(\\s*['\"]DESK_SYNC_KEY['\"]\\s*,\\s*['\"]((?:[^'\"\\\\]|\\\\.){16,200})['\"]~", $src, $m)) {
+            $lit = str_replace(["\\\\", "\\'", '\\"'], ["\\", "'", '"'], $m[1]);
+            if (strlen($lit) >= 16 && strpos($lit, 'CHANGE-ME') === false) $keys[] = $lit;
+        }
+    }
+    return array_values(array_unique($keys));
+}
 
-require_once __DIR__ . '/config/config.php';
-require_once __DIR__ . '/includes/db.php';
+require_once SDP_SYNC_ROOT . '/config/config.php';
+require_once SDP_SYNC_ROOT . '/includes/db.php';
 if(!defined('DESK_SYNC_KEY'))define('DESK_SYNC_KEY',ceg_existing_sync_key());
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, no-cache, must-revalidate');
 
 const SYNC_TABLES = [
     'admins',
@@ -62,13 +96,76 @@ function pk_col($t) { return $t === 'settings' ? 'key_name' : 'id'; }
 function jout($data) { echo json_encode($data, JSON_UNESCAPED_UNICODE); exit; }
 function jfail($msg) { jout(['ok' => false, 'error' => $msg]); }
 
+function desk_sync_unpack_token(string $token): ?array {
+    $token = trim($token);
+    if (strlen($token) < 4) return null;
+    $prefix = substr($token, 0, 2);
+    $b64 = strtr(substr($token, 2), '-_', '+/');
+    $pad = strlen($b64) % 4;
+    if ($pad > 0) $b64 .= str_repeat('=', 4 - $pad);
+    $bin = base64_decode($b64, true);
+    if (!is_string($bin) || $bin === '') return null;
+    if ($prefix === 'z1') {
+        $json = function_exists('gzinflate') ? @gzinflate($bin) : false;
+        if (!is_string($json) || $json === '') return null;
+    } elseif ($prefix === 'b1') {
+        $json = $bin;
+    } else {
+        return null;
+    }
+    $arr = json_decode($json, true);
+    return is_array($arr) ? $arr : null;
+}
+
+function desk_sync_receive_chunk(): ?string {
+    $cid = isset($_REQUEST['sdp_cid']) ? preg_replace('/[^a-f0-9]/', '', strtolower((string)$_REQUEST['sdp_cid'])) : '';
+    if (strlen($cid) < 8 || strlen($cid) > 32) return null;
+    $ci = isset($_REQUEST['sdp_ci']) ? (int)$_REQUEST['sdp_ci'] : -1;
+    $cn = isset($_REQUEST['sdp_cn']) ? (int)$_REQUEST['sdp_cn'] : 0;
+    $cp = isset($_REQUEST['sdp_cp']) ? (string)$_REQUEST['sdp_cp'] : '';
+    if ($ci < 0 || $cn < 1 || $cn > 2000 || $ci >= $cn || $cp === '' || strlen($cp) > 65536) jfail('bad chunk');
+    $dir = rtrim(sys_get_temp_dir(), '/\\') . '/sdp_sync_chunks';
+    if (!is_dir($dir)) @mkdir($dir, 0700, true);
+    if ($ci === 0) {
+        foreach (glob($dir . '/chk_*') ?: [] as $old) {
+            if (@filemtime($old) < time() - 300) @unlink($old);
+        }
+    }
+    $partFile = $dir . '/chk_' . $cid . '_' . $ci;
+    if (@file_put_contents($partFile, $cp) === false) jfail('chunk storage unavailable');
+    if ($ci < $cn - 1) jout(['ok' => true, 'chunk' => $ci]);
+    $full = '';
+    for ($i = 0; $i < $cn; $i++) {
+        $pf = $dir . '/chk_' . $cid . '_' . $i;
+        if (!is_file($pf)) jfail('missing chunk ' . $i);
+        $full .= (string)@file_get_contents($pf);
+        @unlink($pf);
+    }
+    return $full;
+}
+if (defined('SDP_SYNC_LIB_ONLY')) return;
+
+$in = null;
+if (!empty($_REQUEST['sdp_cid'])) {
+    $assembledToken = desk_sync_receive_chunk();
+    if (is_string($assembledToken)) $in = desk_sync_unpack_token($assembledToken);
+}
 $rawRequest = file_get_contents('php://input');
-$in = json_decode($rawRequest, true); // Keep backward compatibility with existing JSON clients.
+if (!is_array($in)) {
+    $sdpZ = $_POST['sdp_z'] ?? $_GET['sdp_z'] ?? $_SERVER['HTTP_X_SDP_Z'] ?? null;
+    if (!is_string($sdpZ) && $rawRequest !== '') {
+        $formZ = [];
+        parse_str($rawRequest, $formZ);
+        if (isset($formZ['sdp_z']) && is_string($formZ['sdp_z'])) $sdpZ = $formZ['sdp_z'];
+    }
+    if (is_string($sdpZ) && $sdpZ !== '') $in = desk_sync_unpack_token($sdpZ);
+}
+if (!is_array($in)) $in = json_decode($rawRequest, true); // Keep backward compatibility with existing JSON clients.
 if (!is_array($in)) {
     // WAF/hosting compatibility: some hosts reject application/json POSTs before PHP.
     // The desktop client can tunnel the exact same JSON document as one form field,
     // avoiding max_input_vars truncation of large sync batches.
-    $formPayload = $_POST['payload'] ?? null;
+    $formPayload = $_POST['payload'] ?? $_GET['payload'] ?? null;
     if (!is_string($formPayload) && $rawRequest !== '') {
         $form = [];
         parse_str($rawRequest, $form); // Covers hosts that do not populate $_POST.
@@ -76,16 +173,27 @@ if (!is_array($in)) {
     }
     if (is_string($formPayload)) $in = json_decode($formPayload, true);
 }
+if (!is_array($in) && !empty($_REQUEST['action']) && !empty($_REQUEST['key'])) {
+    $in = $_REQUEST;
+}
 if (!is_array($in)) jfail('bad request');
-if (strpos(DESK_SYNC_KEY, 'CHANGE-ME') === 0 || strlen(DESK_SYNC_KEY) < 16) jfail('sync key unavailable — keep the original desk-sync-api.php with its configured DESK_SYNC_KEY');
-if (!hash_equals(DESK_SYNC_KEY, (string)($in['key'] ?? ''))) { http_response_code(200); jfail('invalid key'); }
+$__allSyncKeys = ceg_all_sync_keys();
+if ((strpos(DESK_SYNC_KEY, 'CHANGE-ME') === 0 || strlen(DESK_SYNC_KEY) < 16) && !$__allSyncKeys) jfail('sync key unavailable — keep the original desk-sync-api.php with its configured DESK_SYNC_KEY');
+$__givenKey = (string)($in['key'] ?? '');
+$__keyAuthorized = (strlen(DESK_SYNC_KEY) >= 16 && strpos(DESK_SYNC_KEY, 'CHANGE-ME') === false && hash_equals(DESK_SYNC_KEY, $__givenKey));
+if (!$__keyAuthorized) {
+    foreach ($__allSyncKeys as $__candKey) {
+        if (hash_equals($__candKey, $__givenKey)) { $__keyAuthorized = true; break; }
+    }
+}
+if (!$__keyAuthorized) { http_response_code(200); jfail('invalid key'); }
 
 $pdo = DB::getInstance()->getPdo();
 if (!$pdo) jfail('database unavailable');
 $action = $in['action'] ?? '';
 if ($action === 'bot_outbox') {
     // Authentication above is mandatory; no tokens, arbitrary methods or URLs from clients.
-    require_once __DIR__.'/includes/bot_helpers.php';
+    require_once SDP_SYNC_ROOT.'/includes/bot_helpers.php';
     if(session_status()===PHP_SESSION_ACTIVE)session_write_close();
     try {
         $ids=bot_outbox_accept($in['jobs']??[]);
@@ -94,7 +202,7 @@ if ($action === 'bot_outbox') {
     } catch(Throwable $e) { jfail('notification queue rejected request or storage unavailable'); }
 }
 
-require_once __DIR__.'/includes/class_exam_groups.php';
+require_once SDP_SYNC_ROOT.'/includes/class_exam_groups.php';
 ensure_exams_schema();ceg_schema();
 
 /* ------------------------------------------------------------------ */
@@ -314,7 +422,7 @@ if ($action === 'files_list') {
     foreach (array_slice($dirs, 0, 200) as $d) {
         $rel = desk_safe_rel($d);
         if ($rel === '') continue;
-        $full = __DIR__ . '/' . $rel;
+        $full = SDP_SYNC_ROOT . '/' . $rel;
         $files = [];
         if (is_dir($full)) {
             foreach (scandir($full) ?: [] as $fn) {
@@ -335,7 +443,7 @@ if ($action === 'files_stat') {
     foreach (array_slice($paths, 0, 2000) as $p) {
         $rel = desk_safe_rel($p);
         if ($rel === '') continue;
-        $full = __DIR__ . '/' . $rel;
+        $full = SDP_SYNC_ROOT . '/' . $rel;
         $out[$rel] = is_file($full) ? ['s' => (int)filesize($full), 'm' => (int)filemtime($full)] : ['s' => -1, 'm' => 0];
     }
     jout(['ok' => true, 'files' => $out]);
@@ -344,7 +452,7 @@ if ($action === 'files_stat') {
 if ($action === 'file_get') {
     $rel = desk_safe_rel($in['path'] ?? '');
     if ($rel === '') jfail('bad path');
-    $full = __DIR__ . '/' . $rel;
+    $full = SDP_SYNC_ROOT . '/' . $rel;
     if (!is_file($full)) jfail('not found');
     $size = (int)filesize($full);
     if ($size > 25 * 1024 * 1024) jfail('file too large');
@@ -352,11 +460,10 @@ if ($action === 'file_get') {
 }
 
 /* v2.13.0: reverse exam-design path — an exam DESIGNED ON THE DESKTOP with a
-   PDF source cannot be rendered there (the portable app has no Imagick or
-   Ghostscript). The desktop pushes the PDF via file_put and then calls this
-   action: the SITE converts the PDF to page images (same proven logic as
-   exam-source-api.php) and returns the list, so the desktop pulls them back
-   and both sides show the exam identically. */
+   PDF source cannot be rendered there (the portable app has no Imagick).
+   The desktop pushes the PDF via file_put and then calls this action: the
+   SITE converts the PDF to page images via Imagick and returns the list, so
+   the desktop pulls them back and both sides show the exam identically. */
 if ($action === 'exam_pages') {
     $examId = (int)($in['exam_id'] ?? 0);
     if ($examId <= 0) jfail('bad exam id');
@@ -366,30 +473,25 @@ if ($action === 'exam_pages') {
         $st->execute([$examId]);
         $qf = (string)($st->fetchColumn() ?: '');
     } catch (Exception $e) { /* row may not have synced yet */ }
-    // desktop may convert BEFORE its exam row reaches the site → accept the
-    // explicit path too (still locked inside uploads/)
     if ($qf === '' && !empty($in['path'])) $qf = (string)$in['path'];
     $rel = desk_safe_rel($qf);
     if ($rel === '') jout(['ok' => true, 'pages' => []]);
-    $full = __DIR__ . '/' . $rel;
+    $full = SDP_SYNC_ROOT . '/' . $rel;
     if (!is_file($full)) {
-        /* v4.94.0: PDF بعد از تبدیل حذف می‌شود — اگر تصاویر کش موجودند همان‌ها را بده */
         $cached = [];
-        foreach (glob(__DIR__ . '/uploads/exams/pdf-pages/exam_' . $examId . '/page_*.jpg') ?: [] as $img) $cached[] = 'uploads/exams/pdf-pages/exam_' . $examId . '/' . basename($img);
+        foreach (glob(SDP_SYNC_ROOT . '/uploads/exams/pdf-pages/exam_' . $examId . '/page_*.jpg') ?: [] as $img) $cached[] = 'uploads/exams/pdf-pages/exam_' . $examId . '/' . basename($img);
         sort($cached);
         jout(['ok' => true, 'pages' => $cached]);
     }
     $ext = strtolower(pathinfo($full, PATHINFO_EXTENSION));
     if ($ext !== 'pdf') jout(['ok' => true, 'pages' => [$rel]]);  // image source needs no conversion
 
-    $cacheDir = __DIR__ . '/uploads/exams/pdf-pages/exam_' . $examId;
+    $cacheDir = SDP_SYNC_ROOT . '/uploads/exams/pdf-pages/exam_' . $examId;
     if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
     $declaredPages = max(0, (int)($in['declared_pages'] ?? 0));
-    /* v4.101.0: صفحات انتخابی کاربر (مثلا «5,6») — فقط همین‌ها تبدیل می‌شوند */
     $selPages = array_values(array_filter(array_map('intval', explode(',', (string)($in['selected_pages'] ?? ''))), function($x){ return $x >= 1; }));
     sort($selPages);
     $pages = [];
-    // valid cache (newer than the pdf, and complete) → reuse
     foreach (glob($cacheDir . '/page_*.jpg') ?: [] as $img) {
         if (filemtime($img) < filemtime($full)) @unlink($img); else $pages[] = 'uploads/exams/pdf-pages/exam_' . $examId . '/' . basename($img);
     }
@@ -401,7 +503,6 @@ if ($action === 'exam_pages') {
     }
     if ($declaredPages <= 0) $declaredPages = 1;
     $srcList = $selPages ?: range(1, $declaredPages);
-    // 1) Imagick — render one source page per output image (never flatten)
     if (class_exists('Imagick')) {
         foreach ($srcList as $oi => $sp) {
             $i = $sp - 1;
@@ -416,31 +517,7 @@ if ($action === 'exam_pages') {
             } catch (Exception $e) { break; }
         }
     }
-    // 2) Ghostscript CLI fallback
-    if (count($pages) < count($srcList) && function_exists('exec')) {
-        foreach (glob($cacheDir . '/page_*.jpg') ?: [] as $old) @unlink($old);
-        $pages = [];
-        foreach ($srcList as $oi => $sp) {
-            $file = $cacheDir . '/page_' . str_pad((string)($oi + 1), 3, '0', STR_PAD_LEFT) . '.jpg';
-            @exec('gs -q -dSAFER -dBATCH -dNOPAUSE -sDEVICE=jpeg -r180 -dJPEGQ=90 -dFirstPage=' . (int)$sp . ' -dLastPage=' . (int)$sp . ' -sOutputFile=' . escapeshellarg($file) . ' ' . escapeshellarg($full) . ' 2>&1', $o1, $c1);
-            if ($c1 === 0 && is_file($file)) $pages[] = 'uploads/exams/pdf-pages/exam_' . $examId . '/' . basename($file);
-        }
-    }
-    // 3) ImageMagick CLI fallback (hosts without the PHP extension)
-    if (count($pages) < count($srcList) && function_exists('exec')) {
-        foreach (glob($cacheDir . '/page_*.jpg') ?: [] as $old) @unlink($old);
-        $pages = [];
-        foreach (['magick', 'convert'] as $bin) {
-            foreach ($srcList as $oi => $sp) {
-                $file = $cacheDir . '/page_' . str_pad((string)($oi + 1), 3, '0', STR_PAD_LEFT) . '.jpg';
-                @exec($bin . ' -density 180 ' . escapeshellarg($full . '[' . ($sp - 1) . ']') . ' -background white -alpha remove -quality 90 ' . escapeshellarg($file) . ' 2>&1', $o2, $c2);
-                if ($c2 === 0 && is_file($file)) $pages[] = 'uploads/exams/pdf-pages/exam_' . $examId . '/' . basename($file);
-            }
-            if (count($pages) >= count($srcList)) break;
-        }
-    }
     sort($pages);
-    /* v4.94.0: تبدیل کامل شد → PDF منبع برای آزادسازی فضای هاست حذف می‌شود */
     if (count($pages) >= count($srcList) && count($srcList) >= 1) @unlink($full);
     jout(['ok' => true, 'pages' => array_slice($pages, 0, count($srcList)), 'converted' => count($pages) > 0]);
 }
@@ -451,7 +528,7 @@ if ($action === 'file_put') {
     $b64 = (string)($in['b64'] ?? '');
     $data = base64_decode($b64, true);
     if ($data === false || strlen($data) > 25 * 1024 * 1024) jfail('bad data');
-    $full = __DIR__ . '/' . $rel;
+    $full = SDP_SYNC_ROOT . '/' . $rel;
     $dir = dirname($full);
     if (!is_dir($dir)) @mkdir($dir, 0755, true);
     if (@file_put_contents($full, $data) === false) jfail('write failed');

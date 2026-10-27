@@ -42,19 +42,84 @@ function pk_col($t) { return $t === 'settings' ? 'key_name' : 'id'; }
 function jout($data) { echo json_encode($data, JSON_UNESCAPED_UNICODE); exit; }
 function jfail($msg) { jout(['ok' => false, 'error' => $msg]); }
 
+function desk_sync_unpack_token(string $token): ?array {
+    $token = trim($token);
+    if (strlen($token) < 4) return null;
+    $prefix = substr($token, 0, 2);
+    $b64 = strtr(substr($token, 2), '-_', '+/');
+    $pad = strlen($b64) % 4;
+    if ($pad > 0) $b64 .= str_repeat('=', 4 - $pad);
+    $bin = base64_decode($b64, true);
+    if (!is_string($bin) || $bin === '') return null;
+    if ($prefix === 'z1') {
+        $json = function_exists('gzinflate') ? @gzinflate($bin) : false;
+        if (!is_string($json) || $json === '') return null;
+    } elseif ($prefix === 'b1') {
+        $json = $bin;
+    } else {
+        return null;
+    }
+    $arr = json_decode($json, true);
+    return is_array($arr) ? $arr : null;
+}
+
+function desk_sync_receive_chunk(): ?string {
+    $cid = isset($_REQUEST['sdp_cid']) ? preg_replace('/[^a-f0-9]/', '', strtolower((string)$_REQUEST['sdp_cid'])) : '';
+    if (strlen($cid) < 8 || strlen($cid) > 32) return null;
+    $ci = isset($_REQUEST['sdp_ci']) ? (int)$_REQUEST['sdp_ci'] : -1;
+    $cn = isset($_REQUEST['sdp_cn']) ? (int)$_REQUEST['sdp_cn'] : 0;
+    $cp = isset($_REQUEST['sdp_cp']) ? (string)$_REQUEST['sdp_cp'] : '';
+    if ($ci < 0 || $cn < 1 || $cn > 2000 || $ci >= $cn || $cp === '' || strlen($cp) > 65536) jfail('bad chunk');
+    $dir = rtrim(sys_get_temp_dir(), '/\\') . '/sdp_sync_chunks';
+    if (!is_dir($dir)) @mkdir($dir, 0700, true);
+    if ($ci === 0) {
+        foreach (glob($dir . '/chk_*') ?: [] as $old) {
+            if (@filemtime($old) < time() - 300) @unlink($old);
+        }
+    }
+    $partFile = $dir . '/chk_' . $cid . '_' . $ci;
+    if (@file_put_contents($partFile, $cp) === false) jfail('chunk storage unavailable');
+    if ($ci < $cn - 1) jout(['ok' => true, 'chunk' => $ci]);
+    $full = '';
+    for ($i = 0; $i < $cn; $i++) {
+        $pf = $dir . '/chk_' . $cid . '_' . $i;
+        if (!is_file($pf)) jfail('missing chunk ' . $i);
+        $full .= (string)@file_get_contents($pf);
+        @unlink($pf);
+    }
+    return $full;
+}
+
+$in = null;
+if (!empty($_REQUEST['sdp_cid'])) {
+    $assembledToken = desk_sync_receive_chunk();
+    if (is_string($assembledToken)) $in = desk_sync_unpack_token($assembledToken);
+}
 $rawRequest = file_get_contents('php://input');
-$in = json_decode($rawRequest, true); // Keep backward compatibility with existing JSON clients.
+if (!is_array($in)) {
+    $sdpZ = $_POST['sdp_z'] ?? $_GET['sdp_z'] ?? $_SERVER['HTTP_X_SDP_Z'] ?? null;
+    if (!is_string($sdpZ) && $rawRequest !== '') {
+        $formZ = [];
+        parse_str($rawRequest, $formZ);
+        if (isset($formZ['sdp_z']) && is_string($formZ['sdp_z'])) $sdpZ = $formZ['sdp_z'];
+    }
+    if (is_string($sdpZ) && $sdpZ !== '') $in = desk_sync_unpack_token($sdpZ);
+}
+if (!is_array($in)) $in = json_decode($rawRequest, true); // Keep backward compatibility with existing JSON clients.
 if (!is_array($in)) {
     // WAF/hosting compatibility: some hosts reject application/json POSTs before PHP.
     // The desktop client can tunnel the exact same JSON document as one form field,
     // avoiding max_input_vars truncation of large sync batches.
-    $formPayload = $_POST['payload'] ?? null;
+    $formPayload = $_POST['payload'] ?? $_GET['payload'] ?? null;
     if (!is_string($formPayload) && $rawRequest !== '') {
         $form = [];
         parse_str($rawRequest, $form); // Covers hosts that do not populate $_POST.
         $formPayload = $form['payload'] ?? null;
     }
     if (is_string($formPayload)) $in = json_decode($formPayload, true);
+}
+if (!is_array($in) && !empty($_REQUEST['action']) && !empty($_REQUEST['key'])) {
+    $in = $_REQUEST;
 }
 if (!is_array($in)) jfail('bad request');
 if (strpos(DESK_SYNC_KEY, 'CHANGE-ME') === 0 || strlen(DESK_SYNC_KEY) < 16) jfail('server key not configured — edit desk-sync-api.php');
@@ -374,29 +439,6 @@ if ($action === 'exam_pages') {
                 $page->writeImage($file); $page->clear();
                 $pages[] = 'uploads/exams/pdf-pages/exam_' . $examId . '/' . basename($file);
             } catch (Exception $e) { break; }
-        }
-    }
-    // 2) Ghostscript CLI fallback
-    if (count($pages) < $declaredPages && function_exists('exec')) {
-        foreach (glob($cacheDir . '/page_*.jpg') ?: [] as $old) @unlink($old);
-        $pages = [];
-        for ($i = 1; $i <= $declaredPages; $i++) {
-            $file = $cacheDir . '/page_' . str_pad((string)$i, 3, '0', STR_PAD_LEFT) . '.jpg';
-            @exec('gs -q -dSAFER -dBATCH -dNOPAUSE -sDEVICE=jpeg -r180 -dJPEGQ=90 -dFirstPage=' . (int)$i . ' -dLastPage=' . (int)$i . ' -sOutputFile=' . escapeshellarg($file) . ' ' . escapeshellarg($full) . ' 2>&1', $o1, $c1);
-            if ($c1 === 0 && is_file($file)) $pages[] = 'uploads/exams/pdf-pages/exam_' . $examId . '/' . basename($file);
-        }
-    }
-    // 3) ImageMagick CLI fallback (hosts without the PHP extension)
-    if (count($pages) < $declaredPages && function_exists('exec')) {
-        foreach (glob($cacheDir . '/page_*.jpg') ?: [] as $old) @unlink($old);
-        $pages = [];
-        foreach (['magick', 'convert'] as $bin) {
-            for ($i = 0; $i < $declaredPages; $i++) {
-                $file = $cacheDir . '/page_' . str_pad((string)($i + 1), 3, '0', STR_PAD_LEFT) . '.jpg';
-                @exec($bin . ' -density 180 ' . escapeshellarg($full . '[' . $i . ']') . ' -background white -alpha remove -quality 90 ' . escapeshellarg($file) . ' 2>&1', $o2, $c2);
-                if ($c2 === 0 && is_file($file)) $pages[] = 'uploads/exams/pdf-pages/exam_' . $examId . '/' . basename($file);
-            }
-            if (count($pages) >= $declaredPages) break;
         }
     }
     sort($pages);

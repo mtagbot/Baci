@@ -25,12 +25,22 @@ if (!function_exists('desk_update_badge')) {
 /* AJAX: run one sync cycle now (also used by the background timer) */
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'run') {
     header('Content-Type: application/json; charset=utf-8');
+    if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
     ignore_user_abort(true);
     set_time_limit(300);
     $res = isset($_GET['force']) ? DeskSync::run(true) : DeskSync::runIfDue();
     $res['status'] = DeskSync::status();
     $res['pending'] = DeskSync::pendingCount();
     $res['update'] = desk_update_badge();
+    if (!empty($res['ok']) && empty($res['skipped'])) {
+        $hbFile = dirname(__DIR__) . '/data/sync-heartbeat.json';
+        @file_put_contents($hbFile, json_encode([
+            'phase' => 'settled', 'ts' => time(), 'daemon' => 1, 'ok' => true,
+            'server_verified' => true, 'fails' => 0, 'alert' => false, 'retry_in' => 0,
+            'pending' => $res['pending'], 'pushed' => $res['pushed'] ?? 0, 'pulled' => $res['pulled'] ?? 0,
+            'update' => $res['update'], 'error' => '',
+        ], JSON_UNESCAPED_UNICODE), LOCK_EX);
+    }
     echo json_encode($res, JSON_UNESCAPED_UNICODE);
     exit;
 }

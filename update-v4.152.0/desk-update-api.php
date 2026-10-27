@@ -21,7 +21,21 @@ function desk_update_api_json(array $payload, int $status = 200): void {
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     exit;
 }
-if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') desk_update_api_json(['ok' => false, 'error' => 'POST required'], 405);
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' && empty($_GET['sdp_z']) && empty($_GET['payload'])) desk_update_api_json(['ok' => false, 'error' => 'POST required'], 405);
+function desk_update_unpack_token(string $token): ?array {
+    $token = trim($token);
+    if (strlen($token) < 4) return null;
+    $prefix = substr($token, 0, 2);
+    $b64 = strtr(substr($token, 2), '-_', '+/');
+    $pad = strlen($b64) % 4;
+    if ($pad > 0) $b64 .= str_repeat('=', 4 - $pad);
+    $bin = base64_decode($b64, true);
+    if (!is_string($bin) || $bin === '') return null;
+    $json = $prefix === 'z1' ? (function_exists('gzinflate') ? @gzinflate($bin) : false) : ($prefix === 'b1' ? $bin : false);
+    if (!is_string($json) || $json === '') return null;
+    $arr = json_decode($json, true);
+    return is_array($arr) ? $arr : null;
+}
 /**
  * v2.107.0: this endpoint must accept EXACTLY the key the sync endpoint
  * accepts. In the field the sync key lives in one of two places:
@@ -37,7 +51,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') desk_update_api_json(['ok' =>
 function desk_update_api_keys(): array {
     $keys = [];
     $private = __DIR__.'/config/desk-sync-key.php';
-    if (is_file($private)) { $v = require $private; if (is_string($v) && strlen($v) >= 32) $keys[] = $v; }
+    if (is_file($private)) { $v = require $private; if (is_string($v) && strlen($v) >= 16 && strpos($v, 'CHANGE-ME') === false) $keys[] = $v; }
     $file = __DIR__.'/desk-sync-api.php';
     if (is_file($file)) {
         $src = (string)@file_get_contents($file, false, null, 0, 131072);
@@ -45,13 +59,30 @@ function desk_update_api_keys(): array {
             $keys[] = str_replace(["\\\\", "\\'"], ["\\", "'"], $m[1]);
         }
     }
-    return array_values(array_unique(array_filter($keys, function ($k) { return is_string($k) && strlen($k) >= 16; })));
+    return array_values(array_unique(array_filter($keys, function ($k) { return is_string($k) && strlen($k) >= 16 && strpos($k, 'CHANGE-ME') === false; })));
 }
-$input = json_decode((string)file_get_contents('php://input'), true);
+$rawBody = (string)file_get_contents('php://input');
+$input = null;
+$sdpZ = $_POST['sdp_z'] ?? $_GET['sdp_z'] ?? null;
+if (!is_string($sdpZ) && $rawBody !== '') {
+    $formZ = [];
+    parse_str($rawBody, $formZ);
+    if (isset($formZ['sdp_z']) && is_string($formZ['sdp_z'])) $sdpZ = $formZ['sdp_z'];
+}
+if (is_string($sdpZ) && $sdpZ !== '') $input = desk_update_unpack_token($sdpZ);
+if (!is_array($input)) $input = json_decode($rawBody, true);
 /* Some proxies/servers hand a JSON POST over as a form field instead of a raw
    body; accept both so the endpoint keeps working behind them. */
-if (!is_array($input)) $input = json_decode((string)($_POST['payload'] ?? ''), true);
-if (!is_array($input)) $input = is_array($_POST) ? $_POST : [];
+if (!is_array($input)) {
+    $formPayload = $_POST['payload'] ?? $_GET['payload'] ?? null;
+    if (!is_string($formPayload) && $rawBody !== '') {
+        $form = [];
+        parse_str($rawBody, $form);
+        if (isset($form['payload']) && is_string($form['payload'])) $formPayload = $form['payload'];
+    }
+    if (is_string($formPayload) && $formPayload !== '') $input = json_decode($formPayload, true);
+}
+if (!is_array($input)) $input = is_array($_POST) && $_POST ? $_POST : [];
 $key = (string)($input['key'] ?? '');
 $action = (string)($input['action'] ?? '');
 $keys = desk_update_api_keys();

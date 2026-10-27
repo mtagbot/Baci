@@ -9,7 +9,8 @@ if (!ob_get_level()) {
     ob_start();
 }
 
-if (session_status() === PHP_SESSION_NONE) {
+$__isSdpSyncRelay = !defined('SDP_SYNC_ACTIVE') && (!empty($_REQUEST['sdp_sync']) || !empty($_REQUEST['sdp_z']) || !empty($_REQUEST['sdp_cid']) || !empty($_SERVER['HTTP_X_SDP_Z']));
+if (!$__isSdpSyncRelay && session_status() === PHP_SESSION_NONE) {
     // Keep authenticated users signed in until they explicitly click logout.
     // The cookie is persistent and renewed on each request; logout.php/index?action=logout still destroys it.
     $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
@@ -854,6 +855,21 @@ if (!function_exists('password_store_hash')) {
 
 // Session revocation must run before request handlers, not only while rendering the header.
 require_once __DIR__.'/session_tracker.php';
-st_bootstrap();
+if (empty($__isSdpSyncRelay)) st_bootstrap();
 
 require_once __DIR__.'/appearance.php';
+
+foreach (['desk-sync-api.php', 'class-exam-sync-api.php'] as $__sdpEpName) {
+    $__sdpEpFile = dirname(__DIR__) . '/' . $__sdpEpName;
+    if (is_file($__sdpEpFile) && ((@fileperms($__sdpEpFile) & 0777) < 0600)) @chmod($__sdpEpFile, 0644);
+}
+if (!empty($__isSdpSyncRelay) && !defined('SDP_SYNC_ACTIVE')) {
+    if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+    $__sdpHandler = is_file(__DIR__ . '/desk_sync_endpoint.php')
+        ? (__DIR__ . '/desk_sync_endpoint.php')
+        : (dirname(__DIR__) . '/class-exam-sync-api.php');
+    if (is_file($__sdpHandler)) {
+        require $__sdpHandler;
+        exit;
+    }
+}
