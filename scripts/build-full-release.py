@@ -23,8 +23,8 @@ SITE_CORRECTIVE_PREFIX = 'site-update-v4.152.0/'
 # could not tell what it actually contained. config/version.php now carries the
 # code version for existing installs too; release.php keeps describing the bundle.
 RELEASE_NAME = 'Release_V1.5'
-SITE_VERSION = '4.209.1'
-DESKTOP_VERSION = '2.133.1'
+SITE_VERSION = '4.209.2'
+DESKTOP_VERSION = '2.133.2'
 # Correctives published after the V1.0 rebuild, in installation order. From
 # v4.170.0 on, packages are version-numbered instead of feature-slugged, and
 # V4.170.0 / v2.92.0 are cumulative for v4.161..v4.169.
@@ -70,7 +70,7 @@ VERSIONED_CORRECTIVES = [
     ('MODIFIED-FILES-V4.206.0.zip', 'SchoolDesk-FIX-v2.130.0.zip'),
     ('MODIFIED-FILES-V4.207.0.zip', 'SchoolDesk-FIX-v2.131.0.zip'),
     ('MODIFIED-FILES-V4.208.0.zip', 'SchoolDesk-FIX-v2.132.0.zip'),
-    ('MODIFIED-FILES-V4.209.1.zip', 'SchoolDesk-FIX-v2.133.1.zip'),
+    ('MODIFIED-FILES-V4.209.2.zip', 'SchoolDesk-FIX-v2.133.2.zip'),
 ]
 def sha(b): return hashlib.sha256(b).hexdigest()
 def run(*args): return subprocess.check_output(args, text=True)
@@ -275,7 +275,11 @@ def assemble():
         if not (web/'assets/vendor/chart.umd.min.js').is_file():copy(chartfile,web/'assets/vendor/chart.umd.min.js')
         copy(chart/'LICENSE.md',web/'assets/vendor/Chart.js-LICENSE.md')
         functions=web/'includes/functions.php'
-        text=functions.read_text();text=text.replace('<?php',"<?php\nrequire_once __DIR__.'/install_guard.php';",1);functions.write_text(text)
+        # V4.209.2: the guard is injected as `is_file(...)` — a fresh install
+        # always ships install_guard.php, so behaviour is identical, but a
+        # damaged/partial upload can no longer turn every page into a blank 500
+        # ("Failed opening required .../install_guard.php").
+        text=functions.read_text();text=text.replace('<?php',"<?php\nif (is_file(__DIR__.'/install_guard.php')) require_once __DIR__.'/install_guard.php';",1);functions.write_text(text)
         footer=web/'includes/footer.php'
         text=footer.read_text()
         # v4.179.0: the footer now self-guards the desktop auto-sync script with

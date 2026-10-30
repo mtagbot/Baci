@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""v4.209.1 / v2.133.1 — «همهٔ صفحه‌ها سریع» (ادامهٔ trace واقعی مرورگر).
+"""v4.209.2 / v2.133.2 — «همهٔ صفحه‌ها سریع» (ادامهٔ trace واقعی مرورگر).
 
     python3 scripts/release-v4.208.0.py
 
 بسته‌ها:
-  MODIFIED-FILES-V4.209.1.zip   -> سایت   (site-update-v4.152.0/...)
-  SchoolDesk-FIX-v2.133.1.zip   -> دسکتاپ (SchoolDeskPro/reports/... و SchoolDeskPro/www/...)
+  MODIFIED-FILES-V4.209.2.zip   -> سایت   (site-update-v4.152.0/...)
+  SchoolDesk-FIX-v2.133.2.zip   -> دسکتاپ (SchoolDeskPro/reports/... و SchoolDeskPro/www/...)
 
 محتوا:
   · includes/perf.php            هستهٔ کارایی (DDL یک‌بار، کش داده، باندل دارایی)
@@ -26,7 +26,7 @@ import hashlib
 
 ROOT = Path(__file__).resolve().parents[1]
 STAMP = (2026, 10, 30, 0, 0, 0)
-SUMS = 'V4.209.1-SHA256SUMS.txt'
+SUMS = 'V4.209.2-SHA256SUMS.txt'
 
 SITE_PAIRS = [
     ('api/docs.php', 'update-v4.209.0/api/docs.php'),
@@ -103,8 +103,8 @@ DESKTOP_PAIRS = (
 )
 
 PACKAGES = [
-    ('MODIFIED-FILES-V4.209.1.zip', 'site-update-v4.152.0/', SITE_PAIRS),
-    ('SchoolDesk-FIX-v2.133.1.zip', 'SchoolDeskPro/',        DESKTOP_PAIRS),
+    ('MODIFIED-FILES-V4.209.2.zip', 'site-update-v4.152.0/', SITE_PAIRS),
+    ('SchoolDesk-FIX-v2.133.2.zip', 'SchoolDeskPro/',        DESKTOP_PAIRS),
 ]
 
 

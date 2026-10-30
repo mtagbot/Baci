@@ -1,6 +1,6 @@
 <?php
 /**
- * doctor.php — عیب‌یاب مستقل SchoolDesk Pro (V4.209.1)
+ * doctor.php — عیب‌یاب مستقل SchoolDesk Pro (V4.209.2)
  * ---------------------------------------------------------------------------
  * چرا؟ وقتی سایت «HTTP ERROR 500» می‌دهد، هیچ سرنخی به دست کاربر نمی‌رسد.
  * این فایل بدون وابستگی به بقیهٔ برنامه (بدون session، بدون دیتابیس اجباری)
@@ -235,7 +235,34 @@ if (is_file($logFile)) {
     </div>
 
     <div class="card">
-        <h2>۵) اتصال به دیتابیس</h2>
+        <h2>۵) هم‌خوانی با نصب قدیمی (قبل از Release_V1.0)</h2>
+        <?php
+        $skeleton = [
+            'includes/install_guard.php' => 'قفل نصب امن (Release_V1.0)',
+            'includes/db_sqlite_compat.php' => 'شیم SQLite (نسخهٔ دسکتاپ)',
+            'includes/release_install.php' => 'مایگریشن نصب',
+            'config/database.php' => 'تنظیمات دیتابیس',
+        ];
+        ?>
+        <table>
+            <tr><th>فایل</th><th>وضعیت</th><th>کاربرد</th></tr>
+            <?php foreach ($skeleton as $f => $why): $on = is_file($root . '/' . $f); ?>
+                <tr>
+                    <td><code><?= $esc($f) ?></code></td>
+                    <td class="<?= $on ? 'ok' : 'warn' ?>"><?= $on ? 'هست' : 'نیست' ?></td>
+                    <td><?= $esc($why) ?></td>
+                </tr>
+            <?php endforeach; ?>
+        </table>
+        <p style="font-size:12px;color:#64748b;margin:8px 0 0">
+            نبودِ <code>install_guard.php</code> و <code>db_sqlite_compat.php</code> طبیعی است اگر سایت از نسخه‌ای قدیمی‌تر از
+            <code>Release_V1.0</code> آمده باشد؛ از V4.209.2 به بعد هیچ فایلی آن‌ها را با <code>require</code> بی‌قید صدا نمی‌زند.
+            نبودِ <code>config/database.php</code> یا <code>installed.lock</code> یعنی نصب ناقص است.
+        </p>
+    </div>
+
+    <div class="card">
+        <h2>۶) اتصال به دیتابیس</h2>
         <table>
             <tr><th>درایور</th><td><code><?= $esc($db['driver']) ?></code></td></tr>
             <tr><th>نتیجه</th>
@@ -249,7 +276,7 @@ if (is_file($logFile)) {
     </div>
 
     <div class="card">
-        <h2>۶) آزمون بالا آمدن هستهٔ برنامه</h2>
+        <h2>۷) آزمون بالا آمدن هستهٔ برنامه</h2>
         <?php if ($boot['ok'] === null): ?>
             <p style="font-size:12.5px;margin:0">برای اجرای آزمون (یک‌بار)، روی دکمه بزنید. این کار همان مسیری را می‌رود که صفحات سایت می‌روند.</p>
             <a class="btn" href="?boot=1">اجرای آزمون بوت</a>
@@ -269,7 +296,7 @@ if (is_file($logFile)) {
     </div>
 
     <div class="card">
-        <h2>۷) آخرین خطاهای ثبت‌شده (<code>config/php-error.log</code>)</h2>
+        <h2>۸) آخرین خطاهای ثبت‌شده (<code>config/php-error.log</code>)</h2>
         <?php if (!$logLines): ?>
             <p style="font-size:12.5px;margin:0;color:#64748b">چیزی ثبت نشده است.</p>
         <?php else: ?>
@@ -277,7 +304,7 @@ if (is_file($logFile)) {
         <?php endif; ?>
     </div>
 
-    <div class="sub" style="margin-top:18px">SchoolDesk Pro · عیب‌یاب V4.209.1 — بعد از پایان کار این فایل را حذف کنید.</div>
+    <div class="sub" style="margin-top:18px">SchoolDesk Pro · عیب‌یاب V4.209.2 — بعد از پایان کار این فایل را حذف کنید.</div>
 </div>
 </body>
 </html>

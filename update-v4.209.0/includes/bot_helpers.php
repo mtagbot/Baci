@@ -6,8 +6,11 @@
  */
 
 require_once __DIR__ . '/functions.php';
-require_once __DIR__ . '/report_image.php';
-require_once __DIR__ . '/bot_outbox.php';
+/* V4.209.2 — این دو فایل روی نصب‌های قدیمی می‌توانند نباشند (از بسته‌های
+   اصلاحی جدا آمده‌اند). require بی‌قید یعنی صفحهٔ سفید؛ پس فقط اگر هستند
+   بارگذاری می‌شوند و کدِ مربوط به ربات خودش با function_exists محافظت دارد. */
+if (is_file(__DIR__ . '/report_image.php')) require_once __DIR__ . '/report_image.php';
+if (is_file(__DIR__ . '/bot_outbox.php')) require_once __DIR__ . '/bot_outbox.php';
 
 if (!function_exists('bot_platforms')) {
     /**

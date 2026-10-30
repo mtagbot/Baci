@@ -10,8 +10,13 @@
  * MySQL-backed web system.
  */
 
-require_once __DIR__ . '/install_guard.php';
-require_once __DIR__ . '/db_sqlite_compat.php';
+/* V4.209.2 — این دو فایل «اسکلت نصب Release_V1.0» هستند و روی نصب‌های قدیمی‌تر
+   (که فقط با بسته‌های اصلاحی به‌روز شده‌اند) وجود ندارند. پیش‌تر require بی‌قید
+   بود و روی چنین نصبی صفحه با «Failed opening required install_guard.php»
+   کامل ۵۰۰ می‌شد؛ دقیقاً همان خطایی که روی هاست cPanel دیده شد. حالا اگر
+   نباشند، نادیده گرفته می‌شوند: رفتار همان نسخهٔ قبل از Release_V1.0 است. */
+if (is_file(__DIR__ . '/install_guard.php')) require_once __DIR__ . '/install_guard.php';
+if (is_file(__DIR__ . '/db_sqlite_compat.php')) require_once __DIR__ . '/db_sqlite_compat.php';
 
 /**
  * PDO subclass that transparently rewrites MySQL SQL into SQLite dialect.
@@ -19,23 +24,27 @@ require_once __DIR__ . '/db_sqlite_compat.php';
  * (backups, migration-updater, db-optimizer, installer).
  */
 class SQLitePDO extends PDO {
+    /** بازنویسی SQL فقط اگر شیم SQLite نصب باشد (روی MySQL هرگز لازم نیست). */
+    private static function rw($sql) {
+        return class_exists('SQLiteCompat') ? SQLiteCompat::rewrite($sql) : $sql;
+    }
     /** run a trusted multi-statement script with NO rewriting */
     public function rawScript($sql) {
         return parent::exec($sql);
     }
     #[\ReturnTypeWillChange]
     public function exec($sql) {
-        return parent::exec(SQLiteCompat::rewrite($sql));
+        return parent::exec(self::rw($sql));
     }
     #[\ReturnTypeWillChange]
     public function query($sql, $fetchMode = null, ...$args) {
-        $sql = SQLiteCompat::rewrite($sql);
+        $sql = self::rw($sql);
         if ($fetchMode === null) return parent::query($sql);
         return parent::query($sql, $fetchMode, ...$args);
     }
     #[\ReturnTypeWillChange]
     public function prepare($sql, $options = []) {
-        return parent::prepare(SQLiteCompat::rewrite($sql), $options);
+        return parent::prepare(self::rw($sql), $options);
     }
 }
 
@@ -56,17 +65,64 @@ class DB {
             }
         }
 
-        if (!is_array($dbConfig) || !in_array($dbConfig['driver'] ?? '', ['sqlite','mysql'], true)) {
+        /* V4.209.2 — تحمل «شکل قدیمی» config/database.php
+           ------------------------------------------------------------------
+           نصب‌هایی که از نسخه‌های پیش از Release_V1.0 آمده‌اند، همین فایل را
+           با کلیدهای دیگری نوشته‌اند (db_name/db_user/… یا بدون driver و
+           port/charset). پیش‌تر این‌ها با «Invalid database configuration» یا
+           «Incomplete database configuration» رد می‌شدند؛ یعنی بعد از رفع
+           خطای install_guard، خطای بعدی همین بود.
+           حالا شکل‌های قدیمی به همان شکل استاندارد نگاشت می‌شوند (بدون حدس
+           رمز؛ فقط نام کلیدها و مقادیر پیش‌فرضِ بی‌خطر). */
+        if (!is_array($dbConfig)) {
             throw new RuntimeException('Invalid database configuration; no implicit driver or credentials are allowed.');
         }
+        $alias = [
+            'database' => ['database', 'dbname', 'db_name', 'name'],
+            'host'     => ['host', 'db_host', 'hostname', 'server'],
+            'username' => ['username', 'user', 'db_user', 'db_username'],
+            'password' => ['password', 'pass', 'db_pass', 'db_password'],
+            'port'     => ['port', 'db_port'],
+            'charset'  => ['charset', 'db_charset'],
+        ];
+        foreach ($alias as $canonical => $names) {
+            if (array_key_exists($canonical, $dbConfig)) continue;
+            foreach ($names as $name) {
+                if (array_key_exists($name, $dbConfig)) { $dbConfig[$canonical] = $dbConfig[$name]; break; }
+            }
+        }
+        if (!isset($dbConfig['driver']) || !in_array($dbConfig['driver'], ['sqlite','mysql'], true)) {
+            /* استنتاج محافظ: مسیر فایل SQLite ⇒ sqlite؛ در غیر این صورت اگر
+               شناسهٔ دیتابیس و میزبان هست ⇒ mysql؛ وگرنه خطا (مثل قبل). */
+            $candidate = strtolower((string)($dbConfig['driver'] ?? ''));
+            $pathLike = (string)($dbConfig['database'] ?? '');
+            if ($candidate === 'sqlite3' || $candidate === 'sqlite' ||
+                ($candidate === '' && preg_match('/\.(sqlite3?|db)$/i', $pathLike) && !isset($dbConfig['host']))) {
+                $dbConfig['driver'] = 'sqlite';
+            } elseif ($candidate === 'mysqli' || $candidate === 'mariadb') {
+                $dbConfig['driver'] = 'mysql';
+            } elseif ($candidate === '' && isset($dbConfig['host']) && (string)($dbConfig['database'] ?? '') !== '') {
+                $dbConfig['driver'] = 'mysql';
+            } else {
+                throw new RuntimeException('Invalid database configuration; no implicit driver or credentials are allowed.');
+            }
+        }
         if ($dbConfig['driver'] === 'mysql') {
-            foreach (['host','port','database','username','password','charset'] as $field) {
+            /* مقادیر پیش‌فرض فقط برای کلیدهای «بی‌اثر»؛ نام کاربری و رمز
+               هیچ‌گاه حدس زده نمی‌شوند. */
+            if (!isset($dbConfig['host']) || (string)$dbConfig['host'] === '') $dbConfig['host'] = '127.0.0.1';
+            if (!isset($dbConfig['port']) || (string)$dbConfig['port'] === '') $dbConfig['port'] = '3306';
+            if (!isset($dbConfig['charset']) || (string)$dbConfig['charset'] === '') $dbConfig['charset'] = 'utf8mb4';
+            foreach (['database','username','password'] as $field) {
                 if (!array_key_exists($field, $dbConfig)) throw new RuntimeException('Incomplete database configuration.');
             }
         }
         try {
             if ($dbConfig['driver'] === 'sqlite') {
-                $path = $dbConfig['database'] ?? '';
+                $path = (string)($dbConfig['database'] ?? '');
+                if ($path !== '' && !preg_match('#^(?:[A-Za-z]:[\\\\/]|/)#', $path)) {
+                    $path = dirname(__DIR__) . '/' . ltrim($path, './');
+                }
                 if ($path === '' || !is_file($path) || filesize($path) === 0) throw new RuntimeException('The installed database is missing or empty. Restore a backup; it will not be recreated.');
                 $fresh = !file_exists($path) || filesize($path) === 0;
                 $this->pdo = new SQLitePDO('sqlite:' . $path);
