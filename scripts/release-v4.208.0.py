@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""v4.208.0 / v2.132.0 — بستهٔ «کارایی حداکثری» (بر پایهٔ trace واقعی مرورگر).
+
+    python3 scripts/release-v4.208.0.py
+
+بسته‌ها:
+  MODIFIED-FILES-V4.208.0.zip   -> سایت   (site-update-v4.152.0/...)
+  SchoolDesk-FIX-v2.132.0.zip   -> دسکتاپ (SchoolDeskPro/reports/... و SchoolDeskPro/www/...)
+
+محتوا:
+  · includes/perf.php            هستهٔ کارایی (DDL یک‌بار، کش داده، باندل دارایی)
+  · includes/db.php              آمار کوئری + حذف DDL تکراری + حافظهٔ خواندن
+  · includes/header.php|footer   باندل CSS/JS (۱۱ درخواست → ۴)
+  · includes/appearance.php      فونت WOFF2 تنها + کش هش + بازهٔ وزن
+  · includes/functions.php       همگام‌سازی عکس‌ها یک‌بار/ساعت با یک کوئری
+  · includes/school_roles.php    DDL دبیران یک‌بار در هر نسخه
+  · includes/session_tracker.php DDL نشست‌ها یک‌بار در هر نسخه
+  · includes/management_hub.php  لینک صفحهٔ کارایی
+  · students.php                 فهرست بدون پنج زیرکوئری تجمعی در هر بازدید
+  · performance.php              داشبورد کارایی + تنظیمات آمادهٔ سرور
+  · perf-config/*                nginx / Apache / php.ini پیشنهادی
+"""
+from pathlib import Path
+from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
+import hashlib
+
+ROOT = Path(__file__).resolve().parents[1]
+STAMP = (2026, 10, 30, 0, 0, 0)
+SUMS = 'V4.208.0-SHA256SUMS.txt'
+
+SITE_PAIRS = [
+    ('.htaccess', 'release-v1.0/common/.htaccess'),
+    ('assets/css/exam-designer-mobile.css', 'update-v4.152.0/assets/css/exam-designer-mobile.css'),
+    ('config/version.php', 'update-v4.208.0/config/version.php'),
+    ('desk-sync-api.php', 'update-v4.152.0/includes/desk_sync_endpoint.php'),
+    ('includes/appearance.php', 'update-v4.208.0/includes/appearance.php'),
+    ('includes/db.php', 'update-v4.208.0/includes/db.php'),
+    ('includes/footer.php', 'update-v4.208.0/includes/footer.php'),
+    ('includes/functions.php', 'update-v4.208.0/includes/functions.php'),
+    ('includes/header.php', 'update-v4.208.0/includes/header.php'),
+    ('includes/management_hub.php', 'update-v4.208.0/includes/management_hub.php'),
+    ('includes/perf.php', 'update-v4.208.0/includes/perf.php'),
+    ('includes/perf_fallback.php', 'update-v4.208.0/includes/perf_fallback.php'),
+    ('includes/school_roles.php', 'update-v4.208.0/includes/school_roles.php'),
+    ('includes/session_tracker.php', 'update-v4.208.0/includes/session_tracker.php'),
+    ('performance.php', 'update-v4.208.0/performance.php'),
+    ('perf-config/.htaccess', 'update-v4.208.0/perf-config/.htaccess'),
+    ('perf-config/apache-performance.htaccess', 'update-v4.208.0/perf-config/apache-performance.htaccess'),
+    ('perf-config/nginx-performance.conf', 'update-v4.208.0/perf-config/nginx-performance.conf'),
+    ('perf-config/README-FA.txt', 'update-v4.208.0/perf-config/README-FA.txt'),
+    ('perf-config/php-performance.ini', 'update-v4.208.0/perf-config/php-performance.ini'),
+    ('students.php', 'update-v4.208.0/students.php'),
+]
+
+DESKTOP_BASE_PAIRS = [
+    ('assets/css/exam-designer-mobile.css', 'desktop-app-v2/patch/www-assets-css-exam-designer-mobile.css'),
+    ('config/version.php', 'update-v4.208.0/config/version.php'),
+    ('desk-prepend.php', 'desktop-app-v2/patch/www-desk-prepend.php'),
+    ('desk-sync-api.php', 'update-v4.152.0/includes/desk_sync_endpoint.php'),
+    ('includes/appearance.php', 'desktop-app-v2/patch/includes-appearance.php'),
+    ('includes/db.php', 'release-v1.0/common/includes/db.php'),
+    ('includes/footer.php', 'desktop-app-v2/patch/includes-footer.php'),
+    ('includes/functions.php', 'update-v4.208.0/includes/functions.php'),
+    ('includes/header.php', 'desktop-app-v2/patch/includes-header.php'),
+    ('includes/management_hub.php', 'desktop-app-v2/patch/includes-management_hub.php'),
+    ('includes/perf.php', 'desktop-app-v2/patch/includes-perf.php'),
+    ('includes/perf_fallback.php', 'desktop-app-v2/patch/includes-perf_fallback.php'),
+    ('includes/school_roles.php', 'desktop-app-v2/patch/includes-school_roles.php'),
+    ('includes/session_tracker.php', 'desktop-app-v2/patch/includes-session_tracker.php'),
+    ('performance.php', 'desktop-app-v2/patch/www-performance.php'),
+    ('perf-config/.htaccess', 'update-v4.208.0/perf-config/.htaccess'),
+    ('perf-config/apache-performance.htaccess', 'update-v4.208.0/perf-config/apache-performance.htaccess'),
+    ('perf-config/nginx-performance.conf', 'update-v4.208.0/perf-config/nginx-performance.conf'),
+    ('perf-config/README-FA.txt', 'update-v4.208.0/perf-config/README-FA.txt'),
+    ('perf-config/php-performance.ini', 'update-v4.208.0/perf-config/php-performance.ini'),
+    ('students.php', 'desktop-app-v2/patch/www-students.php'),
+]
+
+DESKTOP_PAIRS = (
+    [('reports/' + arc, src) for arc, src in DESKTOP_BASE_PAIRS]
+    + [('www/' + arc, src) for arc, src in DESKTOP_BASE_PAIRS]
+)
+
+PACKAGES = [
+    ('MODIFIED-FILES-V4.208.0.zip', 'site-update-v4.152.0/', SITE_PAIRS),
+    ('SchoolDesk-FIX-v2.132.0.zip', 'SchoolDeskPro/',        DESKTOP_PAIRS),
+]
+
+
+def sha(p: Path) -> str:
+    return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def build() -> None:
+    names = {n for n, _, _ in PACKAGES}
+    before = {p: sha(p) for p in ROOT.glob('*.zip') if p.name not in names}
+    result = []
+    for name, prefix, pairs in PACKAGES:
+        out_zip = ROOT / name
+        with ZipFile(out_zip, 'w', ZIP_DEFLATED, compresslevel=9) as z:
+            for arc, src in sorted(pairs):
+                data = (ROOT / src).read_bytes()
+                info = ZipInfo(prefix + arc, STAMP)
+                info.compress_type = ZIP_DEFLATED
+                info.external_attr = 0o100644 << 16
+                z.writestr(info, data)
+                print('  ' + prefix + arc, len(data))
+        entry = {
+            'name': name,
+            'bytes': out_zip.stat().st_size,
+            'sha256': sha(out_zip),
+            'files': sorted(a for a, _ in pairs),
+        }
+        result.append(entry)
+        print(name, entry['bytes'], entry['sha256'])
+    for p, h in before.items():
+        assert sha(p) == h, 'Historical archive modified: ' + p.name
+    (ROOT / SUMS).write_text(
+        ''.join(x['sha256'] + '  ' + x['name'] + '\n' for x in result),
+        encoding='utf-8',
+    )
+    print('Historical archives verified unchanged:', len(before))
+
+
+if __name__ == '__main__':
+    build()

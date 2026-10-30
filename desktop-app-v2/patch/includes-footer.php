@@ -34,9 +34,14 @@ $showConnection=$footerDesk&&empty($isEmbedded);
 <?php if(!empty($needsCharts)||in_array(basename($_SERVER['PHP_SELF']??''),['analytics.php','student-panel.php','report-view.php'],true)): ?>
 <script defer src="assets/vendor/chart.umd.min.js?v=4.6.1"></script>
 <?php endif; ?>
+<?php /* V4.208.0 — این سه فایل همراه school-ui/school-icons/session-watch در یک
+       باندل واحد بارگذاری شده‌اند؛ بارگذاری دوباره یعنی درخواست اضافه و اجرای
+       دوبارهٔ کد. فقط اگر باندل ساخته نشده باشد اینجا تک‌تک می‌آیند. */ ?>
+<?php if (empty($GLOBALS['__perf_js_bundled'])): ?>
 <script defer src="assets/js/main.js"></script>
 <script defer src="assets/js/ui-modern.js?v=20261005a"></script>
 <script defer src="assets/js/searchable-select.js?v=20260917e"></script>
+<?php endif; ?>
 <?php if (PHP_SAPI === 'cli-server'): ?><script defer src="assets/js/desk-shell.js"></script><?php endif; ?>
 <?php if($showConnection): ?><script defer src="assets/js/desk-connection.js?v=20260917f"></script><?php endif; ?>
 </body>

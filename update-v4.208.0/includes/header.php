@@ -1,0 +1,318 @@
+<?php
+// File: includes/header.php - v4.28.13 - Online Exams + Unified Academic Year
+require_once __DIR__ . '/auth.php';
+if (is_file(__DIR__ . '/perf.php')) require_once __DIR__ . '/perf.php';
+    elseif (is_file(__DIR__ . '/perf_fallback.php')) require_once __DIR__ . '/perf_fallback.php';
+require_once __DIR__ . '/academic_year_helpers.php';
+// Revocation is enforced centrally in functions.php, before any request handler.
+// v4.33.0: never let the browser cache panel pages — prevents the Back button
+// from showing a stale page (e.g. old menus after logout/role switch).
+if (!headers_sent()) {
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+}
+/* V4.208.0 — این تابع CREATE TABLE + پیمایش و نرمال‌سازی academic_years را در
+   «هر درخواست» انجام می‌داد. حالا فقط یک‌بار برای هر نسخه؛ منطقش همان است. */
+try { perf_schema_once('academic_years_unified_v1', 'ensure_academic_years_unified_schema'); } catch (Throwable $e) {}
+/* ایندکس‌های حیاتی (students/reports/report_grades/…) یک‌بار در هر نسخه ساخته
+   می‌شوند؛ بدون این‌ها فهرست دانش‌آموزان و کارنامه‌ها کل جدول را می‌گردند. */
+try { perf_ensure_indexes(); } catch (Throwable $e) {}
+$schoolName = get_setting('school_name', 'سیستم مدیریت کارنامه دانش‌آموزی');
+$themeColor = get_setting('theme_color', '#2563eb');
+$accentColor= get_setting('accent_color', '#d97706');
+$themeMode  = get_setting('theme_mode', 'light');
+
+/* v4.135.0 — رنگ‌های مشتق از دو رنگ انتخابی کاربر.
+   در PHP حساب می‌شوند (نه با color-mix در CSS) تا روی وب‌ویوهای قدیمی
+   ویندوز هم دقیقاً همان نتیجه را بدهند. */
+if (!function_exists('theme_shade')) {
+    /** روشن/تیره کردن یک رنگ hex. $amt مثبت = روشن‌تر، منفی = تیره‌تر. */
+    function theme_shade($hex, $amt) {
+        $hex = ltrim(trim((string)$hex), '#');
+        if (strlen($hex) === 3) $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
+        if (!preg_match('/^[0-9a-fA-F]{6}$/', $hex)) return '#' . ($hex ?: '2563eb');
+        $out = '#';
+        for ($i = 0; $i < 3; $i++) {
+            $c = hexdec(substr($hex, $i * 2, 2));
+            $c = $amt >= 0 ? $c + (255 - $c) * $amt : $c * (1 + $amt);
+            $out .= str_pad(dechex(max(0, min(255, (int)round($c)))), 2, '0', STR_PAD_LEFT);
+        }
+        return $out;
+    }
+}
+if (!function_exists('theme_rgba')) {
+    /** rgba() از یک رنگ hex — برای حالت نرم و حلقهٔ فوکوس. */
+    function theme_rgba($hex, $alpha) {
+        $hex = ltrim(trim((string)$hex), '#');
+        if (strlen($hex) === 3) $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
+        if (!preg_match('/^[0-9a-fA-F]{6}$/', $hex)) $hex = '2563eb';
+        return sprintf('rgba(%d,%d,%d,%s)',
+            hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2)), $alpha);
+    }
+}
+$primaryHover = theme_shade($themeColor, -0.18);
+$primarySoft  = theme_rgba($themeColor, '0.09');
+$primaryRing  = theme_rgba($themeColor, '0.22');
+$accentHover  = theme_shade($accentColor, -0.18);
+$accentSoft   = theme_rgba($accentColor, '0.12');
+$fontFamily = get_setting('font_family', 'Vazirmatn');
+$bSize      = get_setting('body_font_size', '14px');
+$bColor     = get_setting('body_text_color', '');
+$hFont      = get_setting('heading_font_family', 'Vazirmatn');
+$hSize      = get_setting('heading_font_size', '22px');
+$hWeight    = get_setting('heading_font_weight', '700');
+$hColor     = get_setting('heading_text_color', '');
+$tSize      = get_setting('table_font_size', '13px');
+$tBg        = get_setting('table_header_bg', '');
+$customFont = get_setting('custom_font_url', '');
+$logoUrl    = get_setting('logo_url', '');
+$isEmbedded = isset($_GET['embedded']) && $_GET['embedded'] === '1';
+$headerRelease=is_file(dirname(__DIR__).'/config/release.php')?require dirname(__DIR__).'/config/release.php':[];
+$isDeskRuntime=($headerRelease['distribution']??(PHP_SAPI==='cli-server'?'desktop':'site'))==='desktop';
+$isDeskInitialSyncRequired = false;
+if ($isDeskRuntime && (PHP_SAPI === 'cli-server' || !empty($_SERVER['SDP_ENFORCE_INITIAL_SYNC']) || get_setting('desk_require_initial_sync', '') === '1')) {
+    $syncUrlCfg = trim((string)get_setting('desk_sync_url', ''));
+    $syncKeyCfg = trim((string)get_setting('desk_sync_key', ''));
+    $syncDoneOk = (get_setting('desk_sync_snapshot_done', '0') === '1') || ((int)get_setting('desk_sync_last_ok', '0') > 0);
+    if ($syncUrlCfg === '' || strlen($syncKeyCfg) < 16 || !$syncDoneOk) {
+        $isDeskInitialSyncRequired = true;
+        $curScript = basename($_SERVER['PHP_SELF'] ?? $_SERVER['SCRIPT_NAME'] ?? '');
+        if (!in_array($curScript, ['desk-sync.php', 'admin-login.php', 'logout.php', 'installer.php'], true)) {
+            if (is_admin_logged_in()) {
+                set_flash_message('warning', 'برای راه‌اندازی اولیه و استفاده از نرم‌افزار دسکتاپ، ابتدا باید همگام‌سازی با سرور سایت مدرسه را تکمیل نمایید.');
+                redirect('desk-sync.php?initial_sync=1');
+            } else {
+                set_flash_message('warning', 'نرم‌افزار دسکتاپ هنوز با سرور سایت همگام‌سازی نشده است. لطفاً ابتدا با حساب مدیریت وارد شده و همگام‌سازی اولیه با سرور را انجام دهید.');
+                redirect('admin-login.php?initial_sync=1');
+            }
+        }
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="fa" dir="rtl" class="school-shell<?php echo $isEmbedded?' hub-embedded':''; ?>">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo clean($schoolName); ?> - پنل مدیریت و کارنامه</title>
+    <script>try{localStorage.setItem('theme','light');document.documentElement.classList.remove('dark');}catch(e){}</script>
+    <meta name="theme-color" content="<?php echo clean($themeColor); ?>"><!-- v4.30.0 -->
+    <?php
+    /* ═══════════════════════════════════════════════════════════════════
+       V4.208.0 — باندل دارایی‌ها
+       ───────────────────────────────────────────────────────────────────
+       پیش از این هر صفحه ۵ فایل CSS و ۶ فایل JS جدا می‌گرفت: ۱۱ درخواست،
+       هر کدام با TTFB مستقل (در trace واقعی ۱۰۰ تا ۲۳۵ میلی‌ثانیه). حالا
+       همان فایل‌ها یک‌بار در assets/cache با نامِ هش‌دار بسته‌بندی می‌شوند:
+       ۲ درخواست، با کش یک‌ساله و immutable.
+       اگر پوشهٔ assets/cache قابل نوشتن نبود، perf_asset_url بی‌صدا به همان
+       فایل اصلی (با ?v=mtime) برمی‌گردد؛ یعنی سایت هرگز به‌خاطر کش نمی‌شکند.
+       ═══════════════════════════════════════════════════════════════════ */
+    if (is_file(__DIR__ . '/perf.php')) require_once __DIR__ . '/perf.php';
+    elseif (is_file(__DIR__ . '/perf_fallback.php')) require_once __DIR__ . '/perf_fallback.php';
+    /* دو باندل با همان ترتیب آبشاری قبلی: پایه (style + ui-modern) پیش از
+       استایل درون‌خطی صفحه، و لایهٔ رابط مدرسه (school-ui + management-hub)
+       پس از آن — دقیقاً مثل نسخهٔ ۴.۲۰۷ که پنج link جدا داشت. */
+    $perfCssBase = perf_asset_url(['assets/css/style.css', 'assets/css/ui-modern.css'], 'css');
+    $perfCssApp  = perf_asset_url(['assets/css/school-ui.css', 'assets/css/management-hub.css'], 'css');
+    $perfJsFiles = [];
+    if (st_current_user()) $perfJsFiles[] = 'assets/js/session-watch.js';
+    $perfJsFiles = array_merge($perfJsFiles, ['assets/js/school-icons.js', 'assets/js/school-ui.js', 'assets/js/main.js', 'assets/js/ui-modern.js', 'assets/js/searchable-select.js']);
+    $perfJsBundle = perf_asset_url($perfJsFiles, 'js');
+    $GLOBALS['__perf_js_bundled'] = $perfJsBundle !== '';
+    ?>
+    <?php echo app_screen_font_preload(); ?>
+    <?php if ($perfCssBase): ?>
+    <link rel="stylesheet" href="<?php echo clean($perfCssBase); ?>">
+    <?php else: ?>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/ui-modern.css"><!-- v4.30.0: high-end UI layer -->
+    <?php endif; ?>
+    <style>
+        :root {
+            /* v4.135.0 — رنگ اول و دوم واقعاً همه‌جا اعمال می‌شوند.
+               پیش از این فقط --primary و --admin-gold ست می‌شد، ولی:
+                 · --primary-hover ثابت می‌ماند، پس هاورِ هر دکمهٔ اصلی
+                   رنگ قدیمی را نشان می‌داد.
+                 · --accent (که ui-modern.css از آن استفاده می‌کند) اصلاً
+                   مقدار نمی‌گرفت، پس رنگ دوم عملاً بی‌اثر بود.
+               رنگ‌های مشتق (هاور، سایه، حالت نرم) در PHP حساب می‌شوند تا
+               به color-mix نیاز نباشد و روی مرورگر قدیمی هم کار کند. */
+            --primary: <?php echo clean($themeColor); ?> !important;
+            --primary-hover: <?php echo clean($primaryHover); ?> !important;
+            --primary-soft: <?php echo clean($primarySoft); ?> !important;
+            --primary-ring: <?php echo clean($primaryRing); ?> !important;
+            --accent: <?php echo clean($accentColor); ?> !important;
+            --accent-hover: <?php echo clean($accentHover); ?> !important;
+            --accent-soft: <?php echo clean($accentSoft); ?> !important;
+            --admin-gold: <?php echo clean($accentColor); ?> !important;
+            --admin-gold-light: <?php echo clean($accentHover); ?> !important;
+            font-family: '<?php echo clean($fontFamily); ?>', Tahoma, sans-serif !important;
+            font-size: <?php echo clean($bSize); ?>;
+        }
+        body { font-family: '<?php echo clean($fontFamily); ?>', Tahoma, sans-serif !important; <?php if ($bColor): ?>color: <?php echo clean($bColor); ?>;<?php endif; ?> }
+        h1, h2, h3, h4, h5, h6 { font-family: '<?php echo clean($hFont === 'CustomUploadedFont' ? $fontFamily : $hFont); ?>', Tahoma, sans-serif !important; font-weight: <?php echo clean($hWeight); ?> !important; <?php if ($hColor): ?>color: <?php echo clean($hColor); ?> !important;<?php endif; ?> }
+        h1, h2 { font-size: <?php echo clean($hSize); ?>; }
+        table { font-size: <?php echo clean($tSize); ?> !important; }
+        <?php if ($tBg): ?>th { background-color: <?php echo clean($tBg); ?> !important; }<?php endif; ?>
+        <?php if ($isEmbedded): ?>
+        .navbar, .sidebar, footer { display: none !important; }
+        main.flex-1 { width: 100vw !important; height: 100vh !important; padding: .75rem !important; overflow: auto !important; }
+        body > .flex { height: 100vh !important; }
+        <?php endif; ?>
+    </style>
+    <?php /* v4.129.0: صفحه می‌تواند پیش از require، $pageCss را ست کند تا stylesheet
+           صفحه‌ای در جای درستِ <head> بنشیند (نه داخل body). پیش‌فرض: هیچ. */
+    if (!empty($pageCss)) foreach((array)$pageCss as $sheet): ?>
+    <link rel="stylesheet" href="<?php echo clean($sheet); ?>">
+    <?php endforeach; ?>
+<?php echo app_appearance_head(true); ?>
+<?php if ($perfJsBundle): ?><script defer src="<?php echo clean($perfJsBundle); ?>"></script><?php else: ?><?php if(st_current_user()): ?><script defer src="assets/js/session-watch.js"></script><?php endif; ?><script defer src=assets/js/school-icons.js?v20260917e></script><script defer src=assets/js/school-ui.js?v20260917e></script><?php endif; ?><?php if ($perfCssApp): ?><link rel="stylesheet" href="<?php echo clean($perfCssApp); ?>"><?php else: ?><link rel=stylesheet href=assets/css/school-ui.css?v20261007a><link rel="stylesheet" href="assets/css/management-hub.css?v=20260917f"><?php endif; ?><?php require_once __DIR__.'/school_ui_theme.php'; echo school_ui_theme(); ?><noscript><style>@media screen and (max-width:900px){body.school-app>.flex.flex-1{display:block}body.school-app .sidebar{position:static!important;transform:none!important;visibility:visible!important;width:100%!important;max-width:none;height:auto!important}body.school-app .hamburger-btn,body.school-app .ui-drawer-close{display:none!important}}</style></noscript>
+<script>try{if(window.frameElement&&window.frameElement.id==='hubFrame')document.documentElement.classList.add('hub-embedded');}catch(ignore){}</script>
+</head>
+<body class="school-app <?php echo $isDeskRuntime&&!$isEmbedded?'desk-runtime':''; ?> <?php echo $isEmbedded ? 'embedded-mode' : ''; ?> bg-body text-main min-h-screen flex flex-col font-sans">
+<a class="ui-skip" href="#main-content">رفتن به محتوای اصلی</a>
+<script>
+/* v4.66.0: یک دکمه، دو رفتار — موبایل: کشوی بازشو (sidebar-open)؛
+   دسکتاپ/تبلت: جمع‌کردن سایدبار (sidebar-collapsed) با حافظه در localStorage.
+   این اسکریپت بلافاصله بعد از body است تا حالت ذخیره‌شده قبل از رندر سایدبار اعمال شود. */
+function mtagToggleSidebar(){
+    if (window.innerWidth > 900) {
+        document.body.classList.toggle('sidebar-collapsed');
+        try { localStorage.setItem('mtag_sidebar_collapsed', document.body.classList.contains('sidebar-collapsed') ? '1' : '0'); } catch (e) {}
+    } else {
+        document.body.classList.toggle('sidebar-open');
+    }
+}
+(function(){ try { if (window.innerWidth > 900 && localStorage.getItem('mtag_sidebar_collapsed') === '1') document.body.classList.add('sidebar-collapsed'); } catch (e) {} })();
+</script>
+
+<?php if (is_admin_logged_in() || is_student_logged_in() || (function_exists('is_teacher_logged_in') && is_teacher_logged_in())): ?>
+<header class="navbar flex items-center justify-between px-6 py-4 border-b border-color bg-card shadow-sm">
+    <?php /* v4.67.0: دکمه ☰ + لوگو + نام مدرسه + زیرنویس در «یک گروه» ابتدای هدر —
+          قبلاً ☰ فرزند جدا بود و justify-between برند را وسط هدر می‌انداخت. */ ?>
+    <div class="flex items-center gap-3">
+        <button type="button" class="hamburger-btn" id="sidebarToggleBtn" title="باز و بسته کردن منوی کناری" onclick="mtagToggleSidebar()"><svg data-ui-icon="menu" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 5h18M3 12h18M3 19h18"/></svg></button>
+        <?php if (!empty($logoUrl)): ?><img src="<?php echo clean($logoUrl); ?>" alt="نشان مدرسه" class="h-10 w-10 object-contain rounded"><?php endif; ?>
+        <div><h1 class="text-lg font-bold"><?php echo clean($schoolName); ?></h1><span class="text-xs text-muted"><?php echo is_admin_logged_in() ? 'پنل مدیریت سیستم' : (is_student_logged_in() ? 'پنل دانش‌آموزی' : 'پنل دبیران'); ?></span></div>
+    </div>
+    <?php /* v4.132.0: منوی کاشی‌ای وسط هدر — فقط برای مدیر، یک ردیف، حداکثر ۸ کاشی.
+          چیدمانش در «سفارشی‌سازی → منوی سریع هدر» تنظیم می‌شود. */ ?>
+    <?php require_once __DIR__ . '/header_tiles.php'; render_header_tiles(); ?>
+    <div class="flex items-center gap-4">
+        <span class="text-sm font-medium hdr-date">مورخ: <?php echo jdate('l j F Y'); ?></span>
+        <div class="user-menu-wrap">
+            <button type="button" class="btn btn-secondary user-menu-btn" onclick="document.body.classList.toggle('user-menu-open')"><svg data-ui-icon="user" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2c0-8 16-8 16 0v2"/></svg> کاربری</button>
+            <div class="user-menu-dropdown">
+                <?php /* v4.60.0: bg-green-600 / bg-amber-600 don't exist in this project's CSS,
+                      which left white text on a white badge. Explicit inline colors. */ ?>
+                <?php /* v4.68.0: کلیک روی نام کاربر → صفحه نشست‌های فعال همه دستگاه‌ها */ ?>
+                <?php if (is_admin_logged_in()): ?><a href="my-sessions.php" class="badge w-full justify-center text-xs" style="background:var(--primary,#2563eb);color:#fff;text-decoration:none;cursor:pointer" title="مشاهده نشست‌های فعال در همه دستگاه‌ها"><?php echo clean($_SESSION['admin_name'] ?? 'مدیر'); ?></a><a href="index.php?action=logout" class="btn btn-danger w-full text-xs">خروج</a>
+                <?php elseif (is_student_logged_in()): ?><a href="my-sessions.php" class="badge w-full justify-center text-xs" style="background:#059669;color:#fff;text-decoration:none;cursor:pointer" title="مشاهده نشست‌های فعال در همه دستگاه‌ها"><?php echo clean($_SESSION['student_name'] ?? 'دانش‌آموز'); ?></a><a href="index.php?action=logout" class="btn btn-danger w-full text-xs">خروج</a>
+                <?php elseif (function_exists('is_teacher_logged_in') && is_teacher_logged_in()): ?><a href="my-sessions.php" class="badge w-full justify-center text-xs" style="background:#d97706;color:#fff;text-decoration:none;cursor:pointer" title="مشاهده نشست‌های فعال در همه دستگاه‌ها"><?php echo clean(function_exists('teacher_family_name') ? teacher_family_name($_SESSION['teacher_name'] ?? 'دبیر') : ($_SESSION['teacher_name'] ?? 'دبیر')); ?></a><a href="logout.php" class="btn btn-danger w-full text-xs">خروج</a><?php endif; ?>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="flex flex-1">
+    <?php if (is_admin_logged_in()): ?>
+    <aside class="sidebar w-64 bg-card border-l border-color p-4 flex flex-col gap-1.5 shrink-0 shadow-lg">
+        <button type="button" class="ui-drawer-close" onclick="document.body.classList.remove('sidebar-open')">بستن فهرست</button><div class="sidebar-scroll">
+        <div class="sidebar-section-title">نمای کلی</div>
+        <a href="index.php?view=dashboard" class="sidebar-item <?php echo (!isset($_GET['view']) || $_GET['view'] == 'dashboard') && basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : ''; ?>">داشبورد مدیریت</a>
+        <?php if (has_permission('manage_students')): ?>
+            <div class="sidebar-section-title">پرونده دانش‌آموزی</div>
+            <a href="students.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['students.php','deputy-panel.php']) ? 'active' : ''; ?>">مدیریت دانش‌آموزان</a>
+            <?php /* v4.90.0: «موارد انضباطی» از منو حذف شد — دسترسی مدیر از دکمه داخل «مدیریت دانش‌آموزان» */ ?>
+            <a href="attendance.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'attendance.php' ? 'active' : ''; ?>">حضور و غیاب</a>
+        <?php endif; ?>
+        <?php if (has_permission('manage_classes')): ?>
+            <div class="sidebar-section-title">آموزش، کلاس و دبیران</div>
+            <a href="courses-management.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['courses-management.php','classes.php','import-teachers.php','import-schedule.php']) ? 'active' : ''; ?>">مدیریت دروس</a>
+            <?php /* v4.145.0: خانهٔ لیست‌ها و گزارش‌های اداری */ ?>
+            <a href="reports-lists.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'reports-lists.php' ? 'active' : ''; ?>">لیست‌ها و گزارشات</a>
+        <?php endif; ?>
+        <?php if (has_permission('manage_reports')): ?>
+            <div class="sidebar-section-title">ارزشیابی و امتحانات</div>
+            <a href="reports-management.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['reports-management.php','reports.php','import.php','analytics.php']) ? 'active' : ''; ?>">مدیریت کارنامه‌ها</a>
+            <a href="exams.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'exams.php' ? 'active' : ''; ?>">امتحانات حضوری</a>
+            <!-- Virtual exams moved under evaluation, below presencial -->
+            <a href="online-exams.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['online-exams.php','online-exam-form.php','online-exam-questions.php','online-exam-monitor.php','online-exam-results.php','online-exam-result.php','online-exam-grading.php','online-exam-categories.php','online-question-bank.php']) ? 'active' : ''; ?>">آزمون‌های مجازی (آنلاین)</a>
+        <?php endif; ?>
+        <?php if (has_permission('import_data')): ?>
+            <div class="sidebar-section-title">ورود و خروج داده</div>
+            <a href="student-recovery.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['student-recovery.php','import-students.php','import-photos.php']) ? 'active' : ''; ?>">بازیابی دانش‌آموز</a>
+        <?php endif; ?>
+        <?php if (has_permission('send_sms')): ?>
+            <div class="sidebar-section-title">ارتباطات و ربات‌ها</div>
+            <a href="messages-management.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['messages-management.php','notifications.php','sms-panel.php']) ? 'active' : ''; ?>">پیامک و اعلان‌ها</a>
+            <a href="bale-bot.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'bale-bot.php' ? 'active' : ''; ?>">بازوی بله</a>
+            <a href="telegram-bot.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'telegram-bot.php' ? 'active' : ''; ?>">ربات تلگرام</a>
+            <a href="rubika-bot.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'rubika-bot.php' ? 'active' : ''; ?>">ربات روبیکا</a>
+            <a href="bot-accounts.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'bot-accounts.php' ? 'active' : ''; ?>">اکانت‌های متصل</a>
+        <?php endif; ?>
+        <div class="sidebar-section-title">سیستم</div>
+        <a href="other-settings.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['other-settings.php','backups.php','activity-logs.php','migration-updater.php','desk-sync.php','db-optimizer.php','admins.php']) ? 'active' : ''; ?>">تنظیمات دیگر</a>
+        <?php if (has_permission('system_settings')): ?><a href="settings.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'settings.php' ? 'active' : ''; ?>">سفارشی‌سازی</a><?php endif; ?>
+        </div>
+    </aside>
+    <?php elseif (is_student_logged_in()): ?>
+    <aside class="sidebar w-64 bg-card border-l border-color p-4 flex flex-col gap-2 shrink-0 shadow-lg">
+        <a href="student-panel.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'student-panel.php' ? 'active' : ''; ?>">داشبورد و کارنامه‌های من</a>
+        <div class="sidebar-section-title">ارزشیابی و امتحانات</div>
+        <a href="student-online-exams.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['student-online-exams.php','online-exam-take.php','online-exam-result.php']) ? 'active' : ''; ?>">آزمون‌های مجازی من</a>
+    </aside>
+    <?php elseif (function_exists('is_teacher_logged_in') && is_teacher_logged_in()): ?>
+    <aside class="sidebar w-64 bg-card border-l border-color p-4 flex flex-col gap-2 shrink-0 shadow-lg">
+        <a href="teacher-panel.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'teacher-panel.php' ? 'active' : ''; ?>">پنل دبیر</a>
+        <div class="sidebar-section-title">ارزشیابی و امتحانات</div>
+        <a href="teacher-panel.php?tab=exams" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'teacher-panel.php' && ($_GET['tab']??'')=='exams' ? 'active' : ''; ?>">امتحانات حضوری / طراحی تشریحی</a>
+        <a href="online-exams.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['online-exams.php','online-exam-form.php','online-exam-questions.php','online-exam-monitor.php','online-exam-results.php','online-exam-grading.php','online-question-bank.php']) ? 'active' : ''; ?>">آزمون‌های مجازی (آنلاین)</a>
+        <?php require_once __DIR__ . '/school_roles.php'; ensure_school_roles_schema(); if (teacher_has_deputy($_SESSION['teacher_id'])): ?><a href="deputy-panel.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'deputy-panel.php' ? 'active' : ''; ?>">پنل معاونت</a><a href="attendance.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'attendance.php' ? 'active' : ''; ?>">حضور و غیاب</a><?php endif; if (teacher_has_counselor($_SESSION['teacher_id'])): ?><a href="counselor-panel.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'counselor-panel.php' ? 'active' : ''; ?>">پنل مشاور</a><?php endif; if (teacher_has_executive($_SESSION['teacher_id'])): ?><a href="executive-panel.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'executive-panel.php' ? 'active' : ''; ?>">معاون اجرایی</a><?php endif; ?>
+    </aside>
+    <?php endif; ?>
+
+    <main id="main-content" tabindex="-1" class="flex-1 p-6 overflow-y-auto">
+        <?php
+        $flash = get_flash_message();
+        if ($flash):
+            $type = $flash['type'];
+            $message = $flash['message'];
+            // Define colors with inline styles to ensure visibility even without Tailwind
+            if ($type === 'success') {
+                $bg = '#dcfce7'; $border = '#86efac'; $textColor = '#14532d'; $icon = '<svg data-ui-icon="check" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m7 12 3 3 7-7"/></svg>'; $title = 'عملیات موفق';
+            } elseif ($type === 'error') {
+                $bg = '#fee2e2'; $border = '#fca5a5'; $textColor = '#7f1d1d'; $icon = '<svg data-ui-icon="error" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m-6 0 6-6"/></svg>'; $title = 'خطا / عدم موفقیت';
+            } elseif ($type === 'warning') {
+                $bg = '#fef9c3'; $border = '#fde047'; $textColor = '#713f12'; $icon = '<svg data-ui-icon="warning" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 2 21h20Z"/><path d="M12 9v5m0 3v.1"/></svg>'; $title = 'هشدار';
+            } else { // info
+                $bg = '#dbeafe'; $border = '#93c5fd'; $textColor = '#1e3a8a'; $icon = '<svg data-ui-icon="info" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.1"/></svg>'; $title = 'پیام سیستم';
+            }
+        ?>
+        <div class="flash-message" style="margin-bottom:16px;padding:14px 18px;border-radius:12px;border:2px solid <?php echo $border; ?>;background:<?php echo $bg; ?>;color:<?php echo $textColor; ?>;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;box-shadow:0 4px 12px rgba(0,0,0,0.08);font-size:13px;line-height:1.8;white-space:pre-line;">
+            <div style="display:flex;gap:10px;align-items:flex-start;flex:1;">
+                <span style="font-size:20px;flex-shrink:0;"><?php echo $icon; ?></span>
+                <div style="flex:1;">
+                    <div style="font-weight:bold;font-size:13px;margin-bottom:2px;"><?php echo $title; ?></div>
+                    <div><?php echo nl2br(clean($message)); ?></div>
+                </div>
+            </div>
+            <button onclick="this.parentElement.remove();" style="flex-shrink:0;background:rgba(0,0,0,0.1);border:0;border-radius:6px;padding:2px 8px;font-weight:bold;cursor:pointer;color:<?php echo $textColor; ?>;">×</button>
+        </div>
+        <script>
+            // Auto hide flash after 8 seconds for success/info, keep error/warning longer
+            (function(){
+                let type = <?php echo json_encode($type); ?>;
+                let duration = (type==='success' || type==='info') ? 8000 : 15000;
+                setTimeout(()=>{
+                    let el = document.querySelector('.flash-message');
+                    if(el) { el.style.transition='opacity 0.5s'; el.style.opacity='0'; setTimeout(()=>el.remove(),500); }
+                }, duration);
+            })();
+        </script>
+        <?php endif; ?>
+<?php else: ?>
+    <main id="main-content" tabindex="-1" class="flex-1 flex items-center justify-center p-6">
+<?php endif; ?>

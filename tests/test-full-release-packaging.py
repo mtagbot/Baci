@@ -100,7 +100,11 @@ class FullRelease(unittest.TestCase):
         for platform,(z,p,w) in self.bundles.items():
             manifest=json.loads(z.read(p+'RELEASE-MANIFEST.json'))
             self.assertEqual(manifest['platform'],platform)
-            self.assertEqual(manifest['patches'][-1],'update-v4.152.0')
+            # The newest staged corrective must be the last applied patch — derive it
+            # from the repo instead of hard-coding a version that goes stale.
+            newest=max((d.name for d in ROOT.glob('update-v4.*') if d.is_dir()),
+                       key=lambda n: tuple(int(x) for x in n.split('v',1)[1].split('.')))
+            self.assertEqual(manifest['patches'][-1],newest)
             files={x.filename[len(p):] for x in z.infolist() if not x.is_dir() and x.filename!=p+'RELEASE-MANIFEST.json'}
             self.assertEqual(files,set(manifest['files']))
             for rel,entry in manifest['files'].items():

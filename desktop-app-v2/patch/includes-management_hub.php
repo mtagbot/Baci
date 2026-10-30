@@ -29,6 +29,9 @@ function school_management_hubs() {
             'api'=>['مستندات API','api/docs.php?embedded=1'],
             'sync'=>['همگام‌سازی با سایت','desk-sync.php?embedded=1'],
             'health'=>['سلامت پایگاه داده','db-optimizer.php?embedded=1'],
+            /* V4.208.0 — داشبورد کارایی: سنجه‌های همان درخواست، وضعیت کش و باندل،
+               ایندکس‌های حیاتی و تنظیمات آمادهٔ سرور برای کپی. */
+            'performance'=>['کارایی و سرعت سایت','performance.php?embedded=1'],
             'queue'=>['صف اعلان‌های ربات','bot-queue.php?embedded=1'],
             'inbox'=>['پیام‌های دریافتی ربات','bot-inbox.php?embedded=1'],
             'software-update'=>['به‌روزرسانی نرم‌افزار','desk-update.php?embedded=1'],
@@ -40,7 +43,7 @@ function render_management_hub($key) {
     $hub=school_management_hubs()[$key];$tabs=$hub['tabs'];
     if ($key==='settings') {
         // The child controllers remain the authority; do not expose unusable/privileged tabs.
-        foreach (['logs'=>'view_logs','migration'=>'system_settings','backups'=>'manage_backups','health'=>'system_settings','queue'=>'send_sms','inbox'=>'send_sms'] as $id=>$permission) {
+        foreach (['logs'=>'view_logs','migration'=>'system_settings','backups'=>'manage_backups','health'=>'system_settings','performance'=>'system_settings','queue'=>'send_sms','inbox'=>'send_sms'] as $id=>$permission) {
             if (!has_permission($permission)) unset($tabs[$id]);
         }
         if (($_SESSION['admin_role']??'')!=='super_admin') unset($tabs['admins']);

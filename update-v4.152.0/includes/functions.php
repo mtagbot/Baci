@@ -1,6 +1,9 @@
 <?php
 // Preserve clean-install guards when upgrading Release_V1.0; older installs have no guard file.
 if (is_file(__DIR__.'/install_guard.php')) require_once __DIR__.'/install_guard.php';
+// V4.208.0: هستهٔ کارایی (کش داده، «یک‌بار در هر نسخه» برای DDL، باندل دارایی‌ها).
+if (is_file(__DIR__.'/perf.php')) require_once __DIR__.'/perf.php';
+elseif (is_file(__DIR__.'/perf_fallback.php')) require_once __DIR__.'/perf_fallback.php';
 // File: includes/functions.php
 /**
  * Core Helper Functions
@@ -494,26 +497,72 @@ if (!function_exists('redirect')) {
 }
 
 if (!function_exists('sync_student_photos_from_uploads')) {
-    function sync_student_photos_from_uploads($limit = 1000) {
+    /**
+     * اتصال فایل‌های داخل uploads/photos به پروندهٔ دانش‌آموزان.
+     *
+     * V4.208.0 — این تابع پیش از این در «هر باز شدن» صفحهٔ مدیریت دانش‌آموزان
+     * اجرا می‌شد: یک scandir روی پوشهٔ عکس‌ها و برای «هر فایل» یک SELECT و
+     * احتمالأ یک UPDATE. با چند صد دانش‌آموز یعنی چند صد رفت‌وبرگشت دیتابیس
+     * در هر بارگذاری صفحه — یکی از دو عامل اصلی کندی TTFB.
+     *
+     * اکنون:
+     *   · با $force=false (پیش‌فرض در نمایش صفحه) فقط وقتی پوشه تغییر کرده
+     *     اجرا می‌شود؛ اثر انگشت = تعداد فایل + جدیدترین mtime.
+     *   · در یک گذر، همهٔ فایل‌ها خوانده و با «یک» کوئری، نگاشت national_id
+     *     ساخته می‌شود؛ سپس فقط موارد لازم UPDATE می‌شوند (بدون SELECT تکراری).
+     *   · ورودی/خروجی و امضای تابع برای سازگاری حفظ شده است.
+     */
+    function sync_student_photos_from_uploads($limit = 1000, $force = false) {
         $dir = dirname(__DIR__) . '/uploads/photos';
         if (!is_dir($dir)) return ['matched'=>0,'skipped'=>0];
-        $matched=0; $skipped=0; $n=0;
+
+        $files=[]; $newest=0; $total=0;
         foreach (scandir($dir) ?: [] as $fn) {
             if ($fn === '.' || $fn === '..') continue;
-            if (++$n > $limit) break;
+            $path=$dir.'/'.$fn;
+            if (!is_file($path)) continue;
+            $total++;
             $ext = strtolower(pathinfo($fn, PATHINFO_EXTENSION));
-            if (!in_array($ext, ['jpg','jpeg','png','webp'], true)) { $skipped++; continue; }
-            $base = tr_num(pathinfo($fn, PATHINFO_FILENAME), 'en');
-            $digits = preg_replace('/[^0-9]/', '', $base);
-            if (strlen($digits) === 9) $digits = '0'.$digits;
-            if (strlen($digits) !== 10) { $skipped++; continue; }
-            $rel = 'uploads/photos/' . $fn;
-            try {
-                $st = DB::fetch("SELECT id, photo_url FROM students WHERE national_id=? AND (photo_url IS NULL OR photo_url='' OR photo_url<>?) LIMIT 1", [$digits, $rel]);
-                if ($st) { DB::execute("UPDATE students SET photo_url=? WHERE national_id=?", [$rel, $digits]); $matched++; }
-            } catch (Exception $e) { $skipped++; }
+            if (!in_array($ext, ['jpg','jpeg','png','webp'], true)) continue;
+            $newest=max($newest,(int)@filemtime($path));
+            $files[$fn]=$path;
+            if (count($files) >= $limit) break;
         }
-        return ['matched'=>$matched,'skipped'=>$skipped];
+        if (!$files) return ['matched'=>0,'skipped'=>0];
+
+        $signature=$total.':'.count($files).':'.$newest;
+        $run = function () use ($files, $signature) {
+            $put=[];
+            foreach ($files as $fn => $path) {
+                $base = tr_num(pathinfo($fn, PATHINFO_FILENAME), 'en');
+                $digits = preg_replace('/[^0-9]/', '', $base);
+                if (strlen($digits) === 9) $digits = '0'.$digits;
+                if (strlen($digits) !== 10) continue;
+                $put[$digits]='uploads/photos/'.$fn;
+            }
+            if (!$put) return ['matched'=>0,'skipped'=>count($files)];
+            // یک کوئری برای همهٔ شناسه‌های ملی به‌جای یکی‌یکی
+            $ids=array_keys($put); $have=[]; $matched=0;
+            foreach (array_chunk($ids, 400) as $chunk) {
+                $ph=implode(',', array_fill(0, count($chunk), '?'));
+                try {
+                    foreach (DB::fetchAll("SELECT national_id, photo_url FROM students WHERE national_id IN ($ph)", $chunk) as $row) {
+                        $have[(string)$row['national_id']]=(string)($row['photo_url'] ?? '');
+                    }
+                } catch (Exception $e) { /* مثل قبل: بی‌صدا رد شو */ }
+            }
+            foreach ($put as $nid => $rel) {
+                if (array_key_exists($nid, $have) && $have[$nid] === $rel) continue;
+                if (!array_key_exists($nid, $have)) continue;   // دانش‌آموزی با این کد ملی نیست
+                try { DB::execute("UPDATE students SET photo_url=? WHERE national_id=?", [$rel, $nid]); $matched++; }
+                catch (Exception $e) { }
+            }
+            return ['matched'=>$matched,'skipped'=>count($files)-$matched];
+        };
+        if ($force) return $run();
+        $result=['matched'=>0,'skipped'=>0];
+        perf_daily_once('photo_sync', function () use ($run, &$result) { $result=$run(); }, 3600, $signature);
+        return $result;
     }
 }
 
@@ -1041,6 +1090,8 @@ if (!function_exists('ensure_report_locks_schema')) {
         static $done = false;
         if ($done || !class_exists('DB')) return;
         $done = true;
+        /* V4.208.0 — CREATE TABLE در هر درخواست تکرار می‌شد؛ حالا یک‌بار در هر نسخه. */
+        if (function_exists('perf_schema_is_marked') && perf_schema_is_marked('report_locks_v1')) return;
         try {
             $pdo = DB::getInstance()->getPdo();
             $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
@@ -1071,6 +1122,7 @@ if (!function_exists('ensure_report_locks_schema')) {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
             }
         } catch (Throwable $e) {}
+        if (function_exists('perf_schema_mark')) perf_schema_mark('report_locks_v1');
     }
 }
 

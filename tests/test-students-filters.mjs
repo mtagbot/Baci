@@ -90,7 +90,9 @@ ok('grid در CSS به .students-filters محدود است (bot-inbox آسیب �
 ok('bot-inbox.php به کلاس‌های جدید ارجاع ندارد', !readFileSync(resolveFile('bot-inbox.php'), 'utf8').includes('sf-search'));
 ok('واکنش‌گرا: زیر ۹۸۰ دو ستون، زیر ۶۴۰ تک‌ستون',
    /@media\(max-width:980px\)/.test(css) && /@media\(max-width:640px\)/.test(css));
-ok('کش‌شکن جلو رفته', page.includes('school-ui.css?v20261007a'));
+/* V4.208.0 — CSS دیگر تک‌تک لینک نمی‌شود؛ در باندل هش‌دار assets/cache قرار می‌گیرد.
+   قصد تست (نبودِ نسخهٔ کهنهٔ کش‌شده) با هر دو قالب برآورده می‌شود. */
+ok('کش‌شکن جلو رفته', /assets\/cache\/css-[a-f0-9]{14}\.css/.test(page) || page.includes('school-ui.css?v20261007a'));
 
 /* ═══════ ۶) منطق چینش در PHP دست‌نخورده ═══════ */
 console.log('\n── منبع ──');

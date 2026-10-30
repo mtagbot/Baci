@@ -1,6 +1,8 @@
 <?php
 // File: includes/header.php - v4.28.13 - Online Exams + Unified Academic Year
 require_once __DIR__ . '/auth.php';
+if (is_file(__DIR__ . '/perf.php')) require_once __DIR__ . '/perf.php';
+    elseif (is_file(__DIR__ . '/perf_fallback.php')) require_once __DIR__ . '/perf_fallback.php';
 require_once __DIR__ . '/academic_year_helpers.php';
 // Revocation is enforced centrally in functions.php, before any request handler.
 // v4.33.0: never let the browser cache panel pages — prevents the Back button
@@ -10,7 +12,12 @@ if (!headers_sent()) {
     header('Pragma: no-cache');
     header('Expires: 0');
 }
-try { ensure_academic_years_unified_schema(); } catch (Exception $e) {}
+/* V4.208.0 — این تابع CREATE TABLE + پیمایش و نرمال‌سازی academic_years را در
+   «هر درخواست» انجام می‌داد. حالا فقط یک‌بار برای هر نسخه؛ منطقش همان است. */
+try { perf_schema_once('academic_years_unified_v1', 'ensure_academic_years_unified_schema'); } catch (Throwable $e) {}
+/* ایندکس‌های حیاتی (students/reports/report_grades/…) یک‌بار در هر نسخه ساخته
+   می‌شوند؛ بدون این‌ها فهرست دانش‌آموزان و کارنامه‌ها کل جدول را می‌گردند. */
+try { perf_ensure_indexes(); } catch (Throwable $e) {}
 $schoolName = get_setting('school_name', 'سیستم مدیریت کارنامه دانش‌آموزی');
 $themeColor = get_setting('theme_color', '#2563eb');
 $accentColor= get_setting('accent_color', '#d97706');
@@ -110,9 +117,26 @@ if ($isDeskRuntime && (PHP_SAPI === 'cli-server' || !empty($_SERVER['SDP_ENFORCE
     })();
     </script>
     <?php endif; ?>
+    <?php
+    /* V4.208.0 — باندل دارایی‌ها: ۱۱ درخواست CSS/JS به ۴ درخواست با کش یک‌ساله.
+       اگر assets/cache قابل نوشتن نبود، همان لینک‌های قبلی برمی‌گردند. */
+    if (is_file(__DIR__ . '/perf.php')) require_once __DIR__ . '/perf.php';
+    elseif (is_file(__DIR__ . '/perf_fallback.php')) require_once __DIR__ . '/perf_fallback.php';
+    $perfCssBase = perf_asset_url(['assets/css/style.css', 'assets/css/ui-modern.css'], 'css');
+    $perfCssApp  = perf_asset_url(['assets/css/school-ui.css', 'assets/css/management-hub.css'], 'css');
+    $perfJsFiles = [];
+    if (st_current_user()) $perfJsFiles[] = 'assets/js/session-watch.js';
+    $perfJsFiles = array_merge($perfJsFiles, ['assets/js/school-icons.js', 'assets/js/school-ui.js', 'assets/js/main.js', 'assets/js/ui-modern.js', 'assets/js/searchable-select.js']);
+    $perfJsBundle = perf_asset_url($perfJsFiles, 'js');
+    $GLOBALS['__perf_js_bundled'] = $perfJsBundle !== '';
+    ?>
     <?php echo app_screen_font_preload(); ?>
+    <?php if ($perfCssBase): ?>
+    <link rel="stylesheet" href="<?php echo clean($perfCssBase); ?>">
+    <?php else: ?>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/ui-modern.css"><!-- v4.30.0: high-end UI layer -->
+    <?php endif; ?>
     <style>
         :root {
             /* v4.135.0 — رنگ اول و دوم واقعاً همه‌جا اعمال می‌شوند.
@@ -151,9 +175,8 @@ if ($isDeskRuntime && (PHP_SAPI === 'cli-server' || !empty($_SERVER['SDP_ENFORCE
     if (!empty($pageCss)) foreach((array)$pageCss as $sheet): ?>
     <link rel="stylesheet" href="<?php echo clean($sheet); ?>">
     <?php endforeach; ?>
-<?php if(st_current_user()): ?><script defer src="assets/js/session-watch.js"></script><?php endif; ?>
 <?php echo app_appearance_head(true); ?>
-<link rel=stylesheet href=assets/css/school-ui.css?v20260917e><script defer src=assets/js/school-icons.js?v20260917e></script><script defer src=assets/js/school-ui.js?v20260917e></script><?php require_once __DIR__.'/school_ui_theme.php'; echo school_ui_theme(); ?><noscript><style>@media screen and (max-width:900px){body.school-app>.flex.flex-1{display:block}body.school-app .sidebar{position:static!important;transform:none!important;visibility:visible!important;width:100%!important;max-width:none;height:auto!important}body.school-app .hamburger-btn,body.school-app .ui-drawer-close{display:none!important}}</style></noscript><link rel="stylesheet" href="assets/css/management-hub.css?v=20260917f">
+<?php if ($perfJsBundle): ?><script defer src="<?php echo clean($perfJsBundle); ?>"></script><?php else: ?><?php if(st_current_user()): ?><script defer src="assets/js/session-watch.js"></script><?php endif; ?><script defer src=assets/js/school-icons.js?v20260917e></script><script defer src=assets/js/school-ui.js?v20260917e></script><?php endif; ?><?php if ($perfCssApp): ?><link rel="stylesheet" href="<?php echo clean($perfCssApp); ?>"><?php else: ?><link rel=stylesheet href=assets/css/school-ui.css?v20260917e><link rel="stylesheet" href="assets/css/management-hub.css?v=20260917f"><?php endif; ?><?php require_once __DIR__.'/school_ui_theme.php'; echo school_ui_theme(); ?><noscript><style>@media screen and (max-width:900px){body.school-app>.flex.flex-1{display:block}body.school-app .sidebar{position:static!important;transform:none!important;visibility:visible!important;width:100%!important;max-width:none;height:auto!important}body.school-app .hamburger-btn,body.school-app .ui-drawer-close{display:none!important}}</style></noscript>
 <script>try{if(window.frameElement&&window.frameElement.id==='hubFrame')document.documentElement.classList.add('hub-embedded');}catch(ignore){}</script>
 </head>
 <body class="school-app <?php echo $isDeskRuntime&&!$isEmbedded?'desk-runtime':''; ?> <?php echo $isEmbedded ? 'embedded-mode' : ''; ?> bg-body text-main min-h-screen flex flex-col font-sans">

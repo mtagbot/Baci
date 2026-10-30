@@ -13,8 +13,18 @@ ensure_school_roles_schema();
 
 
 if (!current_teacher_is_executive()) require_permission('manage_students');
-try { DB::execute("ALTER TABLE students ADD COLUMN academic_year varchar(20) DEFAULT NULL"); } catch (Exception $e) {}
-try { DB::execute("CREATE TABLE IF NOT EXISTS report_parent_reviews (id int(11) NOT NULL AUTO_INCREMENT, report_id int(11) NOT NULL, platform enum('bale','telegram') NOT NULL, chat_id varchar(80) NOT NULL, reviewed_at_jalali varchar(30) NOT NULL, PRIMARY KEY(id), UNIQUE KEY uniq_review (report_id, platform, chat_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"); } catch (Exception $e) {}
+/* V4.208.0 — DDL صفحهٔ دانش‌آموزان فقط یک‌بار برای هر نسخه اجرا می‌شود
+   (پیش از این CREATE TABLE و ALTER TABLE در هر بازدید تکرار می‌شد). */
+if (!function_exists('perf_schema_once')) {
+    if (is_file(__DIR__ . '/includes/perf.php')) require_once __DIR__ . '/includes/perf.php';
+    elseif (is_file(__DIR__ . '/includes/perf_fallback.php')) require_once __DIR__ . '/includes/perf_fallback.php';
+    // دسکتاپ: ممکن است perf.php پیش از این فایل بارگذاری نشده باشد
+}
+perf_schema_once('students_page_schema_v1', function () {
+    try { DB::execute("ALTER TABLE students ADD COLUMN academic_year varchar(20) DEFAULT NULL"); } catch (Exception $e) {}
+    try { DB::execute("CREATE TABLE IF NOT EXISTS report_parent_reviews (id int(11) NOT NULL AUTO_INCREMENT, report_id int(11) NOT NULL, platform enum('bale','telegram','soroush','rubika') NOT NULL, chat_id varchar(80) NOT NULL, reviewed_at_jalali varchar(30) NOT NULL, PRIMARY KEY(id), UNIQUE KEY uniq_review (report_id, platform, chat_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"); } catch (Exception $e) {}
+});
+/* همگام‌سازی عکس‌ها: حداکثر یک‌بار در ساعت یا فقط وقتی پوشهٔ عکس‌ها تغییر کرده. */
 sync_student_photos_from_uploads();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['transfer_students'])) {
@@ -232,12 +242,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_student'])) {
 }
 
 /* v4.68.0: ستون تاریخ تولد پدر و مادر — افزودن امن در صورت نبود */
-try {
-    $stCols = DB::fetchAll("SHOW COLUMNS FROM students LIKE 'father_birth_date'");
-    if (empty($stCols)) DB::execute("ALTER TABLE students ADD COLUMN father_birth_date VARCHAR(20) DEFAULT NULL");
-    $stCols2 = DB::fetchAll("SHOW COLUMNS FROM students LIKE 'mother_birth_date'");
-    if (empty($stCols2)) DB::execute("ALTER TABLE students ADD COLUMN mother_birth_date VARCHAR(20) DEFAULT NULL");
-} catch (Throwable $e) { error_log('students parent-birth columns: ' . $e->getMessage()); }
+/* v4.208.0: این بررسی فقط یک‌بار (و پس از موفقیت، برای همیشه) اجرا می‌شود؛
+   پیش‌تر دو SHOW COLUMNS در هر بازدید از فهرست دانش‌آموزان اجرا می‌شد. */
+$__parentBirthSchema = function () {
+    foreach (['father_birth_date', 'mother_birth_date'] as $__col) {
+        try {
+            $stCols = DB::fetchAll("SHOW COLUMNS FROM students LIKE '" . $__col . "'");
+            if (empty($stCols)) DB::execute('ALTER TABLE students ADD COLUMN ' . $__col . ' VARCHAR(20) DEFAULT NULL');
+        } catch (Throwable $e) { error_log('students parent-birth column ' . $__col . ': ' . $e->getMessage()); }
+    }
+};
+if (function_exists('perf_schema_once')) {
+    perf_schema_once('students_parent_birth_v1', $__parentBirthSchema);
+} else {
+    $__parentBirthSchema();
+}
+unset($__parentBirthSchema);
 
 require_once __DIR__ . '/includes/header.php';
 
@@ -513,6 +533,52 @@ else:
     if (!in_array($sortKey, ['class', 'name', 'first', 'grade', 'nid', 'gpa', 'disc'], true)) $sortKey = 'name';
     $sortDir = (trim($_GET['dir'] ?? 'asc') === 'desc') ? 'desc' : 'asc';
 
+    /* ═══════════════════════════════════════════════════════════════════
+       V4.208.0 — آمار کمکی فهرست، یک‌بار محاسبه و کش می‌شود
+       ───────────────────────────────────────────────────────────────────
+       پیش از این، همین یک صفحه پنج زیرکوئری تجمعی سنگین داشت (LEFT JOIN با
+       GROUP BY روی student_discipline_records، reports، report_grades و
+       report_parent_reviews) و با هر بازدید، کل این جدول‌ها اسکن می‌شدند.
+       اکنون همان اعداد یک‌بار (هر ۳۰ ثانیه و بلافاصله پس از هر نوشتن در
+       دیتابیس) محاسبه و کش می‌شوند و فیلترها روی همان آرایه اعمال می‌شوند.
+       ═══════════════════════════════════════════════════════════════════ */
+    $stats = perf_cache_remember('student_list_stats_v1', 30, function () {
+        $out = [];
+        $blank = ['discipline_count'=>0,'unreviewed_count'=>0,'unreviewed_reports'=>0,'last_disc_jalali'=>null,'latest_gpa'=>null,'latest_month'=>null,'failed_count'=>0];
+        $touch = function ($sid) use (&$out, $blank) { $sid=(int)$sid; if(!isset($out[$sid])) $out[$sid]=$blank; return $sid; };
+        try {
+            foreach (DB::fetchAll("SELECT student_id, COUNT(*) AS c, SUM(CASE WHEN COALESCE(review_status,'pending')='pending' THEN 1 ELSE 0 END) AS u, MAX(occurred_at_jalali) AS l FROM student_discipline_records GROUP BY student_id") as $r) {
+                $sid=$touch($r['student_id']); $out[$sid]['discipline_count']=(int)$r['c']; $out[$sid]['unreviewed_count']=(int)$r['u']; $out[$sid]['last_disc_jalali']=$r['l'];
+            }
+        } catch (Throwable $e) {}
+        try {
+            foreach (DB::fetchAll("SELECT r1.student_id, r1.gpa, r1.report_month FROM reports r1 JOIN (SELECT student_id, MAX(id) AS max_id FROM reports GROUP BY student_id) x ON x.max_id=r1.id") as $r) {
+                $sid=$touch($r['student_id']); $out[$sid]['latest_gpa']=$r['gpa']; $out[$sid]['latest_month']=$r['report_month'];
+            }
+        } catch (Throwable $e) {}
+        try {
+            foreach (DB::fetchAll("SELECT r.student_id, COUNT(*) AS c FROM reports r LEFT JOIN report_parent_reviews rv ON rv.report_id=r.id WHERE rv.id IS NULL GROUP BY r.student_id") as $r) {
+                $sid=$touch($r['student_id']); $out[$sid]['unreviewed_reports']=(int)$r['c'];
+            }
+        } catch (Throwable $e) {}
+        try {
+            foreach (DB::fetchAll("SELECT r.student_id, COUNT(*) AS c FROM reports r JOIN report_grades rg ON rg.report_id=r.id WHERE rg.score < 10 GROUP BY r.student_id") as $r) {
+                $sid=$touch($r['student_id']); $out[$sid]['failed_count']=(int)$r['c'];
+            }
+        } catch (Throwable $e) {}
+        return $out;
+    });
+    $subjectStudents = null;
+    if ($subjectFilter !== '') {
+        $subjectStudents = perf_cache_remember('subject_students_' . md5($subjectFilter), 60, function () use ($subjectFilter) {
+            $set = [];
+            try {
+                foreach (DB::fetchAll("SELECT DISTINCT r.student_id FROM reports r JOIN report_grades rg ON rg.report_id=r.id WHERE rg.subject_name = ?", [$subjectFilter]) as $r) $set[(int)$r['student_id']] = true;
+            } catch (Throwable $e) {}
+            return $set;
+        });
+    }
+
     $where = ["s.status IN ('active','inactive')"];
     $params = [];
     if ($search !== '') {
@@ -521,32 +587,51 @@ else:
     }
     if ($filterGrade !== '') { $where[] = "s.grade_level = ?"; $params[] = $filterGrade; }
     if ($filterClass !== '') { $where[] = "s.class_name = ?"; $params[] = $filterClass; }
-    if ($disciplineFilter === 'has_records') $where[] = "dr.discipline_count > 0";
-    if ($disciplineFilter === 'no_records') $where[] = "COALESCE(dr.discipline_count,0) = 0";
-    if ($disciplineFilter === 'recent_30') $where[] = "dr.discipline_count > 0 AND dr.last_disc_jalali >= ?"; // Jalali lexical works with yyyy/mm/dd
-    if ($disciplineFilter === 'recent_30') $params[] = jdate('Y/m/d', time() - 30*86400);
-    if ($minGpa !== '') { $where[] = "lr.latest_gpa >= ?"; $params[] = (float)$minGpa; }
-    if ($maxGpa !== '') { $where[] = "lr.latest_gpa <= ?"; $params[] = (float)$maxGpa; }
-    if ($academicFilter === 'excellent') $where[] = "lr.latest_gpa >= 17";
-    if ($academicFilter === 'weak') $where[] = "lr.latest_gpa > 0 AND lr.latest_gpa < 12";
-    if ($academicFilter === 'failed') $where[] = "fg.failed_count > 0";
-    if ($subjectFilter !== '') { $where[] = "sg.student_id IS NOT NULL"; }
+    /* فیلترهای وابسته به آمار، روی آرایهٔ کش‌شده اعمال می‌شوند */
+    $postFilter = null;
+    $recentCut = ($disciplineFilter === 'recent_30') ? jdate('Y/m/d', time() - 30*86400) : '';
+    if ($disciplineFilter !== '' || $minGpa !== '' || $maxGpa !== '' || $academicFilter !== '' || $subjectFilter !== '') {
+        $postFilter = function ($row) use ($disciplineFilter, $minGpa, $maxGpa, $academicFilter, $subjectFilter, $subjectStudents, $recentCut) {
+            $sid = (int)($row['id'] ?? 0);
+            $dc = (int)($row['discipline_count'] ?? 0);
+            $lg = $row['latest_gpa'];
+            if ($disciplineFilter === 'has_records' && $dc <= 0) return false;
+            if ($disciplineFilter === 'no_records' && $dc !== 0) return false;
+            if ($disciplineFilter === 'recent_30') {
+                if ($dc <= 0) return false;
+                if ((string)($row['last_disc_jalali'] ?? '') < $recentCut) return false;
+            }
+            if ($minGpa !== '' && ($lg === null || (float)$lg < (float)$minGpa)) return false;
+            if ($maxGpa !== '' && ($lg === null || (float)$lg > (float)$maxGpa)) return false;
+            if ($academicFilter === 'excellent' && ($lg === null || (float)$lg < 17)) return false;
+            if ($academicFilter === 'weak' && ($lg === null || (float)$lg <= 0 || (float)$lg >= 12)) return false;
+            if ($academicFilter === 'failed' && (int)($row['failed_count'] ?? 0) <= 0) return false;
+            if ($subjectFilter !== '' && !($subjectStudents && isset($subjectStudents[$sid]))) return false;
+            return true;
+        };
+    }
 
     $whereSql = implode(' AND ', $where);
-    $sql = "SELECT s.*, COALESCE(dr.discipline_count,0) AS discipline_count, COALESCE(dr.unreviewed_count,0) AS unreviewed_count, COALESCE(rr.unreviewed_reports,0) AS unreviewed_reports, dr.last_disc_jalali, lr.latest_gpa, lr.latest_month, COALESCE(fg.failed_count,0) AS failed_count
-        FROM students s
-        LEFT JOIN (SELECT student_id, COUNT(*) AS discipline_count, SUM(CASE WHEN COALESCE(review_status,'pending')='pending' THEN 1 ELSE 0 END) AS unreviewed_count, MAX(occurred_at_jalali) AS last_disc_jalali FROM student_discipline_records GROUP BY student_id) dr ON dr.student_id=s.id
-        LEFT JOIN (SELECT r1.student_id, r1.gpa AS latest_gpa, r1.report_month AS latest_month FROM reports r1 JOIN (SELECT student_id, MAX(id) AS max_id FROM reports GROUP BY student_id) x ON x.max_id=r1.id) lr ON lr.student_id=s.id
-        LEFT JOIN (SELECT r.student_id, COUNT(*) AS unreviewed_reports FROM reports r LEFT JOIN report_parent_reviews rv ON rv.report_id=r.id WHERE rv.id IS NULL GROUP BY r.student_id) rr ON rr.student_id=s.id
-        LEFT JOIN (SELECT r.student_id, COUNT(*) AS failed_count FROM reports r JOIN report_grades rg ON rg.report_id=r.id WHERE rg.score < 10 GROUP BY r.student_id) fg ON fg.student_id=s.id
-        LEFT JOIN (SELECT DISTINCT r.student_id FROM reports r JOIN report_grades rg ON rg.report_id=r.id WHERE rg.subject_name = ?) sg ON sg.student_id=s.id
-        WHERE $whereSql";
-    $allParams = array_merge([$subjectFilter], $params);
+    $sql = "SELECT s.* FROM students s WHERE $whereSql";
+    $allParams = $params;
     if ($filterYear !== '') {
         $sql .= " AND (s.academic_year = ? OR (s.academic_year IS NULL AND EXISTS(SELECT 1 FROM reports ry WHERE ry.student_id=s.id AND ry.academic_year=?)) OR (s.academic_year IS NULL AND EXISTS(SELECT 1 FROM class_schedules cs WHERE cs.academic_year=? AND cs.class_name=s.class_name)) OR (s.academic_year IS NULL AND EXISTS(SELECT 1 FROM classes c WHERE c.academic_year=? AND c.name=s.class_name)))";
         $allParams[] = $filterYear; $allParams[] = $filterYear; $allParams[] = $filterYear; $allParams[] = $filterYear;
     }
     $studentsList = DB::fetchAll($sql, $allParams);
+    /* پیوند آمار کش‌شده به هر ردیف — همان ستون‌هایی که نما انتظار دارد */
+    foreach ($studentsList as &$sRow) {
+        $st = $stats[(int)$sRow['id']] ?? null;
+        $sRow['discipline_count']     = $st ? (int)$st['discipline_count'] : 0;
+        $sRow['unreviewed_count']     = $st ? (int)$st['unreviewed_count'] : 0;
+        $sRow['unreviewed_reports']   = $st ? (int)$st['unreviewed_reports'] : 0;
+        $sRow['last_disc_jalali']     = $st['last_disc_jalali'] ?? null;
+        $sRow['latest_gpa']           = $st['latest_gpa'] ?? null;
+        $sRow['latest_month']         = $st['latest_month'] ?? null;
+        $sRow['failed_count']         = $st ? (int)$st['failed_count'] : 0;
+    }
+    unset($sRow);
+    if ($postFilter) $studentsList = array_values(array_filter($studentsList, $postFilter));
     /* v4.176.0: چینش انتخابی کاربر به‌جای همیشه «نام خانوادگی، سپس نام» */
     $gw = function ($a, $b) { return grade_sort_weight($a['grade_level'] ?? '') <=> grade_sort_weight($b['grade_level'] ?? ''); };
     $cw = function ($a, $b) {

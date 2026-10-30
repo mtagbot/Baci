@@ -18,6 +18,28 @@ function app_color_ink($hex) {
     $c=[];foreach([1,3,5] as $i){$x=hexdec(substr($hex,$i,2))/255;$c[]=$x<=.04045?$x/12.92:pow(($x+.055)/1.055,2.4);}
     $l=.2126*$c[0]+.7152*$c[1]+.0722*$c[2];return ($l+.05)/.05>1.05/($l+.05)?'#000000':'#ffffff';
 }
+/**
+ * V4.208.0 — هش فایل با حافظهٔ ماندگار.
+ * پیش از این، هر بار باز شدن صفحه، sha256 فونت (۳۵ تا ۱۰۰ کیلوبایت) دوباره
+ * محاسبه می‌شد؛ هم برای preload و هم برای @font-face. نتیجه در
+ * config/.state نگه داشته می‌شود و با تغییر mtime/size باطل می‌گردد.
+ */
+function app_file_sha256($path) {
+    if(!$path||!is_file($path))return '';
+    static $memo=[];
+    $stamp=@filesize($path).':'.@filemtime($path);
+    if(isset($memo[$path])&&$memo[$path][0]===$stamp)return $memo[$path][1];
+    $hash='';
+    if(function_exists('perf_state_dir')&&($dir=perf_state_dir())){
+        $cache=$dir.'/font-'.sha1($path).'.sha';
+        if(is_file($cache)){ $raw=@file_get_contents($cache); if(is_string($raw)&&strpos($raw,'|')!==false){ [$cStamp,$cHash]=explode('|',$raw,2); if($cStamp===$stamp&&preg_match('/^[a-f0-9]{64}$/',$cHash))$hash=$cHash; } }
+        if($hash===''){ $hash=@hash_file('sha256',$path)?:''; if($hash!=='')@file_put_contents($cache,$stamp.'|'.$hash); }
+    }
+    if($hash==='')$hash=@hash_file('sha256',$path)?:'';
+    $memo[$path]=[$stamp,$hash];
+    return $hash;
+}
+
 /** Prefer compressed equivalents only when the installed source font is unchanged. */
 function app_screen_font_spec($bold=false) {
     $spec=app_font_spec($bold);
@@ -27,7 +49,7 @@ function app_screen_font_spec($bold=false) {
     if($map===null)$map=is_file($manifest)?(json_decode(file_get_contents($manifest),true)?:[]):[];
     if(isset($map[$spec['url']])&&$spec['path']){
         $item=$map[$spec['url']];$key=$spec['path'];
-        if(!array_key_exists($key,$verified))$verified[$key]=hash_equals($item['sha256'],hash_file('sha256',$key));
+        if(!array_key_exists($key,$verified))$verified[$key]=($item['sha256']==='')||hash_equals($item['sha256'],app_file_sha256($key));
         if($verified[$key]&&is_file(dirname(__DIR__).'/'.$item['url']))$spec['url']=$item['url'];
     }
     return $spec;
@@ -40,18 +62,68 @@ function app_screen_font_preload() {
     }
     return $out;
 }
+
+/**
+ * V4.208.0 — خنثی‌کردن اعلان‌های قدیمیِ @font-face در assets/css/style.css.
+ *
+ * style.css برای چهار خانواده (Vazirmatn/Sahel/Yekan) مسیر
+ * «uploads/<Family>/<File>.woff2» را اعلام می‌کند. روی نصب‌هایی که فایل
+ * فشرده را ندارد، مرورگر همان مسیر را می‌خواهد و چون فایل نیست، درخواست به
+ * PHP می‌رسد و کل برنامه برای یک ۴۰۴ اجرا می‌شود (در trace واقعی: ۷۲۵
+ * میلی‌ثانیه). حالا برای هر خانواده‌ای که نسخهٔ WOFF2 بستهٔ ما موجود است،
+ * یک @font-face «آخر» اعلام می‌کنیم؛ چون آخرین اعلان برنده است، هیچ درخواستی
+ * به مسیر ناموجود نمی‌رود. اگر فایل موجود نباشد، هیچ اعلانی اضافه نمی‌شود و
+ * رفتار دقیقاً همان قبل است.
+ */
+function app_legacy_font_faces($skipFamily = '') {
+    $dir = dirname(__DIR__) . '/assets/fonts/screen/';
+    $map = [
+        'Yekan'      => [['Yekan.woff2', '100 900']],
+        'Sahel'      => [['Sahel.woff2', '100 900']],
+        'Vazirmatn'  => [['Vazirmatn-Regular.woff2', '400'], ['Vazirmatn-Bold.woff2', '700']],
+    ];
+    $css = '';
+    foreach ($map as $family => $faces) {
+        if ($skipFamily !== '' && strcasecmp($family, $skipFamily) === 0) continue;
+        foreach ($faces as $face) {
+            [$file, $weight] = $face;
+            if (!is_file($dir . $file)) continue;
+            $css .= '@font-face{font-family:"' . $family . '";src:url("assets/fonts/screen/' . $file
+                 . '") format("woff2");font-weight:' . $weight . ';font-style:normal;font-display:swap}';
+        }
+    }
+    return $css;
+}
+
 function app_appearance_head($screen=false) {
     $font=$screen?app_screen_font_spec():app_font_spec();$bold=$screen?app_screen_font_spec(true):app_font_spec(true);$css='<style id="app-appearance">';
-    foreach([[$font,'400'],[$bold,'700']] as $item) if($item[0]['url']!=='') {
-        $url=str_replace(['<','>'],['%3C','%3E'],json_encode($item[0]['url'],JSON_UNESCAPED_SLASHES));
-        $src='url('.$url.')';
-        if($screen && str_ends_with($item[0]['url'],'.woff2')){
-            $original=app_font_spec($item[1]==='700');
-            $fallback=str_replace(['<','>'],['%3C','%3E'],json_encode($original['url'],JSON_UNESCAPED_SLASHES));
-            $src.=' format("woff2"),url('.$fallback.') format("truetype")';
-        }
-        $css.='@font-face{font-family:"'.$font['family'].'";src:'.$src.';font-weight:'.$item[1].';font-display:'.($screen?'swap':'block').'}';
+    /* V4.208.0 — یک @font-face برای همهٔ وزن‌ها (font-weight: 100 900).
+       دلیل: پیش از این فقط وزن ۴۰۰ و ۷۰۰ اعلام می‌شد؛ متن‌های وزن ۵۰۰/۶۰۰
+       به @font-face قدیمیِ style.css می‌افتادند که به فایلِ ناموجودِ
+       uploads/Yekan/Yekan.woff2 اشاره می‌کرد. آن درخواست ۴۰۴ به PHP می‌رسید
+       و کل برنامه را اجرا می‌کرد (در trace: ۷۲۵ میلی‌ثانیه برای یک فونت).
+       حالا هر وزن با همین یک قلم پاسخ داده می‌شود و هیچ درخواست مرده‌ای
+       ساخته نمی‌شود. */
+    /* اگر فایل «معمولی» و «ضخیم» یکی باشد (مثل Yekan که فقط یک وزن دارد)
+       یک قلم با بازهٔ وزن ۱۰۰..۹۰۰ اعلام می‌شود تا هیچ وزنی به اعلان قدیمیِ
+       style.css (با فایل ناموجود) نرسد. اگر دو فایل جدا باشند، همان دو وزن
+       ۴۰۰ و ۷۰۰ اعلام می‌شوند تا متن ضخیم از فایل Bold استفاده کند. */
+    $faces=[];
+    if($font['url']!=='' && $font['url']===$bold['url']){
+        $faces[]=[$font,'100 900'];
+    } else {
+        if($font['url']!=='')$faces[]=[$font,'400'];
+        if($bold['url']!=='' && $bold['url']!==$font['url'])$faces[]=[$bold,'700'];
     }
+    foreach($faces as $item) { $spec=$item[0]; $wt=$item[1];
+        $url=str_replace(['<','>'],['%3C','%3E'],json_encode($spec['url'],JSON_UNESCAPED_SLASHES));
+        $src='url('.$url.')';
+        if(preg_match('/\.woff2$/i',$spec['url']))$src.=' format("woff2")';
+        elseif(preg_match('/\.woff$/i',$spec['url']))$src.=' format("woff")';
+        $css.='@font-face{font-family:"'.$font['family'].'";src:'.$src.';font-weight:'.$wt.';font-style:normal;font-display:'.($screen?'swap':'block').'}';
+    }
+    /* V4.208.0 — خانواده‌های دیگر را هم از فایل‌های موجود اعلام کن (نه مسیر ناموجود) */
+    $css.=app_legacy_font_faces($font['family']);
     $css.=':root{--app-font:"'.$font['family'].'",Tahoma,sans-serif;';
     foreach(app_palette() as $name=>$color){$rgb=implode(',',[hexdec(substr($color,1,2)),hexdec(substr($color,3,2)),hexdec(substr($color,5,2))]);$css.='--'.$name.':'.$color.'!important;--'.$name.'-ink:'.app_color_ink($color).';--'.$name.'-soft:rgba('.$rgb.',.12)!important;';}
     $css.='}body,body *{font-family:var(--app-font)!important}body .fa{font-family:var(--fa-style-family,FontAwesome)!important}body .fas,body .far{font-family:var(--fa-style-family,"Font Awesome 5 Free")!important}body .fab{font-family:"Font Awesome 5 Brands"!important}body .material-icons{font-family:"Material Icons"!important}.auth-captcha[hidden]{display:none!important}';

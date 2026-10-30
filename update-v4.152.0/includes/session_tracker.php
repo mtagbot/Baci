@@ -13,9 +13,12 @@ if (!function_exists('ensure_user_sessions_schema')) {
         static $done = false;
         if ($done) return;
         if(!DB::getInstance()->getPdo())throw new RuntimeException('Database unavailable');
+        /* V4.208.0 — پیش از این هر درخواست دو SELECT آزمایشی + CREATE TABLE
+           (در اولین بار) اجرا می‌کرد. اکنون فقط یک‌بار در هر نسخه. */
+        if (function_exists('perf_schema_is_marked') && perf_schema_is_marked('user_sessions_v1')) { $done=true; return; }
 
         try {
-            try { DB::fetch('SELECT remember_hash FROM user_sessions LIMIT 1'); $done=true; return; } catch(PDOException $e) {}
+            try { DB::fetch('SELECT remember_hash FROM user_sessions LIMIT 1'); if (function_exists('perf_schema_mark')) perf_schema_mark('user_sessions_v1'); $done=true; return; } catch(PDOException $e) {}
             DB::execute("CREATE TABLE IF NOT EXISTS user_sessions (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 session_id VARCHAR(128) NOT NULL,
@@ -37,6 +40,7 @@ if (!function_exists('ensure_user_sessions_schema')) {
                 KEY idx_seen (last_seen_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
             try { DB::fetch('SELECT remember_hash FROM user_sessions LIMIT 1'); } catch(PDOException $e) { DB::execute('ALTER TABLE user_sessions ADD COLUMN remember_hash varchar(64) DEFAULT NULL'); }
+            if (function_exists('perf_schema_mark')) perf_schema_mark('user_sessions_v1');
             $done=true;
         } catch (Throwable $e) { throw $e; }
     }

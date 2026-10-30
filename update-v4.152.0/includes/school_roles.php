@@ -7,7 +7,26 @@
 require_once __DIR__ . '/functions.php';
 
 if (!function_exists('ensure_school_roles_schema')) {
+    /**
+     * V4.208.0 — این تابع از هدر، منوی دبیر و چند صفحه در «هر درخواست» صدا زده
+     * می‌شد و هر بار ۵ ALTER TABLE به‌علاوهٔ backfill و چند CREATE TABLE اجرا
+     * می‌کرد. روی MySQL هر ALTER (حتی وقتی ستون موجود است) یک رفت‌وبرگشت
+     * شبکه و تلاش برای قفل متادیتا است؛ نتیجه: TTFB نزدیک یک ثانیه.
+     * حالا کل بدنه فقط یک‌بار برای هر نسخه اجرا می‌شود و در درخواست‌های بعدی
+     * تنها هزینه یک is_file() روی نشانهٔ نسخه است.
+     */
     function ensure_school_roles_schema() {
+        static $done = false;
+        if ($done) return;
+        $done = true;
+        perf_schema_once('school_roles_v1', function () {
+            if (function_exists('sd_ensure_school_roles_schema_legacy')) sd_ensure_school_roles_schema_legacy();
+        });
+    }
+}
+
+if (!function_exists('sd_ensure_school_roles_schema_legacy')) {
+    function sd_ensure_school_roles_schema_legacy() {
         try { DB::execute("ALTER TABLE teachers ADD COLUMN is_deputy tinyint(1) NOT NULL DEFAULT 0"); } catch (Exception $e) {}
         try { DB::execute("ALTER TABLE teachers ADD COLUMN is_counselor tinyint(1) NOT NULL DEFAULT 0"); } catch (Exception $e) {}
         try { DB::execute("ALTER TABLE teachers ADD COLUMN is_executive tinyint(1) NOT NULL DEFAULT 0"); } catch (Exception $e) {}

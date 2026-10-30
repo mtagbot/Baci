@@ -1,0 +1,49 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SchoolDesk Pro — .htaccess پیشنهادی Apache برای حداکثر سرعت (V4.208.0)
+# ─────────────────────────────────────────────────────────────────────────────
+# این فایل را در ریشهٔ سایت (کنار index.php) با نام .htaccess بگذارید.
+# اگر از قبل .htaccess دارید، فقط بلوک‌های زیر را به آن اضافه کنید.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── فشرده‌سازی ──
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml \
+        application/javascript application/json application/xml image/svg+xml
+</IfModule>
+
+# ── کش یک‌ساله برای دارایی‌های هش‌دار و فونت‌ها ──
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css               "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType font/woff2             "access plus 1 year"
+    ExpiresByType font/woff              "access plus 1 year"
+    ExpiresByType image/svg+xml          "access plus 1 month"
+    ExpiresByType image/png              "access plus 1 month"
+    ExpiresByType image/jpeg             "access plus 1 month"
+</IfModule>
+<IfModule mod_headers.c>
+    <FilesMatch "\.(css|js|woff2|woff|ttf)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+</IfModule>
+
+# ── فایل استاتیک گم‌شده نباید به PHP برسد ──
+# روی Apache، اگر RewriteRule عمومی همه‌چیز را به index.php بفرستد،
+# یک فونت گم‌شده هم کل برنامه را اجرا می‌کند (در trace: ۷۲۵ میلی‌ثانیه).
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(assets|uploads)/ - [R=404,L]
+</IfModule>
+
+# ── دسترسی به پوشه‌های حساس ──
+<IfModule mod_authz_core.c>
+    <FilesMatch "^(config|includes|sql|backups|cache|perf-config)/">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+
+# ── UTF-8 پیش‌فرض ──
+AddDefaultCharset UTF-8
