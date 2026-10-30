@@ -77,14 +77,20 @@ function app_screen_font_preload() {
  */
 function app_legacy_font_faces($skipFamily = '') {
     $dir = dirname(__DIR__) . '/assets/fonts/screen/';
+    /* V4.209.0 — وزن‌ها «دقیق» اعلام می‌شوند (۴۰۰ و ۷۰۰)، نه بازهٔ ۱۰۰..۹۰۰.
+       دلیل: در style.css همین خانواده‌ها با وزن دقیق ۴۰۰ اعلام شده‌اند و
+       مرورگر آن اعلان را ترجیح می‌داد؛ نتیجه دو درخواست مرده به
+       uploads/Yekan/Yekan.woff2 (۴۰۴) و .ttf بود. با وزن دقیق و اعلانِ
+       بعدی، همین قاعده برنده است و هیچ درخواستی به مسیر ناموجود نمی‌رود.
+       خانوادهٔ فعال هم دیگر مستثنا نمی‌شود تا در همهٔ حالت‌ها اعلان ما آخر
+       باشد. */
     $map = [
-        'Yekan'      => [['Yekan.woff2', '100 900']],
-        'Sahel'      => [['Sahel.woff2', '100 900']],
+        'Yekan'      => [['Yekan.woff2', '400'], ['Yekan.woff2', '700']],
+        'Sahel'      => [['Sahel.woff2', '400'], ['Sahel.woff2', '700']],
         'Vazirmatn'  => [['Vazirmatn-Regular.woff2', '400'], ['Vazirmatn-Bold.woff2', '700']],
     ];
     $css = '';
     foreach ($map as $family => $faces) {
-        if ($skipFamily !== '' && strcasecmp($family, $skipFamily) === 0) continue;
         foreach ($faces as $face) {
             [$file, $weight] = $face;
             if (!is_file($dir . $file)) continue;
@@ -93,6 +99,49 @@ function app_legacy_font_faces($skipFamily = '') {
         }
     }
     return $css;
+}
+
+/**
+ * V4.209.0 — قاعدهٔ @font-face برای یک خانواده، بر پایهٔ فایلی که واقعاً هست.
+ *
+ * صفحات چاپ/سند (report-print، exam-print، bulk-print) و style.css قبلاً
+ * مسیر «uploads/<Family>/<File>.woff2» را اعلام می‌کردند که روی بیشتر نصب‌ها
+ * وجود ندارد؛ آن ۴۰۴ در nginx به PHP می‌رسید و کل برنامه برای یک فونت اجرا
+ * می‌شد. این تابع همیشه فایل موجود را انتخاب می‌کند و اگر هیچ فایلی نبود،
+ * رشتهٔ خالی برمی‌گرداند (یعنی هیچ درخواست مرده‌ای ساخته نمی‌شود).
+ *
+ * @param string $family Yekan | Sahel | Vazirmatn | BTitr
+ * @param string $weight وزن اعلان ('' یعنی پیش‌فرض)
+ * @param bool   $bold   استفاده از فایل Bold در صورت وجود
+ * @param string $prefer 'print' → TTF کامل (پوشش همهٔ حروف)، 'screen' → WOFF2 سبک‌تر
+ */
+function app_font_face_rule($family, $weight = '', $bold = false, $prefer = 'screen') {
+    $root = dirname(__DIR__);
+    $candidates = [];
+    $ttf = [
+        'Yekan' => 'uploads/Yekan/Yekan.ttf',
+        'Sahel' => 'uploads/Sahel/Sahel.ttf',
+        'Vazirmatn' => $bold ? 'uploads/Vazirmatn/Vazirmatn-Bold.ttf' : 'uploads/Vazirmatn/Vazirmatn-Regular.ttf',
+        'BTitr' => 'uploads/B-Titr/B-Titr.ttf',
+    ];
+    $woff2 = [
+        'Yekan' => 'assets/fonts/screen/Yekan.woff2',
+        'Sahel' => 'assets/fonts/screen/Sahel.woff2',
+        'Vazirmatn' => $bold ? 'assets/fonts/screen/Vazirmatn-Bold.woff2' : 'assets/fonts/screen/Vazirmatn-Regular.woff2',
+    ];
+    if ($prefer === 'print') {
+        if (isset($ttf[$family])) $candidates[] = [$ttf[$family], 'truetype'];
+        if (isset($woff2[$family])) $candidates[] = [$woff2[$family], 'woff2'];
+    } else {
+        if (isset($woff2[$family])) $candidates[] = [$woff2[$family], 'woff2'];
+        if (isset($ttf[$family])) $candidates[] = [$ttf[$family], 'truetype'];
+    }
+    foreach ($candidates as $item) {
+        if (!is_file($root . '/' . $item[0])) continue;
+        return '@font-face{font-family:"' . $family . '";src:url("' . $item[0] . '") format("' . $item[1] . '");'
+             . ($weight !== '' ? 'font-weight:' . $weight . ';' : '') . 'font-style:normal;font-display:swap}';
+    }
+    return '';
 }
 
 function app_appearance_head($screen=false) {
@@ -123,7 +172,7 @@ function app_appearance_head($screen=false) {
         $css.='@font-face{font-family:"'.$font['family'].'";src:'.$src.';font-weight:'.$wt.';font-style:normal;font-display:'.($screen?'swap':'block').'}';
     }
     /* V4.208.0 — خانواده‌های دیگر را هم از فایل‌های موجود اعلام کن (نه مسیر ناموجود) */
-    $css.=app_legacy_font_faces($font['family']);
+    $css.=app_legacy_font_faces();
     $css.=':root{--app-font:"'.$font['family'].'",Tahoma,sans-serif;';
     foreach(app_palette() as $name=>$color){$rgb=implode(',',[hexdec(substr($color,1,2)),hexdec(substr($color,3,2)),hexdec(substr($color,5,2))]);$css.='--'.$name.':'.$color.'!important;--'.$name.'-ink:'.app_color_ink($color).';--'.$name.'-soft:rgba('.$rgb.',.12)!important;';}
     $css.='}body,body *{font-family:var(--app-font)!important}body .fa{font-family:var(--fa-style-family,FontAwesome)!important}body .fas,body .far{font-family:var(--fa-style-family,"Font Awesome 5 Free")!important}body .fab{font-family:"Font Awesome 5 Brands"!important}body .material-icons{font-family:"Material Icons"!important}.auth-captcha[hidden]{display:none!important}';

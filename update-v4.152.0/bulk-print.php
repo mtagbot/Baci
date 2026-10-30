@@ -32,8 +32,7 @@ if (isset($_GET['print'])) {
     <meta charset="UTF-8">
     <title>چاپ گروهی کارنامه‌ها - کلاس <?php echo clean($class ?: 'همه'); ?></title>
     <style>
-        @font-face { font-family: 'Vazirmatn'; src: url('uploads/Vazirmatn/Vazirmatn-Regular.woff2') format('woff2'), url('uploads/Vazirmatn/Vazirmatn-Regular.ttf') format('truetype'); font-display: swap; }
-        @font-face { font-family: 'Vazirmatn'; src: url('uploads/Vazirmatn/Vazirmatn-Bold.woff2') format('woff2'), url('uploads/Vazirmatn/Vazirmatn-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+        <?php echo app_font_face_rule('Vazirmatn', '400', false, 'print'); echo app_font_face_rule('Vazirmatn', '700', true, 'print'); ?>
         * { box-sizing: border-box; }
         body { font-family: 'Vazirmatn', Tahoma, sans-serif; background: #fff; color: #000; margin: 0; padding: 0; }
         .btn-print { display: block; margin: 15px auto; padding: 10px 25px; background: #2563eb; color: #fff; border: none; border-radius: 5px; font-size: 15px; cursor: pointer; }
@@ -81,7 +80,8 @@ if (isset($_GET['print'])) {
         @media print { .btn-print, .no-print { display: none !important; } }
     </style>
 <?php echo app_appearance_head(); ?>
-<link rel=stylesheet href=assets/css/school-ui.css?v20260917d><script defer src=assets/js/school-icons.js?v20260917d></script><script defer src=assets/js/school-ui.js?v20260917d></script></head>
+<?php $__css = function_exists('perf_bundle_url') ? perf_bundle_url(perf_css_app_files(), 'css') : ''; $__js = function_exists('perf_bundle_url') ? perf_bundle_url(perf_js_core_files(), 'js') : ''; ?>
+<?php if ($__css): ?><link rel="stylesheet" href="<?php echo clean($__css); ?>"><?php else: ?><link rel=stylesheet href=assets/css/school-ui.css?v20260917d><?php endif; ?><?php if ($__js): ?><script defer src="<?php echo clean($__js); ?>"></script><?php else: ?><script defer src=assets/js/school-icons.js?v20260917d></script><script defer src=assets/js/school-ui.js?v20260917d></script><?php endif; ?></head>
 <body data-school-return="preview">
 <button onclick="appPrint()" class="btn-print"><svg data-ui-icon="print" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 8V3h10v5M7 17H3V9h18v8h-4M7 14h10v8H7ZM17 11h.1"/></svg> چاپ گروهی (Layout: <?php echo tr_num($layout, 'fa'); ?> کارنامه در صفحه)</button>
 

@@ -59,7 +59,8 @@ video{width:100%;height:100%;object-fit:cover;display:block}
 .sndhint{padding:2px 8px;text-align:center;font-size:.6rem;color:#94a3b8;background:rgba(0,0,0,.55);pointer-events:none}
 </style>
 <?php echo app_appearance_head(); ?>
-<link rel=stylesheet href=assets/css/school-ui.css?v20260917d><script defer src=assets/js/school-icons.js?v20260917d></script><script defer src=assets/js/school-ui.js?v20260917d></script></head>
+<?php $__css = function_exists('perf_bundle_url') ? perf_bundle_url(perf_css_app_files(), 'css') : ''; $__js = function_exists('perf_bundle_url') ? perf_bundle_url(perf_js_core_files(), 'js') : ''; ?>
+<?php if ($__css): ?><link rel="stylesheet" href="<?php echo clean($__css); ?>"><?php else: ?><link rel=stylesheet href=assets/css/school-ui.css?v20260917d><?php endif; ?><?php if ($__js): ?><script defer src="<?php echo clean($__js); ?>"></script><?php else: ?><script defer src=assets/js/school-icons.js?v20260917d></script><script defer src=assets/js/school-ui.js?v20260917d></script><?php endif; ?></head>
 <body class="ui-scanner">
 <div class="hdr">
     <div class="sch"><?php echo clean($schoolName); ?></div>

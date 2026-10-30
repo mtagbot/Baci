@@ -1,0 +1,193 @@
+<?php
+// File: report-print.php
+/**
+ * Printable Version of Report Card (report-print.php) - Clean without coefficients
+ */
+
+require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__.'/includes/page_navigation.php';
+require_once __DIR__ . '/includes/school_roles.php';
+ensure_school_roles_schema();
+
+$reportId = (int)($_GET['id'] ?? 0);
+$report = DB::fetch("SELECT r.*, s.first_name, s.last_name, s.national_id, s.father_name, s.grade_level, s.photo_url FROM reports r JOIN students s ON r.student_id = s.id WHERE r.id = ?", [$reportId]);
+
+if (!$report) {
+    app_page_error('کارنامه یافت نشد.');
+}
+
+$staffFileAccess = current_teacher_has_student_file_access();
+$printTokenOk = verify_report_print_token($_GET['pt'] ?? '', $reportId, $report['student_id']);
+$isLockedForStu = is_report_locked_for_student($report);
+if (!is_admin_logged_in() && !$staffFileAccess && $isLockedForStu) {
+    app_page_error('غیرمجاز یا مسدود.');
+}
+if (!$printTokenOk && is_student_logged_in() && ($report['student_id'] != $_SESSION['student_id'] || $isLockedForStu)) {
+    app_page_error('غیرمجاز یا مسدود.');
+}
+if (!$printTokenOk && !is_student_logged_in() && !is_admin_logged_in() && !$staffFileAccess) {
+    app_page_error('برای مشاهده کارنامه باید وارد سیستم شوید.');
+}
+
+$rawGrades = DB::fetchAll("SELECT * FROM report_grades WHERE report_id = ?", [$reportId]);
+$parsedData = extract_clean_grades_and_discipline($rawGrades, $report['discipline_score']);
+$grades = $parsedData['regular_grades'];
+$computedGpa = $parsedData['count'] > 0 ? $parsedData['calculated_gpa'] : $report['gpa'];
+$discScore = $parsedData['discipline_score'];
+
+if ($parsedData['count'] > 0 && abs((float)$report['gpa'] - (float)$computedGpa) > 0.001) {
+    DB::execute("UPDATE reports SET gpa = ?, total_score = ? WHERE id = ?", [$computedGpa, $computedGpa * $parsedData['count'], $reportId]);
+    $report['gpa'] = $computedGpa;
+}
+
+// Compute overall ranks (strictly within the same academic year and same grade/class)
+$classReports = fetch_report_rank_scope($report, 'class');
+$classRank = 1;
+foreach ($classReports as $idx => $cr) { if ((int)$cr['student_id'] === (int)$report['student_id']) { $classRank = $idx + 1; break; } }
+
+$gradeReports = fetch_report_rank_scope($report, 'grade');
+$gradeRank = 1;
+foreach ($gradeReports as $idx => $gr) { if ((int)$gr['student_id'] === (int)$report['student_id']) { $gradeRank = $idx + 1; break; } }
+
+$rLine1 = get_setting('report_header_line1', 'بسمه تعالی');
+$rLine2 = get_setting('report_header_line2', 'دبیرستان غیردولتی بصیرت');
+?>
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head><meta name=viewport content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <title>چاپ کارنامه - <?php echo clean($report['first_name'] . ' ' . $report['last_name']); ?></title>
+    <style>
+        <?php /* V4.209.0 — فقط فایلی که واقعاً هست اعلام می‌شود (پایان درخواست ۴۰۴ گران‌قیمت) */ ?>
+        <?php echo app_font_face_rule('Vazirmatn', '400', false, 'print'); echo app_font_face_rule('Vazirmatn', '700', true, 'print'); ?>
+        body { font-family: 'Vazirmatn', Tahoma, sans-serif; background: #fff; color: #000; margin: 0; padding: 20px; }
+        .print-container { max-width: 800px; margin: 0 auto; border: 2px solid #000; padding: 25px; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px; }
+        .header-text { text-align: center; flex: 1; }
+        /* v4.74.0: تناسب اندازه سربرگ — قبلاً 18px/16px بود و بزرگ به نظر می‌رسید */
+        .header-text h1 { font-size: 15px; margin: 0 0 4px 0; }
+        .header-text h2 { font-size: 13px; margin: 0; font-weight: bold; }
+        .photo-box { width: 85px; height: 113px; /* v4.91.0: نسبت ۳×۴ */ border: 1px solid #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .photo-box img { width: 100%; height: 100%; object-fit: cover; }
+        .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; border: 1px solid #000; padding: 10px; margin-bottom: 15px; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 13px; }
+        th, td { border: 1px solid #000; padding: 8px; text-align: center; }
+        th { background: #f0f0f0; }
+        .signatures { display: flex; justify-content: space-around; margin-top: 50px; font-size: 14px; font-weight: bold; }
+        .sig-box { text-align: center; width: 200px; }
+        .btn-print { display: block; margin: 20px auto; padding: 10px 25px; background: #2563eb; color: #fff; border: none; border-radius: 5px; font-size: 15px; cursor: pointer; }
+        @media print { .btn-print { display: none; } .print-container { border: none; padding: 0; } }
+    </style>
+<?php echo app_appearance_head(); ?>
+<?php $__css = function_exists('perf_bundle_url') ? perf_bundle_url(perf_css_app_files(), 'css') : ''; $__js = function_exists('perf_bundle_url') ? perf_bundle_url(perf_js_core_files(), 'js') : ''; ?>
+<?php if ($__css): ?><link rel="stylesheet" href="<?php echo clean($__css); ?>"><?php else: ?><link rel=stylesheet href=assets/css/school-ui.css?v20260917d><?php endif; ?><?php if ($__js): ?><script defer src="<?php echo clean($__js); ?>"></script><?php else: ?><script defer src=assets/js/school-icons.js?v20260917d></script><script defer src=assets/js/school-ui.js?v20260917d></script><?php endif; ?></head>
+<body data-school-return="preview">
+
+<button onclick="appPrint()" class="btn-print"><svg data-ui-icon="print" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 8V3h10v5M7 17H3V9h18v8h-4M7 14h10v8H7ZM17 11h.1"/></svg> چاپ یا ذخیره PDF از مرورگر</button>
+
+<div class="print-container">
+    <div class="header">
+        <div style="width: 120px; text-align: right; font-size: 11px; line-height: 1.6;">
+            <p style="margin:2px 0;">استان: <b><?php echo clean(get_setting('school_province', 'تهران')); ?></b></p>
+            <p style="margin:2px 0;">منطقه: <b><?php echo clean(get_setting('school_region', 'منطقه ۳')); ?></b></p>
+            <p style="margin:2px 0;">نوع واحد: <b><?php echo clean(get_setting('school_unit_type', 'متوسطه اول پسرانه')); ?></b></p>
+            <p style="margin:2px 0;">تاریخ صدور: <b style="font-family:monospace;"><?php echo jdate('Y/m/d'); ?></b></p>
+        </div>
+        <div class="header-text">
+            <h1><?php echo clean($rLine1); ?></h1>
+            <h1><?php echo clean($rLine2); ?></h1>
+            <h2>کارنامه تحصیلی دانش‌آموز - <?php echo clean($report['term'] . ' (' . $report['report_month'] . ')'); ?> سال <?php echo tr_num($report['academic_year'], 'fa'); ?></h2>
+        </div>
+        <div class="photo-box">
+            <?php if (!empty($report['photo_url'])): ?>
+                <img src="<?php echo clean($report['photo_url']); ?>" alt="عکس">
+            <?php else: ?>
+                <span style="font-size: 11px;">عکس ندارد</span>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="info-grid">
+        <div><span>نام و نام خانوادگی: </span><b><?php echo clean($report['first_name'] . ' ' . $report['last_name']); ?></b></div>
+        <div><span>کد ملی: </span><b style="font-family: monospace;"><?php echo tr_num($report['national_id'], 'fa'); ?></b></div>
+        <div><span>نام پدر: </span><b><?php echo clean($report['father_name'] ?: '---'); ?></b></div>
+        <div><span>کلاس و پایه: </span><b><?php echo clean($report['class_name'] . ' (' . $report['grade_level'] . ')'); ?></b></div>
+    </div>
+
+    <!-- v4.73.0: کادر تکراری «معدل کل / رتبه در کلاس / رتبه در پایه» حذف شد؛ همین اطلاعات در ردیف پایانی جدول نمرات وجود دارد -->
+    <table>
+        <thead>
+            <tr>
+                <th>ردیف</th>
+                <th>نام درس</th>
+                <th>نمره اخذشده</th>
+                <th>رتبه در کلاس</th>
+                <th>رتبه در پایه</th>
+                <th>نتیجه ارزشیابی</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($grades as $idx => $g): 
+                // Subject ranks (strictly within the same academic year and same grade/class, excluding absence score 21)
+                $sClassReps = fetch_subject_rank_scope($report, (string)$g['subject_name'], 'class');
+                $sClsRank = 1;
+                if ((float)$g['score'] != 21.0) {
+                    foreach ($sClassReps as $si => $scr) { if ((int)$scr['student_id'] === (int)$report['student_id'] || (float)$scr['score'] <= (float)$g['score']) { $sClsRank = $si + 1; break; } }
+                }
+
+                $sGradeReps = fetch_subject_rank_scope($report, (string)$g['subject_name'], 'grade');
+                $sGrdRank = 1;
+                if ((float)$g['score'] != 21.0) {
+                    foreach ($sGradeReps as $si => $sgr) { if ((int)$sgr['student_id'] === (int)$report['student_id'] || (float)$sgr['score'] <= (float)$g['score']) { $sGrdRank = $si + 1; break; } }
+                }
+            ?>
+            <tr>
+                <td><?php echo tr_num($idx + 1, 'fa'); ?></td>
+                <td style="font-weight:bold;"><?php echo clean($g['subject_name']); ?></td>
+                <td style="font-weight:bold; font-size:14px;"><?php echo display_score($g['score']); ?></td>
+                <td>#<?php echo tr_num($sClsRank, 'fa'); ?></td>
+                <td>#<?php echo tr_num($sGrdRank, 'fa'); ?></td>
+                <td><?php echo ((float)$g['score'] == 21.0) ? 'غیبت' : ($g['score'] >= 10 ? 'قبول' : 'مردود'); ?></td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+        <tfoot>
+            <tr style="background:#f0f0f0; font-weight:bold;">
+                <td colspan="2" style="text-align:right;">معدل نهایی کارنامه:</td>
+                <td><?php echo format_score($computedGpa); ?></td>
+                <td>رتبه کلاس: #<?php echo tr_num($classRank, 'fa'); ?></td>
+                <td colspan="2">رتبه پایه: #<?php echo tr_num($gradeRank, 'fa'); ?></td>
+            </tr>
+            <tr style="font-size:11px;">
+                <td colspan="2" style="text-align:right; font-weight:bold;">نمره انضباط (غیرموثر در معدل):</td>
+                <td style="font-weight:bold; font-size:14px; color:#10b981;"><?php echo ($discScore !== null && $discScore !== '' && (float)$discScore >= 0) ? format_score($discScore) : 'بدون نمره'; ?></td>
+                <td colspan="3">ارزشیابی انضباطی مدرسه</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div style="margin-top: 30px;">
+        <hr style="border: none; border-top: 1.5px dashed #000; margin: 20px 0;">
+        <p style="font-size: 12px; margin: 10px 0;"><svg data-ui-icon="crop" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 2v16h16M2 6h16v16M3 21 21 3"/></svg> اینجانب ولی دانش‌آموز <b><?php echo clean($report['first_name'] . ' ' . $report['last_name']); ?></b> گزارش عملکرد تحصیلی نوبت <b><?php echo clean($report['term']); ?></b> را مشاهده و بررسی نموده‌ام.</p>
+        <div class="signatures">
+            <div class="sig-box">
+                <p>امضا و تاریخ رویت ولی دانش‌آموز</p>
+                <div style="border-bottom: 1px solid #000; width: 130px; margin: 40px auto 0 auto;"></div>
+            </div>
+            <div class="sig-box" style="position: relative;">
+                <p style="position: relative; z-index: 1;">مهر و امضای مدیر مدرسه</p>
+                <div style="height: 60px;"></div>
+                <!-- v4.73.0: تصاویر مهر و امضا بالاتر آمدند تا روی متن «مهر و امضای مدیر مدرسه» قرار بگیرند و آن را بپوشانند -->
+                <?php if ($sStamp = get_setting('school_stamp_url')): ?>
+                    <img src="<?php echo clean($sStamp); ?>" style="max-height: 75px; position: absolute; left: 50%; transform: translateX(-58%); top: -18px; opacity: 0.9; z-index: 5;">
+                <?php endif; ?>
+                <?php if ($pSig = get_setting('principal_signature_url')): ?>
+                    <img src="<?php echo clean($pSig); ?>" style="max-height: 60px; position: absolute; left: 50%; transform: translateX(-42%); top: -10px; z-index: 10;">
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

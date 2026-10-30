@@ -66,12 +66,45 @@ function dephp(js) {
   });
 }
 
+/* ── V4.209.0 — فقط «HTML واقعی» اسکن می‌شود، نه رشته‌ها و کامنت‌های PHP ──
+ * پیش از این، هر <script> که داخل یک رشتهٔ PHP (مثل صفحهٔ HTML پل همگام‌سازی)
+ * یا داخل یک کامنت PHP نوشته شده بود، «بلوک اسکریپت» شمرده می‌شد و کل کد
+ * بعدی — با چسب «. ' » و متن فارسی — به node داده می‌شد؛ نتیجه سه خطای
+ * کاذبِ همیشگی بود که سیگنال واقعی را زیر نویز می‌برد.
+ * حالا کد PHP بیرون از بلوک‌های <script> با فاصله جایگزین می‌شود. داخل
+ * بلوک اسکریپت، تگ‌ها دست‌نخورده می‌مانند تا dephp() مثل قبل کار کند.
+ */
+function maskPhpCode(src) {
+  const n = src.length;
+  let out = '', i = 0, inScript = false;
+  while (i < n) {
+    if (src.startsWith('<?php', i) || src.startsWith('<?=', i)) {
+      const open = src.startsWith('<?=', i) ? '<?=' : '<?php';
+      const end = src.indexOf('?>', i + open.length);
+      const stop = end === -1 ? n : end + 2;
+      out += inScript ? src.slice(i, stop) : ' '.repeat(stop - i);
+      i = stop;
+      continue;
+    }
+    const ch = src[i];
+    out += ch;
+    if (ch === '<') {
+      const ahead = src.slice(i, i + 400);
+      if (!inScript && /^<script(?![^>]*\bsrc=)/i.test(ahead)) inScript = true;
+      else if (inScript && /^<\/script>/i.test(src.slice(i, i + 10))) inScript = false;
+    }
+    i++;
+  }
+  return out;
+}
+
 let checked = 0, bad = 0;
 const TMP = join(process.cwd(), `.tmp-jssyntax-${process.pid}.js`);
 
 for (const abs of files) {
   const src = readFileSync(abs, 'utf8');
-  const blocks = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  const htmlOnly = maskPhpCode(src);
+  const blocks = [...htmlOnly.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
   if (!blocks.length) continue;
   checked++;
   const rel = process.env.PATCH && abs.includes(process.env.PATCH)

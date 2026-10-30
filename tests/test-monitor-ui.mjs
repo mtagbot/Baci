@@ -12,7 +12,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { resolveFile } from './harness/site.mjs';
-import { req, loginAdmin, examId } from './harness/lib.mjs';
+import { req, loginAdmin, examId, php } from './harness/lib.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, d = '') => c ? (pass++, console.log(`  ✅ ${n}`)) : (fail++, console.log(`  ❌ ${n}${d ? '  → ' + d : ''}`));
@@ -109,7 +109,18 @@ ok('صفحه رندر شد', page.length > 2000, 'طول=' + page.length);
 ok('بدون خطای PHP', !r.res.fatal, r.res.fatal);
 ok('اسپرایت آیکون در خروجی هست', page.includes('id="i-camera"') && page.includes('id="i-check"'));
 ok('مودال وب‌کم در خروجی هست', page.includes('id="webcamModal"'));
-ok('لایهٔ CSS در <head> لینک شده', /<link rel="stylesheet" href="assets\/css\/exam-ui\.css">/.test(page));
+/* V4.209.0 — استایل صفحه داخل باندل هش‌دار assets/cache می‌رود (یک درخواست
+   کمتر). پس یا لینک مستقیم exam-ui.css باید باشد، یا باندلی که واقعاً همان
+   محتوا را دارد. صرفِ وجود یک باندل کافی نیست؛ محتوایش بررسی می‌شود. */
+const cssDirect = /<link rel="stylesheet" href="assets\/css\/exam-ui\.css">/.test(page);
+const bundleHrefs = [...page.matchAll(/href="(assets\/cache\/css-[a-f0-9]+\.css)"/g)].map(m => m[1]);
+let bundleHasExamUi = false;
+for (const b of bundleHrefs) {
+  try { if (php.readFileAsText('/www/' + b).includes('em-btn')) { bundleHasExamUi = true; break; } } catch (e) {}
+}
+const bundleHref = bundleHrefs.join(' | ');
+ok('لایهٔ CSS در <head> لینک شده (مستقیم یا داخل باندل)',
+  cssDirect || bundleHasExamUi, `direct=${cssDirect} bundle=${bundleHref}`);
 
 console.log('\n════════════════════════════════');
 console.log(`  سوئیت رابط مانیتورینگ: ${pass} PASS / ${fail} FAIL`);

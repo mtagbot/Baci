@@ -23,7 +23,7 @@
  */
 
 if (!defined('PERF_CORE_VERSION')) {
-    define('PERF_CORE_VERSION', '4.208.0');
+    define('PERF_CORE_VERSION', '4.209.0');
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -434,6 +434,94 @@ if (!function_exists('perf_asset_signature')) {
     }
 }
 
+if (!function_exists('perf_screen_font_map')) {
+    /**
+     * نگاشت «فایل قلمِ uploads» به «نسخهٔ WOFF2 موجود در assets/fonts/screen».
+     * از manifest می‌خوانیم و نام فایل را هم کلید می‌کنیم تا مسیرهای
+     * .woff2/.woff/.ttf هر سه به همان یک فایل سالم برسند.
+     */
+    function perf_screen_font_map() {
+        static $map = null;
+        if ($map !== null) return $map;
+        $map = [];
+        $dir = perf_root() . '/assets/fonts/screen/';
+        if (is_file($dir . 'manifest.json')) {
+            $json = json_decode((string)@file_get_contents($dir . 'manifest.json'), true);
+            if (is_array($json)) {
+                foreach ($json as $src => $item) {
+                    $url = is_array($item) ? (string)($item['url'] ?? '') : '';
+                    if ($url === '' || !is_file(perf_root() . '/' . $url)) continue;
+                    $map[basename((string)$src)] = $url;
+                }
+            }
+        }
+        foreach ([
+            'Yekan.woff2' => 'assets/fonts/screen/Yekan.woff2',
+            'Yekan.woff' => 'assets/fonts/screen/Yekan.woff2',
+            'Yekan.ttf' => 'assets/fonts/screen/Yekan.woff2',
+            'Sahel.woff2' => 'assets/fonts/screen/Sahel.woff2',
+            'Sahel.ttf' => 'assets/fonts/screen/Sahel.woff2',
+            'Vazirmatn-Regular.woff2' => 'assets/fonts/screen/Vazirmatn-Regular.woff2',
+            'Vazirmatn-Regular.ttf' => 'assets/fonts/screen/Vazirmatn-Regular.woff2',
+            'Vazirmatn-Bold.woff2' => 'assets/fonts/screen/Vazirmatn-Bold.woff2',
+            'Vazirmatn-Bold.ttf' => 'assets/fonts/screen/Vazirmatn-Bold.woff2',
+        ] as $k => $v) {
+            if (!isset($map[$k]) && is_file(perf_root() . '/' . $v)) $map[$k] = $v;
+        }
+        return $map;
+    }
+}
+
+if (!function_exists('perf_css_fix_font_urls')) {
+    /**
+     * تعمیر آدرس قلم‌ها در CSS هنگام بسته‌بندی.
+     *
+     * style.css مسیر ../../uploads/Yekan/Yekan.woff2 را اعلام می‌کند، ولی روی
+     * بیشتر نصب‌ها فقط .ttf وجود دارد. آن درخواست ۴۰۴ می‌شود و در nginx به PHP
+     * می‌رسد و کل برنامه را برای یک فایل اجرا می‌کند (در trace واقعی ۷۲۵ms و
+     * بعد ۱۱۲ms با مایم‌تایپ text/html = صفحهٔ PHP به‌جای فونت).
+     *
+     *   • فایل مقصد موجود است → دست نمی‌زند
+     *   • نسخهٔ WOFF2 در assets/fonts/screen هست → همان جایگزین می‌شود
+     *   • وگرنه آن گزینه حذف می‌شود؛ اگر هیچ نماند کل @font-face حذف می‌شود
+     */
+    function perf_css_fix_font_urls($css) {
+        $map = perf_screen_font_map();
+        $out = preg_replace_callback('/src\s*:\s*([^;}]+)/i', function ($m) use ($map) {
+            $decl = $m[1];
+            if (stripos($decl, 'url(') === false) return $m[0];
+            $parts = preg_split('/\s*,\s*(?=(?:local|url)\()/i', trim($decl));
+            $kept = [];
+            foreach ($parts as $part) {
+                if (!preg_match('/url\(\s*[\x27"]?([^\x27")]+)[\x27"]?\s*\)/i', $part, $u)) { $kept[] = $part; continue; }
+                $raw = trim($u[1]);
+                if (stripos($raw, 'uploads/') === false) { $kept[] = $part; continue; }
+                $rel = ltrim(preg_replace('#^(\.\./)+#', '', $raw), '/');
+                $rel = str_replace('\\', '/', $rel);
+                if (is_file(perf_root() . '/' . $rel)) { $kept[] = $part; continue; }
+                $base = basename($rel);
+                if (isset($map[$base])) {
+                    $target = '../fonts/screen/' . basename($map[$base]);
+                    $kept[] = preg_replace('/url\(\s*[\x27"]?[^\x27")]+[\x27"]?\s*\)/i', 'url(' . $target . ')', $part);
+                }
+            }
+            if (!$kept) return '';
+            return 'src:' . implode(',', $kept);
+        }, $css);
+        return $out === null ? $css : $out;
+    }
+}
+
+if (!function_exists('perf_css_drop_empty_faces')) {
+    /** حذف @font-faceهایی که پس از تعمیر هیچ src سالمی ندارند. */
+    function perf_css_drop_empty_faces($css) {
+        $out = preg_replace_callback('/@font-face\s*\{[^{}]*\}/i', function ($m) {
+            return preg_match('/src\s*:/i', $m[0]) ? $m[0] : '';
+        }, $css);
+        return $out === null ? $css : $out;
+    }
+}
+
 if (!function_exists('perf_asset_bundle')) {
     /**
      * ساخت (یا یافتن) یک فایل بستهٔ CSS/JS از چند فایل منبع.
@@ -456,14 +544,7 @@ if (!function_exists('perf_asset_bundle')) {
         /* روی Apache، همین پوشه باید با کش یک‌ساله سرو شود؛ وگرنه هر بار
            بازدید مرورگر دوباره باندل را می‌گیرد. (nginx با perf-config تنظیم
            می‌شود.) محتوای فایل فقط «اجازهٔ دسترسی + کش» است. */
-        if (!is_file($dir . '/.htaccess')) {
-            @file_put_contents($dir . '/.htaccess',
-                "Options -Indexes\n"
-                . "<IfModule mod_expires.c>\n    ExpiresActive On\n"
-                . "    ExpiresByType text/css \"access plus 1 year\"\n"
-                . "    ExpiresByType application/javascript \"access plus 1 year\"\n</IfModule>\n"
-                . "<IfModule mod_headers.c>\n    Header set Cache-Control \"public, max-age=31536000, immutable\"\n</IfModule>\n");
-        }
+        if (function_exists('perf_cache_web_headers')) perf_cache_web_headers($dir);
 
         $buffer = '';
         foreach ($files as $rel) {
@@ -473,6 +554,8 @@ if (!function_exists('perf_asset_bundle')) {
             $body = @file_get_contents($path);
             if ($body === false) continue;
             if ($type === 'css') {
+                /* V4.209.0 — آدرس قلم‌های ناموجود پیش از کوچک‌سازی تعمیر می‌شود. */
+                $body = perf_css_drop_empty_faces(perf_css_fix_font_urls($body));
                 $buffer .= perf_minify_css($body) . "\n";
             } else {
                 // جداسازی با ; تا فایلی که بدون «;» تمام شده، فایل بعدی را نشکند.
@@ -504,6 +587,98 @@ if (!function_exists('perf_asset_url')) {
         if ($first === '') return '';
         $v = @filemtime(perf_root() . '/' . $first);
         return $first . ($v ? '?v=' . $v : '');
+    }
+}
+
+if (!function_exists('perf_css_base_files')) {
+    /** فایل‌های باندل پایه (هر صفحه‌ای لازم دارد). */
+    function perf_css_base_files() {
+        return ['assets/css/style.css', 'assets/css/ui-modern.css'];
+    }
+}
+
+if (!function_exists('perf_css_app_files')) {
+    /** لایهٔ رابط مدرسه + استایل اختصاصی صفحه (اختیاری). */
+    function perf_css_app_files(array $extra = []) {
+        return array_merge(['assets/css/school-ui.css', 'assets/css/management-hub.css'], $extra);
+    }
+}
+
+if (!function_exists('perf_js_core_files')) {
+    /**
+     * اسکریپت‌های مشترک همهٔ صفحات.
+     * session-watch عمداً اینجا نیست تا باندل «پنل» و «چاپ/اسکنر» یکی باشد و
+     * یک‌بار دانلود و برای همیشه کش شود.
+     */
+    function perf_js_core_files() {
+        return ['assets/js/school-icons.js', 'assets/js/school-ui.js', 'assets/js/main.js',
+                'assets/js/ui-modern.js', 'assets/js/searchable-select.js'];
+    }
+}
+
+if (!function_exists('perf_bundle_url')) {
+    /**
+     * آدرس باندل برای فهرست فایل‌ها؛ «?v=…» و تکرارها پاک می‌شوند.
+     * رشتهٔ خالی یعنی باندل ساخته نشد (پوشهٔ کش قابل نوشتن نیست) و فراخوان
+     * باید همان <link>/<script>های قبلی را بگذارد.
+     */
+    function perf_bundle_url(array $files, $type = 'css') {
+        $clean = [];
+        foreach ($files as $f) {
+            $f = trim((string)$f);
+            if ($f === '') continue;
+            $f = (string)preg_replace('/[?#].*$/', '', $f);
+            $f = ltrim(str_replace('\\', '/', $f), '/');
+            $clean[$f] = true;
+        }
+        if (!$clean) return '';
+        if (!function_exists('perf_asset_url')) return '';
+        return (string)perf_asset_url(array_keys($clean), $type);
+    }
+}
+
+if (!function_exists('perf_cache_web_headers')) {
+    /**
+     * پوشهٔ عمومی assets/cache باید با کش یک‌ساله و immutable سرو شود؛
+     * وگرنه باندلِ هش‌دار در هر بازدید دوباره داوری می‌شود.
+     */
+    function perf_cache_web_headers($dir) {
+        $file = rtrim($dir, '/\\') . '/.htaccess';
+        if (is_file($file)) return;
+        @file_put_contents($file,
+            "Options -Indexes\n"
+            . "<IfModule mod_expires.c>\n    ExpiresActive On\n"
+            . "    ExpiresByType text/css \"access plus 1 year\"\n"
+            . "    ExpiresByType application/javascript \"access plus 1 year\"\n</IfModule>\n"
+            . "<IfModule mod_headers.c>\n    Header set Cache-Control \"public, max-age=31536000, immutable\"\n</IfModule>\n");
+    }
+}
+
+if (!function_exists('perf_inline_js')) {
+    /**
+     * تبدیل یک قطعهٔ JS ثابت به فایل کش‌شده با نام هش‌دار.
+     * یک <script> درون‌خطی ۷ کیلوبایتی در trace واقعی ۴۳ms از رشتهٔ اصلی را
+     * گرفت؛ همان کد به‌صورت فایل، یک‌بار کامپایل و برای همیشه کش می‌شود.
+     */
+    function perf_inline_js($code, $name, $minBytes = 1200) {
+        $code = (string)$code;
+        if (strlen($code) < (int)$minBytes || !perf_config('assets', true)) return '<script>' . $code . '</script>';
+        $dir = perf_root() . '/assets/cache';
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return '<script>' . $code . '</script>';
+        if (!is_dir($dir) || !is_writable($dir)) return '<script>' . $code . '</script>';
+        /* همان کش یک‌سالهٔ immutable که باندل‌ها دارند؛ وگرنه فایل درون‌خطیِ
+           تازه‌ساخته هم در هر بازدید شرطی (304) گرفته می‌شود. */
+        if (function_exists('perf_cache_web_headers')) {
+            perf_cache_web_headers($dir);
+        }
+        $hash = substr(sha1('inline|' . $name . '|' . $code . '|' . PERF_CORE_VERSION), 0, 14);
+        $rel = 'assets/cache/js-i' . $hash . '.js';
+        $abs = perf_root() . '/' . $rel;
+        if (!is_file($abs)) {
+            $tmp = $abs . '.' . getmypid() . '.tmp';
+            if (@file_put_contents($tmp, $code) === false || !@rename($tmp, $abs)) { @unlink($tmp); return '<script>' . $code . '</script>'; }
+        }
+        return '<script defer src="' . $rel . '"></script>';
     }
 }
 

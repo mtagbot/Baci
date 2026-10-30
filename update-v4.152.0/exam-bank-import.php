@@ -435,7 +435,13 @@ foreach ([__DIR__ . '/exams', dirname(__DIR__) . '/exams'] as $sd) {
 .imp-pick-thumb.active{border-color:#2563eb}
 .pfrac{direction:ltr}
 </style>
-<script>
+<?php
+/* V4.209.0 — ۱۶ کیلوبایت جاوااسکریپت ثابت که کل تجزیهٔ HTML را متوقف می‌کرد
+   (در trace واقعی ۴۳ms برای یک بلوک ۷ کیلوبایتی)، حالا یک فایل هش‌دار و
+   کش‌شده با defer است. کد عوض نشده؛ فقط جایش عوض شده. اگر perf_inline_js
+   در دسترس نباشد، همان <script> درون‌خطی قبلی چاپ می‌شود. */
+ob_start();
+?>
 /* ============ v4.108.0: ریست پیش‌نمایش به حالت اولیه ============ */
 let impInitial=[];
 window.addEventListener('DOMContentLoaded',()=>{
@@ -754,7 +760,12 @@ function impUploadImage(inp){
   };
   rd.readAsDataURL(file);
 }
-</script>
+<?php
+$__impJs = (string) ob_get_clean();
+echo function_exists('perf_inline_js')
+    ? perf_inline_js($__impJs, 'exam-bank-import')
+    : '<script>' . $__impJs . '</script>';
+?>
  <?php endif; ?>
 </div>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

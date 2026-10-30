@@ -226,6 +226,10 @@ class DB {
             self::$stats['selects']++;
         }
         if ($ms > 120) self::$stats['slow'][] = ['ms' => round($ms, 1), 'sql' => mb_substr(preg_replace('/\s+/', ' ', (string)$sql), 0, 200)];
+        /* V4.208.1 — ثبت اختیاری دستورها برای عیب‌یابی (فقط وقتی صریحاً روشن شود). */
+        if (isset($GLOBALS['__perf_sql_log']) && is_array($GLOBALS['__perf_sql_log']) && count($GLOBALS['__perf_sql_log']) < 500) {
+            $GLOBALS['__perf_sql_log'][] = ($isWrite ? 'W ' : 'R ') . round($ms, 2) . 'ms  ' . mb_substr(preg_replace('/\s+/', ' ', (string)$sql), 0, 180);
+        }
         return $stmt;
     }
 

@@ -114,12 +114,18 @@ if ($isDeskRuntime && (PHP_SAPI === 'cli-server' || !empty($_SERVER['SDP_ENFORCE
     /* دو باندل با همان ترتیب آبشاری قبلی: پایه (style + ui-modern) پیش از
        استایل درون‌خطی صفحه، و لایهٔ رابط مدرسه (school-ui + management-hub)
        پس از آن — دقیقاً مثل نسخهٔ ۴.۲۰۷ که پنج link جدا داشت. */
-    $perfCssBase = perf_asset_url(['assets/css/style.css', 'assets/css/ui-modern.css'], 'css');
-    $perfCssApp  = perf_asset_url(['assets/css/school-ui.css', 'assets/css/management-hub.css'], 'css');
-    $perfJsFiles = [];
-    if (st_current_user()) $perfJsFiles[] = 'assets/js/session-watch.js';
-    $perfJsFiles = array_merge($perfJsFiles, ['assets/js/school-icons.js', 'assets/js/school-ui.js', 'assets/js/main.js', 'assets/js/ui-modern.js', 'assets/js/searchable-select.js']);
-    $perfJsBundle = perf_asset_url($perfJsFiles, 'js');
+    $perfCssBase = perf_bundle_url(perf_css_base_files(), 'css');
+    /* V4.209.0 — استایل اختصاصی صفحه ($pageCss) هم داخل همین باندل می‌رود.
+       ترتیب آبشاری حفظ می‌شود (صفحه پیش از school-ui/management-hub) و یک
+       درخواست CSS مستقل (در trace واقعی ۱۴۵ms) از هر صفحه حذف می‌شود. */
+    $perfPageCss = [];
+    if (!empty($pageCss)) foreach ((array)$pageCss as $__sheet) {
+        $__sheet = trim((string)$__sheet);
+        if ($__sheet !== '') $perfPageCss[] = $__sheet;
+    }
+    $perfCssApp  = perf_bundle_url(perf_css_app_files($perfPageCss), 'css');
+    $perfJsBundle = perf_bundle_url(perf_js_core_files(), 'js');
+    $perfJsWatch  = (st_current_user() && is_file(dirname(__DIR__) . '/assets/js/session-watch.js')) ? 'assets/js/session-watch.js' : '';
     $GLOBALS['__perf_js_bundled'] = $perfJsBundle !== '';
     ?>
     <?php echo app_screen_font_preload(); ?>
@@ -164,11 +170,11 @@ if ($isDeskRuntime && (PHP_SAPI === 'cli-server' || !empty($_SERVER['SDP_ENFORCE
     </style>
     <?php /* v4.129.0: صفحه می‌تواند پیش از require، $pageCss را ست کند تا stylesheet
            صفحه‌ای در جای درستِ <head> بنشیند (نه داخل body). پیش‌فرض: هیچ. */
-    if (!empty($pageCss)) foreach((array)$pageCss as $sheet): ?>
+    if (!empty($pageCss) && $perfCssApp === '') foreach((array)$pageCss as $sheet): ?>
     <link rel="stylesheet" href="<?php echo clean($sheet); ?>">
     <?php endforeach; ?>
 <?php echo app_appearance_head(true); ?>
-<?php if ($perfJsBundle): ?><script defer src="<?php echo clean($perfJsBundle); ?>"></script><?php else: ?><?php if(st_current_user()): ?><script defer src="assets/js/session-watch.js"></script><?php endif; ?><script defer src=assets/js/school-icons.js?v20260917e></script><script defer src=assets/js/school-ui.js?v20260917e></script><?php endif; ?><?php if ($perfCssApp): ?><link rel="stylesheet" href="<?php echo clean($perfCssApp); ?>"><?php else: ?><link rel=stylesheet href=assets/css/school-ui.css?v20261007a><link rel="stylesheet" href="assets/css/management-hub.css?v=20260917f"><?php endif; ?><?php require_once __DIR__.'/school_ui_theme.php'; echo school_ui_theme(); ?><noscript><style>@media screen and (max-width:900px){body.school-app>.flex.flex-1{display:block}body.school-app .sidebar{position:static!important;transform:none!important;visibility:visible!important;width:100%!important;max-width:none;height:auto!important}body.school-app .hamburger-btn,body.school-app .ui-drawer-close{display:none!important}}</style></noscript>
+<?php if ($perfJsBundle): ?><script defer src="<?php echo clean($perfJsBundle); ?>"></script><?php else: ?><script defer src=assets/js/school-icons.js?v20260917e></script><script defer src=assets/js/school-ui.js?v20260917e></script><?php endif; ?><?php if ($perfJsWatch): ?><script defer src="<?php echo clean($perfJsWatch); ?>"></script><?php endif; ?><?php if ($perfCssApp): ?><link rel="stylesheet" href="<?php echo clean($perfCssApp); ?>"><?php else: ?><link rel=stylesheet href=assets/css/school-ui.css?v20261007a><link rel="stylesheet" href="assets/css/management-hub.css?v=20260917f"><?php endif; ?><?php require_once __DIR__.'/school_ui_theme.php'; echo school_ui_theme(); ?><noscript><style>@media screen and (max-width:900px){body.school-app>.flex.flex-1{display:block}body.school-app .sidebar{position:static!important;transform:none!important;visibility:visible!important;width:100%!important;max-width:none;height:auto!important}body.school-app .hamburger-btn,body.school-app .ui-drawer-close{display:none!important}}</style></noscript>
 <script>try{if(window.frameElement&&window.frameElement.id==='hubFrame')document.documentElement.classList.add('hub-embedded');}catch(ignore){}</script>
 </head>
 <body class="school-app <?php echo $isDeskRuntime&&!$isEmbedded?'desk-runtime':''; ?> <?php echo $isEmbedded ? 'embedded-mode' : ''; ?> bg-body text-main min-h-screen flex flex-col font-sans">

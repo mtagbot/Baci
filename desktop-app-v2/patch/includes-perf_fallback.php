@@ -139,8 +139,59 @@ if (!function_exists('perf_cache_version')) {
     function perf_cache_version() { return ''; }
 }
 
+if (!function_exists('perf_cache_web_headers')) {
+    /* پوشهٔ کش عمومی؛ در حالت بدون perf.php، باندلی ساخته نمی‌شود و این
+       تابع هیچ کاری ندارد — فقط نباید «تعریف‌نشده» باشد. */
+    function perf_cache_web_headers($dir) { return false; }
+}
+
 if (!function_exists('perf_minify_css')) {
     function perf_minify_css($css) { return $css; }
+}
+
+/* ── V4.209.0: پوشش کامل توابع تازه (باندل صفحه‌ای، فونت، اسکریپت درون‌خطی) ──
+ * بدون این‌ها اگر فقط header.php از بستهٔ جدید کپی شده باشد و perf.php نه،
+ * صفحه با «Call to undefined function perf_bundle_url()» از کار می‌افتاد.
+ * همهٔ این جایگزین‌ها رفتار «قبل از V4.209.0» را برمی‌گردانند، نه خرابی. */
+
+if (!function_exists('perf_screen_font_map')) {
+    function perf_screen_font_map() { return []; }
+}
+
+if (!function_exists('perf_css_fix_font_urls')) {
+    function perf_css_fix_font_urls($css) { return $css; }
+}
+
+if (!function_exists('perf_css_drop_empty_faces')) {
+    function perf_css_drop_empty_faces($css) { return $css; }
+}
+
+if (!function_exists('perf_css_base_files')) {
+    function perf_css_base_files() {
+        return ['assets/css/style.css', 'assets/css/ui-modern.css'];
+    }
+}
+
+if (!function_exists('perf_css_app_files')) {
+    function perf_css_app_files(array $extra = []) {
+        return array_merge(['assets/css/school-ui.css', 'assets/css/management-hub.css'], $extra);
+    }
+}
+
+if (!function_exists('perf_js_core_files')) {
+    function perf_js_core_files() {
+        return ['assets/js/school-icons.js', 'assets/js/school-ui.js', 'assets/js/main.js',
+                'assets/js/ui-modern.js', 'assets/js/searchable-select.js'];
+    }
+}
+
+if (!function_exists('perf_bundle_url')) {
+    /* رشتهٔ خالی ⇒ فراخوان همان <link>/<script>های جداگانهٔ قبلی را می‌گذارد. */
+    function perf_bundle_url(array $files, $type = 'css') { return ''; }
+}
+
+if (!function_exists('perf_inline_js')) {
+    function perf_inline_js($code, $name, $minBytes = 1200) { return '<script>' . $code . '</script>'; }
 }
 
 if (!function_exists('perf_asset_signature')) {

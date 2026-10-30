@@ -221,8 +221,13 @@ ok('بار دوم همان تعداد ردیف را می‌دهد (خروجی پ
   `${cold.res?.count} vs ${warm.res?.count}`);
 
 if (cold.res?.stats && warm.res?.stats) {
-  ok('بار اول: DDLهایی که قبلاً تکرار می‌شدند صرف‌نظر شدند',
-    (cold.res.stats.ddl_skipped || 0) > 0, JSON.stringify(cold.res.stats));
+  /* V4.209.0: کلید کش DDL شامل نسخهٔ هسته است؛ با هر ارتقا «بار اول» همهٔ
+     DDLها یک‌بار اجرا می‌شوند. ضمانت واقعی این است که از بار دوم به بعد
+     هیچ DDL ای اجرا نشود — که در بار سوم هم بررسی می‌شود. */
+  const third = await loadPage();
+  ok('بار سوم هم صفر DDL اجرا می‌شود (نه فقط بار دوم)',
+    (third.res?.stats?.ddl || 0) === 0 && (third.res?.stats?.writes || 0) === 0,
+    JSON.stringify(third.res?.stats));
   ok('بار دوم: صفر DDL اجرا می‌شود (پیش‌تر ۴۰ DDL در هر بازدید)',
     cold.res.stats.ddl > 0 && warm.res.stats.ddl === 0, JSON.stringify(warm.res.stats));
   ok('بار دوم: تعداد کوئری‌ها ≤ ۴۰ (پیش‌تر ۵۵+)',

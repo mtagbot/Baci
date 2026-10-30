@@ -96,6 +96,25 @@ if (!function_exists('bot_token_key')) {
 if (!function_exists('ensure_bot_schema')) {
     function ensure_bot_schema($platform = 'bale') {
         $platform = bot_valid_platform($platform);
+        /* V4.209.0 — کل این تابع (۵ CREATE + ۱ ALTER + ۳ بررسی enum + seed)
+           پیش از این در هر بازدیدِ هر صفحهٔ ربات اجرا می‌شد. حالا یک‌بار در هر
+           نسخه برای هر پیام‌رسان؛ نتیجه همان است و فقط کوئری‌های تکراری حذف
+           می‌شوند. */
+        if (function_exists('perf_schema_once')) {
+            static $ran = [];
+            $key = 'bot_schema_' . $platform . '_v1';
+            if (isset($ran[$key])) return;
+            $ran[$key] = true;
+            perf_schema_once($key, function () use ($platform) { ensure_bot_schema_work($platform); });
+            return;
+        }
+        ensure_bot_schema_work($platform);
+    }
+}
+
+if (!function_exists('ensure_bot_schema_work')) {
+    function ensure_bot_schema_work($platform) {
+        $platform = bot_valid_platform($platform);
         $userTable = bot_user_table($platform);
         $stateTable = bot_state_table($platform);
         $chatCol = bot_chat_column($platform);
@@ -215,17 +234,20 @@ if (!function_exists('bot_default_buttons')) {
 if (!function_exists('bot_seed_templates')) {
     function bot_seed_templates($platform) {
         $platform = bot_valid_platform($platform);
+        /* V4.209.0 — پیش از این برای هر پیام و هر دکمه یک SELECT جدا اجرا می‌شد
+           (حدود ۲۵ کوئری برای هر پیام‌رسان در هر بازدید صفحهٔ ربات‌ها). حالا
+           کلیدهای موجود با یک کوئری خوانده می‌شوند و فقط کلیدهای تازه درج
+           می‌شوند؛ نتیجهٔ نهایی دقیقاً همان قبلی است. */
+        $haveMsg = []; $haveBtn = [];
+        try { foreach (DB::fetchAll("SELECT template_key FROM bot_message_templates WHERE platform = ?", [$platform]) as $r) $haveMsg[(string)$r['template_key']] = true; } catch (Throwable $e) {}
+        try { foreach (DB::fetchAll("SELECT button_key FROM bot_button_templates WHERE platform = ?", [$platform]) as $r) $haveBtn[(string)$r['button_key']] = true; } catch (Throwable $e) {}
         foreach (bot_default_messages() as $key => $text) {
-            $exists = DB::fetch("SELECT id FROM bot_message_templates WHERE platform = ? AND template_key = ?", [$platform, $key]);
-            if (!$exists) {
-                DB::execute("INSERT INTO bot_message_templates (platform, template_key, template_text) VALUES (?, ?, ?)", [$platform, $key, $text]);
-            }
+            if (isset($haveMsg[(string)$key])) continue;
+            try { DB::execute("INSERT INTO bot_message_templates (platform, template_key, template_text) VALUES (?, ?, ?)", [$platform, $key, $text]); } catch (Throwable $e) {}
         }
         foreach (bot_default_buttons() as $b) {
-            $exists = DB::fetch("SELECT id FROM bot_button_templates WHERE platform = ? AND button_key = ?", [$platform, $b[0]]);
-            if (!$exists) {
-                DB::execute("INSERT INTO bot_button_templates (platform, button_key, button_text, sort_order, row_no, is_active) VALUES (?, ?, ?, ?, ?, 1)", [$platform, $b[0], $b[1], $b[2], $b[3]]);
-            }
+            if (isset($haveBtn[(string)$b[0]])) continue;
+            try { DB::execute("INSERT INTO bot_button_templates (platform, button_key, button_text, sort_order, row_no, is_active) VALUES (?, ?, ?, ?, ?, 1)", [$platform, $b[0], $b[1], $b[2], $b[3]]); } catch (Throwable $e) {}
         }
     }
 }

@@ -5,8 +5,9 @@
     <meta charset="UTF-8">
     <title>مستندات رابط برنامه‌نویسی (API Documentation)</title>
     <style>
-        @font-face { font-family: 'Vazirmatn'; src: url('../uploads/Vazirmatn/Vazirmatn-Regular.woff2') format('woff2'), url('../uploads/Vazirmatn/Vazirmatn-Regular.ttf') format('truetype'); font-display: swap; }
-        @font-face { font-family: 'Vazirmatn'; src: url('../uploads/Vazirmatn/Vazirmatn-Bold.woff2') format('woff2'), url('../uploads/Vazirmatn/Vazirmatn-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+        /* V4.209.0 — فقط فایل موجود اعلام می‌شود (نسخهٔ woff2 روی نصب وجود ندارد) */
+        @font-face { font-family: 'Vazirmatn'; src: url('../uploads/Vazirmatn/Vazirmatn-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+        @font-face { font-family: 'Vazirmatn'; src: url('../uploads/Vazirmatn/Vazirmatn-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
         body { font-family: 'Vazirmatn', Tahoma, sans-serif; background: #f8fafc; color: #1e293b; padding: 30px; }
         .container { max-width: 900px; margin: 0 auto; }
         .card { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 20px; }
