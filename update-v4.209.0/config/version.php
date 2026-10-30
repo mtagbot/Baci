@@ -12,7 +12,7 @@
  * `release.php` همچنان بستهٔ نصب را توصیف می‌کند.
  */
 return [
-    'site_version'    => '4.209.0',
-    'desktop_version' => '2.133.0',
-    'correction'      => 'V4.209.0',
+    'site_version'    => '4.209.1',
+    'desktop_version' => '2.133.1',
+    'correction'      => 'V4.209.1',
 ];

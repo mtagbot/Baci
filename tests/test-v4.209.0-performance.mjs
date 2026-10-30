@@ -55,10 +55,10 @@ for (const [name, src] of Object.entries(FILES)) {
   if (!has(src)) missing.push(src);
 }
 ok('۱۶ فایل این نسخه در مخزن موجود است', missing.length === 0, missing.join(', '));
-ok('نسخهٔ ۴.۲۰۹.۰ / ۲.۱۳۳.۰ ثبت شده',
-  /'site_version'\s*=>\s*'4\.209\.0'/.test(read(FILES['config/version.php'])) &&
-  /'desktop_version'\s*=>\s*'2\.133\.0'/.test(read(FILES['config/version.php'])) &&
-  /'correction'\s*=>\s*'V4\.209\.0'/.test(read(FILES['config/version.php'])));
+ok('نسخهٔ ۴.۲۰۹.x / ۲.۱۳۳.x ثبت شده',
+  /'site_version'\s*=>\s*'4\.209\.\d+'/.test(read(FILES['config/version.php'])) &&
+  /'desktop_version'\s*=>\s*'2\.133\.\d+'/.test(read(FILES['config/version.php'])) &&
+  /'correction'\s*=>\s*'V4\.209\.\d+'/.test(read(FILES['config/version.php'])));
 
 /* ═════════════════════════════════════════ ۱) تناسب perf.php با fallback ══ */
 console.log('\n══ ۱) پوشش کامل fallback (باگ صفحهٔ سفید) ══');
@@ -82,8 +82,8 @@ ok('fallback هیچ‌وقت exception پرت نمی‌کند', !/throw new/.tes
 
 /* ═══════════════════════════════════════ ۲) قرارداد توابع تازهٔ باندل ══ */
 console.log('\n══ ۲) قرارداد باندل و کش ══');
-ok('نسخهٔ هسته به ۴.۲۰۹.۰ رسیده (نام باندل‌ها تازه می‌شود)',
-  perfSrc.includes("define('PERF_CORE_VERSION', '4.209.0')"));
+ok('نسخهٔ هسته به ۴.۲۰۹.x رسیده (نام باندل‌ها تازه می‌شود)',
+  /define\('PERF_CORE_VERSION', '4\.209\.\d+'\)/.test(perfSrc));
 ok('perf_bundle_url امضای ?v= و تکرارها را پاک می‌کند',
   perfSrc.includes("preg_replace('/[?#].*$/', '', $f)") && perfSrc.includes('$clean[$f] = true;'));
 ok('perf_bundle_url در نبود perf_asset_url رشتهٔ خالی می‌دهد',
@@ -138,8 +138,12 @@ ok('ریشه: فشرده‌سازی متن‌ها روشن است',
   /mod_deflate/.test(rootHt) && rootHt.includes('application/javascript'));
 ok('ریشه: درخواست دارایی ناموجود به ۴۰۴ می‌رود، نه به PHP',
   /RewriteRule \^\(assets\|uploads\)\/ - \[R=404,L\]/.test(rootHt));
-ok('ریشه: قواعد امنیتی قبلی حفظ شده‌اند',
-  rootHt.includes('Require all denied') && rootHt.includes('Options -Indexes') &&
+/* V4.209.1 — `Options` و `Require` بدون محافظ حذف شدند (روی بعضی هاست‌ها
+   ۵۰۰ می‌دهند)؛ هم‌ارزشان با IfModule هست و قواعد امنیتی سرجایش است. */
+ok('ریشه: قواعد امنیتی حفظ شده و دستورهای پرخطر محافظت‌دارند',
+  rootHt.includes('Require all denied') &&
+  /<IfModule mod_authz_core\.c>[\s\S]{0,80}Require all denied/.test(rootHt) &&
+  !/^\s*Options\s/m.test(rootHt) &&
   rootHt.includes('RewriteRule ^(?:config|includes|sql|vendor|backups)'));
 ok('فونت: کش ۳۰ روزه با نوع MIME درست', /max-age=2592000/.test(fontHt) && fontHt.includes('AddType font/woff2'));
 ok('CSS/JS: کش یک‌ساعته (اصلاحیه همان روز اعمال می‌شود)', /max-age=3600/.test(cssHt) && /max-age=3600/.test(jsHt));

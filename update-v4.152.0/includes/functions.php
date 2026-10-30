@@ -4,6 +4,8 @@ if (is_file(__DIR__.'/install_guard.php')) require_once __DIR__.'/install_guard.
 // V4.208.0: هستهٔ کارایی (کش داده، «یک‌بار در هر نسخه» برای DDL، باندل دارایی‌ها).
 if (is_file(__DIR__.'/perf.php')) require_once __DIR__.'/perf.php';
 elseif (is_file(__DIR__.'/perf_fallback.php')) require_once __DIR__.'/perf_fallback.php';
+// V4.209.1: خطای کشنده ثبت و (اگر PHP خاموش کرده باشد) خوانا نمایش داده شود.
+if (is_file(__DIR__.'/fatal_guard.php')) require_once __DIR__.'/fatal_guard.php';
 // File: includes/functions.php
 /**
  * Core Helper Functions

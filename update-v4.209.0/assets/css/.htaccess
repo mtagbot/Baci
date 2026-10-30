@@ -18,5 +18,3 @@
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/css
 </IfModule>
-
-Options -Indexes

@@ -28,10 +28,14 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 /* ═══════ ۱) پیدا کردن سورس سایت ═══════ */
 const SITE = resolveSite();
-console.log(`>>> سورس سایت: ${relative(REPO, SITE) || SITE}`);
+console.log(`>>> سورس سایت: ${relative(REPO, SITE) || SITE} · PHP ${process.env.PHP_VERSION || '8.3'}`);
 
 /* ═══════ ۲) راه‌اندازی php-wasm ═══════ */
-export const php = new PHP(await loadNodeRuntime('8.3', { emscriptenOptions: { processId: 1 } }));
+/* نسخهٔ PHP قابل تغییر است تا همان سوئیت‌ها روی PHP تازه‌تر هم اجرا شوند:
+   PHP_VERSION=8.5 bash scripts/run-tests.sh
+   پیش‌فرض همان ۸.۳ است (پایهٔ تست‌ها). */
+const PHP_RUNTIME = process.env.PHP_VERSION || '8.3';
+export const php = new PHP(await loadNodeRuntime(PHP_RUNTIME, { emscriptenOptions: { processId: 1 } }));
 php.mkdirTree('/www');
 php.mkdirTree('/data');
 php.mkdirTree('/harness');

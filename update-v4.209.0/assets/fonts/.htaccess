@@ -28,5 +28,3 @@
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE font/ttf image/svg+xml
 </IfModule>
-
-Options -Indexes

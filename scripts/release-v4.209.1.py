@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""v4.209.0 / v2.133.0 — «همهٔ صفحه‌ها سریع» (ادامهٔ trace واقعی مرورگر).
+"""v4.209.1 / v2.133.1 — «همهٔ صفحه‌ها سریع» (ادامهٔ trace واقعی مرورگر).
 
     python3 scripts/release-v4.208.0.py
 
 بسته‌ها:
-  MODIFIED-FILES-V4.209.0.zip   -> سایت   (site-update-v4.152.0/...)
-  SchoolDesk-FIX-v2.133.0.zip   -> دسکتاپ (SchoolDeskPro/reports/... و SchoolDeskPro/www/...)
+  MODIFIED-FILES-V4.209.1.zip   -> سایت   (site-update-v4.152.0/...)
+  SchoolDesk-FIX-v2.133.1.zip   -> دسکتاپ (SchoolDeskPro/reports/... و SchoolDeskPro/www/...)
 
 محتوا:
   · includes/perf.php            هستهٔ کارایی (DDL یک‌بار، کش داده، باندل دارایی)
@@ -26,11 +26,11 @@ import hashlib
 
 ROOT = Path(__file__).resolve().parents[1]
 STAMP = (2026, 10, 30, 0, 0, 0)
-SUMS = 'V4.209.0-SHA256SUMS.txt'
+SUMS = 'V4.209.1-SHA256SUMS.txt'
 
 SITE_PAIRS = [
-    ('.htaccess', 'release-v1.0/common/.htaccess'),
     ('api/docs.php', 'update-v4.209.0/api/docs.php'),
+    ('doctor.php', 'update-v4.209.0/doctor.php'),
     ('assets/css/.htaccess', 'update-v4.209.0/assets/css/.htaccess'),
     ('assets/css/exam-designer-mobile.css', 'update-v4.152.0/assets/css/exam-designer-mobile.css'),
     ('assets/fonts/.htaccess', 'update-v4.209.0/assets/fonts/.htaccess'),
@@ -49,6 +49,7 @@ SITE_PAIRS = [
     ('includes/appearance.php', 'update-v4.209.0/includes/appearance.php'),
     ('includes/bot_helpers.php', 'update-v4.209.0/includes/bot_helpers.php'),
     ('includes/db.php', 'update-v4.209.0/includes/db.php'),
+    ('includes/fatal_guard.php', 'update-v4.209.0/includes/fatal_guard.php'),
     ('includes/footer.php', 'update-v4.209.0/includes/footer.php'),
     ('includes/functions.php', 'update-v4.209.0/includes/functions.php'),
     ('includes/header.php', 'update-v4.209.0/includes/header.php'),
@@ -102,8 +103,8 @@ DESKTOP_PAIRS = (
 )
 
 PACKAGES = [
-    ('MODIFIED-FILES-V4.209.0.zip', 'site-update-v4.152.0/', SITE_PAIRS),
-    ('SchoolDesk-FIX-v2.133.0.zip', 'SchoolDeskPro/',        DESKTOP_PAIRS),
+    ('MODIFIED-FILES-V4.209.1.zip', 'site-update-v4.152.0/', SITE_PAIRS),
+    ('SchoolDesk-FIX-v2.133.1.zip', 'SchoolDeskPro/',        DESKTOP_PAIRS),
 ]
 
 

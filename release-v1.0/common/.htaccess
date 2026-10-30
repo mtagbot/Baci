@@ -1,22 +1,23 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# SchoolDesk Pro — تنظیمات پایهٔ Apache (نسخهٔ V4.209.0)
+# SchoolDesk Pro — .htaccess پیش‌فرض نصب تازه (V4.209.1)
 # ─────────────────────────────────────────────────────────────────────────────
-# این فایل امنیت پایه و «سرعت پیش‌فرض» را با هم می‌آورد. همهٔ بلوک‌ها با
-# <IfModule> محافظت شده‌اند؛ روی سروری که آن ماژول را ندارد، هیچ خطایی نمی‌دهد.
+# ⚠ این فایل فقط برای «نصب از صفر» است. روی نصب موجود هرگز جای‌گزین نشود؛
+#   cPanel و DirectAdmin برای انتخاب نسخهٔ PHP خودشان در همین فایل خط
+#   AddHandler می‌نویسند و بازنویسی آن، سایت را روی نسخهٔ دیگری از PHP
+#   می‌اندازد. بسته‌های اصلاحی از V4.209.1 به بعد این فایل را همراه ندارند.
+#
+# هر بلوک داخل <IfModule> است و هر دستوری که ممکن است روی هاستی مجاز نباشد
+# (Options / Require) یا حذف شده یا با نسخهٔ جایگزین محافظت شده است.
 
-Options -Indexes
 DirectoryIndex index.php
 
 # ── نوع MIME درست دارایی‌ها ──
-# بدون این بلوک، بعضی هاست‌ها فونت را با application/octet-stream می‌فرستند؛
-# آن‌وقت preload با type="font/woff2" تطبیق نمی‌خورد و مرورگر فایل را دو بار
-# می‌گیرد. این همان چیزی است که در trace واقعی دیده شد.
 <IfModule mod_mime.c>
-    AddType font/woff2          .woff2
-    AddType font/woff           .woff
-    AddType font/ttf            .ttf
+    AddType font/woff2             .woff2
+    AddType font/woff              .woff
+    AddType font/ttf               .ttf
     AddType application/javascript .js
-    AddType image/svg+xml       .svg
+    AddType image/svg+xml          .svg
 </IfModule>
 
 # ── فشرده‌سازی ──
@@ -25,9 +26,7 @@ DirectoryIndex index.php
         application/javascript application/json application/xml image/svg+xml
 </IfModule>
 
-# ── کش دارایی‌ها ──
-# باندل‌های هش‌دار (assets/cache) و فونت‌ها و CSS/JS بی‌نسخه، هر کدام
-# .htaccess اختصاصی خودشان را دارند؛ اینجا فقط تصاویر و آیکون‌ها.
+# ── کش تصاویر (باندل‌ها و فونت‌ها .htaccess اختصاصی خودشان را دارند) ──
 <IfModule mod_expires.c>
     ExpiresActive On
     ExpiresByType image/svg+xml "access plus 7 days"
@@ -42,12 +41,7 @@ DirectoryIndex index.php
     RewriteRule (^|/)\. - [F,L]
     RewriteRule ^(?:config|includes|sql|vendor|backups)(?:/|$) - [F,L,NC]
     RewriteRule ^uploads/.*\.(?:php[0-9]?|phtml|phar|cgi|pl|py|sh)(?:/|$) - [F,L,NC]
-</IfModule>
-
-# ── فایل استاتیک گم‌شده نباید کل برنامه را اجرا کند ──
-# روی هاستی که همه‌چیز را به index.php می‌فرستد، یک فونت گم‌شده هم PHP را
-# بالا می‌آورد (در trace واقعی ۷۲۵ میلی‌ثانیه). اینجا مستقیم ۴۰۴ می‌شود.
-<IfModule mod_rewrite.c>
+    # دارایی ناموجود نباید کل برنامه را اجرا کند (در trace واقعی ۷۲۵ms)
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^(assets|uploads)/ - [R=404,L]
@@ -55,7 +49,15 @@ DirectoryIndex index.php
 
 # ── فایل‌های حساس ──
 <FilesMatch "(?i)\.(sqlite(?:3|-wal|-shm)?|db|sql|ini|log|bak|backup|env|lock|py|md|json)$">
-    Require all denied
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
 </FilesMatch>
 
-AddDefaultCharset UTF-8
+<IfModule mod_mime.c>
+    AddDefaultCharset UTF-8
+</IfModule>

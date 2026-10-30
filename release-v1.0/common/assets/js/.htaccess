@@ -18,5 +18,3 @@
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE application/javascript
 </IfModule>
-
-Options -Indexes
