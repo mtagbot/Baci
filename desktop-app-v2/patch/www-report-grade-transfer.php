@@ -86,15 +86,15 @@ function rgt_transfer(array $src,array $dst,$mode) {
             if($dst['student']!=='all')$destStudent=$targetById[(int)$dst['student']]??null;
             else {$nid=trim((string)($sourceReport['national_id']??''));$destStudent=$nid!==''?($targetByNational[$nid]??null):($targetById[$sourceStudentId]??null);}
             if(!$destStudent){$summary['missing_student']++;continue;}
-            if($mode==='move'&&(int)$sourceReport['is_locked']===1){$summary['source_locked']++;continue;}
+            if($mode==='move'&&is_report_locked_for_student($sourceReport)){$summary['source_locked']++;continue;}
             $destClass=$dst['class']!==''?$dst['class']:trim((string)$destStudent['class_name']);
             if($destClass===''&&$dst['class']===''){$summary['missing_student']++;continue;}
             $destMonth=$dst['month']==='all'?(string)$sourceReport['report_month']:$dst['month'];
             $destSubject=$dst['subject']==='all'?(string)$g['subject_name']:$dst['subject'];
             if(!rgt_target_subject_exists($dst['year'],$destClass,$destSubject)){$summary['missing_subject']++;continue;}
-            $destReport=DB::fetch('SELECT id,is_locked FROM reports WHERE student_id=? AND academic_year=? AND report_month=? AND '.rgt_class_sql('class_name').' ORDER BY id DESC LIMIT 1',[(int)$destStudent['id'],$dst['year'],$destMonth,norm_class_str($destClass)]);
-            if(!$destReport && $dst['class']==='')$destReport=DB::fetch('SELECT id,is_locked FROM reports WHERE student_id=? AND academic_year=? AND report_month=? ORDER BY id DESC LIMIT 1',[(int)$destStudent['id'],$dst['year'],$destMonth]);
-            if($destReport&&(int)$destReport['is_locked']===1){$summary['locked']++;continue;}
+            $destReport=DB::fetch('SELECT id,student_id,class_name,academic_year,report_month,is_locked FROM reports WHERE student_id=? AND academic_year=? AND report_month=? AND '.rgt_class_sql('class_name').' ORDER BY id DESC LIMIT 1',[(int)$destStudent['id'],$dst['year'],$destMonth,norm_class_str($destClass)]);
+            if(!$destReport && $dst['class']==='')$destReport=DB::fetch('SELECT id,student_id,class_name,academic_year,report_month,is_locked FROM reports WHERE student_id=? AND academic_year=? AND report_month=? ORDER BY id DESC LIMIT 1',[(int)$destStudent['id'],$dst['year'],$destMonth]);
+            if($destReport&&is_report_locked_for_student($destReport)){$summary['locked']++;continue;}
             if(!$destReport){DB::execute('INSERT INTO reports (student_id,class_name,academic_year,term,report_month,total_score,gpa) VALUES (?,?,?,?,?,0,0)',[(int)$destStudent['id'],$destClass,$dst['year'],rgt_term($destMonth),$destMonth]);$destReport=['id'=>(int)DB::lastInsertId()];}
             $destReportId=(int)$destReport['id'];$sourceReportId=(int)$sourceReport['id'];
             $existing=DB::fetch('SELECT id FROM report_grades WHERE report_id=? AND subject_name=? ORDER BY id DESC LIMIT 1',[$destReportId,$destSubject]);

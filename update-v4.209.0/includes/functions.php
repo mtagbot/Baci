@@ -1092,6 +1092,11 @@ if (!function_exists('ensure_report_locks_schema')) {
         static $done = false;
         if ($done || !class_exists('DB')) return;
         $done = true;
+        /* V4.209.4 — یک‌بار برای همیشه: قفل‌های «گروهی» دیگر در ستون
+           reports.is_locked کپی نمی‌شوند؛ آن ستون از این پس فقط قفلِ فردیِ
+           خودِ ردیف را نگه می‌دارد. برای دادهٔ قبلی هم همین حالت بازسازی
+           می‌شود (تصمیمِ نمایش هیچ دانش‌آموزی عوض نمی‌شود). */
+        if (function_exists('report_lock_normalize_node_holds')) report_lock_normalize_node_holds();
         /* V4.208.0 — CREATE TABLE در هر درخواست تکرار می‌شد؛ حالا یک‌بار در هر نسخه. */
         if (function_exists('perf_schema_is_marked') && perf_schema_is_marked('report_locks_v1')) return;
         try {
@@ -1144,44 +1149,158 @@ if (!function_exists('get_all_report_locks')) {
     }
 }
 
-if (!function_exists('is_report_prelocked')) {
+if (!function_exists('report_lock_rule_rank')) {
     /**
-     * بررسی می‌کند آیا کارنامهٔ یک ماه/کلاس/دانش‌آموز به‌صورت پیشینی یا گروهی در جدول report_locks مسدود شده است یا خیر.
-     * این مسدودسازی صرفاً نمایش کارنامه به دانش‌آموز را می‌بندد و مانع ثبت نمره توسط دبیران نمی‌شود.
+     * V4.209.4 — «دقت» یک قاعدهٔ مسدودسازی: ۳ = همین دانش‌آموز، ۲ = یک کلاس، ۱ = همه کلاس‌ها.
+     *
+     * چرا لازم است؟ فرض کنید کل کلاس «هفتم ۱» برای ماه آبان مسدود شده تا نمرات
+     * تکمیل شود و همان موقع یک دانش‌آموز به دلیل بدهی مالی جداگانه مسدود شده
+     * است. آزادسازی کلاس هیچ ربطی به مسدودیت فردی او ندارد و نباید آن را باز
+     * کند؛ برای همین هنگام تصمیم‌گیری، قاعدهٔ دقیق‌تر (فردی) بر قاعدهٔ کلی‌تر
+     * (کلاسی) اولویت دارد.
      */
-    function is_report_prelocked($academicYear, $reportMonth, $className = '', $studentId = 0, &$reasonOut = null): bool {
-        $locks = get_all_report_locks();
-        if (!$locks) return false;
+    function report_lock_rule_rank(array $rule): int {
+        if ((int)($rule['student_id'] ?? 0) > 0) return 3;
+        if (trim((string)($rule['class_name'] ?? '')) !== '') return 2;
+        return 1;
+    }
+}
+
+if (!function_exists('report_lock_rule_matches')) {
+    /** آیا این قاعده به همین سال/ماه/کلاس/دانش‌آموز مربوط است؟ */
+    function report_lock_rule_matches(array $rule, $academicYear, $reportMonth, $className = '', $studentId = 0): bool {
         $targetYears = report_year_variants($academicYear);
         $targetMonth = trim((string)$reportMonth);
         $targetClass = function_exists('norm_class_str') ? norm_class_str((string)$className) : trim((string)$className);
         $targetStudent = (int)$studentId;
 
-        foreach ($locks as $rule) {
-            $rYear = trim((string)($rule['academic_year'] ?? ''));
-            if ($rYear !== '' && !array_intersect($targetYears, report_year_variants($rYear))) continue;
+        $rYear = trim((string)($rule['academic_year'] ?? ''));
+        if ($rYear !== '' && !array_intersect($targetYears, report_year_variants($rYear))) return false;
 
-            $rMonth = trim((string)($rule['report_month'] ?? ''));
-            if ($rMonth !== '' && $targetMonth !== '' && $rMonth !== $targetMonth) continue;
-            if ($rMonth !== '' && $targetMonth === '') continue;
+        $rMonth = trim((string)($rule['report_month'] ?? ''));
+        if ($rMonth !== '' && $targetMonth !== '' && $rMonth !== $targetMonth) return false;
+        if ($rMonth !== '' && $targetMonth === '') return false;
 
-            $rClass = trim((string)($rule['class_name'] ?? ''));
-            $rClassNorm = function_exists('norm_class_str') ? norm_class_str($rClass) : $rClass;
-            if ($rClassNorm !== '' && $targetClass !== '' && $rClassNorm !== $targetClass) continue;
-            if ($rClassNorm !== '' && $targetClass === '') continue;
+        $rClass = trim((string)($rule['class_name'] ?? ''));
+        $rClassNorm = function_exists('norm_class_str') ? norm_class_str($rClass) : $rClass;
+        if ($rClassNorm !== '' && $targetClass !== '' && $rClassNorm !== $targetClass) return false;
+        if ($rClassNorm !== '' && $targetClass === '') return false;
 
-            $rStudent = (int)($rule['student_id'] ?? 0);
-            if ($rStudent > 0 && $rStudent !== $targetStudent) continue;
+        $rStudent = (int)($rule['student_id'] ?? 0);
+        if ($rStudent > 0 && $rStudent !== $targetStudent) return false;
+        return true;
+    }
+}
 
-            // اولین قانون منطبق (جدیدترین): اگر برای دانش‌آموز خاص آزادسازی ثبت شده باشد (is_locked=0) اولویت دارد
-            if ((int)($rule['is_locked'] ?? 1) === 1) {
-                $reasonOut = trim((string)($rule['reason'] ?? '')) ?: 'کارنامهٔ این ماه تا تکمیل ثبت نمرات توسط دبیران مسدود است.';
-                return true;
-            } else {
-                return false;
+if (!function_exists('report_lock_normalize_node_holds')) {
+    /**
+     * V4.209.4 — یک‌بار برای همیشه (نه در هر بازدید): ستون reports.is_locked را
+     * به «قفل فردیِ ردیف» محدود می‌کند.
+     *
+     * چرا؟ تا پیش از این نسخه، هر مسدودسازی گروهی علاوه بر ثبت قاعده، همان
+     * ستون را هم ۱ می‌کرد؛ بنابراین هنگام آزادسازی گروهی معلوم نبود کدام قفل
+     * «فردی» بوده و همه پاک می‌شدند. حالا ردیفی که قفلش کاملاً با قاعده‌های
+     * فعلی توضیح داده می‌شود ستونش صفر می‌شود: همان لحظه هم مسدود می‌ماند
+     * (چون قاعده هست) و هم آزادسازی گروهیِ بعدی می‌تواند واقعاً آزادش کند.
+     * ردیف‌هایی که با هیچ قاعده‌ای توضیح داده نمی‌شوند دست‌نخورده می‌مانند؛
+     * پس هیچ کارنامه‌ای نه باز می‌شود و نه بسته. فقط «منبع قفل» روشن می‌شود.
+     */
+    function report_lock_normalize_node_holds(): void {
+        if (!empty($GLOBALS['__sdp_report_lock_norm_done'])) return;
+        $GLOBALS['__sdp_report_lock_norm_done'] = true;
+        if (!class_exists('DB')) return;
+        try {
+            if (function_exists('get_setting') && get_setting('report_lock_node_holds_v2094', '') === '1') return;
+        } catch (Throwable $e) { return; }
+        try {
+            $locks = function_exists('get_all_report_locks') ? get_all_report_locks(true) : [];
+            $freeIds = [];
+            if ($locks) {
+                foreach (DB::fetchAll("SELECT id, student_id, class_name, academic_year, report_month FROM reports WHERE is_locked = 1") ?: [] as $row) {
+                    if (is_report_prelocked($row['academic_year'] ?? '', $row['report_month'] ?? '', $row['class_name'] ?? '', (int)($row['student_id'] ?? 0))) {
+                        $freeIds[] = (int)$row['id'];
+                    }
+                }
             }
+            foreach (array_chunk($freeIds, 300) as $chunk) {
+                $marks = implode(',', array_fill(0, count($chunk), '?'));
+                DB::execute("UPDATE reports SET is_locked = 0 WHERE id IN ($marks)", $chunk);
+            }
+        } catch (Throwable $e) {}
+        try { if (function_exists('set_setting')) set_setting('report_lock_node_holds_v2094', '1'); } catch (Throwable $e) {}
+    }
+}
+
+if (!function_exists('report_lock_node_holds')) {
+    /**
+     * V4.209.4 — فهرست قفل‌های «فردیِ ردیف کارنامه» که با هیچ قاعده‌ای در
+     * report_locks توضیح داده نمی‌شوند (قفل دستی از جدول کارنامه‌ها، پنل دبیر
+     * یا صفحهٔ انضباط). این‌ها با آزادسازی گروهی پاک نمی‌شوند و باید جدا
+     * دیده و جدا آزاد شوند.
+     */
+    function report_lock_node_holds($academicYear = '', $reportMonth = '', $className = '', $limit = 200): array {
+        if (!class_exists('DB')) return [];
+        $where = ["r.is_locked = 1"];
+        $params = [];
+        $year = trim((string)$academicYear);
+        if ($year !== '') {
+            $years = report_year_variants($year);
+            $where[] = "r.academic_year IN (" . implode(',', array_fill(0, count($years), '?')) . ")";
+            foreach ($years as $yv) $params[] = $yv;
         }
-        return false;
+        $month = trim((string)$reportMonth);
+        if ($month !== '') { $where[] = "r.report_month = ?"; $params[] = $month; }
+        $className = trim((string)$className);
+        if ($className !== '') { $where[] = "r.class_name = ?"; $params[] = $className; }
+        $limit = max(1, min(2000, (int)$limit));
+        try {
+            $rows = DB::fetchAll(
+                "SELECT r.id, r.student_id, r.class_name, r.term, r.report_month, r.academic_year, s.first_name, s.last_name
+                   FROM reports r LEFT JOIN students s ON s.id = r.student_id
+                  WHERE " . implode(' AND ', $where) . " ORDER BY r.id DESC LIMIT " . $limit,
+                $params
+            ) ?: [];
+        } catch (Throwable $e) { return []; }
+        $out = [];
+        foreach ($rows as $row) {
+            if (is_report_prelocked($row['academic_year'] ?? '', $row['report_month'] ?? '', $row['class_name'] ?? '', (int)($row['student_id'] ?? 0))) continue;
+            $out[] = $row;
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('is_report_prelocked')) {
+    /**
+     * بررسی می‌کند آیا کارنامهٔ یک ماه/کلاس/دانش‌آموز به‌صورت پیشینی یا گروهی در جدول report_locks مسدود شده است یا خیر.
+     * این مسدودسازی صرفاً نمایش کارنامه به دانش‌آموز را می‌بندد و مانع ثبت نمره توسط دبیران نمی‌شود.
+     *
+     * V4.209.4 — قاعدهٔ تصمیم:
+     *   · قاعدهٔ جدیدتر بر قدیمی‌تر مقدم است (همان رفتار قبلی)،
+     *   · ولی یک «آزادسازی» هرگز نمی‌تواند مسدودیتِ *دقیق‌تری* را خنثی کند:
+     *     آزادسازی کلاسی، مسدودیت فردیِ همان دانش‌آموز را باز نمی‌کند.
+     *   · ستون reports.is_locked (قفل فردیِ ردیف) جدا و مستقل باقی می‌ماند.
+     */
+    function is_report_prelocked($academicYear, $reportMonth, $className = '', $studentId = 0, &$reasonOut = null): bool {
+        $locks = get_all_report_locks();
+        if (!$locks) return false;
+
+        $newest = null;       // جدیدترین قاعدهٔ منطبق (تصمیم پیش‌فرض)
+        $specificHold = null; // قفلِ دقیق‌تری که آزادسازیِ کلی‌تر نمی‌تواند خنثی کند
+
+        foreach ($locks as $rule) {
+            if (!report_lock_rule_matches($rule, $academicYear, $reportMonth, $className, $studentId)) continue;
+            $rank = report_lock_rule_rank($rule);
+            $isHold = ((int)($rule['is_locked'] ?? 1) === 1);
+            if ($newest === null) $newest = ['rule' => $rule, 'rank' => $rank, 'hold' => $isHold];
+            if ($isHold && $newest !== null && $rank > $newest['rank']) { $specificHold = $rule; break; }
+        }
+        if ($newest === null) return false;
+
+        $deciding = $specificHold ?? ($newest['hold'] ? $newest['rule'] : null);
+        if ($deciding === null) return false;
+        $reasonOut = trim((string)($deciding['reason'] ?? '')) ?: 'کارنامهٔ این ماه تا تکمیل ثبت نمرات توسط دبیران مسدود است.';
+        return true;
     }
 }
 
@@ -1298,8 +1417,20 @@ if (!function_exists('set_report_bulk_lock')) {
     /**
      * اعمال مسدودسازی یا آزادسازی پیشینی/گروهی کارنامه برای یک سال، ماه، کلاس یا دانش‌آموز
      * حتی زمانی که هنوز هیچ کارنامه‌ای برای آن ماه صادر نشده است.
+     *
+     * V4.209.4 — «لایه‌های مسدودسازی» از هم جدا شدند:
+     *
+     *   · مسدودیت گروهی (کلاس یا همه کلاس‌ها)  → فقط یک قاعدهٔ گروهی در report_locks
+     *   · مسدودیت فردی (یک دانش‌آموز خاص)      → قاعدهٔ فردی، و قفل ستون reports.is_locked
+     *
+     * آزادسازی گروهی **فقط قاعده‌های گروهی هم‌محدوده** را برمی‌دارد؛ بنابراین
+     * دانش‌آموزی که هم‌زمان به دلیل بدهی مالی مسدود شده، بعد از «تکمیل نمرات»
+     * و آزادسازی کلاس همچنان مسدود می‌ماند و مسدودیت دومش از بین نمی‌رود.
+     *
+     * $includeIndividual = true فقط برای وقتی است که مدیر صریحاً بخواهد همین
+     * محدوده را کامل (شامل مسدودیت‌های فردی) آزاد کند؛ پیش‌فرض عمداً false است.
      */
-    function set_report_bulk_lock($academicYear, $reportMonth, $className = '', $studentId = 0, $isLocked = 1, $reason = ''): void {
+    function set_report_bulk_lock($academicYear, $reportMonth, $className = '', $studentId = 0, $isLocked = 1, $reason = '', $includeIndividual = false): void {
         if (!class_exists('DB')) return;
         ensure_report_locks_schema();
         $year = function_exists('unify_academic_year') ? unify_academic_year(trim((string)$academicYear)) : trim((string)$academicYear);
@@ -1310,51 +1441,87 @@ if (!function_exists('set_report_bulk_lock')) {
         $normClass = function_exists('norm_class_str') ? norm_class_str($className) : $className;
         $studentId = max(0, (int)$studentId);
         $isLocked = (int)$isLocked ? 1 : 0;
+        $includeIndividual = (bool)$includeIndividual;
         $reason = trim((string)$reason) ?: 'تا زمان تکمیل نمرات توسط دبیران یا تسویه امور اداری مسدود است';
 
-        // ۱) به‌روزرسانی کارنامه‌های موجود منطبق (در صورت وجود)
-        $where = ["academic_year IN ($yMarks)"];
-        $params = $years;
-        if ($month !== '') { $where[] = "report_month = ?"; $params[] = $month; }
-        if ($className !== '') {
-            $where[] = "(class_name = ? OR REPLACE(REPLACE(class_name, ' ', ''), '‌', '') = ?)";
-            $params[] = $className;
-            $params[] = $normClass;
-        }
-        if ($studentId > 0) { $where[] = "student_id = ?"; $params[] = $studentId; }
-        DB::execute("UPDATE reports SET is_locked = ? WHERE " . implode(' AND ', $where), array_merge([$isLocked], $params));
+        /* محدودهٔ پایه: سال (+ ماه) */
+        $baseWhere = ["academic_year IN ($yMarks)"];
+        $baseParams = $years;
+        if ($month !== '') { $baseWhere[] = "report_month = ?"; $baseParams[] = $month; }
 
-        // ۲) ثبت یا حذف قانون مسدودسازی پیشینی در report_locks
-        $lockWhere = ["academic_year IN ($yMarks)"];
-        $lockParams = $years;
-        if ($month !== '') { $lockWhere[] = "report_month = ?"; $lockParams[] = $month; }
+        /* محدودهٔ کلاس (کلاس مشخص یا همه کلاس‌ها) */
+        $classWhere = $baseWhere;
+        $classParams = $baseParams;
         if ($className !== '') {
-            $lockWhere[] = "(class_name = ? OR REPLACE(REPLACE(class_name, ' ', ''), '‌', '') = ?)";
-            $lockParams[] = $className;
-            $lockParams[] = $normClass;
-        } elseif ($studentId === 0 && $isLocked === 0) {
-            // آزادسازی کل کلاس‌ها در آن ماه → همهٔ قوانین کلاسی و کلی آن ماه پاک شوند
-        } else {
-            $lockWhere[] = "(class_name IS NULL OR class_name = '')";
-        }
-        if ($studentId > 0) {
-            $lockWhere[] = "student_id = ?";
-            $lockParams[] = $studentId;
-        } elseif ($isLocked === 1) {
-            $lockWhere[] = "(student_id IS NULL OR student_id = 0)";
+            $classWhere[] = "(class_name = ? OR REPLACE(REPLACE(class_name, ' ', ''), '‌', '') = ?)";
+            $classParams[] = $className;
+            $classParams[] = $normClass;
         }
 
-        DB::execute("DELETE FROM report_locks WHERE " . implode(' AND ', $lockWhere), $lockParams);
+        /* محدودهٔ قاعدهٔ گروهی: ردیف‌های بدون دانش‌آموز */
+        $groupWhere = $classWhere;
+        $groupParams = $classParams;
+        if ($className === '') $groupWhere[] = "(class_name IS NULL OR class_name = '')";
+        $groupWhere[] = "(student_id IS NULL OR student_id = 0)";
+
+        /* محدودهٔ قاعده/قفل فردی: دقیقاً همین دانش‌آموز در همین ماه */
+        $studentWhere = $baseWhere;
+        $studentParams = $baseParams;
+        $studentWhere[] = "student_id = ?";
+        $studentParams[] = $studentId;
 
         if ($isLocked === 1) {
+            if ($studentId > 0) {
+                /* مسدودیت فردی: هر قاعدهٔ قبلی همین دانش‌آموز (قفل یا آزادسازی) جایگزین می‌شود */
+                DB::execute("DELETE FROM report_locks WHERE " . implode(' AND ', $studentWhere), $studentParams);
+            } else {
+                /* مسدودیت گروهی: قاعدهٔ گروهی هم‌محدوده جایگزین می‌شود و
+                   استثناهای آزادسازیِ همین محدوده برداشته می‌شوند تا همه دوباره بسته شوند.
+                   (مسدودیت‌های فردیِ دانش‌آموزان دست‌نخورده می‌مانند.) */
+                DB::execute("DELETE FROM report_locks WHERE is_locked = 1 AND " . implode(' AND ', $groupWhere), $groupParams);
+                DB::execute("DELETE FROM report_locks WHERE is_locked = 0 AND " . implode(' AND ', $classWhere), $classParams);
+            }
             DB::execute(
                 "INSERT INTO report_locks (academic_year, term, report_month, class_name, student_id, is_locked, reason) VALUES (?, ?, ?, ?, ?, 1, ?)",
                 [$year, $month ?: null, $month, $className, $studentId > 0 ? $studentId : null, $reason]
             );
-        } elseif ($className !== '' && $studentId === 0) {
-            // اگر قبلاً کل کلاس‌ها (class_name='') برای این ماه مسدود بوده و مدیر فقط یک کلاس را آزاد کرده، استثنای آزادسازی برای این کلاس ثبت شود
+            unset($GLOBALS['__sdp_report_locks_cache']);
+            return;
+        }
+
+        /* ── آزادسازی ─────────────────────────────────────────────────────── */
+        if ($studentId > 0) {
+            /* آزادسازی یک دانش‌آموز: قاعده‌های فردی (قفل یا آزادسازی قبلی) + قفل فردیِ ردیف برداشته می‌شود */
+            DB::execute("DELETE FROM report_locks WHERE " . implode(' AND ', $studentWhere), $studentParams);
+            DB::execute("UPDATE reports SET is_locked = 0 WHERE " . implode(' AND ', $studentWhere), $studentParams);
+            unset($GLOBALS['__sdp_report_locks_cache']);
+            /* اگر مسدودیت کلی‌تری (کلاس/همه کلاس‌ها) باقی است، استثنای آزادسازی همین دانش‌آموز ثبت شود */
+            if (is_report_prelocked($year, $month, $className, $studentId)) {
+                DB::execute(
+                    "INSERT INTO report_locks (academic_year, term, report_month, class_name, student_id, is_locked, reason) VALUES (?, ?, ?, ?, ?, 0, '')",
+                    [$year, $month ?: null, $month, $className, $studentId]
+                );
+            }
+            unset($GLOBALS['__sdp_report_locks_cache']);
+            return;
+        }
+
+        if ($includeIndividual) {
+            /* آزادسازی کاملِ همین محدوده: همهٔ قاعده‌ها (گروهی و فردی) + قفل‌های فردی ردیف‌ها */
+            DB::execute("DELETE FROM report_locks WHERE " . implode(' AND ', $classWhere), $classParams);
+            DB::execute("UPDATE reports SET is_locked = 0 WHERE " . implode(' AND ', $classWhere), $classParams);
+            unset($GLOBALS['__sdp_report_locks_cache']);
+            return;
+        }
+
+        /* آزادسازی گروهی (رفتار پیش‌فرض): فقط قاعده‌های گروهی هم‌محدوده */
+        DB::execute("DELETE FROM report_locks WHERE is_locked = 1 AND " . implode(' AND ', $groupWhere), $groupParams);
+        unset($GLOBALS['__sdp_report_locks_cache']);
+
+        /* اگر مسدودیتِ کلی‌تری (همه کلاس‌ها) برای این ماه مانده، استثنای آزادسازی برای کلاس ثبت شود */
+        if ($className !== '') {
             $globalLocks = DB::fetchAll(
-                "SELECT id FROM report_locks WHERE academic_year IN ($yMarks) AND (report_month = ? OR report_month IS NULL OR report_month = '') AND (class_name IS NULL OR class_name = '') AND is_locked = 1",
+                "SELECT id FROM report_locks WHERE academic_year IN ($yMarks) AND (report_month = ? OR report_month IS NULL OR report_month = '') AND (class_name IS NULL OR class_name = '') AND (student_id IS NULL OR student_id = 0) AND is_locked = 1",
                 array_merge($years, [$month])
             );
             if ($globalLocks) {

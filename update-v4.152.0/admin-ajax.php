@@ -23,20 +23,15 @@ if ($action === 'toggle_lock') {
         ensure_report_locks_schema();
         $currentlyLocked = is_report_locked_for_student($rep);
         $newLock = $currentlyLocked ? 0 : 1;
-        DB::execute("UPDATE reports SET is_locked = ? WHERE id = ?", [$newLock, $reportId]);
-        $repYears = report_year_variants($rep['academic_year'] ?? '');
-        $yMarks = implode(',', array_fill(0, count($repYears), '?'));
-        DB::execute(
-            "DELETE FROM report_locks WHERE student_id = ? AND report_month = ? AND academic_year IN ($yMarks)",
-            array_merge([(int)$rep['student_id'], (string)$rep['report_month']], $repYears)
-        );
-        if ($newLock === 0 && is_report_prelocked($rep['academic_year'] ?? '', $rep['report_month'] ?? '', $rep['class_name'] ?? '', 0)) {
-            DB::execute(
-                "INSERT INTO report_locks (academic_year, term, report_month, class_name, student_id, is_locked, reason) VALUES (?, ?, ?, ?, ?, 0, '')",
-                [$rep['academic_year'], $rep['term'], $rep['report_month'], $rep['class_name'], (int)$rep['student_id']]
-            );
+        /* V4.209.4 — همان قاعدهٔ reports.php: قفل این ردیف یک مسدودیت فردیِ
+           مستقل است (با آزادسازی گروهی باز نمی‌شود) و رفع مسدودیت، آزادسازی
+           کامل همین دانش‌آموز در همین ماه است. */
+        if ($newLock === 1) {
+            DB::execute("UPDATE reports SET is_locked = 1 WHERE id = ?", [$reportId]);
+            unset($GLOBALS['__sdp_report_locks_cache']);
+        } else {
+            set_report_bulk_lock($rep['academic_year'] ?? '', $rep['report_month'] ?? '', $rep['class_name'] ?? '', (int)$rep['student_id'], 0, '');
         }
-        unset($GLOBALS['__sdp_report_locks_cache']);
         log_activity($_SESSION['admin_id'] ?? null, 'تغییر قفل کارنامه (AJAX)', "وضعیت قفل کارنامه $reportId به $newLock تغییر کرد.");
         echo json_encode(['status' => 'success', 'is_locked' => $newLock]);
         exit;
@@ -52,11 +47,15 @@ if ($action === 'bulk_lock') {
     $studentId = (int)($_POST['student_id'] ?? 0);
     $isLocked  = (int)($_POST['is_locked'] ?? 1);
     $reason    = trim($_POST['reason'] ?? 'در حال تکمیل نمرات توسط دبیران');
+    /* V4.209.4 — پیش‌فرض «آزادسازی گروهی» است: مسدودیت‌های فردی (بدهی مالی و…)
+       دست‌نخورده می‌مانند. فقط اگر مدیر صریحاً تیک «آزادسازی کامل» بزند،
+       مسدودیت‌های فردیِ همین محدوده هم برداشته می‌شود. */
+    $includeIndividual = (int)($_POST['include_individual'] ?? 0) === 1;
 
-    set_report_bulk_lock($year, $month, $className, $studentId, $isLocked, $reason);
+    set_report_bulk_lock($year, $month, $className, $studentId, $isLocked, $reason, $includeIndividual);
 
-    log_activity($_SESSION['admin_id'] ?? null, 'مسدودسازی پیشینی/گروهی کارنامه', "وضعیت قفل برای کلاس '$className' در ماه '$month' سال '$year' به $isLocked تغییر کرد.");
-    echo json_encode(['status' => 'success']);
+    log_activity($_SESSION['admin_id'] ?? null, 'مسدودسازی پیشینی/گروهی کارنامه', "وضعیت قفل برای کلاس '$className' در ماه '$month' سال '$year' به $isLocked تغییر کرد." . ($includeIndividual && $isLocked === 0 ? ' (آزادسازی کامل شامل مسدودیت‌های فردی)' : ''));
+    echo json_encode(['status' => 'success', 'include_individual' => $includeIndividual ? 1 : 0]);
     exit;
 }
 

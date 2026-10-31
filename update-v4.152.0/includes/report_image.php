@@ -129,7 +129,13 @@ if (!function_exists('get_report_analysis_data')) {
             if ((int)$gr['student_id'] === (int)$report['student_id']) { $gradeRankVal = $gi + 1; break; }
         }
 
-        $progress = DB::fetchAll("SELECT report_month, term, gpa FROM reports WHERE student_id = ? AND academic_year IN ($yMarks) AND is_locked = 0 ORDER BY id ASC LIMIT 12", array_merge([(int)$report['student_id']], $years));
+        /* V4.209.4 — نمودار روند فقط ماه‌های آزاد را نشان می‌دهد؛ قفل گروهی هم مثل
+           قفل فردی ماه را از نمودار بیرون می‌گذارد (قبلاً فقط ستون is_locked دیده می‌شد). */
+        $progress = [];
+        foreach (DB::fetchAll("SELECT id, student_id, class_name, report_month, term, gpa, academic_year FROM reports WHERE student_id = ? AND academic_year IN ($yMarks) ORDER BY id ASC LIMIT 12", array_merge([(int)$report['student_id']], $years)) ?: [] as $pr) {
+            if (is_report_locked_for_student($pr)) continue;
+            $progress[] = $pr;
+        }
         $subjectAvgs = []; $subjectRanks = [];
         foreach ($parsed['regular_grades'] as $g) {
             $sClassList = fetch_subject_rank_scope($report, (string)$g['subject_name'], 'class');

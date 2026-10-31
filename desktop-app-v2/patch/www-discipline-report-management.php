@@ -131,11 +131,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_discipline_score
                 }
                 if ($report && (int)$report['is_locked'] === 1 && !is_report_prelocked($year, $month, $reportClass, $sid)) { $locked++; continue; }
                 if (!$report) {
-                    $initLock = is_report_prelocked($year, $month, $reportClass, $sid) ? 1 : 0;
-                    DB::execute('INSERT INTO reports (student_id,class_name,academic_year,term,report_month,total_score,gpa,is_locked) VALUES (?,?,?,?,?,0,0,?)', [$sid,$reportClass,$year,drm_term_for_month($month),$month,$initLock]);
+                    /* V4.209.4 — قفل گروهی در ستون کپی نمی‌شود (فقط مسدودیت فردی در آن است). */
+                    DB::execute('INSERT INTO reports (student_id,class_name,academic_year,term,report_month,total_score,gpa,is_locked) VALUES (?,?,?,?,?,0,0,0)', [$sid,$reportClass,$year,drm_term_for_month($month),$month]);
                     $report = ['id'=>(int)DB::lastInsertId()];
-                } elseif (is_report_prelocked($year, $month, $reportClass, $sid)) {
-                    DB::execute('UPDATE reports SET is_locked=1 WHERE id=?', [(int)$report['id']]);
                 }
                 DB::execute('UPDATE reports SET discipline_score=? WHERE id=?', [$score,(int)$report['id']]);
                 $saved++;

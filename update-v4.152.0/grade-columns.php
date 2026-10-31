@@ -160,7 +160,9 @@ if (!function_exists('gc_grade_map')) {
         );
         foreach ($reports as $r) {
             $sid = (int)$r['student_id'];
-            $out[$sid] = ['report_id' => (int)$r['id'], 'gpa' => $r['gpa'], 'locked' => (int)$r['is_locked'], 'scores' => []];
+            /* V4.209.4 — قفلِ «ترکیبی» (گروهی + فردی) از تصمیم واقعی خوانده می‌شود، نه
+               فقط از ستون ردیف؛ وگرنه با جدا شدن لایه‌ها آیکون قفل نادرست می‌شد. */
+            $out[$sid] = ['report_id' => (int)$r['id'], 'gpa' => $r['gpa'], 'locked' => is_report_locked_for_student($r) ? 1 : 0, 'scores' => []];
         }
         $ids = array_column($out, 'report_id');
         if ($ids) {
@@ -224,12 +226,10 @@ if (!function_exists('gc_save_cell')) {
         $report = DB::fetch("SELECT * FROM reports WHERE student_id = ? AND academic_year = ? AND report_month = ? ORDER BY id DESC LIMIT 1",
             [$studentId, $year, $month]);
         if (!$report) {
-            $initLock = is_report_prelocked($year, $month, (string)$student['class_name'], $studentId) ? 1 : 0;
-            DB::execute("INSERT INTO reports (student_id, class_name, academic_year, term, report_month, total_score, gpa, is_locked) VALUES (?,?,?,?,?,0,0,?)",
-                [$studentId, (string)$student['class_name'], $year, gc_term_for_month($month), $month, $initLock]);
+            /* V4.209.4 — قفل گروهی در ستون کپی نمی‌شود (فقط مسدودیت فردی در آن است). */
+            DB::execute("INSERT INTO reports (student_id, class_name, academic_year, term, report_month, total_score, gpa, is_locked) VALUES (?,?,?,?,?,0,0,0)",
+                [$studentId, (string)$student['class_name'], $year, gc_term_for_month($month), $month]);
             $report = DB::fetch("SELECT * FROM reports WHERE id = ?", [DB::lastInsertId()]);
-        } elseif (is_report_prelocked($year, $month, (string)$student['class_name'], $studentId)) {
-            DB::execute("UPDATE reports SET is_locked = 1 WHERE id = ?", [(int)$report['id']]);
         }
         if (!$report) return ['ok' => false, 'message' => 'ساخت کارنامهٔ ماه انجام نشد.'];
 

@@ -29,18 +29,21 @@ if ($action === 'unlock_rule' && isset($_GET['lock_id'])) {
     $lockId = (int)$_GET['lock_id'];
     $rule = DB::fetch("SELECT * FROM report_locks WHERE id = ?", [$lockId]);
     if ($rule) {
-        set_report_bulk_lock(
-            $rule['academic_year'] ?? '',
-            $rule['report_month'] ?? '',
-            $rule['class_name'] ?? '',
-            (int)($rule['student_id'] ?? 0),
-            0,
-            ''
-        );
+        /* V4.209.4 — دو نوع قاعده دو معنی متفاوت دارد:
+           · قاعدهٔ گروهی (کلاس/همه کلاس‌ها) → فقط همان لایه برداشته می‌شود؛
+             مسدودیت‌های فردیِ دانش‌آموزان (بدهی مالی و…) سر جایشان می‌مانند.
+           · قاعدهٔ یک دانش‌آموز → همان دانش‌آموز کامل آزاد می‌شود (قاعده + قفل ردیف). */
+        if ((int)($rule['student_id'] ?? 0) > 0) {
+            set_report_bulk_lock($rule['academic_year'] ?? '', $rule['report_month'] ?? '', $rule['class_name'] ?? '', (int)$rule['student_id'], 0, '');
+        } else {
+            set_report_bulk_lock($rule['academic_year'] ?? '', $rule['report_month'] ?? '', $rule['class_name'] ?? '', 0, 0, '');
+        }
         DB::execute("DELETE FROM report_locks WHERE id = ?", [$lockId]);
         unset($GLOBALS['__sdp_report_locks_cache']);
         log_activity($_SESSION['admin_id'] ?? null, 'رفع مسدودیت پیشینی کارنامه', "قانون مسدودسازی #{$lockId} ({$rule['report_month']}) آزاد شد.");
-        set_flash_message('success', 'مسدودسازی کارنامه برای ماه/کلاس انتخاب‌شده برطرف شد و کارنامه‌ها برای دانش‌آموزان قابل مشاهده گردید.');
+        set_flash_message('success', (int)($rule['student_id'] ?? 0) > 0
+            ? 'مسدودیت فردی این دانش‌آموز برای این ماه برداشته شد.'
+            : 'مسدودیت گروهی این ماه/کلاس برداشته شد. مسدودیت‌های فردیِ دانش‌آموزان (مثل بدهی مالی) دست‌نخورده باقی ماند.');
     }
     redirect('reports.php');
 }
@@ -52,22 +55,22 @@ if ($action === 'toggle_lock' && $reportId > 0) {
         ensure_report_locks_schema();
         $currentlyLocked = is_report_locked_for_student($rep);
         $newLock = $currentlyLocked ? 0 : 1;
-        DB::execute("UPDATE reports SET is_locked = ? WHERE id = ?", [$newLock, $reportId]);
-        $repYears = report_year_variants($rep['academic_year'] ?? '');
-        $yMarks = implode(',', array_fill(0, count($repYears), '?'));
-        DB::execute(
-            "DELETE FROM report_locks WHERE student_id = ? AND report_month = ? AND academic_year IN ($yMarks)",
-            array_merge([(int)$rep['student_id'], (string)$rep['report_month']], $repYears)
-        );
-        if ($newLock === 0 && is_report_prelocked($rep['academic_year'] ?? '', $rep['report_month'] ?? '', $rep['class_name'] ?? '', 0)) {
-            DB::execute(
-                "INSERT INTO report_locks (academic_year, term, report_month, class_name, student_id, is_locked, reason) VALUES (?, ?, ?, ?, ?, 0, '')",
-                [$rep['academic_year'], $rep['term'], $rep['report_month'], $rep['class_name'], (int)$rep['student_id']]
-            );
+        /* V4.209.4 — «مسدود کردن» این ردیف یعنی یک مسدودیت فردیِ مستقل:
+           فقط ستون همین کارنامه. پس آزادسازی گروهیِ ماه/کلاس هرگز آن را باز
+           نمی‌کند و تا وقتی مدیر همین ردیف را آزاد نکند مسدود می‌ماند.
+           «رفع مسدودیت» یعنی آزادسازی کامل همین دانش‌آموز در همین ماه
+           (قاعده‌های فردی + قفل ردیف) و اگر مسدودیت کلاسی باقی باشد، استثنای
+           آزادسازی برای او ثبت می‌شود. */
+        if ($newLock === 1) {
+            DB::execute("UPDATE reports SET is_locked = 1 WHERE id = ?", [$reportId]);
+            unset($GLOBALS['__sdp_report_locks_cache']);
+        } else {
+            set_report_bulk_lock($rep['academic_year'] ?? '', $rep['report_month'] ?? '', $rep['class_name'] ?? '', (int)$rep['student_id'], 0, '');
         }
-        unset($GLOBALS['__sdp_report_locks_cache']);
         log_activity($_SESSION['admin_id'] ?? null, 'تغییر قفل کارنامه', "کارنامه $reportId وضعیت مسدودسازی به $newLock شد.");
-        set_flash_message('success', 'وضعیت مسدودسازی کارنامه تغییر یافت.');
+        set_flash_message('success', $newLock === 1
+            ? 'این کارنامه به‌صورت فردی مسدود شد؛ با آزادسازی گروهی ماه/کلاس باز نمی‌شود.'
+            : 'مسدودیت این دانش‌آموز برای این ماه برداشته شد.');
     }
     redirect('reports.php');
 }
@@ -487,7 +490,14 @@ else:
         if ($mn !== '' && !isset($monthMap[$mn])) $monthMap[$mn] = ['report_month' => $mn];
     }
     ensure_report_locks_schema();
+    /* V4.209.4 — دو لایهٔ جدا: مسدودیت گروهی (کلاس/ماه) و مسدودیت فردی (دانش‌آموز).
+       آزادسازی گروهی فقط لایهٔ اول را برمی‌دارد، پس مدیر باید هر دو را جدا ببیند. */
     $activePreLocks = DB::fetchAll("SELECT rl.*, s.first_name, s.last_name FROM report_locks rl LEFT JOIN students s ON rl.student_id = s.id WHERE rl.is_locked = 1 ORDER BY rl.id DESC") ?: [];
+    $groupLocks = []; $individualLocks = [];
+    foreach ($activePreLocks as $apl) {
+        if ((int)($apl['student_id'] ?? 0) > 0) $individualLocks[] = $apl; else $groupLocks[] = $apl;
+    }
+    $rowLocks = report_lock_node_holds('', '', '', 300);
     foreach ($activePreLocks as $apl) {
         $mn = trim((string)($apl['report_month'] ?? ''));
         if ($mn !== '' && !isset($monthMap[$mn])) $monthMap[$mn] = ['report_month' => $mn];
@@ -512,31 +522,76 @@ else:
         </div>
     </div>
 
-    <?php if (!empty($activePreLocks)): ?>
-    <div class="card p-4 border-amber-300 bg-amber-50 space-y-2">
-        <div class="flex justify-between items-center flex-wrap gap-2">
+    <?php if (!empty($groupLocks) || !empty($individualLocks) || !empty($rowLocks)): ?>
+    <div class="card p-4 border-amber-300 bg-amber-50 space-y-3">
+        <?php if (!empty($groupLocks)): ?>
+        <div class="space-y-2">
             <h3 class="font-bold text-sm text-amber-900 flex items-center gap-1">
                 <svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg>
-                ماه‌ها و کلاس‌های دارای مسدودسازی فعال برای دانش‌آموزان (دبیران همچنان می‌توانند نمرات را ثبت کنند):
+                ۱) مسدودیت گروهی — ماه‌ها و کلاس‌های مسدود برای دانش‌آموزان (دبیران همچنان می‌توانند نمره ثبت کنند):
             </h3>
-        </div>
-        <div class="flex flex-wrap gap-2">
-            <?php foreach ($activePreLocks as $apl):
-                $scopeLbl = 'سال ' . ($apl['academic_year'] ?: 'همه سال‌ها') . ' — ماه «' . ($apl['report_month'] ?: 'همه ماه‌ها') . '»';
-                $scopeLbl .= !empty($apl['class_name']) ? (' — کلاس ' . $apl['class_name']) : ' — همه کلاس‌ها';
-                if (!empty($apl['student_id'])) {
-                    $scopeLbl .= ' — دانش‌آموز: ' . trim(($apl['first_name'] ?? '') . ' ' . ($apl['last_name'] ?? ''));
-                }
-            ?>
-            <div class="flex items-center gap-2 bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-xs shadow-sm">
-                <span class="font-bold text-amber-900"><?php echo clean($scopeLbl); ?></span>
-                <?php if (!empty($apl['reason'])): ?>
-                    <span class="text-muted">(<?php echo clean($apl['reason']); ?>)</span>
-                <?php endif; ?>
-                <a href="reports.php?action=unlock_rule&lock_id=<?php echo (int)$apl['id']; ?>" class="btn btn-secondary text-xs px-2 py-0.5 text-green-700 font-bold" onclick="return confirm('آیا مسدودیت این ماه/کلاس برای دانش‌آموزان برداشته شود؟')">آزادسازی 🔓</a>
+            <div class="flex flex-wrap gap-2">
+                <?php foreach ($groupLocks as $apl):
+                    $scopeLbl = 'سال ' . ($apl['academic_year'] ?: 'همه سال‌ها') . ' — ماه «' . ($apl['report_month'] ?: 'همه ماه‌ها') . '»';
+                    $scopeLbl .= !empty($apl['class_name']) ? (' — کلاس ' . $apl['class_name']) : ' — همه کلاس‌ها';
+                ?>
+                <div class="flex items-center gap-2 bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-xs shadow-sm">
+                    <span class="font-bold text-amber-900"><?php echo clean($scopeLbl); ?></span>
+                    <?php if (!empty($apl['reason'])): ?>
+                        <span class="text-muted">(<?php echo clean($apl['reason']); ?>)</span>
+                    <?php endif; ?>
+                    <a href="reports.php?action=unlock_rule&lock_id=<?php echo (int)$apl['id']; ?>" class="btn btn-secondary text-xs px-2 py-0.5 text-green-700 font-bold" onclick="return confirm('آیا مسدودیت گروهی این ماه/کلاس برداشته شود؟ مسدودیت‌های فردی دانش‌آموزان دست‌نخورده می‌مانند.')">آزادسازی گروهی 🔓</a>
+                </div>
+                <?php endforeach; ?>
             </div>
-            <?php endforeach; ?>
+            <p class="text-[11px] text-amber-800">با آزادسازی گروهی، کارنامهٔ دانش‌آموزانی که مسدودیت فردی دارند (مثل بدهی مالی) همچنان مسدود می‌ماند.</p>
         </div>
+        <?php endif; ?>
+
+        <?php if (!empty($individualLocks)): ?>
+        <div class="space-y-2">
+            <h3 class="font-bold text-sm text-rose-900 flex items-center gap-1">
+                <svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg>
+                ۲) مسدودیت فردی — دانش‌آموزانی که جدا از گروه مسدود شده‌اند (با آزادسازی گروهی باز نمی‌شوند):
+            </h3>
+            <div class="flex flex-wrap gap-2">
+                <?php foreach ($individualLocks as $apl):
+                    $scopeLbl = 'سال ' . ($apl['academic_year'] ?: 'همه سال‌ها') . ' — ماه «' . ($apl['report_month'] ?: 'همه ماه‌ها') . '»';
+                    $scopeLbl .= !empty($apl['class_name']) ? (' — کلاس ' . $apl['class_name']) : ' — همه کلاس‌ها';
+                    $scopeLbl .= ' — دانش‌آموز: ' . (trim(($apl['first_name'] ?? '') . ' ' . ($apl['last_name'] ?? '')) ?: ('#' . (int)$apl['student_id']));
+                ?>
+                <div class="flex items-center gap-2 bg-white border border-rose-300 rounded-lg px-3 py-1.5 text-xs shadow-sm">
+                    <span class="font-bold text-rose-900"><?php echo clean($scopeLbl); ?></span>
+                    <?php if (!empty($apl['reason'])): ?>
+                        <span class="text-muted">(<?php echo clean($apl['reason']); ?>)</span>
+                    <?php endif; ?>
+                    <a href="reports.php?action=unlock_rule&lock_id=<?php echo (int)$apl['id']; ?>" class="btn btn-secondary text-xs px-2 py-0.5 text-green-700 font-bold" onclick="return confirm('آیا مسدودیت فردی این دانش‌آموز برداشته شود؟')">رفع مسدودیت فردی 🔓</a>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if (!empty($rowLocks)): ?>
+        <div class="space-y-2">
+            <h3 class="font-bold text-sm text-slate-800 flex items-center gap-1">۳) قفل فردی روی خودِ کارنامه (بدون قاعده، از جدول کارنامه‌ها):</h3>
+            <div class="flex flex-wrap gap-2">
+                <?php foreach (array_slice($rowLocks, 0, 12) as $rl):
+                    $rlLbl = trim((string)($rl['first_name'] ?? '') . ' ' . (string)($rl['last_name'] ?? ''));
+                    if ($rlLbl === '') $rlLbl = '#' . (int)$rl['student_id'];
+                    $rlLbl .= ' — ' . (($rl['term'] ?? '') !== '' ? $rl['term'] . ' / ' : '') . ($rl['report_month'] ?: '—');
+                ?>
+                <div class="flex items-center gap-2 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs shadow-sm">
+                    <span class="font-bold text-slate-800"><?php echo clean($rlLbl); ?></span>
+                    <a href="reports.php?action=toggle_lock&id=<?php echo (int)$rl['id']; ?>" class="btn btn-secondary text-xs px-2 py-0.5 text-green-700 font-bold" onclick="return confirm('آیا قفل فردی این کارنامه برداشته شود؟')">آزادسازی 🔓</a>
+                </div>
+                <?php endforeach; ?>
+                <?php if (count($rowLocks) > 12): ?>
+                    <span class="text-xs text-muted">و <?php echo tr_num((string)(count($rowLocks) - 12), 'fa'); ?> مورد دیگر…</span>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 
@@ -600,7 +655,9 @@ else:
                 </thead>
                 <tbody>
                     <?php foreach ($reports as $rep):
-                        $repLocked = is_report_locked_for_student($rep);
+                        $repLockReason = '';
+                        $repLocked = is_report_locked_for_student($rep, $repLockReason);
+                        if ($repLocked && function_exists('report_lock_reason_for')) $repLockReason = report_lock_reason_for($rep);
                     ?>
                     <tr>
                         <td class="font-mono text-xs">#<?php echo $rep['id']; ?></td>
@@ -611,6 +668,9 @@ else:
                         <td>
                             <?php if ($repLocked): ?>
                                 <span class="badge badge-danger">مسدود برای دانش‌آموز <svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg></span>
+                                <?php if (trim((string)$repLockReason) !== ''): ?>
+                                    <div class="text-[11px] text-muted mt-1" title="<?php echo clean($repLockReason); ?>">علت: <?php echo clean(mb_strlen($repLockReason) > 52 ? mb_substr($repLockReason, 0, 52) . '…' : $repLockReason); ?></div>
+                                <?php endif; ?>
                             <?php else: ?>
                                 <span class="badge badge-success">آزاد و قابل مشاهده <svg data-ui-icon="unlock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0M12 15v3"/></svg></span>
                             <?php endif; ?>
@@ -620,8 +680,9 @@ else:
                                 <a href="report-view.php?id=<?php echo $rep['id']; ?>" class="btn btn-primary text-xs px-2 py-1">مشاهده</a>
                                 <a href="export-excel.php?id=<?php echo $rep['id']; ?>" class="btn btn-outline text-xs px-2 py-1 text-green-700">Excel</a>
                                 <a href="export-pdf.php?id=<?php echo $rep['id']; ?>" class="btn btn-outline text-xs px-2 py-1 text-red-600">PDF</a>
-                                <a href="reports.php?action=toggle_lock&id=<?php echo $rep['id']; ?>" class="btn btn-secondary text-xs px-2 py-1">
-                                    <?php echo $repLocked ? 'رفع مسدودیت' : 'مسدود کردن'; ?>
+                                <a href="reports.php?action=toggle_lock&id=<?php echo $rep['id']; ?>" class="btn btn-secondary text-xs px-2 py-1"
+                                   onclick="return confirm('<?php echo $repLocked ? 'آیا مسدودیت فردی این دانش‌آموز برای این ماه برداشته شود؟' : 'این کارنامه به‌صورت فردی مسدود شود؟ با آزادسازی گروهی ماه/کلاس باز نمی‌شود.'; ?>')">
+                                    <?php echo $repLocked ? 'رفع مسدودیت فردی' : 'مسدودیت فردی'; ?>
                                 </a>
                                 <a href="reports.php?action=edit&id=<?php echo $rep['id']; ?>" class="btn btn-secondary text-xs px-2 py-1">ویرایش</a>
                                 <a href="reports.php?action=delete&id=<?php echo $rep['id']; ?>" onclick="return confirm('حذف این کارنامه؟')" class="btn btn-danger text-xs px-2 py-1">حذف</a>
@@ -641,7 +702,8 @@ else:
 <div id="bulkLockModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
     <div class="card max-w-md w-full p-6 shadow-xl">
         <h3 class="font-bold text-lg mb-4 text-amber-700"><svg data-ui-icon="lock" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="12" rx="2"/><path d="M7 10V6c0-6 10-6 10 0v4M12 15v3"/></svg> مسدودسازی پیشینی یا آزادسازی گروهی کارنامه‌ها</h3>
-        <p class="text-xs text-muted mb-4">می‌توانید حتی <b>پیش از ثبت نمرات توسط دبیران</b> و پیش از ساخته شدن کارنامه‌ها، ماه مورد نظر (مثلاً آبان) را برای همه کلاس‌ها یا یک کلاس مسدود کنید تا دبیران به مرور نمرات را ثبت کنند و پس از تکمیل تمام نمرات، کارنامه آن ماه را برای دانش‌آموزان آزاد نمایید.</p>
+        <p class="text-xs text-muted mb-2">می‌توانید حتی <b>پیش از ثبت نمرات توسط دبیران</b> و پیش از ساخته شدن کارنامه‌ها، ماه مورد نظر (مثلاً آبان) را برای همه کلاس‌ها یا یک کلاس مسدود کنید تا دبیران به مرور نمرات را ثبت کنند و پس از تکمیل تمام نمرات، کارنامه آن ماه را برای دانش‌آموزان آزاد نمایید.</p>
+        <p class="text-xs mb-4 rounded-lg bg-amber-50 border border-amber-200 p-2 text-amber-900"><b>توجه:</b> آزادسازی گروهی فقط مسدودیت همان کلاس/ماه را برمی‌دارد. دانش‌آموزی که جداگانه (مثلاً به دلیل بدهی مالی) مسدود شده باشد <b>مسدود می‌ماند</b> و باید از بخش «مسدودیت فردی» بالا آزاد شود.</p>
         <form id="bulkLockForm" data-no-ajax="1" onsubmit="submitBulkLock(event)">
             <div class="mb-4">
                 <label class="block text-xs font-semibold mb-1">انتخاب کلاس</label>
@@ -686,10 +748,14 @@ else:
                     <option value="0">آزادسازی و رفع مسدودیت 🔓</option>
                 </select>
             </div>
-            <div class="mb-6">
+            <div class="mb-4">
                 <label class="block text-xs font-semibold mb-1">علت مسدودسازی (جهت نمایش به دانش‌آموز / اولیا)</label>
                 <input type="text" id="bulkReason" class="form-input" value="در حال تکمیل نمرات توسط دبیران">
             </div>
+            <label id="bulkIncludeWrap" class="hidden items-start gap-2 mb-6 text-xs bg-rose-50 border border-rose-200 rounded-lg p-2 text-rose-900" style="display:none">
+                <input type="checkbox" id="bulkIncludeIndividual" class="mt-0.5">
+                <span>آزادسازی کامل: مسدودیت‌های <b>فردی</b> این محدوده (مثل بدهی مالی) هم برداشته شود. اگر این تیک را نزنید، فقط مسدودیت گروهی برداشته می‌شود.</span>
+            </label>
             <div class="flex justify-end gap-2">
                 <button type="button" onclick="document.getElementById('bulkLockModal').style.display='none'" class="btn btn-secondary">انصراف</button>
                 <button type="submit" class="btn btn-primary px-6">اعمال گروهی</button>
@@ -698,6 +764,20 @@ else:
     </div>
 </div>
 <script>
+/* V4.209.4 — تیک «آزادسازی کامل» فقط در حالت آزادسازی معنا دارد. */
+(function () {
+    var sel = document.getElementById('bulkIsLocked');
+    var wrap = document.getElementById('bulkIncludeWrap');
+    if (!sel || !wrap) return;
+    var sync = function () {
+        var unlocking = sel.value === '0';
+        wrap.style.display = unlocking ? 'flex' : 'none';
+        wrap.classList.toggle('hidden', !unlocking);
+        if (!unlocking) { var cb = document.getElementById('bulkIncludeIndividual'); if (cb) cb.checked = false; }
+    };
+    sel.addEventListener('change', sync);
+    sync();
+})();
 function submitBulkLock(e) {
     e.preventDefault();
     const formData = new URLSearchParams();
@@ -708,6 +788,8 @@ function submitBulkLock(e) {
     formData.append('report_month', document.getElementById('bulkMonth').value);
     formData.append('is_locked', document.getElementById('bulkIsLocked').value);
     formData.append('reason', document.getElementById('bulkReason').value);
+    var inc = document.getElementById('bulkIncludeIndividual');
+    formData.append('include_individual', (inc && inc.checked) ? '1' : '0');
 
     fetch('admin-ajax.php', {
         method: 'POST',

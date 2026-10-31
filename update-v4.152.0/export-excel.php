@@ -17,7 +17,9 @@ if (!$report) {
 // The downloadable export must enforce the same scope as its report-print preview.
 $printTokenOk=verify_report_print_token($_GET['pt'] ?? '',$reportId,$report['student_id']);
 $staffFileAccess=current_teacher_has_student_file_access();
-if (!$printTokenOk && ((is_student_logged_in() && ($report['student_id'] != $_SESSION['student_id'] || $report['is_locked'])) || (!is_student_logged_in() && !is_admin_logged_in() && !$staffFileAccess))) {
+/* V4.209.4 — قفل از تصمیم واقعی خوانده می‌شود (گروهی + فردی)، نه فقط از ستون ردیف. */
+$excelStudentLocked = is_report_locked_for_student($report);
+if (!$printTokenOk && ((is_student_logged_in() && ($report['student_id'] != $_SESSION['student_id'] || $excelStudentLocked)) || (!is_student_logged_in() && !is_admin_logged_in() && !$staffFileAccess))) {
     http_response_code(403);
     die('دسترسی غیرمجاز به کارنامه.');
 }

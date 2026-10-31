@@ -72,7 +72,10 @@ $discipline = DB::fetchAll("SELECT * FROM student_discipline_records WHERE stude
                 <td><?php echo clean($r['term'] . ' / ' . $r['report_month']); ?></td>
                 <td><span class="badge badge-info"><?php echo format_score($r['gpa']); ?></span></td>
                 <td><?php echo tr_num($r['rank_in_class'] ?: '---', 'fa'); ?></td>
-                <td><?php echo $r['is_locked'] ? '<span class="badge badge-danger">قفل</span>' : '<span class="badge badge-success">آزاد</span>'; ?></td>
+                <?php $sfLockReason = ''; $sfLocked = is_report_locked_for_student($r, $sfLockReason); ?>
+                <td><?php echo $sfLocked
+                        ? '<span class="badge badge-danger" title="' . clean($sfLockReason) . '">قفل</span>'
+                        : '<span class="badge badge-success">آزاد</span>'; ?></td>
                 <td><a class="btn btn-primary text-xs" href="report-view.php?id=<?php echo $r['id']; ?>&staff=1">مشاهده</a> <a class="btn btn-secondary text-xs" target="_blank" href="report-print.php?id=<?php echo $r['id']; ?>&staff=1">چاپ</a></td>
             </tr><?php endforeach; if (!$reports): ?><tr><td colspan="6" class="text-center text-muted">کارنامه‌ای ثبت نشده است.</td></tr><?php endif; ?>
         </tbody></table></div>

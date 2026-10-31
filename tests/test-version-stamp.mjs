@@ -33,8 +33,8 @@ let n = 0, skipped = 0;
 const check = (v, m) => { assert(v, m); n++; };
 const skip = (m) => { console.log('  ⏭  skip: ' + m); skipped++; };
 
-const SITE_VERSION = '4.209.3';
-const DESKTOP_VERSION = '2.133.3';
+const SITE_VERSION = '4.209.4';
+const DESKTOP_VERSION = '2.133.4';
 
 /* ═══════ ۱) فایل نسخه واقعاً با PHP خوانده می‌شود ═══════ */
 const meta = await run(String.raw`<?php
@@ -49,7 +49,7 @@ check(meta.out.includes('site=' + SITE_VERSION),
   'config/version.php reports the site version ' + SITE_VERSION + ': ' + meta.out.trim());
 check(meta.out.includes('desk=' + DESKTOP_VERSION),
   'config/version.php reports the desktop version ' + DESKTOP_VERSION);
-check(meta.out.includes('corr=V4.209.3'), 'the correction label is recorded');
+check(meta.out.includes('corr=V4.209.4'), 'the correction label is recorded');
 
 /* فایل نسخه نباید distribution داشته باشد — وگرنه همان ریسک release.php را دارد.
    این بررسی روی «آرایهٔ برگشتیِ واقعی» انجام می‌شود، نه روی متن فایل؛ وگرنه

@@ -172,9 +172,10 @@ function ri_execute($sessionId, $adminId, $targetYear) {
         foreach ($check['rows'] as $r) {
             $key=json_encode([$r['_student_id'],$r['academic_year'],$r['term'],$r['report_month']]);
             if (!isset($reports[$key])) {
-                $existing=DB::fetchAll('SELECT id,is_locked FROM reports WHERE student_id=? AND academic_year=? AND term=? AND report_month=?',[$r['_student_id'],$r['academic_year'],$r['term'],$r['report_month']]);
+                $existing=DB::fetchAll('SELECT id,student_id,class_name,academic_year,report_month,is_locked FROM reports WHERE student_id=? AND academic_year=? AND term=? AND report_month=?',[$r['_student_id'],$r['academic_year'],$r['term'],$r['report_month']]);
                 if (count($existing)>1) throw new InvalidArgumentException('برای یک دانش‌آموز چند کارنامهٔ هم‌دوره وجود دارد؛ ابتدا تعارض را در کارنامه‌ها رفع کنید.');
-                if ($existing && $existing[0]['is_locked']) throw new InvalidArgumentException('کارنامهٔ مقصد قفل است؛ هیچ نمره‌ای ثبت نشد.');
+                /* V4.209.4 — قفل از تصمیم واقعی (گروهی + فردی) خوانده می‌شود. */
+                if ($existing && is_report_locked_for_student($existing[0])) throw new InvalidArgumentException('کارنامهٔ مقصد قفل است؛ هیچ نمره‌ای ثبت نشد.');
                 if ($existing) $id=$existing[0]['id'];
                 else {
                     DB::execute('INSERT INTO reports (student_id,class_name,academic_year,term,report_month,total_score,gpa) VALUES (?,?,?,?,?,0,0)',[$r['_student_id'],$r['class_name'],$r['academic_year'],$r['term'],$r['report_month']]); $id=DB::lastInsertId();
