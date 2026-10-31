@@ -23,7 +23,7 @@
  */
 
 if (!defined('PERF_CORE_VERSION')) {
-    define('PERF_CORE_VERSION', '4.209.2');
+    define('PERF_CORE_VERSION', '4.209.3');
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

@@ -175,6 +175,11 @@ if (!function_exists('bot_default_messages')) {
             'exam_schedule_empty' => 'برای {student_name} برنامه امتحانی ثبت نشده است.',
             'exam_schedule_title' => "📝 برنامه امتحانی {student_name}:\n",
             'report_caption' => "🎓 کارنامه تصویری و تحلیل نموداری {student_name}\n⭐ معدل: {gpa}\n✨ انضباط: {discipline}\n🏅 رتبه کلاس: {rank}",
+            /* V4.209.3 — متن «چرا کارنامه مسدود است»؛ مدیر می‌تواند از صفحهٔ
+               الگوهای ربات همین متن را ویرایش کند. */
+            'report_locked' => "🔒 کارنامهٔ «{student_name}»\n📅 {term} — {month}\n\n📝 علت مسدودسازی: {reason}\n\nبرای پیگیری با آموزشگاه در تماس باشید.",
+            'report_locked_list' => "🔒 کارنامه‌های مسدودشده برای {student_name}:\n\n{locks}\n\nبرای پیگیری با آموزشگاه در تماس باشید.",
+            'report_not_found' => '❌ این کارنامه یافت نشد یا حذف شده است.',
             'broadcast_prefix' => "📢 اطلاعیه آموزشگاه:\n\n{message}",
         ];
     }
@@ -229,6 +234,83 @@ if (!function_exists('bot_text')) {
             $text = str_replace('{' . $k . '}', (string)$v, $text);
         }
         return $text;
+    }
+}
+
+if (!function_exists('bot_report_student_name')) {
+    /** V4.209.3 — نام دانش‌آموز از ردیف کارنامه (اگر join شده باشد) یا از فیلد مستقیم. */
+    function bot_report_student_name(array $report): string {
+        $name = trim(((string)($report['first_name'] ?? '')) . ' ' . ((string)($report['last_name'] ?? '')));
+        if ($name === '') $name = trim((string)($report['student_name'] ?? ''));
+        if ($name === '') $name = trim((string)($report['student_full_name'] ?? ''));
+        return $name;
+    }
+}
+
+if (!function_exists('bot_report_lock_message')) {
+    /**
+     * V4.209.3 — پیامِ «کارنامه مسدود است» همراه با علتی که مدیر ثبت کرده.
+     *
+     * پیش از این، درخواست کارنامهٔ مسدود در ربات کاملاً بی‌صدا رد می‌شد و
+     * والدین فقط «هیچ اتفاقی نیفتاد» را می‌دیدند. اکنون همان قفل سر جایش
+     * است (هیچ نمره‌ای نمایش داده نمی‌شود) اما دلیلش هم گفته می‌شود.
+     */
+    function bot_report_lock_message($platform, array $report, $reason = ''): string {
+        $reason = trim((string)$reason);
+        if ($reason === '' && function_exists('report_lock_reason_for')) {
+            $reason = report_lock_reason_for($report);
+        }
+        if ($reason === '') {
+            $reason = function_exists('report_lock_generic_reason')
+                ? report_lock_generic_reason()
+                : 'به دلیل امور اداری/مالی یا تکمیل نمرات مسدود است.';
+        }
+        $term = trim((string)($report['term'] ?? ''));
+        $month = trim((string)($report['report_month'] ?? ''));
+        return bot_text($platform, 'report_locked', [
+            'student_name' => bot_report_student_name($report),
+            'term' => $term !== '' ? $term : '---',
+            'month' => $month !== '' ? $month : '---',
+            'reason' => $reason,
+        ]);
+    }
+}
+
+if (!function_exists('bot_report_lock_list_message')) {
+    /**
+     * V4.209.3 — فهرستِ ماه‌های مسدودشده همراه علت هرکدام.
+     *
+     * ورودی: آرایه‌ای از ['term','report_month','reason'].
+     * «تکراری‌ها یکی می‌شوند» تا برای هر ماه/علت یک خط بیاید.
+     */
+    function bot_report_lock_list_message($platform, $studentName, array $items): string {
+        $lines = [];
+        $seen = [];
+        foreach ($items as $it) {
+            $term = trim((string)($it['term'] ?? ''));
+            $month = trim((string)($it['report_month'] ?? ''));
+            $reason = trim((string)($it['reason'] ?? ''));
+            if ($reason === '') {
+                $reason = function_exists('report_lock_generic_reason')
+                    ? report_lock_generic_reason()
+                    : 'به دلیل امور اداری/مالی یا تکمیل نمرات مسدود است.';
+            }
+            $key = $term . '|' . $month . '|' . $reason;
+            if (isset($seen[$key])) continue;
+            $seen[$key] = true;
+            $label = trim($term . ($term !== '' && $month !== '' ? ' — ' : '') . $month);
+            if ($label === '') $label = 'کارنامه';
+            $lines[] = '• ' . $label . ":\n   " . $reason;
+        }
+        $count = count($lines);
+        if ($count > 8) {
+            $lines = array_slice($lines, 0, 8);
+            $lines[] = '… و ' . tr_num((string)($count - 8), 'fa') . ' مورد دیگر.';
+        }
+        return bot_text($platform, 'report_locked_list', [
+            'student_name' => trim((string)$studentName),
+            'locks' => implode("\n", $lines),
+        ]);
     }
 }
 

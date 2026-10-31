@@ -1185,12 +1185,25 @@ if (!function_exists('is_report_prelocked')) {
     }
 }
 
+if (!function_exists('report_lock_generic_reason')) {
+    /**
+     * V4.209.3 — متن پیش‌فرض «چرا مسدود است» وقتی مدیر علت خاصی ثبت نکرده باشد.
+     * جدا شد تا ربات و پنل دقیقاً یک جمله نشان دهند و سه جای مختلف، سه متن نسازند.
+     */
+    function report_lock_generic_reason(): string {
+        return 'به دلیل امور اداری/مالی یا تکمیل نمرات مسدود است.';
+    }
+}
+
 if (!function_exists('is_report_locked_for_student')) {
     /**
      * آیا مشاهده/چاپ/دریافت این کارنامه برای دانش‌آموز مسدود است؟
+     *
+     * $reasonOut (اختیاری) علتِ خوانا را برمی‌گرداند. اگر مدیر برای همین ماه
+     * علتی در report_locks ثبت کرده باشد همان متن می‌آید؛ وگرنه متن عمومی.
      */
     function is_report_locked_for_student(array $report, &$reasonOut = null): bool {
-        $reasonOut = 'به دلیل امور اداری/مالی یا تکمیل نمرات مسدود است.';
+        $reasonOut = report_lock_generic_reason();
         $preReason = null;
         $preLocked = is_report_prelocked(
             $report['academic_year'] ?? '',
@@ -1200,10 +1213,84 @@ if (!function_exists('is_report_locked_for_student')) {
             $preReason
         );
         if ($preReason) $reasonOut = $preReason;
-        if (!empty($report['is_locked']) && (int)$report['is_locked'] === 1) {
-            return true;
+        $locked = $preLocked || (!empty($report['is_locked']) && (int)$report['is_locked'] === 1);
+        /* V4.209.3 — اگر قفل از ستون reports.is_locked آمده باشد (قفل تک‌تک،
+           پنل دبیر، انضباط) قاعدهٔ پیشینی متنی برای گفتن ندارد؛ متنِ علتی را
+           که مدیر برای همان ماه/کلاس ثبت کرده از report_locks می‌خوانیم.
+           فقط خواندن — قفل و آزادسازی هیچ تغییری نمی‌کند. */
+        if ($locked && !$preReason && function_exists('report_lock_reason_lookup')) {
+            $specific = report_lock_reason_lookup(
+                $report['academic_year'] ?? '',
+                $report['report_month'] ?? '',
+                $report['class_name'] ?? '',
+                (int)($report['student_id'] ?? 0)
+            );
+            if ($specific !== '') $reasonOut = $specific;
         }
-        return $preLocked;
+        return $locked;
+    }
+}
+
+if (!function_exists('report_lock_reason_lookup')) {
+    /**
+     * V4.209.3 — آخرین «علتِ» ثبت‌شدهٔ مدیریت برای همین سال/ماه/کلاس/دانش‌آموز.
+     *
+     * چرا لازم است؟ قفلِ یک کارنامه دو جا ثبت می‌شود:
+     *   ۱) ستون reports.is_locked  (قفل یا آزادسازی همان کارنامه)
+     *   ۲) جدول report_locks       (قانون گروهی + متن علت)
+     * بعضی مسیرها (پنل دبیر، انضباط، قفل تک‌تکِ کارنامه) فقط ستون را عوض
+     * می‌کنند و ستون، متن ندارد. این تابع بدون تغییر هیچ چیز، متنِ علتی را
+     * که مدیر برای همان ماه نوشته پیدا می‌کند تا به دانش‌آموز نمایش داده شود.
+     *
+     * این تابع فقط می‌خواند: هیچ ردیفی درج/حذف نمی‌کند و در قفل‌بودن یا
+     * نبودن کارنامه اثری ندارد.
+     */
+    function report_lock_reason_lookup($academicYear, $reportMonth, $className = '', $studentId = 0): string {
+        $locks = get_all_report_locks();
+        if (!$locks) return '';
+        $targetYears = report_year_variants($academicYear);
+        $targetMonth = trim((string)$reportMonth);
+        $targetClass = function_exists('norm_class_str') ? norm_class_str((string)$className) : trim((string)$className);
+        $targetStudent = (int)$studentId;
+        foreach ($locks as $rule) {
+            /* فقط قوانین «مسدودکننده» متن علت دارند؛ ردیف آزادسازی (is_locked=0) علت نیست. */
+            if ((int)($rule['is_locked'] ?? 1) !== 1) continue;
+            $reason = trim((string)($rule['reason'] ?? ''));
+            if ($reason === '') continue;
+
+            $rYear = trim((string)($rule['academic_year'] ?? ''));
+            if ($rYear !== '' && !array_intersect($targetYears, report_year_variants($rYear))) continue;
+
+            $rMonth = trim((string)($rule['report_month'] ?? ''));
+            if ($rMonth !== '' && $targetMonth !== '' && $rMonth !== $targetMonth) continue;
+            if ($rMonth !== '' && $targetMonth === '') continue;
+
+            $rClass = trim((string)($rule['class_name'] ?? ''));
+            $rClassNorm = function_exists('norm_class_str') ? norm_class_str($rClass) : $rClass;
+            if ($rClassNorm !== '' && $targetClass !== '' && $rClassNorm !== $targetClass) continue;
+            if ($rClassNorm !== '' && $targetClass === '') continue;
+
+            $rStudent = (int)($rule['student_id'] ?? 0);
+            if ($rStudent > 0 && $rStudent !== $targetStudent) continue;
+
+            return $reason;
+        }
+        return '';
+    }
+}
+
+if (!function_exists('report_lock_reason_for')) {
+    /**
+     * V4.209.3 — علتِ خوانای مسدودیِ همین کارنامه؛ رشتهٔ خالی یعنی «مسدود نیست».
+     *
+     * این تنها تابعی است که ربات/پنل باید صدا بزند: خودش تشخیص می‌دهد قفل
+     * است یا نه و متن مناسب را برمی‌گرداند.
+     */
+    function report_lock_reason_for(array $report): string {
+        $reason = '';
+        if (!is_report_locked_for_student($report, $reason)) return '';
+        $reason = trim((string)$reason);
+        return $reason !== '' ? $reason : report_lock_generic_reason();
     }
 }
 

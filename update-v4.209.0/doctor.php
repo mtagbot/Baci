@@ -1,6 +1,6 @@
 <?php
 /**
- * doctor.php — عیب‌یاب مستقل SchoolDesk Pro (V4.209.2)
+ * doctor.php — عیب‌یاب مستقل SchoolDesk Pro (V4.209.3)
  * ---------------------------------------------------------------------------
  * چرا؟ وقتی سایت «HTTP ERROR 500» می‌دهد، هیچ سرنخی به دست کاربر نمی‌رسد.
  * این فایل بدون وابستگی به بقیهٔ برنامه (بدون session، بدون دیتابیس اجباری)
@@ -304,7 +304,7 @@ if (is_file($logFile)) {
         <?php endif; ?>
     </div>
 
-    <div class="sub" style="margin-top:18px">SchoolDesk Pro · عیب‌یاب V4.209.2 — بعد از پایان کار این فایل را حذف کنید.</div>
+    <div class="sub" style="margin-top:18px">SchoolDesk Pro · عیب‌یاب V4.209.3 — بعد از پایان کار این فایل را حذف کنید.</div>
 </div>
 </body>
 </html>

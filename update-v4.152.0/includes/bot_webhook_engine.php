@@ -144,18 +144,31 @@ if ($callbackQuery) {
     // v4.50.0: parent requests the PDF version of a report card.
     if ($chatId !== '' && strpos($data, 'pdfrep_') === 0) {
         $repId = (int)substr($data, 7);
-        $report = DB::fetch("SELECT r.*, s.first_name, s.last_name FROM reports r JOIN students s ON r.student_id = s.id WHERE r.id = ? AND r.is_locked = 0", [$repId]);
-        if ($report && is_report_locked_for_student($report)) $report = null;
-        if ($report) {
+        /* V4.209.3 — قفل دیگر «سکوت» نیست. فیلتر is_locked برداشته شد تا بتوانیم
+           علت را بگوییم؛ اما ترتیب عمداً این است: اول «آیا این کارنامه مالِ
+           همین گفتگوست؟» بعد علت. اگر این ترتیب برعکس شود، هر کسی با حدس
+           شمارهٔ کارنامه متن علتِ مسدودی دیگران را می‌خواند. نمره هم همچنان
+           فقط وقتی می‌رود که is_report_locked_for_student() منفی باشد. */
+        $report = DB::fetch("SELECT r.*, s.first_name, s.last_name FROM reports r JOIN students s ON r.student_id = s.id WHERE r.id = ?", [$repId]);
+        if (!$report) {
+            bot_webhook_safe_send($platform, $chatId, bot_text($platform, 'report_not_found'), bot_main_keyboard($platform));
+        } else {
             $linked = DB::fetch("SELECT id FROM `$userTable` WHERE `$chatCol` = ? AND student_id = ?", [$chatId, $report['student_id']]);
-            if ($linked) {
-                try {
-                    bot_send_report_pdf_to_chat($platform, $chatId, $repId);
-                } catch (Exception $e) {
-                    bot_webhook_safe_send($platform, $chatId, 'ساخت نسخه PDF کارنامه با خطا روبه‌رو شد: ' . $e->getMessage(), bot_main_keyboard($platform));
-                }
-            } else {
+            if (!$linked) {
                 bot_webhook_safe_send($platform, $chatId, 'دسترسی شما به این کارنامه تأیید نشد.', bot_main_keyboard($platform));
+            } else {
+                $lockReason = '';
+                $isLocked = is_report_locked_for_student($report, $lockReason);
+                if ($isLocked) {
+                    if (function_exists('report_lock_reason_for')) $lockReason = report_lock_reason_for($report);
+                    bot_webhook_safe_send($platform, $chatId, bot_report_lock_message($platform, $report, $lockReason), bot_main_keyboard($platform));
+                } else {
+                    try {
+                        bot_send_report_pdf_to_chat($platform, $chatId, $repId);
+                    } catch (Exception $e) {
+                        bot_webhook_safe_send($platform, $chatId, 'ساخت نسخه PDF کارنامه با خطا روبه‌رو شد: ' . $e->getMessage(), bot_main_keyboard($platform));
+                    }
+                }
             }
         }
     }
@@ -182,26 +195,37 @@ if ($callbackQuery) {
 
     if ($chatId !== '' && strpos($data, 'rep_') === 0) {
         $repId = (int)substr($data, 4);
-        $report = DB::fetch("SELECT r.*, s.first_name, s.last_name FROM reports r JOIN students s ON r.student_id = s.id WHERE r.id = ? AND r.is_locked = 0", [$repId]);
-        if ($report && is_report_locked_for_student($report)) $report = null;
-        if ($report) {
+        /* V4.209.3 — ترتیب امن: اول «این کارنامه مالِ همین گفتگوست؟»، بعد علت.
+           اگر برعکس شود، با حدسِ شمارهٔ کارنامه می‌شد متن علتِ مسدودیِ
+           دانش‌آموزان دیگر را خواند. نمره هم همچنان فقط وقتی ارسال می‌شود
+           که is_report_locked_for_student() منفی باشد. */
+        $report = DB::fetch("SELECT r.*, s.first_name, s.last_name FROM reports r JOIN students s ON r.student_id = s.id WHERE r.id = ?", [$repId]);
+        if (!$report) {
+            bot_webhook_safe_send($platform, $chatId, bot_text($platform, 'report_not_found'), bot_main_keyboard($platform));
+        } else {
             $linked = DB::fetch("SELECT id FROM `$userTable` WHERE `$chatCol` = ? AND student_id = ?", [$chatId, $report['student_id']]);
-            if ($linked) {
-                try {
-                    $grades = DB::fetchAll("SELECT subject_name, score FROM report_grades WHERE report_id=?", [$repId]);
-                    $txt = "🎓 کارنامه " . $report['first_name'] . ' ' . $report['last_name'] . "\n";
-                    $txt .= "📅 " . $report['term'] . ' - ' . $report['report_month'] . "\n⭐ معدل: " . format_score($report['gpa']) . "\n";
-                    if ($report['discipline_score'] !== null && $report['discipline_score'] !== '') {
-                        $txt .= "✨ انضباط: " . format_score($report['discipline_score']) . "\n";
-                    }
-                    foreach ($grades as $gg) $txt .= "\n▪️ " . $gg['subject_name'] . ': ' . display_score($gg['score']);
-                    bot_webhook_safe_send($platform, $chatId, $txt);
-                    bot_send_report_image_to_chat($platform, $chatId, $repId);
-                } catch (Exception $e) {
-                    bot_webhook_safe_send($platform, $chatId, 'ارسال تصویر کارنامه با خطا روبه‌رو شد: ' . $e->getMessage(), bot_main_keyboard($platform));
-                }
-            } else {
+            if (!$linked) {
                 bot_webhook_safe_send($platform, $chatId, 'دسترسی شما به این کارنامه تأیید نشد.', bot_main_keyboard($platform));
+            } else {
+                $lockReason = '';
+                if (is_report_locked_for_student($report, $lockReason)) {
+                    if (function_exists('report_lock_reason_for')) $lockReason = report_lock_reason_for($report);
+                    bot_webhook_safe_send($platform, $chatId, bot_report_lock_message($platform, $report, $lockReason), bot_main_keyboard($platform));
+                } else {
+                    try {
+                        $grades = DB::fetchAll("SELECT subject_name, score FROM report_grades WHERE report_id=?", [$repId]);
+                        $txt = "🎓 کارنامه " . $report['first_name'] . ' ' . $report['last_name'] . "\n";
+                        $txt .= "📅 " . $report['term'] . ' - ' . $report['report_month'] . "\n⭐ معدل: " . format_score($report['gpa']) . "\n";
+                        if ($report['discipline_score'] !== null && $report['discipline_score'] !== '') {
+                            $txt .= "✨ انضباط: " . format_score($report['discipline_score']) . "\n";
+                        }
+                        foreach ($grades as $gg) $txt .= "\n▪️ " . $gg['subject_name'] . ': ' . display_score($gg['score']);
+                        bot_webhook_safe_send($platform, $chatId, $txt);
+                        bot_send_report_image_to_chat($platform, $chatId, $repId);
+                    } catch (Exception $e) {
+                        bot_webhook_safe_send($platform, $chatId, 'ارسال تصویر کارنامه با خطا روبه‌رو شد: ' . $e->getMessage(), bot_main_keyboard($platform));
+                    }
+                }
             }
         }
     }
@@ -430,20 +454,36 @@ if ($text === $btnReports) {
         foreach ($links as $st) {
             $latestSt = get_latest_student_by_id($st['id']);
             $effectiveId = $latestSt ? $latestSt['id'] : $st['id'];
-            $repsRaw = DB::fetchAll("SELECT id, student_id, class_name, term, report_month, academic_year, is_locked FROM reports WHERE student_id = ? AND is_locked = 0 ORDER BY id DESC", [$effectiveId]);
+            $studentName = trim($st['first_name'] . ' ' . $st['last_name']);
+            /* V4.209.3 — پیش‌تر کارنامه‌های مسدود با فیلتر SQL کنار گذاشته می‌شدند
+               و اگر ماه باز دیگری نبود، والدین پیام گمراه‌کنندهٔ «کارنامه‌ای صادر
+               نشده» می‌گرفتند. اکنون همان قفل سر جایش است (دکمه‌ای برای کارنامهٔ
+               بسته ساخته نمی‌شود) اما ماه‌های بسته با علتشان در متن می‌آیند. */
+            $repsRaw = DB::fetchAll("SELECT id, student_id, class_name, term, report_month, academic_year, is_locked FROM reports WHERE student_id = ? ORDER BY id DESC", [$effectiveId]);
             $reps = [];
+            $lockedItems = [];
             foreach ($repsRaw as $rw) {
+                $why = function_exists('report_lock_reason_for') ? report_lock_reason_for($rw) : '';
+                if ($why !== '') {
+                    $lockedItems[] = ['term' => $rw['term'], 'report_month' => $rw['report_month'], 'reason' => $why];
+                    continue;
+                }
                 if (!is_report_locked_for_student($rw)) $reps[] = $rw;
             }
-            if (!$reps) {
-                bot_webhook_safe_send($platform, $chatId, bot_text($platform, 'no_report', ['student_name' => trim($st['first_name'] . ' ' . $st['last_name'])]), bot_main_keyboard($platform));
+            if (!$reps && !$lockedItems) {
+                bot_webhook_safe_send($platform, $chatId, bot_text($platform, 'no_report', ['student_name' => $studentName]), bot_main_keyboard($platform));
                 continue;
             }
-            $inline = [];
-            foreach ($reps as $r) {
-                $inline[] = [['text' => 'کارنامه ' . $r['term'] . ' (' . $r['report_month'] . ')', 'callback_data' => 'rep_' . $r['id']]];
+            if ($reps) {
+                $inline = [];
+                foreach ($reps as $r) {
+                    $inline[] = [['text' => 'کارنامه ' . $r['term'] . ' (' . $r['report_month'] . ')', 'callback_data' => 'rep_' . $r['id']]];
+                }
+                bot_webhook_safe_send($platform, $chatId, bot_text($platform, 'choose_report', ['student_name' => $studentName]), ['inline_keyboard' => $inline]);
             }
-            bot_webhook_safe_send($platform, $chatId, bot_text($platform, 'choose_report', ['student_name' => trim($st['first_name'] . ' ' . $st['last_name'])]), ['inline_keyboard' => $inline]);
+            if ($lockedItems) {
+                bot_webhook_safe_send($platform, $chatId, bot_report_lock_list_message($platform, $studentName, $lockedItems), $reps ? null : bot_main_keyboard($platform));
+            }
         }
     }
     http_response_code(200);
