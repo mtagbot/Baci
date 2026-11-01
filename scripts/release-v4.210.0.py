@@ -129,6 +129,7 @@ DESKTOP_BASE_PAIRS = [
     ('includes/report_image.php', 'desktop-app-v2/patch/includes-report_image.php'),
     ('admin-ajax.php', 'desktop-app-v2/patch/www-admin-ajax.php'),
     ('discipline-report-management.php', 'desktop-app-v2/patch/www-discipline-report-management.php'),
+    ('exam-print.php', 'desktop-app-v2/patch/www-exam-print.php'),
     ('export-excel.php', 'desktop-app-v2/patch/www-export-excel.php'),
     ('grade-columns.php', 'desktop-app-v2/patch/www-grade-columns.php'),
     ('report-grade-transfer.php', 'desktop-app-v2/patch/www-report-grade-transfer.php'),
