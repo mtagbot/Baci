@@ -1,0 +1,554 @@
+<?php
+// File: includes/exams_helper.php
+require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/school_sort.php';
+require_once __DIR__ . '/school_roles.php';
+
+if (!function_exists('jalali_now')) {
+    function jalali_now() { return jdate('Y/m/d H:i'); }
+}
+
+if (!function_exists('exam_teacher_class_design_enabled')) {
+    function exam_teacher_class_design_enabled($exam) {
+        if (!is_array($exam) || ($exam['exam_kind'] ?? '') !== 'class') return true;
+        if (function_exists('is_admin_logged_in') && is_admin_logged_in()) return true;
+        if (function_exists('current_teacher_is_executive') && current_teacher_is_executive()) return true;
+        // One school-wide switch controls new class-exam design by every teacher.
+        // Per-exam legacy flags are intentionally ignored so prior activations/designs remain intact.
+        return get_setting('class_exam_design_enabled', '1') !== '0';
+    }
+}
+
+if (!function_exists('exam_jalali_date_parts')) {
+    function exam_jalali_date_parts($value) {
+        $value = trim(tr_num((string)$value, 'en'));
+        if (!preg_match('~^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$~', $value, $m)) return null;
+        $year=(int)$m[1]; $month=(int)$m[2]; $day=(int)$m[3];
+        if ($year < 1300 || $year > 1600 || $month < 1 || $month > 12 || $day < 1 || $day > 31) return null;
+        return [$year,$month,$day];
+    }
+}
+
+if (!function_exists('exam_jalali_date_sort_key')) {
+    function exam_jalali_date_sort_key($value) {
+        $p=exam_jalali_date_parts($value);
+        return $p ? ($p[0]*10000 + $p[1]*100 + $p[2]) : PHP_INT_MAX;
+    }
+}
+
+if (!function_exists('exam_jalali_days_until')) {
+    function exam_jalali_days_until($value) {
+        $p=exam_jalali_date_parts($value);
+        if (!$p || !function_exists('jalali_to_gregorian')) return null;
+        $g=jalali_to_gregorian($p[0],$p[1],$p[2]);
+        $today=exam_jalali_date_parts(jdate('Y/m/d'));
+        if (!is_array($g) || count($g)<3 || !$today) return null;
+        $tg=jalali_to_gregorian($today[0],$today[1],$today[2]);
+        if (!is_array($tg) || count($tg)<3) return null;
+        $eventTs=gmmktime(12,0,0,(int)$g[1],(int)$g[2],(int)$g[0]);
+        $todayTs=gmmktime(12,0,0,(int)$tg[1],(int)$tg[2],(int)$tg[0]);
+        return (int)(($eventTs-$todayTs)/86400);
+    }
+}
+
+if (!function_exists('ensure_exams_schema')) {
+    function ensure_exams_schema() {
+        DB::execute("CREATE TABLE IF NOT EXISTS exam_schedules (
+            id int(11) NOT NULL AUTO_INCREMENT,
+            academic_year varchar(20) NOT NULL,
+            exam_month varchar(50) DEFAULT NULL,
+            grade_level varchar(50) DEFAULT NULL,
+            class_name varchar(100) DEFAULT NULL,
+            subject_name varchar(150) NOT NULL,
+            teacher_id int(11) DEFAULT NULL,
+            teacher_name varchar(150) DEFAULT NULL,
+            exam_date_jalali varchar(20) NOT NULL,
+            exam_day_name varchar(30) DEFAULT NULL,
+            start_time varchar(10) NOT NULL,
+            duration_minutes int(11) NOT NULL DEFAULT 90,
+            exam_room_default varchar(100) DEFAULT NULL,
+            question_file varchar(255) DEFAULT NULL,
+            header_config text DEFAULT NULL,
+            is_active tinyint(1) NOT NULL DEFAULT 1,
+            created_at_jalali varchar(30) NOT NULL,
+            PRIMARY KEY(id), KEY idx_year_class (academic_year,class_name), KEY idx_date (exam_date_jalali)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN exam_month varchar(50) DEFAULT NULL"); } catch (Exception $e) {}
+        try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN exam_day_name varchar(30) DEFAULT NULL"); } catch (Exception $e) {}
+        try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN is_active tinyint(1) NOT NULL DEFAULT 1"); } catch (Exception $e) {}
+        try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN is_printed tinyint(1) NOT NULL DEFAULT 0"); } catch (Exception $e) {}
+        try { DB::execute("ALTER TABLE exam_schedules ADD COLUMN exam_kind varchar(30) NOT NULL DEFAULT 'official'"); } catch (Exception $e) {}
+
+        DB::execute("CREATE TABLE IF NOT EXISTS exam_assignments (
+            id int(11) NOT NULL AUTO_INCREMENT,
+            exam_id int(11) NOT NULL,
+            student_id int(11) NOT NULL,
+            seat_number varchar(20) DEFAULT NULL,
+            exam_room varchar(100) DEFAULT NULL,
+            created_at_jalali varchar(30) NOT NULL,
+            PRIMARY KEY(id), UNIQUE KEY uniq_exam_student (exam_id, student_id), KEY idx_student (student_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // Seating is independent from individual exams; it is assigned for a year/month/student.
+        DB::execute("CREATE TABLE IF NOT EXISTS exam_student_seating (
+            id int(11) NOT NULL AUTO_INCREMENT,
+            academic_year varchar(20) NOT NULL,
+            exam_month varchar(50) NOT NULL,
+            student_id int(11) NOT NULL,
+            seat_number varchar(20) DEFAULT NULL,
+            exam_room varchar(100) DEFAULT NULL,
+            created_at_jalali varchar(30) NOT NULL,
+            PRIMARY KEY(id), UNIQUE KEY uniq_year_month_student (academic_year, exam_month, student_id), KEY idx_student (student_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        DB::execute("CREATE TABLE IF NOT EXISTS exam_designs (
+            id int(11) NOT NULL AUTO_INCREMENT,
+            exam_id int(11) NOT NULL,
+            design_json longtext NOT NULL,
+            designer_teacher_id int(11) DEFAULT NULL,
+            designer_name varchar(150) DEFAULT NULL,
+            saved_by_admin_id int(11) DEFAULT NULL,
+            updated_at_jalali varchar(30) NOT NULL,
+            PRIMARY KEY(id), UNIQUE KEY uniq_exam (exam_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        /* v4.99.0: آرشیو نسخه‌های قبلی طراحی — وقتی منبع آزمون عوض می‌شود، طراحی
+           قبلی با صفحاتش (منتقل‌شده به uploads/exams/bank-archive/<id>/) اینجا ثبت
+           و در بانک «آزمون‌های ذخیره‌شده» مستقل نمایش داده می‌شود. */
+        DB::execute("CREATE TABLE IF NOT EXISTS exam_design_archive (
+            id int(11) NOT NULL AUTO_INCREMENT,
+            exam_id int(11) NOT NULL,
+            design_json longtext NOT NULL,
+            designer_name varchar(150) DEFAULT NULL,
+            subject_name varchar(150) DEFAULT NULL,
+            exam_month varchar(50) DEFAULT NULL,
+            academic_year varchar(20) DEFAULT NULL,
+            grade_level varchar(50) DEFAULT NULL,
+            class_name varchar(50) DEFAULT NULL,
+            src_fingerprint varchar(80) DEFAULT NULL,
+            created_at_jalali varchar(30) NOT NULL,
+            PRIMARY KEY(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        DB::execute("CREATE TABLE IF NOT EXISTS exam_question_bank (
+            id int(11) NOT NULL AUTO_INCREMENT,
+            source_exam_id int(11) DEFAULT NULL,
+            academic_year varchar(20) DEFAULT NULL,
+            exam_month varchar(50) DEFAULT NULL,
+            subject_name varchar(150) NOT NULL,
+            teacher_id int(11) DEFAULT NULL,
+            designer_name varchar(150) DEFAULT NULL,
+            question_type varchar(30) DEFAULT 'text',
+            question_html longtext NOT NULL,
+            score varchar(20) DEFAULT NULL,
+            meta_json text DEFAULT NULL,
+            created_at_jalali varchar(30) NOT NULL,
+            updated_at_jalali varchar(30) DEFAULT NULL,
+            PRIMARY KEY(id), KEY idx_subject (subject_name), KEY idx_year_month (academic_year, exam_month), KEY idx_teacher (teacher_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        foreach (['exam_header_top'=>'25','exam_header_height'=>'155','exam_header_logo_x'=>'20','exam_header_logo_y'=>'20','exam_header_font_size'=>'12'] as $k=>$v) if (get_setting($k,'')==='') set_setting($k,$v);
+    }
+}
+
+if (!function_exists('exam_can_design')) {
+    function exam_can_design($examId) {
+        if (is_admin_logged_in()) return true;
+        if (!empty($_SESSION['teacher_id'])) {
+            $exam = DB::fetch("SELECT teacher_id FROM exam_schedules WHERE id=?", [(int)$examId]);
+            return $exam && (int)$exam['teacher_id'] === (int)$_SESSION['teacher_id'];
+        }
+        return false;
+    }
+}
+if (!function_exists('exam_can_view_design')) {
+    // Executives may open existing exam designs for review/printing, but the
+    // save API still requires exam_can_design() and therefore remains read-only.
+    function exam_can_view_design($examId) {
+        if (function_exists('current_teacher_is_executive') && current_teacher_is_executive()) return true;
+        return exam_can_design($examId);
+    }
+}
+if (!function_exists('exam_year_students_sql')) {
+    /**
+     * v4.78.0: exam printing must target ONLY students active in the exam's
+     * OWN academic year. Returns [sqlFragment, params] to append to a query
+     * over `students <alias>`. Same year-matching logic as students.php /
+     * attendance (direct match, or legacy NULL-year students attached to
+     * that year through reports/classes/schedules).
+     */
+    function exam_year_students_sql($examYear, $alias = 's') {
+        $y = trim((string)$examYear);
+        if (function_exists('unify_academic_year')) { $u = unify_academic_year($y); if ($u !== '') $y = $u; }
+        if ($y === '' && function_exists('get_current_academic_year')) $y = get_current_academic_year();
+        if ($y === '') return ['1=1', []];
+        $a = $alias;
+        $sql = "($a.academic_year=? OR (($a.academic_year IS NULL OR $a.academic_year='') AND ("
+             . "EXISTS(SELECT 1 FROM reports exyr WHERE exyr.student_id=$a.id AND exyr.academic_year=?)"
+             . " OR EXISTS(SELECT 1 FROM class_schedules exycs WHERE exycs.academic_year=? AND exycs.class_name=$a.class_name)"
+             . " OR EXISTS(SELECT 1 FROM classes exyc WHERE exyc.academic_year=? AND exyc.name=$a.class_name))))";
+        return [$sql, [$y, $y, $y, $y]];
+    }
+}
+if (!function_exists('exam_schedule_design_ready')) {
+    /** آزمون کلاسی عمداً تاریخ/ساعت ندارد؛ فقط رکورد رسمی ناقص رد می‌شود. */
+    function exam_schedule_design_ready(array $exam) {
+        $kind = (string)($exam['exam_kind'] ?? 'official');
+        if ($kind === 'class') return true;
+        if ($kind === 'class_deleted') return false;
+        foreach (['academic_year','subject_name','exam_date_jalali','start_time'] as $field) {
+            if (trim((string)($exam[$field] ?? '')) === '') return false;
+        }
+        return (int)($exam['duration_minutes'] ?? 0) > 0;
+    }
+}
+
+if (!function_exists('exam_student_schedule')) {
+    /**
+     * برنامهٔ حضوری همان سال تحصیلیِ دانش‌آموز را برمی‌گرداند.
+     * آزمون کلاسی/آرشیوشده و رکورد فعالِ ناقص (تاریخ/ساعت خالی) برنامهٔ
+     * قابل ارسال به دانش‌آموز نیست؛ این رکوردها حذف یا غیرفعال نمی‌شوند.
+     * انتخاب آخرین تخصیص صندلی برای هر آزمون، ردیف تکراری legacy را نیز
+     * از خروجی حذف می‌کند.
+     */
+    function exam_student_schedule($studentId) {
+        ensure_exams_schema();
+        $year = trim((string)get_setting('current_academic_year', ''));
+        return DB::fetchAll(
+            "SELECT es.*,
+                    COALESCE(seat.seat_number, ea.seat_number) AS seat_number,
+                    COALESCE(seat.exam_room, ea.exam_room, es.exam_room_default) AS exam_room,
+                    COALESCE(t.full_name, es.teacher_name) AS t_name
+             FROM exam_schedules es
+             JOIN students s ON s.id=?
+             LEFT JOIN exam_assignments ea ON ea.id=(
+                 SELECT MAX(ea2.id) FROM exam_assignments ea2
+                 WHERE ea2.exam_id=es.id AND ea2.student_id=s.id
+             )
+             LEFT JOIN teachers t ON t.id=es.teacher_id
+             LEFT JOIN exam_student_seating seat ON seat.id=(
+                 SELECT MAX(seat2.id) FROM exam_student_seating seat2
+                 WHERE seat2.student_id=s.id AND seat2.academic_year=es.academic_year
+             )
+             WHERE es.is_active=1
+               AND es.academic_year=COALESCE(NULLIF(TRIM(s.academic_year),''), ?)
+               AND COALESCE(es.exam_kind,'official') NOT IN ('class','class_deleted')
+               AND TRIM(COALESCE(es.exam_date_jalali,''))<>''
+               AND TRIM(COALESCE(es.start_time,''))<>''
+               AND (es.class_name=s.class_name
+                    OR (COALESCE(es.class_name,'')='' AND es.grade_level=s.grade_level)
+                    OR ea.student_id=s.id)
+             ORDER BY es.exam_date_jalali ASC, es.start_time ASC, es.id ASC",
+            [(int)$studentId, $year]
+        );
+    }
+}
+
+if (!function_exists('exam_month_rank_map')) {
+    /**
+     * V4.210.0 — ترتیب ماه‌های امتحانی در یک سال تحصیلی (مهر=۱ … شهریور=۱۲).
+     * مبنای «جدیدترین ماه» است؛ نه تاریخ ثبت رکورد. پس اگر مدیر در آبان
+     * برنامهٔ آذر را تعریف کند، آذر جدیدترین است و در پنل دانش‌آموز دیده می‌شود.
+     */
+    function exam_month_rank_map() {
+        return [
+            'مهر' => 1, 'آبان' => 2, 'آذر' => 3, 'دی' => 4,
+            'بهمن' => 5, 'اسفند' => 6, 'فروردین' => 7, 'اردیبهشت' => 8,
+            'خرداد' => 9, 'تیر' => 10, 'مرداد' => 11, 'شهریور' => 12,
+        ];
+    }
+}
+
+if (!function_exists('exam_jalali_month_name')) {
+    /** شمارهٔ ماه شمسی (۱..۱۲) → نام ماه. */
+    function exam_jalali_month_name($month) {
+        $names = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
+                  'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+        $i = (int)$month - 1;
+        return $names[$i] ?? '';
+    }
+}
+
+if (!function_exists('exam_month_rank')) {
+    /**
+     * رتبهٔ ماه در سال تحصیلی. «نوبت اول/دوم» بین ماه‌ها می‌نشیند و ماهِ
+     * ناشناخته رتبهٔ صفر می‌گیرد (همیشه آخر فهرست می‌آید، هرگز حذف نمی‌شود).
+     */
+    function exam_month_rank($month) {
+        $month = trim((string)$month);
+        if ($month === '') return 0.0;
+        $map = exam_month_rank_map();
+        if (isset($map[$month])) return (float)$map[$month];
+        if ($month === 'نوبت اول') return 4.5;
+        if ($month === 'نوبت دوم') return 9.5;
+        return 0.0;
+    }
+}
+
+if (!function_exists('exam_schedule_month_label')) {
+    /**
+     * «ماه مؤثر» یک ردیف برنامهٔ امتحان.
+     * اول exam_month؛ اگر خالی/ناشناخته بود از تاریخ شمسی استخراج می‌شود —
+     * رکوردهایی که از فرم «تعریف امتحان تکی» ثبت شده‌اند exam_month ندارند.
+     */
+    function exam_schedule_month_label($exam) {
+        $month = trim((string)($exam['exam_month'] ?? ''));
+        if ($month !== '' && exam_month_rank($month) > 0) return $month;
+        $parts = exam_jalali_date_parts($exam['exam_date_jalali'] ?? '');
+        if ($parts) {
+            $derived = exam_jalali_month_name($parts[1]);
+            if ($derived !== '') return $derived;
+        }
+        return $month;
+    }
+}
+
+if (!function_exists('exam_schedule_months')) {
+    /**
+     * ماه‌های موجود در یک مجموعهٔ ردیف + تعداد، جدیدترین ماه اول.
+     * برای «آخرین ماه» و فهرست انتخاب مدیر از همین یک تابع استفاده می‌شود تا
+     * پنل مدیریت و پنل دانش‌آموز هرگز دو نظر متفاوت نداشته باشند.
+     */
+    function exam_schedule_months(array $rows) {
+        $buckets = [];
+        foreach ($rows as $row) {
+            $label = exam_schedule_month_label($row);
+            $key = $label === '' ? 'بدون ماه' : $label;
+            if (!isset($buckets[$key])) {
+                $buckets[$key] = ['month' => $key, 'rank' => exam_month_rank($label), 'count' => 0];
+            }
+            $buckets[$key]['count']++;
+        }
+        $list = array_values($buckets);
+        usort($list, function ($a, $b) {
+            if ($a['rank'] === $b['rank']) return 0;   // ترتیب ورود حفظ شود (PHP 8 sort پایدار است)
+            return $a['rank'] < $b['rank'] ? 1 : -1;   // نزولی: جدیدترین ماه اول
+        });
+        return $list;
+    }
+}
+
+if (!function_exists('exam_month_options_for_year')) {
+    /** ماه‌های تعریف‌شده برای یک سال تحصیلی (برای فهرست انتخاب مدیر). */
+    function exam_month_options_for_year($year) {
+        $year = trim((string)$year);
+        $rows = [];
+        try {
+            $rows = DB::fetchAll(
+                "SELECT exam_month, exam_date_jalali FROM exam_schedules
+                  WHERE (academic_year = ? OR academic_year = ?)
+                    AND is_active = 1
+                    AND COALESCE(exam_kind,'official') NOT IN ('class','class_deleted')
+                    AND TRIM(COALESCE(exam_date_jalali,'')) <> ''",
+                [$year, str_replace('/', '-', $year)]
+            );
+        } catch (Throwable $e) {
+            return [];
+        }
+        return exam_schedule_months($rows);
+    }
+}
+
+if (!function_exists('exam_student_month_override')) {
+    /**
+     * تنظیم مدیر (پایین صفحهٔ «امتحانات حضوری»):
+     *   student_exam_month_manual   = ۱ یعنی مدیر خودش ماه را انتخاب کرده است
+     *   student_exam_month_selected = نام همان ماه
+     * پیش‌فرض خاموش است؛ پس رفتار مدرسه‌هایی که این تنظیم را ندیده‌اند
+     * دقیقاً همان «جدیدترین ماه» می‌ماند.
+     */
+    function exam_student_month_override() {
+        return [
+            'enabled' => get_setting('student_exam_month_manual', '0') === '1',
+            'month'   => trim((string)get_setting('student_exam_month_selected', '')),
+        ];
+    }
+}
+
+if (!function_exists('exam_student_schedule_selection')) {
+    /**
+     * ماهِ نمایشی برنامهٔ امتحانی دانش‌آموز + فقط ردیف‌های همان ماه.
+     *
+     * حالت خودکار (پیش‌فرض): جدیدترین ماهی که همین دانش‌آموز در آن برنامه دارد.
+     * حالت دستی (تیک مدیر): همان ماهِ انتخابی مدیر، حتی اگر قدیمی‌تر باشد.
+     * اگر ماه انتخابی برای این دانش‌آموز برنامه‌ای نداشته باشد، بی‌صدا به
+     * حالت خودکار برمی‌گردد تا صفحه هرگز خالی نماند.
+     */
+    function exam_student_schedule_selection($studentId) {
+        $rows = exam_student_schedule($studentId);
+        $months = exam_schedule_months($rows);
+        $override = exam_student_month_override();
+        $chosen = '';
+        $mode = 'auto';
+        if ($months) {
+            if ($override['enabled'] && $override['month'] !== '') {
+                foreach ($months as $m) {
+                    if ($m['month'] === $override['month']) { $chosen = $m['month']; $mode = 'manual'; break; }
+                }
+            }
+            if ($chosen === '') $chosen = $months[0]['month'];
+        }
+        $filtered = [];
+        foreach ($rows as $row) {
+            $label = exam_schedule_month_label($row);
+            $key = $label === '' ? 'بدون ماه' : $label;
+            if ($chosen === '' || $key === $chosen) $filtered[] = $row;
+        }
+        return ['rows' => $filtered, 'month' => $chosen, 'mode' => $mode, 'months' => $months, 'override' => $override];
+    }
+}
+
+if (!function_exists('exam_jalali_day_name')) {
+    /** نام روز هفته برای تاریخ شمسی ذخیره‌شده (وقتی exam_day_name خالی است). */
+    function exam_jalali_day_name($date) {
+        $parts = exam_jalali_date_parts($date);
+        if (!$parts || !function_exists('jalali_to_gregorian')) return '';
+        try {
+            $g = jalali_to_gregorian($parts[0], $parts[1], $parts[2]);
+            $ts = mktime(12, 0, 0, (int)$g[1], (int)$g[2], (int)$g[0]);
+            return $ts ? jdate('l', $ts) : '';
+        } catch (Throwable $e) {
+            return '';
+        }
+    }
+}
+
+if (!function_exists('exam_student_teacher_label')) {
+    /**
+     * V4.210.0 — در پنل دانش‌آموز، نام دبیر نمایش داده نمی‌شود؛ فقط
+     * «آقای + نام خانوادگی» (مثل «آقای حسنی»).
+     */
+    function exam_student_teacher_label($name) {
+        $family = trim((string)teacher_family_name($name));
+        /* اگر پیشوند احترام از قبل داخل نام ذخیره شده بود، دوباره تکرار نشود
+           («آقای خانم رضایی» نباید ساخته شود). */
+        $family = preg_replace('/^(آقای|خانم|استاد|دکتر|مهندس|سید|سیده)\s+/u', '', $family);
+        $family = trim((string)$family);
+        if ($family === '') return '';
+        return 'آقای ' . $family;
+    }
+}
+
+if (!function_exists('exam_subjects_for_grade')) {
+    function exam_subjects_for_grade($year, $grade) {
+        $all = get_schedule_subjects_for_year($year);
+        $out=[]; $seen=[];
+        foreach ($all as $r) {
+            $g = infer_grade_from_class_name($r['class_name']);
+            if ($grade !== '' && $g !== $grade) continue;
+            $key = $r['subject_name'].'|'.($r['teacher_id']??'');
+            if (!isset($seen[$key])) { $seen[$key]=1; $out[]=$r; }
+        }
+        usort($out, fn($a,$b)=>persian_compare($a['subject_name'], $b['subject_name']));
+        return $out;
+    }
+}
+
+if (!function_exists('get_student_global_seat')) {
+    /* v4.72.0: شماره صندلی «سراسری» — مستقل از ماه امتحانی. جدید‌ترین رکورد سال. */
+    function get_student_global_seat($year, $studentId) {
+        return DB::fetch("SELECT * FROM exam_student_seating WHERE academic_year=? AND student_id=? ORDER BY id DESC LIMIT 1", [$year, (int)$studentId]);
+    }
+}
+
+if (!function_exists('exam_archive_design_before_source_change')) {
+    /**
+     * v4.99.0: قبل از تغییر/حذف فایل منبع، طراحی فعلی + صفحات تصویری آن به
+     * بایگانی بانک منتقل می‌شود تا (۱) طراحی قدیمی برای همیشه در «آزمون‌های
+     * ذخیره‌شده» بماند و (۲) صفحات قدیمی هرگز با صفحات منبع جدید قاطی نشوند.
+     * برای آزمون‌هایی که خودشان از بانک استفاده کرده‌اند (origin.txt دارند)
+     * آرشیو ساخته نمی‌شود — منبع اصلی از قبل در بانک هست و فایل تکراری روی
+     * هاست ذخیره نمی‌شود؛ فقط کش صفحات پاک می‌شود.
+     * خروجی: شناسه آرشیو یا 0.
+     */
+    function exam_archive_design_before_source_change($examId) {
+        $examId = (int)$examId;
+        $root = dirname(__DIR__);
+        $cacheDir = $root . '/uploads/exams/pdf-pages/exam_' . $examId;
+        $pages = glob($cacheDir . '/page_*.jpg') ?: [];
+        sort($pages);
+        $exam = DB::fetch("SELECT * FROM exam_schedules WHERE id=?", [$examId]);
+        $design = DB::fetch("SELECT * FROM exam_designs WHERE exam_id=?", [$examId]);
+        // اگر تصویر تکی منبع بود (jpg/png/webp) آن هم صفحه محسوب می‌شود
+        if (!$pages && $exam && !empty($exam['question_file'])) {
+            $qf = (string)$exam['question_file'];
+            if (in_array(strtolower(pathinfo($qf, PATHINFO_EXTENSION)), ['jpg','jpeg','png','webp'], true)) {
+                $p0 = $root . '/' . ltrim($qf, '/');
+                if (is_file($p0)) $pages = [$p0];
+            }
+        }
+        if (!$exam || !$design || !$pages) return 0;                        // چیزی برای بایگانی نیست
+        if (is_file($cacheDir . '/origin.txt')) return 0;                   // استفاده مجدد از بانک — تکراری ذخیره نکن
+        // طراحی خالی (بدون سوال/برش/چینش/نقاشی) ارزش بایگانی ندارد
+        $dj = json_decode((string)$design['design_json'], true) ?: [];
+        $hasWork = !empty($dj['questions']) || !empty($dj['sourceCrops']) || !empty($dj['sourceOrder']) || !empty($dj['drawings']);
+        if (!$hasWork) return 0;
+        // اثرانگشت منبع: از بایگانی دوباره همان نسخه جلوگیری می‌کند (idempotent)
+        $fp = @md5_file($pages[0]) . '|' . count($pages);
+        $dup = DB::fetch("SELECT id FROM exam_design_archive WHERE exam_id=? AND src_fingerprint=?", [$examId, $fp]);
+        if ($dup) return (int)$dup['id'];
+        DB::execute("INSERT INTO exam_design_archive (exam_id, design_json, designer_name, subject_name, exam_month, academic_year, grade_level, class_name, src_fingerprint, created_at_jalali) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            [$examId, $design['design_json'], $design['designer_name'], $exam['subject_name'], $exam['exam_month'], $exam['academic_year'], $exam['grade_level'], $exam['class_name'], $fp, jalali_now()]);
+        $archId = (int)DB::lastInsertId();
+        // صفحات به پوشه بایگانی «منتقل» می‌شوند (کپی نمی‌شوند — فایل اضافه روی هاست نمی‌ماند)
+        $archDir = $root . '/uploads/exams/bank-archive/' . $archId;
+        @mkdir($archDir, 0775, true);
+        foreach ($pages as $i => $pg) {
+            $dst = $archDir . '/page_' . str_pad((string)($i + 1), 3, '0', STR_PAD_LEFT) . '.jpg';
+            if (!@rename($pg, $dst)) { @copy($pg, $dst); @unlink($pg); }
+        }
+        return $archId;
+    }
+}
+
+if (!function_exists('exam_replicate_design_to_grade_siblings')) {
+    /**
+     * v4.88.0 — grade-wide designs must exist for EVERY class of the grade.
+     * When a design is saved on the exam of one class, copy it (plus the
+     * source question file and header config) to the sibling exams of the
+     * same grade+month+subject that have no NEWER design of their own.
+     * Returns the number of sibling exams updated.
+     */
+    function exam_replicate_design_to_grade_siblings($examId) {
+        $examId = (int)$examId;
+        $exam = DB::fetch("SELECT * FROM exam_schedules WHERE id=?", [$examId]);
+        $design = DB::fetch("SELECT * FROM exam_designs WHERE exam_id=?", [$examId]);
+        if (!$exam || !$design) return 0;
+        if ((string)($exam['exam_kind'] ?? 'official') === 'class') return 0;   // class exams stay per-class
+        $grade = trim((string)($exam['grade_level'] ?? ''));
+        if ($grade === '' && function_exists('infer_grade_from_class_name')) $grade = (string)infer_grade_from_class_name($exam['class_name'] ?? '');
+        if ($grade === '') return 0;
+        $siblings = DB::fetchAll(
+            "SELECT id FROM exam_schedules WHERE id<>? AND academic_year=? AND exam_month=? AND subject_name=? AND is_active=1 AND COALESCE(exam_kind,'official')<>'class' AND (grade_level=? OR class_name LIKE ?)",
+            [$examId, $exam['academic_year'], $exam['exam_month'], $exam['subject_name'], $grade, $grade . '%']
+        );
+        $copied = 0;
+        foreach ($siblings as $sib) {
+            $dstId = (int)$sib['id'];
+            $ex = DB::fetch("SELECT id, updated_at_jalali FROM exam_designs WHERE exam_id=?", [$dstId]);
+            // Never clobber a design that someone saved for that class MORE RECENTLY,
+            // and skip siblings that are already in sync (same timestamp) so repeated
+            // runs (page-load backfills) stay cheap and idempotent.
+            if ($ex && strcmp((string)$ex['updated_at_jalali'], (string)$design['updated_at_jalali']) >= 0) continue;
+            if ($ex) DB::execute("UPDATE exam_designs SET design_json=?, designer_teacher_id=?, designer_name=?, saved_by_admin_id=?, updated_at_jalali=? WHERE exam_id=?",
+                [$design['design_json'], $design['designer_teacher_id'], $design['designer_name'], $design['saved_by_admin_id'], $design['updated_at_jalali'], $dstId]);
+            else DB::execute("INSERT INTO exam_designs (exam_id, design_json, designer_teacher_id, designer_name, saved_by_admin_id, updated_at_jalali) VALUES (?,?,?,?,?,?)",
+                [$dstId, $design['design_json'], $design['designer_teacher_id'], $design['designer_name'], $design['saved_by_admin_id'], $design['updated_at_jalali']]);
+            // The design references the SOURCE exam's uploaded file/pages: keep the
+            // sibling exam pointing at the same question file + header config.
+            DB::execute("UPDATE exam_schedules SET question_file=?, header_config=? WHERE id=?", [$exam['question_file'], $exam['header_config'], $dstId]);
+            // share the converted page cache so the sibling never re-converts
+            $srcCache = __DIR__ . '/../uploads/exams/pdf-pages/exam_' . $examId;
+            $dstCache = __DIR__ . '/../uploads/exams/pdf-pages/exam_' . $dstId;
+            if (is_dir($srcCache)) {
+                @mkdir($dstCache, 0775, true);
+                foreach (glob($dstCache . '/page_*.jpg') ?: [] as $old) @unlink($old);
+                foreach (glob($srcCache . '/page_*.jpg') ?: [] as $pf) @copy($pf, $dstCache . '/' . basename($pf));
+                if (is_file($srcCache . '/pages.txt')) @copy($srcCache . '/pages.txt', $dstCache . '/pages.txt');
+                /* v4.96.0: نسخه هم‌پایه = استفاده مجدد از منبع؛ فقط طراحی اولِ منبع در بانک آزمون‌های ذخیره‌شده ثبت می‌شود */
+                $originSrc = is_file($srcCache . '/origin.txt') ? trim((string)@file_get_contents($srcCache . '/origin.txt')) : (string)$examId;
+                @file_put_contents($dstCache . '/origin.txt', $originSrc !== '' ? $originSrc : (string)$examId);
+            }
+            $copied++;
+        }
+        return $copied;
+    }
+}

@@ -5,6 +5,16 @@
 
 require_once __DIR__ . '/includes/auth.php';
 
+/*
+ * v4.210.0 — صفحهٔ نخستِ دانش‌آموز پس از ورود: «برنامه هفتگی».
+ * کاربر خواسته است به‌جای صفحهٔ طولانی قبلی، اول برنامهٔ هفتگیِ کلاسش را ببیند.
+ * اگر فایل تازه روی نصب قدیمی/اورلیِ ناقص موجود نبود، همان داشبورد قبلی می‌ماند
+ * تا ورود هیچ‌وقت به صفحهٔ ۴۰۴ نرسد.
+ */
+$__studentHome    = is_file(__DIR__ . '/student-schedule.php') ? 'student-schedule.php' : 'student-panel.php';
+$__studentReports = is_file(__DIR__ . '/student-reports.php') ? 'student-reports.php' : 'student-panel.php';
+
+
 // Check installer lock
 if (!file_exists(__DIR__ . '/config/installed.lock') && !isset($_GET['ignore_install'])) {
     redirect('installer.php');
@@ -116,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
             ]);
             set_remember_login('student', $student['id']);
             set_flash_message('success', "خوش آمدید، {$_SESSION['student_name']}");
-            redirect('student-panel.php');
+            redirect($__studentHome);
         }
     }
     record_failed_login();
@@ -156,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
         ]);
         set_remember_login('student', $student['id']);
         set_flash_message('success', "استعلام موفق کارنامه‌های سال تحصیلی $year");
-        redirect("student-panel.php?year=" . urlencode($year));
+        redirect($__studentReports . '?year=' . urlencode($year));
     }
     record_failed_login();
     set_flash_message('error', 'اطلاعات استعلام (کد ملی یا سریال ۶ رقمی) با سیستم مطابقت ندارد.');
@@ -200,7 +210,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
 if ($view === 'login') {
     if (function_exists('is_teacher_logged_in') && is_teacher_logged_in()) redirect('teacher-panel.php');
     if (is_admin_logged_in())   redirect('index.php?view=dashboard');
-    if (is_student_logged_in()) redirect('student-panel.php');
+    if (is_student_logged_in()) redirect($__studentHome);
 }
 
 // Require header after POST processing
@@ -215,7 +225,7 @@ if (!is_admin_logged_in() && !is_student_logged_in()) {
 }
 
 if (is_student_logged_in() && $view !== 'login') {
-    redirect('student-panel.php');
+    redirect($__studentHome);
 }
 
 // If Admin Dashboard

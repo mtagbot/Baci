@@ -1,2 +1,2 @@
-244812362a740e493cea2e9181038bce9dd042f4004d2bb0f3c852dbbec10d8b  Release_V1.5-Site.zip
-b1ca0aeca4cc1d390ceb705cd76898e8c91a320d4ad9b78a66c296a03c5e89af  Release_V1.5-Desktop.zip
+2f071c14f3c6a2a120c1db78e798e785ded326b051a2a5dc9c57f8d4cbaf0f8e  Release_V1.5-Site.zip
+82313d26d490c6984eed22ad250ed70e094e13aa1ce784779b453cf1f340614d  Release_V1.5-Desktop.zip

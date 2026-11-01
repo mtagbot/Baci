@@ -574,7 +574,7 @@ class DeskSync {
                 $patchNote = $siteUnpatched
                     ? ' خود سایت در دسترس است اما بستهٔ اصلاحی جدید سایت هنوز روی هاست جایگزین نشده است؛ فایل‌های بستهٔ اصلاحی سایت را در ریشهٔ هاست استخراج کنید تا همگام‌سازی از مسیر امن جایگزین انجام و سطح دسترسی فایل‌ها (0644) خودکار ترمیم شود.'
                     : '';
-                $hint = ' — هر دو مسیر همگام‌سازی (desk-sync-api.php و class-exam-sync-api.php) با HTTP 403 رد شدند.' . $patchNote . ' در APIهای فعلی، کلید نادرست پاسخ HTTP 200 می‌دهد؛ پس این 403 احتمالاً پیش از اجرای API از وب‌سرور/WAF/قواعد دسترسی آمده است (' . $diagnosis . '). از میزبان بخواهید درخواست‌های POST با Content-Type: application/x-www-form-urlencoded را در access/error/WAF log بررسی کند؛ کلید را تغییر ندهید.' . $statText;
+                $hint = ' — هر دو مسیر همگام‌سازی (desk-sync-api.php و class-exam-sync-api.php) با HTTP 403 رد شدند.' . $patchNote . ' در APIهای فعلی، کلید نادرست پاسخ HTTP 200 می‌دهد؛ پس این 403 احتمالاً پیش از اجرای API از وب‌سرور/WAF/قواعد دسترسی آمده است (' . $diagnosis . '). از میزبان بخواهید درخواست‌های POST با Content-Type: application/json یا application/x-www-form-urlencoded را در access/error/WAF log بررسی کند؛ کلید را تغییر ندهید.' . $statText;
             }
             throw new Exception('پاسخ نامعتبر سرور (HTTP ' . $code . ')' . $hint);
         }

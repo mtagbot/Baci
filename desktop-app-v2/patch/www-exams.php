@@ -17,7 +17,30 @@ $tab=$classDeputyOnly?'class':($_GET['tab']??'schedule');
 if (!function_exists('exams_teacher_label')) { function exams_teacher_label($n){ $n=trim((string)$n); if($n==='') return $n; return is_admin_logged_in() ? $n : teacher_family_name($n); } } $year=resolve_academic_year_request($_GET['year']??get_current_academic_year()); // v4.38.0 unified
 if ($_SERVER['REQUEST_METHOD']==='POST') {
  if(!verify_csrf($_POST['csrf_token']??'')){set_flash_message('error','خطای CSRF');redirect('exams.php');}
- if(isset($_POST['mark_printed'])){ DB::execute('UPDATE exam_schedules SET is_printed=? WHERE id=?', [isset($_POST['is_printed'])?1:0, (int)$_POST['exam_id']]); set_flash_message('success','وضعیت چاپ آزمون ذخیره شد.'); $pfQS=''; if(($_POST['pf_month']??'')!=='') $pfQS.='&pf_month='.urlencode($_POST['pf_month']); if(($_POST['pf_printed']??'')!=='') $pfQS.='&pf_printed='.urlencode($_POST['pf_printed']); redirect('exams.php?tab=print&year='.urlencode($year).$pfQS); }
+  if(isset($_POST['save_student_exam_month'])){
+  /* V4.210.0 — تنظیم مدیر برای «کدام ماه در برنامهٔ امتحانی پنل دانش‌آموز دیده شود».
+     خاموش = خودکار (جدیدترین ماهِ تعریف‌شده). روشن = همان ماهِ انتخابی مدیر،
+     حتی اگر قدیمی‌تر از ماه‌های دیگر باشد. این تنظیم فقط نمایشِ پنل دانش‌آموز
+     را عوض می‌کند و به رکوردهای exam_schedules دست نمی‌زند. */
+  $semEnabled = isset($_POST['student_exam_month_enabled']) ? '1' : '0';
+  $semMonth   = trim((string)($_POST['student_exam_month_selected'] ?? ''));
+  $semValid   = function_exists('exam_month_rank') ? (exam_month_rank($semMonth) > 0) : ($semMonth !== '');
+  if (!$semValid) $semMonth = '';
+  if ($semEnabled === '1' && $semMonth === '') {
+      $semEnabled = '0';
+      set_setting('student_exam_month_manual', '0');
+      set_setting('student_exam_month_selected', '');
+      set_flash_message('warning', 'ماهی برای نمایش انتخاب نشده بود؛ نمایش برنامه امتحانی دانش‌آموزان روی «جدیدترین ماه» (خودکار) ماند.');
+  } else {
+      set_setting('student_exam_month_manual', $semEnabled);
+      set_setting('student_exam_month_selected', $semEnabled === '1' ? $semMonth : '');
+      set_flash_message('success', $semEnabled === '1'
+          ? 'برنامه امتحانی دانش‌آموزان روی ماه «'.$semMonth.'» ثابت شد.'
+          : 'نمایش برنامه امتحانی دانش‌آموزان به حالت خودکار (جدیدترین ماه) برگشت.');
+  }
+  redirect('exams.php?tab=schedule&year='.urlencode($year));
+ }
+if(isset($_POST['mark_printed'])){ DB::execute('UPDATE exam_schedules SET is_printed=? WHERE id=?', [isset($_POST['is_printed'])?1:0, (int)$_POST['exam_id']]); set_flash_message('success','وضعیت چاپ آزمون ذخیره شد.'); $pfQS=''; if(($_POST['pf_month']??'')!=='') $pfQS.='&pf_month='.urlencode($_POST['pf_month']); if(($_POST['pf_printed']??'')!=='') $pfQS.='&pf_printed='.urlencode($_POST['pf_printed']); redirect('exams.php?tab=print&year='.urlencode($year).$pfQS); }
  if(isset($_POST['copy_class_design'])){
   $src=(int)($_POST['source_exam_id']??0); $target=explode('|', $_POST['target_assignment']??'');
   if(count($target)>=3){
@@ -198,6 +221,68 @@ $gradeClasses = array_values(array_filter($classes, fn($c)=>$selectedGrade==='' 
                             <option value="<?php echo clean($yy['academic_year']); ?>" <?php echo ($edit['academic_year']??$year)===$yy['academic_year']?'selected':''; ?>><?php echo clean($yy['academic_year']); ?></option>
                         <?php endforeach; ?>
                     </select><select name="grade_level" class="form-select"><option value="">همه پایه/از کلاس</option><?php foreach($grades as $g): ?><option value="<?php echo clean($g['grade_level']); ?>" <?php echo ($edit['grade_level']??'')===$g['grade_level']?'selected':''; ?>><?php echo clean($g['grade_level']); ?></option><?php endforeach; ?></select><select name="class_name" class="form-select"><option value="">همه کلاس‌های پایه</option><?php foreach($classes as $c): ?><option value="<?php echo clean($c['class_name']); ?>" <?php echo ($edit['class_name']??'')===$c['class_name']?'selected':''; ?>><?php echo clean($c['class_name']); ?></option><?php endforeach; ?></select><select name="subject_name" class="form-select" required><option value="">انتخاب درس از برنامه هفتگی</option><?php foreach($gradeSubjects as $gs): ?><option value="<?php echo clean($gs['subject_name']); ?>" <?php echo ($edit['subject_name']??'')===$gs['subject_name']?'selected':''; ?>><?php echo clean($gs['subject_name'].' - '.($gs['teacher_name']?exams_teacher_label($gs['teacher_name']):'دبیر برنامه')); ?></option><?php endforeach; ?></select><select name="teacher_id" class="form-select"><option value="0">دبیر خودکار/انتخاب دستی</option><?php foreach($teachers as $t): ?><option value="<?php echo $t['id']; ?>" <?php echo ($edit['teacher_id']??0)==$t['id']?'selected':''; ?>><?php echo clean(exams_teacher_label($t['full_name'])); ?></option><?php endforeach; ?></select><input name="exam_date_jalali" class="form-input" required placeholder="1404/03/10" value="<?php echo clean($edit['exam_date_jalali']??''); ?>"><input name="start_time" class="form-input" required placeholder="08:00" value="<?php echo clean($edit['start_time']??''); ?>"><input name="duration_minutes" type="number" class="form-input" value="<?php echo clean($edit['duration_minutes']??90); ?>"><input name="exam_room_default" class="form-input" placeholder="کلاس/سالن پیش‌فرض" value="<?php echo clean($edit['exam_room_default']??''); ?>"><label class="text-xs">فایل سوالات بدون سربرگ PDF/تصویر</label><input type="file" name="question_file" class="form-input" accept=".pdf,.png,.jpg,.jpeg,.webp"><button class="btn btn-success w-full">ذخیره امتحان</button></form></div><div class="card col-span-2"><div class="table-container"><table><thead><tr><th>تاریخ</th><th>ساعت</th><th>پایه/کلاس</th><th>درس</th><th>دبیر</th><th>عملیات</th></tr></thead><tbody><?php foreach($exams as $e): ?><tr class="<?php echo empty($e['design_updated_at'])?'exam-no-design':''; ?>"><td><?php echo tr_num($e['exam_date_jalali'],'fa'); ?></td><td><?php echo tr_num($e['start_time'],'fa'); ?></td><td><?php echo clean(($e['grade_level']?:'').' '.$e['class_name']); ?></td><td class="font-bold"><?php echo clean($e['subject_name']); ?></td><td><?php echo clean(exams_teacher_label($e['t_name'])); ?></td><td><a class="btn btn-secondary text-xs" href="exams.php?tab=schedule&edit=<?php echo $e['id']; ?>">ویرایش</a><?php /* v4.180.0: ویرایش آزمون ماهانه از پنجرهٔ تازه هم کار کند — با توکن امضاشدهٔ طراحی */ ?><a class="btn btn-success text-xs" target="_blank" title="ویرایش و طراحی زندهٔ آزمون ماهانه — بدون نیاز به ورود دوباره" href="exam-print.php?type=questions&exam_id=<?php echo $e['id']; ?>&dt=<?php echo urlencode(make_exam_design_token($e['id'], is_admin_logged_in() ? 'admin' : 'exec', $_SESSION['admin_id'] ?? ($_SESSION['teacher_id'] ?? 0))); ?>">ویرایش آزمون ماهانه</a><a class="btn btn-danger text-xs" onclick="return confirm('حذف؟')" href="exams.php?delete=<?php echo $e['id']; ?>">حذف</a></td></tr><?php endforeach; ?></tbody></table></div></div></div>
+<?php
+/* V4.210.0 — تنظیم «ماه نمایشی برنامهٔ امتحانی در پنل دانش‌آموز» */
+$semOverride = function_exists('exam_student_month_override') ? exam_student_month_override() : ['enabled' => false, 'month' => ''];
+$semMonths   = function_exists('exam_month_options_for_year') ? exam_month_options_for_year($year) : [];
+$semAuto     = $semMonths ? $semMonths[0]['month'] : '';
+?>
+<div class="card mt-6" id="studentExamMonthCard">
+  <div class="flex flex-wrap justify-between items-center border-b pb-2 mb-3 gap-2">
+    <h3 class="font-bold text-primary">🎓 نمایش برنامه امتحانی در پنل دانش‌آموز</h3>
+    <span class="badge <?php echo $semOverride['enabled'] ? 'badge-warning' : 'badge-success'; ?>">
+      وضعیت فعلی: <?php echo $semOverride['enabled'] ? 'انتخاب دستی مدیر — ماه '.clean($semOverride['month']) : 'خودکار — جدیدترین ماه'.($semAuto !== '' ? ' ('.clean($semAuto).')' : ''); ?>
+    </span>
+  </div>
+  <p class="text-xs text-muted leading-relaxed mb-3">
+    پیش‌فرض: هر ماهی که تازه‌تر تعریف شود، خودکار در پنل دانش‌آموز نمایش داده می‌شود
+    (ترتیب ماه‌های سال تحصیلی: مهر، آبان، آذر …). اگر می‌خواهید ماه مشخصی — حتی قدیمی‌تر —
+    در پنل دانش‌آموز بماند، تیک زیر را بزنید و همان ماه را انتخاب کنید.
+    این تنظیم فقط نمایش را عوض می‌کند و هیچ آزمون یا نمره‌ای را تغییر نمی‌دهد.
+    فهرست ماه‌ها از سال تحصیلیِ انتخاب‌شده در بالای همین صفحه ساخته می‌شود؛
+    خودِ انتخاب برای همهٔ دانش‌آموزان مدرسه اعمال می‌شود و برای هر دانش‌آموز،
+    همان نام ماه در سالِ تحصیلیِ خودش جست‌وجو می‌شود.
+  </p>
+  <form method="POST" class="grid grid-cols-3 gap-3 items-end">
+    <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
+    <input type="hidden" name="save_student_exam_month" value="1">
+    <label class="flex items-center gap-2 text-sm font-bold" style="grid-column:span 3">
+      <input type="checkbox" name="student_exam_month_enabled" value="1" id="semEnabled" <?php echo $semOverride['enabled'] ? 'checked' : ''; ?>>
+      انتخاب دستی ماه برنامه امتحانی در پنل دانش‌آموز (به‌جای جدیدترین ماه)
+    </label>
+    <div>
+      <label class="text-xs">ماه نمایشی</label>
+      <select name="student_exam_month_selected" id="semMonth" class="form-select font-bold" <?php echo $semOverride['enabled'] ? '' : 'disabled'; ?>>
+        <option value="">— خودکار (جدیدترین ماه) —</option>
+        <?php if ($semOverride['month'] !== '' && !in_array($semOverride['month'], array_column($semMonths, 'month'), true)): ?>
+        <option value="<?php echo clean($semOverride['month']); ?>" selected><?php echo clean($semOverride['month']); ?> (ماه ذخیره‌شده)</option>
+        <?php endif; ?>
+        <?php foreach ($semMonths as $sm): ?>
+        <option value="<?php echo clean($sm['month']); ?>" <?php echo $semOverride['month'] === $sm['month'] ? 'selected' : ''; ?>>
+          <?php echo clean($sm['month']); ?> — <?php echo tr_num($sm['count'], 'fa'); ?> آزمون<?php echo $semAuto === $sm['month'] ? ' (خودکار)' : ''; ?>
+        </option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <div class="text-xs text-muted">
+      <?php if (!$semMonths): ?>
+        هنوز برای سال <?php echo clean($year); ?> آزمونی با ماه مشخص ثبت نشده است.
+      <?php else: ?>
+        جدیدترین ماه این سال: <b><?php echo clean($semAuto); ?></b>
+      <?php endif; ?>
+    </div>
+    <button class="btn btn-success">ذخیره تنظیم نمایش</button>
+  </form>
+  <script>
+  (function(){
+    var cb = document.getElementById('semEnabled'), sel = document.getElementById('semMonth');
+    if (cb && sel) cb.addEventListener('change', function(){
+      sel.disabled = !cb.checked;
+      if (cb.checked && !sel.value && sel.options.length > 1) { sel.selectedIndex = 1; }
+    });
+  })();
+  </script>
+</div>
 <?php elseif($tab==='class'): ?>
 <form method="GET" class="card flex gap-2 items-end"><input type="hidden" name="tab" value="class"><label>سال تحصیلی<select name="year" class="form-select" onchange="this.form.submit()"><?php foreach(get_academic_years_for_filter() as $yy): ?><option value="<?php echo clean($yy['academic_year']); ?>" <?php echo $year===$yy['academic_year']?'selected':''; ?>><?php echo clean($yy['academic_year']); ?></option><?php endforeach; ?></select></label><button class="btn btn-outline">نمایش</button></form>
 <?php include __DIR__.'/includes/admin_class_exams.php'; ?>

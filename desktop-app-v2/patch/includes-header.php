@@ -273,8 +273,13 @@ function mtagToggleSidebar(){
     </aside>
     <?php elseif (is_student_logged_in()): ?>
     <aside class="sidebar w-64 bg-card border-l border-color p-4 flex flex-col gap-2 shrink-0 shadow-lg">
-        <a href="student-panel.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'student-panel.php' ? 'active' : ''; ?>">داشبورد و کارنامه‌های من</a>
-        <div class="sidebar-section-title">ارزشیابی و امتحانات</div>
+        <a href="student-panel.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'student-panel.php' ? 'active' : ''; ?>">داشبورد من</a>
+        <div class="sidebar-section-title">برنامه و کارنامه</div>
+        <a href="student-schedule.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'student-schedule.php' ? 'active' : ''; ?>">برنامه هفتگی</a>
+        <a href="student-exam-schedule.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'student-exam-schedule.php' ? 'active' : ''; ?>">برنامه امتحانی</a>
+        <a href="student-discipline.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'student-discipline.php' ? 'active' : ''; ?>">موارد انضباطی</a>
+        <a href="student-reports.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'student-reports.php' ? 'active' : ''; ?>">کارنامه‌های من</a>
+        <div class="sidebar-section-title">آزمون</div>
         <a href="student-online-exams.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['student-online-exams.php','online-exam-take.php','online-exam-result.php']) ? 'active' : ''; ?>">آزمون‌های مجازی من</a>
     </aside>
     <?php elseif (function_exists('is_teacher_logged_in') && is_teacher_logged_in()): ?>

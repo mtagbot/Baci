@@ -241,6 +241,192 @@ if (!function_exists('exam_student_schedule')) {
         );
     }
 }
+
+if (!function_exists('exam_month_rank_map')) {
+    /**
+     * V4.210.0 — ترتیب ماه‌های امتحانی در یک سال تحصیلی (مهر=۱ … شهریور=۱۲).
+     * مبنای «جدیدترین ماه» است؛ نه تاریخ ثبت رکورد. پس اگر مدیر در آبان
+     * برنامهٔ آذر را تعریف کند، آذر جدیدترین است و در پنل دانش‌آموز دیده می‌شود.
+     */
+    function exam_month_rank_map() {
+        return [
+            'مهر' => 1, 'آبان' => 2, 'آذر' => 3, 'دی' => 4,
+            'بهمن' => 5, 'اسفند' => 6, 'فروردین' => 7, 'اردیبهشت' => 8,
+            'خرداد' => 9, 'تیر' => 10, 'مرداد' => 11, 'شهریور' => 12,
+        ];
+    }
+}
+
+if (!function_exists('exam_jalali_month_name')) {
+    /** شمارهٔ ماه شمسی (۱..۱۲) → نام ماه. */
+    function exam_jalali_month_name($month) {
+        $names = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
+                  'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+        $i = (int)$month - 1;
+        return $names[$i] ?? '';
+    }
+}
+
+if (!function_exists('exam_month_rank')) {
+    /**
+     * رتبهٔ ماه در سال تحصیلی. «نوبت اول/دوم» بین ماه‌ها می‌نشیند و ماهِ
+     * ناشناخته رتبهٔ صفر می‌گیرد (همیشه آخر فهرست می‌آید، هرگز حذف نمی‌شود).
+     */
+    function exam_month_rank($month) {
+        $month = trim((string)$month);
+        if ($month === '') return 0.0;
+        $map = exam_month_rank_map();
+        if (isset($map[$month])) return (float)$map[$month];
+        if ($month === 'نوبت اول') return 4.5;
+        if ($month === 'نوبت دوم') return 9.5;
+        return 0.0;
+    }
+}
+
+if (!function_exists('exam_schedule_month_label')) {
+    /**
+     * «ماه مؤثر» یک ردیف برنامهٔ امتحان.
+     * اول exam_month؛ اگر خالی/ناشناخته بود از تاریخ شمسی استخراج می‌شود —
+     * رکوردهایی که از فرم «تعریف امتحان تکی» ثبت شده‌اند exam_month ندارند.
+     */
+    function exam_schedule_month_label($exam) {
+        $month = trim((string)($exam['exam_month'] ?? ''));
+        if ($month !== '' && exam_month_rank($month) > 0) return $month;
+        $parts = exam_jalali_date_parts($exam['exam_date_jalali'] ?? '');
+        if ($parts) {
+            $derived = exam_jalali_month_name($parts[1]);
+            if ($derived !== '') return $derived;
+        }
+        return $month;
+    }
+}
+
+if (!function_exists('exam_schedule_months')) {
+    /**
+     * ماه‌های موجود در یک مجموعهٔ ردیف + تعداد، جدیدترین ماه اول.
+     * برای «آخرین ماه» و فهرست انتخاب مدیر از همین یک تابع استفاده می‌شود تا
+     * پنل مدیریت و پنل دانش‌آموز هرگز دو نظر متفاوت نداشته باشند.
+     */
+    function exam_schedule_months(array $rows) {
+        $buckets = [];
+        foreach ($rows as $row) {
+            $label = exam_schedule_month_label($row);
+            $key = $label === '' ? 'بدون ماه' : $label;
+            if (!isset($buckets[$key])) {
+                $buckets[$key] = ['month' => $key, 'rank' => exam_month_rank($label), 'count' => 0];
+            }
+            $buckets[$key]['count']++;
+        }
+        $list = array_values($buckets);
+        usort($list, function ($a, $b) {
+            if ($a['rank'] === $b['rank']) return 0;   // ترتیب ورود حفظ شود (PHP 8 sort پایدار است)
+            return $a['rank'] < $b['rank'] ? 1 : -1;   // نزولی: جدیدترین ماه اول
+        });
+        return $list;
+    }
+}
+
+if (!function_exists('exam_month_options_for_year')) {
+    /** ماه‌های تعریف‌شده برای یک سال تحصیلی (برای فهرست انتخاب مدیر). */
+    function exam_month_options_for_year($year) {
+        $year = trim((string)$year);
+        $rows = [];
+        try {
+            $rows = DB::fetchAll(
+                "SELECT exam_month, exam_date_jalali FROM exam_schedules
+                  WHERE (academic_year = ? OR academic_year = ?)
+                    AND is_active = 1
+                    AND COALESCE(exam_kind,'official') NOT IN ('class','class_deleted')
+                    AND TRIM(COALESCE(exam_date_jalali,'')) <> ''",
+                [$year, str_replace('/', '-', $year)]
+            );
+        } catch (Throwable $e) {
+            return [];
+        }
+        return exam_schedule_months($rows);
+    }
+}
+
+if (!function_exists('exam_student_month_override')) {
+    /**
+     * تنظیم مدیر (پایین صفحهٔ «امتحانات حضوری»):
+     *   student_exam_month_manual   = ۱ یعنی مدیر خودش ماه را انتخاب کرده است
+     *   student_exam_month_selected = نام همان ماه
+     * پیش‌فرض خاموش است؛ پس رفتار مدرسه‌هایی که این تنظیم را ندیده‌اند
+     * دقیقاً همان «جدیدترین ماه» می‌ماند.
+     */
+    function exam_student_month_override() {
+        return [
+            'enabled' => get_setting('student_exam_month_manual', '0') === '1',
+            'month'   => trim((string)get_setting('student_exam_month_selected', '')),
+        ];
+    }
+}
+
+if (!function_exists('exam_student_schedule_selection')) {
+    /**
+     * ماهِ نمایشی برنامهٔ امتحانی دانش‌آموز + فقط ردیف‌های همان ماه.
+     *
+     * حالت خودکار (پیش‌فرض): جدیدترین ماهی که همین دانش‌آموز در آن برنامه دارد.
+     * حالت دستی (تیک مدیر): همان ماهِ انتخابی مدیر، حتی اگر قدیمی‌تر باشد.
+     * اگر ماه انتخابی برای این دانش‌آموز برنامه‌ای نداشته باشد، بی‌صدا به
+     * حالت خودکار برمی‌گردد تا صفحه هرگز خالی نماند.
+     */
+    function exam_student_schedule_selection($studentId) {
+        $rows = exam_student_schedule($studentId);
+        $months = exam_schedule_months($rows);
+        $override = exam_student_month_override();
+        $chosen = '';
+        $mode = 'auto';
+        if ($months) {
+            if ($override['enabled'] && $override['month'] !== '') {
+                foreach ($months as $m) {
+                    if ($m['month'] === $override['month']) { $chosen = $m['month']; $mode = 'manual'; break; }
+                }
+            }
+            if ($chosen === '') $chosen = $months[0]['month'];
+        }
+        $filtered = [];
+        foreach ($rows as $row) {
+            $label = exam_schedule_month_label($row);
+            $key = $label === '' ? 'بدون ماه' : $label;
+            if ($chosen === '' || $key === $chosen) $filtered[] = $row;
+        }
+        return ['rows' => $filtered, 'month' => $chosen, 'mode' => $mode, 'months' => $months, 'override' => $override];
+    }
+}
+
+if (!function_exists('exam_jalali_day_name')) {
+    /** نام روز هفته برای تاریخ شمسی ذخیره‌شده (وقتی exam_day_name خالی است). */
+    function exam_jalali_day_name($date) {
+        $parts = exam_jalali_date_parts($date);
+        if (!$parts || !function_exists('jalali_to_gregorian')) return '';
+        try {
+            $g = jalali_to_gregorian($parts[0], $parts[1], $parts[2]);
+            $ts = mktime(12, 0, 0, (int)$g[1], (int)$g[2], (int)$g[0]);
+            return $ts ? jdate('l', $ts) : '';
+        } catch (Throwable $e) {
+            return '';
+        }
+    }
+}
+
+if (!function_exists('exam_student_teacher_label')) {
+    /**
+     * V4.210.0 — در پنل دانش‌آموز، نام دبیر نمایش داده نمی‌شود؛ فقط
+     * «آقای + نام خانوادگی» (مثل «آقای حسنی»).
+     */
+    function exam_student_teacher_label($name) {
+        $family = trim((string)teacher_family_name($name));
+        /* اگر پیشوند احترام از قبل داخل نام ذخیره شده بود، دوباره تکرار نشود
+           («آقای خانم رضایی» نباید ساخته شود). */
+        $family = preg_replace('/^(آقای|خانم|استاد|دکتر|مهندس|سید|سیده)\s+/u', '', $family);
+        $family = trim((string)$family);
+        if ($family === '') return '';
+        return 'آقای ' . $family;
+    }
+}
+
 if (!function_exists('exam_subjects_for_grade')) {
     function exam_subjects_for_grade($year, $grade) {
         $all = get_schedule_subjects_for_year($year);

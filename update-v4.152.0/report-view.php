@@ -9,12 +9,23 @@ require_once __DIR__ . '/includes/school_roles.php';
 ensure_school_roles_schema();
 require_once __DIR__ . '/includes/header.php';
 
+/*
+ * v4.210.0 — کارنامه‌ها صفحهٔ مستقل خودشان را دارند؛ پس بازگشتِ دانش‌آموز از
+ * «نمایش کارنامه» به فهرست کارنامه‌ها می‌رود، نه به داشبورد. اگر فایل تازه
+ * روی نصب قدیمی نبود، همان مقصد قبلی (داشبورد) استفاده می‌شود.
+ */
+if (!function_exists('report_view_student_back_link')) {
+    function report_view_student_back_link() {
+        return is_file(__DIR__ . '/student-reports.php') ? 'student-reports.php' : 'student-panel.php';
+    }
+}
+
 $reportId = (int)($_GET['id'] ?? 0);
 $report = DB::fetch("SELECT r.*, s.first_name, s.last_name, s.national_id, s.father_name, s.grade_level, s.photo_url FROM reports r JOIN students s ON r.student_id = s.id WHERE r.id = ?", [$reportId]);
 
 if (!$report) {
     set_flash_message('error', 'کارنامه مورد نظر یافت نشد.');
-    redirect(is_admin_logged_in() ? 'reports.php' : 'student-panel.php');
+    redirect(is_admin_logged_in() ? 'reports.php' : report_view_student_back_link());
 }
 
 // Check permission / locking
@@ -23,7 +34,7 @@ $studentLockReason = '';
 if (is_student_logged_in()) {
     if ($report['student_id'] != $_SESSION['student_id'] || is_report_locked_for_student($report, $studentLockReason)) {
         set_flash_message('error', $studentLockReason ?: 'شما مجاز به مشاهده این کارنامه نیستید یا کارنامه مسدود است.');
-        redirect('student-panel.php');
+        redirect(report_view_student_back_link());
     }
 } elseif (is_admin_logged_in() || $staffFileAccess) {
     // Admin, deputy and counselor may view the educational dossier without student credentials.
@@ -98,7 +109,7 @@ $subjectScores = [];
 ?>
 <div class="max-w-4xl mx-auto space-y-6">
     <div class="flex justify-between items-center no-print">
-        <a href="<?php echo is_admin_logged_in() ? 'reports.php' : 'student-panel.php'; ?>" class="btn btn-secondary">&rarr; بازگشت به لیست کارنامه‌ها</a>
+        <a href="<?php echo is_admin_logged_in() ? 'reports.php' : report_view_student_back_link(); ?>" class="btn btn-secondary">&rarr; بازگشت به لیست کارنامه‌ها</a>
         <div class="flex gap-2">
             <a href="report-print.php?id=<?php echo $reportId; ?><?php echo is_student_logged_in() ? '&pt=' . urlencode(make_report_print_token($reportId, $report['student_id'])) : ''; ?>" target="_self" class="btn btn-primary gap-1 shadow"><svg data-ui-icon="print" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 8V3h10v5M7 17H3V9h18v8h-4M7 14h10v8H7ZM17 11h.1"/></svg> چاپ کارنامه</a>
             <?php if (is_admin_logged_in() || (function_exists('current_teacher_has_student_file_access') && current_teacher_has_student_file_access())): ?>

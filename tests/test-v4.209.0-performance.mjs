@@ -55,10 +55,14 @@ for (const [name, src] of Object.entries(FILES)) {
   if (!has(src)) missing.push(src);
 }
 ok('۱۶ فایل این نسخه در مخزن موجود است', missing.length === 0, missing.join(', '));
-ok('نسخهٔ ۴.۲۰۹.x / ۲.۱۳۳.x ثبت شده',
-  /'site_version'\s*=>\s*'4\.209\.\d+'/.test(read(FILES['config/version.php'])) &&
-  /'desktop_version'\s*=>\s*'2\.133\.\d+'/.test(read(FILES['config/version.php'])) &&
-  /'correction'\s*=>\s*'V4\.209\.\d+'/.test(read(FILES['config/version.php'])));
+/* V4.210.0: نسخه‌ها دیگر روی ۴.۲۰۹ قفل نیستند؛ هر نسخه‌ای که باشد باید
+   نسخهٔ سایت/دسکتاپ/اصلاحیه هم‌شماره و معتبر باشد و با نسخهٔ هستهٔ کارایی یکی باشد. */
+const versionSrc = read(FILES['config/version.php']);
+const siteVer = (/'site_version'\s*=>\s*'([^']+)'/.exec(versionSrc) || [])[1] || '';
+const deskVer = (/'desktop_version'\s*=>\s*'([^']+)'/.exec(versionSrc) || [])[1] || '';
+const corrVer = (/'correction'\s*=>\s*'([^']+)'/.exec(versionSrc) || [])[1] || '';
+ok(`نسخهٔ سایت/دسکتاپ/اصلاحیه هم‌شماره است (${siteVer} / ${deskVer} / ${corrVer})`,
+  /^4\.\d+\.\d+$/.test(siteVer) && /^2\.\d+\.\d+$/.test(deskVer) && corrVer === 'V' + siteVer);
 
 /* ═════════════════════════════════════════ ۱) تناسب perf.php با fallback ══ */
 console.log('\n══ ۱) پوشش کامل fallback (باگ صفحهٔ سفید) ══');
@@ -82,8 +86,9 @@ ok('fallback هیچ‌وقت exception پرت نمی‌کند', !/throw new/.tes
 
 /* ═══════════════════════════════════════ ۲) قرارداد توابع تازهٔ باندل ══ */
 console.log('\n══ ۲) قرارداد باندل و کش ══');
-ok('نسخهٔ هسته به ۴.۲۰۹.x رسیده (نام باندل‌ها تازه می‌شود)',
-  /define\('PERF_CORE_VERSION', '4\.209\.\d+'\)/.test(perfSrc));
+const coreVer = (/define\('PERF_CORE_VERSION',\s*'([^']+)'\)/.exec(perfSrc) || [])[1] || '';
+ok(`نسخهٔ هستهٔ کارایی با نسخهٔ سایت یکی است و نام باندل‌ها را تازه می‌کند (${coreVer})`,
+  coreVer !== '' && coreVer === siteVer);
 ok('perf_bundle_url امضای ?v= و تکرارها را پاک می‌کند',
   perfSrc.includes("preg_replace('/[?#].*$/', '', $f)") && perfSrc.includes('$clean[$f] = true;'));
 ok('perf_bundle_url در نبود perf_asset_url رشتهٔ خالی می‌دهد',
