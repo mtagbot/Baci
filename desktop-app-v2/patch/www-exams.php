@@ -14,7 +14,18 @@ if($classDeputyOnly && ($_SERVER['REQUEST_METHOD']==='POST' || isset($_GET['dele
 ensure_exams_schema(); ceg_schema();
 $tab=$classDeputyOnly?'class':($_GET['tab']??'schedule');
 /* v4.71.0: خارج از پنل مدیریت فقط نام خانوادگی دبیر نمایش داده شود */
-if (!function_exists('exams_teacher_label')) { function exams_teacher_label($n){ $n=trim((string)$n); if($n==='') return $n; return is_admin_logged_in() ? $n : teacher_family_name($n); } } $year=resolve_academic_year_request($_GET['year']??get_current_academic_year()); // v4.38.0 unified
+if (!function_exists('exams_teacher_label')) {
+    /* V4.211.0 — یک الگوی مرجع برای نام دبیر در این صفحه هم: مدیر نام کامل را
+       همیشه «نام + نام خانوادگی» می‌بیند (حتی اگر در دیتابیس معکوس ذخیره شده
+       باشد) و دبیر/معاون فقط نام خانوادگی را. */
+    function exams_teacher_label($n) {
+        $n = trim((string)$n);
+        if ($n === '') return $n;
+        return is_admin_logged_in()
+            ? teacher_canonical_full_name($n)
+            : teacher_family_name($n);
+    }
+} $year=resolve_academic_year_request($_GET['year']??get_current_academic_year()); // v4.38.0 unified
 if ($_SERVER['REQUEST_METHOD']==='POST') {
  if(!verify_csrf($_POST['csrf_token']??'')){set_flash_message('error','خطای CSRF');redirect('exams.php');}
   if(isset($_POST['save_student_exam_month'])){

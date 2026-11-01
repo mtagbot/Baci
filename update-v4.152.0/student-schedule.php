@@ -1,5 +1,5 @@
 <?php
-// File: student-schedule.php (v4.210.0)
+// File: student-schedule.php (v4.212.0)
 /**
  * برنامهٔ هفتگی دانش‌آموز — «هفتهٔ من»
  *
@@ -7,6 +7,10 @@
  * طریق ربات یا پرسیدن از مدرسه قابل مشاهده بود. این صفحه همان جدول
  * برنامهٔ هفتگی (class_schedules) را برای کلاس و سال تحصیلیِ خودِ
  * دانش‌آموز، فقط-خواندنی نشان می‌دهد: روزهای هفته × زنگ‌ها.
+ *
+ * V4.212.0 — خواستهٔ مدیر مدرسه: در برنامهٔ هفتگی، نام دبیر نمایش داده نشود و
+ * فقط نام درس ذکر شود. (دبیران در جدول برنامهٔ هفتگیِ مدیریت و صفحه‌های دیگر
+ * همان‌جا که لازم است باقی می‌مانند؛ این حذف فقط در پنل دانش‌آموز است.)
  *
  * هیچ داده‌ای نوشته نمی‌شود و هیچ منطق ثبت/ویرایشی تغییر نکرده است.
  */
@@ -73,38 +77,6 @@ $extraDayLabels = [];
 foreach (array_keys($week) as $dKey) {
     if (!in_array($dKey, $knownDayKeys, true)) $extraDayLabels[] = $dayLabels[$dKey] ?? '—';
 }
-/*
- * V4.211.0 — نام دبیر در برنامهٔ هفتگی فقط با «الگوی مرجع» نمایش داده می‌شود:
- * «آقای + نام خانوادگی» (مثلاً «آقای جهان تیغ»). اگر ردیف برنامه به پروندهٔ
- * دبیر وصل باشد، همان رکورد مرجع است (فیلد last_name قطعی)؛ وگرنه از نام
- * ذخیره‌شده در خودِ برنامه استفاده می‌شود و teacher_respectful_name جهت نام
- * را خودش تشخیص می‌دهد. این کار خطای «تیغ علیرضا» را برای نام‌های
- * سه‌کلمه‌ای/نام‌خانوادگی‌اول از بین می‌برد.
- */
-$teacherNameOf = function ($lesson) {
-    $teacher = null;
-    if (!empty($lesson['teacher_id'])) {
-        try {
-            $teacher = DB::fetch("SELECT full_name, first_name, last_name FROM teachers WHERE id = ?", [(int)$lesson['teacher_id']]) ?: null;
-        } catch (Throwable $e) {
-            $teacher = null;
-        }
-    }
-    /* اگر اورلی ناقص باشد و تابع تازه نبود، همان تابع قدیمی سایت استفاده می‌شود
-       تا صفحه هرگز با fatal سفید نشود. */
-    $labelOf = function ($value) {
-        if (function_exists('teacher_respectful_name')) return trim((string)teacher_respectful_name($value));
-        return trim((string)teacher_family_name($value));
-    };
-    if ($teacher) {
-        $label = $labelOf($teacher);
-        if ($label !== '') return $label;
-    }
-    $name = trim((string)($lesson['teacher_name'] ?? ''));
-    if ($name === '') return '';
-    return $labelOf($name);
-};
-
 require_once __DIR__ . '/includes/header.php';
 ?>
 <div class="space-y-6">
@@ -144,7 +116,7 @@ require_once __DIR__ . '/includes/header.php';
                 </thead>
                 <tbody>
                 <?php
-                $renderDayRow = function ($dayLabel) use ($week, $dayKey, $maxPeriod, $teacherNameOf) {
+                $renderDayRow = function ($dayLabel) use ($week, $dayKey, $maxPeriod) {
                     $dKey = $dayKey($dayLabel);
                     ?>
                     <tr data-day="<?php echo clean($dayLabel); ?>">
@@ -153,10 +125,9 @@ require_once __DIR__ . '/includes/header.php';
                             $cellLessons = $week[$dKey][$p] ?? [];
                         ?>
                         <td class="text-center" data-period="<?php echo $p; ?>">
-                            <?php foreach ($cellLessons as $lesson): $tName = $teacherNameOf($lesson); ?>
+                            <?php foreach ($cellLessons as $lesson): ?>
                             <div class="mb-1">
                                 <span class="font-bold text-xs block"><?php echo clean($lesson['subject_name'] ?? ''); ?></span>
-                                <?php if ($tName !== ''): ?><span class="text-[11px] text-muted block"><?php echo clean($tName); ?></span><?php endif; ?>
                             </div>
                             <?php endforeach; if (!$cellLessons): ?>
                             <span class="text-muted text-xs">---</span>
@@ -172,7 +143,7 @@ require_once __DIR__ . '/includes/header.php';
                 </tbody>
             </table>
         </div>
-        <p class="text-xs text-muted mt-2">این جدول فقط-خواندنی است و از برنامهٔ هفتگیِ ثبت‌شده توسط مدرسه خوانده می‌شود.</p>
+        <p class="text-xs text-muted mt-2">این جدول فقط-خواندنی است و از برنامهٔ هفتگیِ ثبت‌شده توسط مدرسه خوانده می‌شود؛ فقط نام درس نمایش داده می‌شود.</p>
         <?php endif; ?>
     </div>
 </div>

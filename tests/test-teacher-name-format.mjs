@@ -1,11 +1,13 @@
 /**
  * test-teacher-name-format.mjs — «یک الگوی مرجع برای نام دبیر» (V4.211.0)
  *
- * درخواست مدیر مدرسه:
+ * درخواست مدیر مدرسه (V4.212.0 به‌روزرسانی شد):
  *   در بخش دبیران، نام بعضی دبیران اول نام و بعد نام خانوادگی ثبت شده و بعضی
  *   برعکس. همین ناهمگونی در برنامهٔ هفتگی پنل دانش‌آموز خودش را نشان داده:
  *   دبیر «علیرضا جهان تیغ» (درس ریاضی) به شکل «تیغ علیرضا» دیده می‌شد.
  *   → یک الگو انتخاب شود و همه‌جا فقط همان نمایش داده شود.
+ *   سپس (V4.212.0): در برنامهٔ هفتگی و برنامهٔ امتحانیِ پنل دانش‌آموز
+ *   اصلاً نام دبیر نمایش داده نشود و فقط نام درس ذکر شود.
  *
  * الگوی مرجع این نسخه:
  *   • نام کامل (صفحه‌های مدیریتی): «نام + نام خانوادگی»  → علیرضا جهان تیغ
@@ -14,19 +16,28 @@
  * همهٔ بررسی‌ها با اجرای واقعی PHP روی سورسِ وصله انجام می‌شوند.
  */
 import { req, run, login, loginAdmin, php } from './harness/lib.mjs';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { REPO } from './harness/site.mjs';
 
-const patchDir = process.env.PATCH || 'update-v4.211.0';
+const patchDir = process.env.PATCH || 'update-v4.212.0';
 const files = [
   'includes/functions.php',
   'includes/exams_helper.php',
   'student-schedule.php',
+  'student-exam-schedule.php',
   'import-teachers.php',
   'exams.php',
 ];
+/* فایل‌هایی که در اورلیِ جاری نیستند از اورلیِ نسخهٔ قبل برداشته می‌شوند */
+const overlayPath = rel => {
+  for (const dir of [patchDir, 'update-v4.211.0']) {
+    const candidate = `${REPO}/${dir}/${rel}`;
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new Error('فایل اورلی پیدا نشد: ' + rel);
+};
 for (const rel of files) {
-  php.writeFile('/www/' + rel, new Uint8Array(readFileSync(`${REPO}/${patchDir}/${rel}`)));
+  php.writeFile('/www/' + rel, new Uint8Array(readFileSync(overlayPath(rel))));
 }
 console.log(`>>> اورلیِ نسخهٔ نو: ${files.length} فایل از ${patchDir}`);
 
@@ -119,30 +130,32 @@ ok('رکورد با فیلدهای جابه‌جا (first=جهان تیغ / last
 ok('فیلد مجزای نام خانوادگی مرجع است (بهرامی)',
    /ARRAY2 => family=\[بهرامی\]/.test(out));
 
-/* ── ۲) برنامهٔ هفتگی دانش‌آموز ──────────────────────────────────────── */
-console.log('\n══ ۲) برنامهٔ هفتگی ══');
+/* ── ۲) برنامهٔ هفتگی دانش‌آموز: هیچ نام دبیری نمایش داده نمی‌شود ─────── */
+console.log('\n══ ۲) برنامهٔ هفتگی (فقط نام درس) ══');
 const sched = await page('student-schedule.php');
 ok('صفحهٔ برنامه هفتگی بدون خطا رندر می‌شود', !sched.fatal, sched.fatal || '');
-ok('کنار «ریاضی» نام «آقای جهان تیغ» نمایش داده می‌شود',
-   sched.page.includes('آقای جهان تیغ'), 'looked for آقای جهان تیغ');
-ok('رشتهٔ معیوب «تیغ علیرضا» دیگر دیده نمی‌شود',
-   !sched.page.includes('تیغ علیرضا'), 'still leaking «تیغ علیرضا»');
-ok('نام کوچک به‌تنهایی در کنار درس نمایش داده نمی‌شود',
-   !/>\s*علیرضا\s*</.test(sched.page));
-ok('ردیف بدون شناسهٔ دبیر هم با همان الگو نمایش داده می‌شود (زنگ ۲)',
-   (sched.page.match(/آقای جهان تیغ/g) || []).length >= 2,
-   (sched.page.match(/آقای جهان تیغ/g) || []).length + ' occurrences');
-ok('دبیر با نام درست «آقای احمدی» است', sched.page.includes('آقای احمدی'));
-ok('دبیر با فیلد مجزا «آقای بهرامی» است', sched.page.includes('آقای بهرامی'));
-ok('هیچ نام کاملی از دبیر در صفحهٔ دانش‌آموز چاپ نمی‌شود',
-   !sched.page.includes('مریم احمدی') && !sched.page.includes('کوروش بهرامی'));
+ok('نام دبیر («آقای …») در برنامهٔ هفتگی دیده نمی‌شود',
+   !sched.page.includes('آقای') && !sched.page.includes('جهان تیغ'),
+   (sched.page.match(/آقای[^<]*|جهان تیغ/g) || []).join(' · '));
+ok('نام کوچک دبیر هم در برنامهٔ هفتگی نیست', !/>\s*علیرضا\s*</.test(sched.page) && !sched.page.includes('علیرضا'));
+ok('رشتهٔ معیوب «تیغ علیرضا» هم دیده نمی‌شود', !sched.page.includes('تیغ'));
+/* «احمدی» نام خانوادگیِ خودِ دانش‌آموز آزمایشی هم هست؛ پس فقط نشانه‌های
+   مخصوص دبیران بررسی می‌شود. */
+ok('نام هیچ دبیری (مریم/کوروش/بهرامی) در صفحه نیامده است',
+   !sched.page.includes('مریم') && !sched.page.includes('کوروش') && !sched.page.includes('بهرامی'));
+for (const subject of ['ریاضی', 'علوم', 'فارسی', 'عربی']) {
+  ok(`نام درس «${subject}» همچنان نمایش داده می‌شود`, sched.page.includes(subject));
+}
 
-/* ── ۳) برنامهٔ امتحانی دانش‌آموز ─────────────────────────────────────── */
-console.log('\n══ ۳) برنامهٔ امتحانی ══');
+/* ── ۳) برنامهٔ امتحانی دانش‌آموز: ستون دبیر حذف شده ─────────────────── */
+console.log('\n══ ۳) برنامهٔ امتحانی (بدون ستون دبیر) ══');
 const exam = await page('student-exam-schedule.php');
 ok('صفحهٔ برنامه امتحانی بدون خطا رندر می‌شود', !exam.fatal, exam.fatal || '');
-ok('نام دبیر در برنامهٔ امتحانی «آقای جهان تیغ» است', exam.page.includes('آقای جهان تیغ'));
-ok('رشتهٔ معیوب «تیغ علیرضا» در برنامهٔ امتحانی هم نیست', !exam.page.includes('تیغ علیرضا'));
+ok('ستون «دبیر» در جدول نیست', !exam.page.includes('<th>دبیر</th>'));
+ok('هیچ نام دبیری در برنامهٔ امتحانی نیامده است',
+   !exam.page.includes('آقای') && !exam.page.includes('جهان تیغ') && !exam.page.includes('علیرضا'));
+ok('نام درس و تاریخ/ساعت آزمون همچنان نمایش داده می‌شود',
+   exam.page.includes('ریاضی') && exam.page.includes('تاریخ') && exam.page.includes('ساعت'));
 
 /* ── ۴) بخش دبیران (صفحهٔ مدیریت) ────────────────────────────────────── */
 console.log('\n══ ۴) بخش دبیران ══');
@@ -179,5 +192,5 @@ ok('در صفحهٔ مدیریت هم نام دبیر «علیرضا جهان ت
 ok('در صفحهٔ مدیریت هم «جهان تیغ علیرضا» دیده نمی‌شود',
    !examAdmin.page.includes('جهان تیغ علیرضا'));
 
-console.log(`\n  سوئیت الگوی نام دبیر: ${pass} PASS / ${fail} FAIL`);
+console.log(`\n  سوئیت نام دبیر (الگو + حذف از پنل دانش‌آموز): ${pass} PASS / ${fail} FAIL`);
 process.exit(fail === 0 ? 0 : 1);

@@ -1,5 +1,5 @@
 <?php
-// File: student-exam-schedule.php (v4.210.0)
+// File: student-exam-schedule.php (v4.212.0)
 /**
  * برنامهٔ امتحانی دانش‌آموز — «کدام ماه؟»
  *
@@ -12,7 +12,10 @@
  *            را بزند و ماهی را انتخاب کند، همان ماه (حتی قدیمی‌تر) نمایش
  *            داده می‌شود. این تصمیم فقط با تنظیم مدیر عوض می‌شود.
  *
- * نام دبیر در این صفحه فقط «آقای + نام خانوادگی» است (بدون نام کوچک).
+ * V4.212.0 — خواستهٔ مدیر مدرسه: در این صفحه نام دبیر نمایش داده نمی‌شود و
+ * فقط نام درس ذکر می‌شود. ستون «دبیر» از جدول حذف شده است؛ دادهٔ آزمون
+ * (شامل teacher_id) دست‌نخورده می‌ماند و در صفحه‌های مدیریتی همان‌جا که لازم
+ * است دیده می‌شود.
  */
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/exams_helper.php';
@@ -65,14 +68,12 @@ require_once __DIR__ . '/includes/header.php';
                         <th>روز</th>
                         <th>ساعت</th>
                         <th>درس</th>
-                        <th>دبیر</th>
                         <th>کلاس امتحانی</th>
                         <th>صندلی</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php foreach ($examRows as $ex):
-                    $teacherLabel = exam_student_teacher_label($ex['t_name'] ?? '');
                     $dayName = trim((string)($ex['exam_day_name'] ?? ''));
                     if ($dayName === '' && function_exists('exam_jalali_day_name')) {
                         $dayName = exam_jalali_day_name($ex['exam_date_jalali'] ?? '');
@@ -84,7 +85,6 @@ require_once __DIR__ . '/includes/header.php';
                         <td><?php echo clean($dayName !== '' ? $dayName : '—'); ?></td>
                         <td><?php echo tr_num($ex['start_time'] ?? '', 'fa'); ?></td>
                         <td class="font-bold"><?php echo clean($ex['subject_name'] ?? ''); ?></td>
-                        <td><?php echo clean($teacherLabel !== '' ? $teacherLabel : '—'); ?></td>
                         <td><?php echo clean($room !== '' ? $room : '—'); ?></td>
                         <td><?php echo tr_num(($ex['seat_number'] ?? '') !== '' ? $ex['seat_number'] : '---', 'fa'); ?></td>
                     </tr>

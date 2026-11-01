@@ -24,7 +24,7 @@ import { REPO } from './harness/site.mjs';
 import { php } from './harness/lib.mjs';
 
 
-const patchDir = process.env.PATCH || 'update-v4.211.0';
+const patchDir = process.env.PATCH || 'update-v4.212.0';
 const files = [
   'index.php', 'report-view.php', 'student-panel.php', 'student-schedule.php', 'student-exam-schedule.php',
   'student-discipline.php', 'student-reports.php', 'exams.php',
@@ -34,10 +34,10 @@ const files = [
 /* فایل‌هایی که در نسخهٔ جاری دست نخورده‌اند از اورلیِ قبلی برداشته می‌شوند
    تا این سوئیت همیشه کل مجموعهٔ پنل دانش‌آموز را روی سایت بگذارد. */
 const overlayPath = rel => {
-  const cur = `${REPO}/${patchDir}/${rel}`;
-  if (existsSync(cur)) return cur;
-  const prev = `${REPO}/update-v4.210.0/${rel}`;
-  if (existsSync(prev)) return prev;
+  for (const dir of [patchDir, 'update-v4.211.0', 'update-v4.210.0']) {
+    const candidate = `${REPO}/${dir}/${rel}`;
+    if (existsSync(candidate)) return candidate;
+  }
   throw new Error('فایل اورلی پیدا نشد: ' + rel);
 };
 for (const rel of files) {
@@ -153,8 +153,12 @@ for (const subject of ['ریاضی', 'علوم', 'فارسی', 'عربی']) {
 }
 ok('روزهای هفته در جدول هست', ['شنبه', 'یک‌شنبه', 'دوشنبه'].every(d => sched.page.includes(d)));
 ok('زنگ‌ها به عدد فارسی ستون‌بندی شده‌اند', sched.page.includes('زنگ ۱') && sched.page.includes('زنگ ۳'));
-ok('دبیر فقط با نام خانوادگی نمایش داده می‌شود (بدون «رضا»)',
-   sched.page.includes('حسنی') && !sched.page.includes('رضا حسنی'));
+/* V4.212.0 — خواستهٔ مدیر: در برنامهٔ هفتگی نام دبیر نمایش داده نمی‌شود */
+ok('نام دبیر در برنامهٔ هفتگی نمایش داده نمی‌شود',
+   !sched.page.includes('حسنی') && !sched.page.includes('رضا') && !sched.page.includes('آقای'),
+   (sched.page.match(/حسنی|آقای[^<]*/g) || []).join(' · '));
+ok('در برنامهٔ هفتگی فقط نام درس در خانه‌ها آمده است',
+   (sched.page.match(/class="font-bold text-xs block"/g) || []).length >= 4);
 ok('درسِ کلاس دیگر در برنامهٔ این دانش‌آموز نیست', (sched.page.match(/عربی/g) || []).length === 1);
 
 /* ── ۳) برنامهٔ امتحانی: پیش‌فرض جدیدترین ماه (آذر) ───────────────────── */
@@ -168,9 +172,12 @@ ok('آزمون‌های آذر دیده می‌شوند', examPage.page.includes
 ok('رکورد بدون exam_month از تاریخش به آذر نسبت داده شد', examPage.page.includes('عربی'));
 ok('آزمون کلاسی/سالِ دیگر در برنامه نیست',
    !examPage.page.includes('آزمون کلاسی') && !examPage.page.includes('تاریخِ سالِ قبل'));
-ok('نام دبیر فقط «آقای حسنی» است',
-   examPage.page.includes('آقای حسنی') && !examPage.page.includes('رضا') && !examPage.page.includes('حسنی رضا'),
-   (examPage.page.match(/آقای[^<]*/g) || []).join(' · '));
+/* V4.212.0 — خواستهٔ مدیر: در برنامهٔ امتحانی هم نام دبیر نمی‌آید */
+ok('ستون «دبیر» از جدول برنامهٔ امتحانی حذف شده است',
+   !examPage.page.includes('<th>دبیر</th>') && !examPage.page.includes('آقای حسنی'),
+   (examPage.page.match(/<th>[^<]*<\/th>/g) || []).join(' '));
+ok('نام دبیر هیچ‌جای برنامهٔ امتحانی (حتی در متن) نیامده است',
+   !examPage.page.includes('حسنی') && !examPage.page.includes('رضا'));
 ok('ستون صندلی/کلاس امتحانی موجود است', examPage.page.includes('صندلی') && examPage.page.includes('کلاس امتحانی'));
 
 /* افزودن ماه جدید (دی) ⇒ خودکار به دی می‌رود */
@@ -210,7 +217,8 @@ const examManual = await page('student-exam-schedule.php');
 ok('پنل دانش‌آموز حالا همان ماهِ انتخابی مدیر (آبان) را نشان می‌دهد',
    examManual.page.includes('علوم') && !examManual.page.includes('زیست') && !examManual.page.includes('فارسی'),
    (examManual.page.match(/برنامهٔ ماه[^<]*/g) || []).join(''));
-ok('در حالت دستی هم نام دبیر «آقای حسنی» می‌ماند', examManual.page.includes('آقای حسنی') && !examManual.page.includes('رضا'));
+ok('در حالت دستی هم نام دبیر نمایش داده نمی‌شود',
+   !examManual.page.includes('آقای') && !examManual.page.includes('حسنی'));
 
 /* ماهی که برای این دانش‌آموز برنامه دارد ولی خیلی قدیمی است: خرداد سال قبل
    — سالِ دیگر است، پس باید بی‌صدا به خودکار برگردد (صفحه خالی نماند) */
@@ -278,8 +286,11 @@ console.log('\n══ ۹) بهداشت نسخه‌ها ══');
 /* V4.211.0: اورلیِ جاری update-v4.211.0 است؛ فایل‌هایی که در این نسخه دست
    نخورده‌اند از اورلیِ قبلی (4.210.0) خوانده می‌شوند تا بررسی همچنان کامل بماند. */
 const shippedDir = rel => {
-  const cur = `${REPO}/update-v4.211.0/${rel}`;
-  return existsSync(cur) ? cur : `${REPO}/update-v4.210.0/${rel}`;
+  for (const dir of ['update-v4.212.0', 'update-v4.211.0', 'update-v4.210.0']) {
+    const candidate = `${REPO}/${dir}/${rel}`;
+    if (existsSync(candidate)) return candidate;
+  }
+  return `${REPO}/update-v4.210.0/${rel}`;
 };
 for (const rel of ['student-panel.php', 'student-schedule.php', 'student-exam-schedule.php',
                    'student-discipline.php', 'student-reports.php', 'exams.php',
@@ -289,9 +300,9 @@ for (const rel of ['student-panel.php', 'student-schedule.php', 'student-exam-sc
   ok(`نسخهٔ توسعه و منتشرشدهٔ ${rel} یکی است`, dev.equals(shipped));
 }
 for (const rel of ['config/version.php', 'includes/perf.php']) {
-  const a = readFileSync(`${REPO}/update-v4.152.0/${rel}`, 'utf8').includes('4.211.0');
-  const b = readFileSync(shippedDir(rel), 'utf8').includes('4.211.0');
-  ok(`مهر نسخه در ${rel} تازه است (4.211.0)`, a && b);
+  const a = readFileSync(`${REPO}/update-v4.152.0/${rel}`, 'utf8').includes('4.212.0');
+  const b = readFileSync(shippedDir(rel), 'utf8').includes('4.212.0');
+  ok(`مهر نسخه در ${rel} تازه است (4.212.0)`, a && b);
 }
 
 console.log(`\n  سوئیت منوی کاشی دانش‌آموز: ${pass} PASS / ${fail} FAIL`);
