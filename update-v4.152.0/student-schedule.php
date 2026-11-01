@@ -73,13 +73,36 @@ $extraDayLabels = [];
 foreach (array_keys($week) as $dKey) {
     if (!in_array($dKey, $knownDayKeys, true)) $extraDayLabels[] = $dayLabels[$dKey] ?? '—';
 }
+/*
+ * V4.211.0 — نام دبیر در برنامهٔ هفتگی فقط با «الگوی مرجع» نمایش داده می‌شود:
+ * «آقای + نام خانوادگی» (مثلاً «آقای جهان تیغ»). اگر ردیف برنامه به پروندهٔ
+ * دبیر وصل باشد، همان رکورد مرجع است (فیلد last_name قطعی)؛ وگرنه از نام
+ * ذخیره‌شده در خودِ برنامه استفاده می‌شود و teacher_respectful_name جهت نام
+ * را خودش تشخیص می‌دهد. این کار خطای «تیغ علیرضا» را برای نام‌های
+ * سه‌کلمه‌ای/نام‌خانوادگی‌اول از بین می‌برد.
+ */
 $teacherNameOf = function ($lesson) {
-    $name = trim((string)($lesson['teacher_name'] ?? ''));
-    if ($name === '' && !empty($lesson['teacher_id'])) {
-        $t = DB::fetch("SELECT full_name AS n FROM teachers WHERE id = ?", [(int)$lesson['teacher_id']]);
-        $name = trim((string)($t['n'] ?? ''));
+    $teacher = null;
+    if (!empty($lesson['teacher_id'])) {
+        try {
+            $teacher = DB::fetch("SELECT full_name, first_name, last_name FROM teachers WHERE id = ?", [(int)$lesson['teacher_id']]) ?: null;
+        } catch (Throwable $e) {
+            $teacher = null;
+        }
     }
-    return $name === '' ? '' : trim((string)teacher_family_name($name));
+    /* اگر اورلی ناقص باشد و تابع تازه نبود، همان تابع قدیمی سایت استفاده می‌شود
+       تا صفحه هرگز با fatal سفید نشود. */
+    $labelOf = function ($value) {
+        if (function_exists('teacher_respectful_name')) return trim((string)teacher_respectful_name($value));
+        return trim((string)teacher_family_name($value));
+    };
+    if ($teacher) {
+        $label = $labelOf($teacher);
+        if ($label !== '') return $label;
+    }
+    $name = trim((string)($lesson['teacher_name'] ?? ''));
+    if ($name === '') return '';
+    return $labelOf($name);
 };
 
 require_once __DIR__ . '/includes/header.php';

@@ -19,21 +19,31 @@
 import { req, run, db, login, loginAdmin } from './harness/lib.mjs';
 
 /* فایل‌های این نسخه از پوشهٔ وصله خوانده می‌شوند (همان چیزی که به هاست می‌رود) */
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { REPO } from './harness/site.mjs';
 import { php } from './harness/lib.mjs';
 
 
-const patchDir = process.env.PATCH || 'update-v4.210.0';
+const patchDir = process.env.PATCH || 'update-v4.211.0';
 const files = [
   'index.php', 'report-view.php', 'student-panel.php', 'student-schedule.php', 'student-exam-schedule.php',
   'student-discipline.php', 'student-reports.php', 'exams.php',
   'includes/student_nav.php', 'includes/exams_helper.php', 'includes/header.php',
+  'includes/functions.php',
 ];
+/* فایل‌هایی که در نسخهٔ جاری دست نخورده‌اند از اورلیِ قبلی برداشته می‌شوند
+   تا این سوئیت همیشه کل مجموعهٔ پنل دانش‌آموز را روی سایت بگذارد. */
+const overlayPath = rel => {
+  const cur = `${REPO}/${patchDir}/${rel}`;
+  if (existsSync(cur)) return cur;
+  const prev = `${REPO}/update-v4.210.0/${rel}`;
+  if (existsSync(prev)) return prev;
+  throw new Error('فایل اورلی پیدا نشد: ' + rel);
+};
 for (const rel of files) {
-  php.writeFile('/www/' + rel, new Uint8Array(readFileSync(`${REPO}/${patchDir}/${rel}`)));
+  php.writeFile('/www/' + rel, new Uint8Array(readFileSync(overlayPath(rel))));
 }
-console.log(`>>> اورلیِ نسخهٔ نو: ${files.length} فایل از ${patchDir}`);
+console.log(`>>> اورلیِ نسخهٔ نو: ${files.length} فایل روی ${patchDir}`);
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => cond
@@ -265,17 +275,23 @@ ok('خروج از حساب همچنان در نوار بالا هست', dashLega
 
 /* ── ۹) یکسانی نسخهٔ توسعه و نسخهٔ منتشرشده ───────────────────────────── */
 console.log('\n══ ۹) بهداشت نسخه‌ها ══');
+/* V4.211.0: اورلیِ جاری update-v4.211.0 است؛ فایل‌هایی که در این نسخه دست
+   نخورده‌اند از اورلیِ قبلی (4.210.0) خوانده می‌شوند تا بررسی همچنان کامل بماند. */
+const shippedDir = rel => {
+  const cur = `${REPO}/update-v4.211.0/${rel}`;
+  return existsSync(cur) ? cur : `${REPO}/update-v4.210.0/${rel}`;
+};
 for (const rel of ['student-panel.php', 'student-schedule.php', 'student-exam-schedule.php',
                    'student-discipline.php', 'student-reports.php', 'exams.php',
                    'includes/student_nav.php', 'includes/exams_helper.php']) {
   const dev = readFileSync(`${REPO}/update-v4.152.0/${rel}`);
-  const shipped = readFileSync(`${REPO}/update-v4.210.0/${rel}`);
+  const shipped = readFileSync(shippedDir(rel));
   ok(`نسخهٔ توسعه و منتشرشدهٔ ${rel} یکی است`, dev.equals(shipped));
 }
 for (const rel of ['config/version.php', 'includes/perf.php']) {
-  const a = readFileSync(`${REPO}/update-v4.152.0/${rel}`, 'utf8').includes('4.210.0');
-  const b = readFileSync(`${REPO}/update-v4.210.0/${rel}`, 'utf8').includes('4.210.0');
-  ok(`مهر نسخه در ${rel} هر دو نسخه 4.210.0 است`, a && b);
+  const a = readFileSync(`${REPO}/update-v4.152.0/${rel}`, 'utf8').includes('4.211.0');
+  const b = readFileSync(shippedDir(rel), 'utf8').includes('4.211.0');
+  ok(`مهر نسخه در ${rel} تازه است (4.211.0)`, a && b);
 }
 
 console.log(`\n  سوئیت منوی کاشی دانش‌آموز: ${pass} PASS / ${fail} FAIL`);

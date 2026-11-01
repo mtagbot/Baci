@@ -507,9 +507,11 @@ try { $maxRow = DB::fetch("SELECT MAX(id) m FROM subjects"); $nextSubjectCode = 
          * «نهم 3» و «نهم3» یک ستون شوند و ستون شبح ساخته نشود. کلاس‌هایی که
          * در برنامه رکورد دارند ولی تعریف نشده‌اند هم اضافه می‌شوند تا داده
          * پنهان نماند. */
-        /* v4.89.0: نگاشت id→نام دبیر برای رندر سبک خانه‌ها */
+        /* v4.89.0: نگاشت id→نام دبیر برای رندر سبک خانه‌ها
+           V4.211.0: نام نمایشی از الگوی مرجع می‌آید (نام + نام خانوادگی) تا
+           جدول برنامهٔ هفتگیِ مدیریت هم دقیقاً مثل بقیهٔ صفحه‌ها باشد. */
         $teacherNamesById = [];
-        foreach ($teachersList as $tl) $teacherNamesById[(int)$tl['id']] = $tl['full_name'];
+        foreach ($teachersList as $tl) $teacherNamesById[(int)$tl['id']] = teacher_canonical_full_name($tl);
         $matrixClasses = []; $wsSeenNorm = [];
         foreach ($classesList as $co) {
             $c = trim($co['name'] ?? ''); $n = norm_class_str($c);
@@ -707,7 +709,7 @@ try { $maxRow = DB::fetch("SELECT MAX(id) m FROM subjects"); $nextSubjectCode = 
            به جای هزاران <option> در DOM، فقط چند صد div سبک داریم. */
         var WS_STD_SUBJECTS = <?php echo json_encode(array_values($standardSubjects), JSON_UNESCAPED_UNICODE); ?>;
         var WS_EXTRA_SUBJECTS = <?php echo json_encode(array_values(array_diff($subjectNameOptions, $standardSubjects)), JSON_UNESCAPED_UNICODE); ?>;
-        var WS_TEACHERS = <?php echo json_encode(array_map(function($t){ return ['id' => (int)$t['id'], 'n' => $t['full_name']]; }, $teachersList), JSON_UNESCAPED_UNICODE); ?>;
+        var WS_TEACHERS = <?php echo json_encode(array_map(function($t){ return ['id' => (int)$t['id'], 'n' => teacher_canonical_full_name($t)]; }, $teachersList), JSON_UNESCAPED_UNICODE); ?>;
 
         function wsStatus(txt, color){
             var el = document.getElementById('wsStatus');

@@ -339,12 +339,22 @@ $filterQ    = trim($_GET['q'] ?? '');
                 <?php
                     /* v4.90.0: نام و نام خانوادگی مجزا؛ برای رکوردهای قدیمی که
                        فیلد مجزا ندارند، همان حدس backfill نمایش داده می‌شود. */
+                    /* V4.211.0 — پیش‌تر توکن اول به‌عنوان «نام خانوادگی» و بقیه
+                       به‌عنوان «نام» پر می‌شد؛ همین باعث می‌شد با هر بار ویرایش،
+                       نام دبیر در دیتابیس معکوس ذخیره شود («علیرضا جهان تیغ»
+                       → «جهان تیغ علیرضا»). حالا از همان تفکیک‌کنندهٔ مرکزی
+                       استفاده می‌شود که جهت نام را تشخیص می‌دهد. */
                     $edFirst = trim($editT['first_name'] ?? '');
                     $edLast  = trim($editT['last_name'] ?? '');
-                    if ($edFirst === '' && $edLast === '' && !empty($editT['full_name'])) {
-                        $edToks = preg_split('/\s+/u', trim($editT['full_name']));
-                        $edLast = array_shift($edToks) ?: '';
-                        $edFirst = trim(implode(' ', $edToks));
+                    $edFull  = trim($editT['full_name'] ?? '');
+                    if ($edFull !== '' && ($edFirst === '' || $edLast === '' || $edFirst === $edLast)) {
+                        $edParts = teacher_name_parts($editT);
+                        if ($edFirst === '') $edFirst = $edParts['first'];
+                        if ($edLast === '')  $edLast  = $edParts['family'];
+                        if ($edFirst === '' || $edLast === '') {
+                            $edFirst = $edParts['first'];
+                            $edLast  = $edParts['family'];
+                        }
                     }
                 ?>
                 <div class="grid grid-cols-2 gap-2 mb-3">
@@ -421,6 +431,7 @@ $filterQ    = trim($_GET['q'] ?? '');
                     <button type="button" class="btn btn-outline text-xs" onclick="document.querySelectorAll('.teacher-check').forEach(c=>c.checked=false)">لغو انتخاب</button>
                     <button type="submit" name="bulk_delete_teachers" value="1" class="btn btn-danger text-xs" onclick="return confirm('حذف دسته‌جمعی دبیران انتخاب شده؟');">حذف دسته‌جمعی</button>
                     <span class="text-xs text-muted self-center">دبیران مستقل از سال تحصیلی هستند و در همه سال‌ها معتبرند.</span>
+                    <span class="text-xs text-muted self-center" title="همهٔ صفحه‌ها نام دبیر را به همین شکل نشان می‌دهند">الگوی نمایش نام: <b>نام + نام خانوادگی</b></span>
                 </div>
             <div class="table-container max-h-[500px]">
                 <table>
@@ -432,7 +443,7 @@ $filterQ    = trim($_GET['q'] ?? '');
                             <td class="font-mono text-xs">#<?php echo $t['id']; ?></td>
                             <td class="font-mono font-bold"><?php echo tr_num($t['national_id'], 'fa'); ?></td>
                             <td class="font-mono"><?php echo clean($t['personnel_code']); ?></td>
-                            <td class="font-bold"><?php echo clean($t['full_name']); ?></td>
+                            <td class="font-bold"><?php echo clean(teacher_canonical_full_name($t)); ?></td>
                             <td><?php if(!empty($t['is_deputy'])): ?><span class="badge badge-warning text-xs">معاون</span><?php endif; ?> <?php if(!empty($t['is_counselor'])): ?><span class="badge badge-info text-xs">مشاور</span><?php endif; ?> <?php if(!empty($t['is_executive'])): ?><span class="badge badge-success text-xs">معاون اجرایی</span><?php endif; ?></td>
                             <td class="font-mono dir-ltr text-xs"><?php echo clean($t['mobile'] ?: '---'); ?></td>
                             <td>

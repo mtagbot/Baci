@@ -293,64 +293,309 @@ if (!function_exists('persian_usort_by')) {
     }
 }
 
+if (!function_exists('teacher_name_norm')) {
+    /**
+     * V4.211.0 — نرمال‌سازی نام دبیر برای «مقایسه» (نه برای نمایش).
+     *
+     * چرا لازم است: در بعضی نصب‌ها نام یک سری دبیران «نام + نام خانوادگی» و
+     * یک سری «نام خانوادگی + نام» ذخیره شده است (ویرایشگر قدیمی دبیران،
+     * توکن اول را اشتباهی نام خانوادگی می‌گذاشت). برای این‌که بتوان جهت نام
+     * را درست تشخیص داد، ی/ک عربی، نیم‌فاصله، همزه‌ها و فاصله‌های تکراری
+     * باید یکسان شوند.
+     */
+    function teacher_name_norm($value) {
+        $s = trim((string)$value);
+        if ($s === '') return '';
+        $s = str_replace(
+            ["ي", "ك", "ۀ", "ة", "أ", "إ", "ؤ", "ٱ", "\xE2\x80\x8C", "\xE2\x80\x8D", "\xE2\x80\x8E", "\xE2\x80\x8F", "\xE2\x80\xAF", "\xE2\x80\xAA", "\xE2\x80\xAB", "\xE2\x80\xAC", "\xE2\x80\xA0"],
+            ["ی", "ک", "ه", "ه", "ا", "ا", "و", "ا", " ", " ", " ", " ", " ", " ", " ", " ", " "],
+            $s
+        );
+        $s = preg_replace('/[\x{200B}-\x{200F}\x{FEFF}]/u', ' ', (string)$s);
+        $s = preg_replace('/\s+/u', ' ', (string)$s);
+        return trim((string)$s);
+    }
+}
+
+if (!function_exists('teacher_honorifics')) {
+    /** V4.211.0 — پیشوندهای احترامی که «بخشی از نام خانوادگی» نیستند. */
+    function teacher_honorifics() {
+        return ['آقای', 'اقای', 'آقا', 'خانم', 'استاد', 'دکتر', 'مهندس', 'جناب', 'سرکار', 'حاج', 'حاجیه', 'سید', 'سیده'];
+    }
+}
+
+if (!function_exists('teacher_first_name_lexicon')) {
+    /**
+     * V4.211.0 — فهرست نام‌های کوچک رایج فارسی برای تشخیص «جهت» نام دبیر.
+     *
+     * چرا فهرست؟ چون داده‌های ثبت‌شده در عمل دو جهت دارند و هیچ نشانهٔ ساختاری
+     * (مثل جداکنندهٔ «،») وجود ندارد. با این فهرست می‌فهمیم کدام توکن نام کوچک
+     * است: اگر توکن اول نبود و توکن آخر بود، یعنی نام خانوادگی‌اول ثبت شده و
+     * باید معکوس تفسیر شود. نام‌های ناشناخته همان قاعدهٔ قبلی (نام‌اول) را
+     * می‌گیرند تا رفتار هیچ نصب سالمی عوض نشود.
+     */
+    function teacher_first_name_lexicon() {
+        static $set = null;
+        if ($set !== null) return $set;
+        $names = [
+            /* مردانه */
+            'علیرضا', 'علی', 'رضا', 'حسن', 'حسین', 'محمد', 'محمدرضا', 'محمدحسین', 'محمدعلی', 'محمدجواد',
+            'محمدمهدی', 'محمدامین', 'محمدطاها', 'محمدیاسین', 'احمد', 'محمود', 'مصطفی', 'مرتضی', 'مهدی',
+            'مجتبی', 'سعید', 'مسعود', 'مجید', 'حمید', 'حمیدرضا', 'امیر', 'امیرحسین', 'امیرمهدی', 'امیرعلی',
+            'سجاد', 'صادق', 'صابر', 'عباس', 'عبدالله', 'عبدالرضا', 'عبدالحسین', 'عزیزالله', 'اسماعیل', 'ابراهیم',
+            'اسحاق', 'یوسف', 'یعقوب', 'یحیی', 'زکریا', 'سلیمان', 'داوود', 'داود', 'الیاس', 'ایوب',
+            'جواد', 'جعفر', 'کاظم', 'کریم', 'اکبر', 'اصغر', 'ناصر', 'نصرالله', 'وحید', 'هادی',
+            'یاسر', 'میلاد', 'میثم', 'مهدی', 'نیما', 'نادر', 'نبی', 'همایون', 'هومن', 'هورشید',
+            'فرهاد', 'فرزاد', 'فرید', 'فربد', 'فرامرز', 'کاوه', 'کیوان', 'کامران', 'کامبیز', 'بهرام',
+            'بهروز', 'بهزاد', 'بابک', 'بیژن', 'پرویز', 'پیمان', 'پیام', 'پوریا', 'پارسا', 'تورج',
+            'داریوش', 'سیاوش', 'شهرام', 'شیرزاد', 'شهاب', 'شاهین', 'صمد', 'طاهر', 'عادل', 'عارف',
+            'غلامرضا', 'غلامحسین', 'غلامعلی', 'فتح‌الله', 'قدرت‌الله', 'محسن', 'مسلم', 'منصور', 'منوچهر', 'مهران',
+            'مهرداد', 'مهرزاد', 'اشکان', 'اردشیر', 'آرش', 'آرمان', 'آرمین', 'آرین', 'آیدین', 'البرز',
+            'بختیار', 'بهنام', 'پدرام', 'پرویز', 'جمشید', 'حجت', 'حجت‌الله', 'رحیم', 'رسول', 'رشید',
+            'روح‌الله', 'زارع', 'سامان', 'سپهر', 'سروش', 'سلمان', 'سهراب', 'شمس', 'صالح', 'طهماسب',
+            'عادل', 'عباسعلی', 'عزیز', 'علاء', 'غفور', 'فرج', 'فرج‌الله', 'قاسم', 'قربان', 'کوروش',
+            'کیانوش', 'گرشاسب', 'مازیار', 'محمدصادق', 'محمدکاظم', 'محمدرحیم', 'مراد', 'مسیح', 'مهدی', 'نریمان',
+            'نظام', 'هاشم', 'هوشنگ', 'یحیی', 'یعقوب', 'یونس', 'ابوالفضل', 'ابوالحسن', 'ابولفضل', 'امید',
+            'ایمان', 'بهاءالدین', 'حسام', 'حسینعلی', 'رضوان', 'سیدرضا', 'شجاع', 'صدرا', 'عطا', 'عطاءالله',
+            'فرشاد', 'فرشید', 'فیروز', 'محمدنبی', 'محمدمهدی', 'مرصاد', 'مهدیار', 'نوید', 'هژیر', 'یاشار',
+            /* زنانه */
+            'زهرا', 'فاطمه', 'مریم', 'سارا', 'نرگس', 'نسیم', 'ندا', 'نیلوفر', 'هدیه', 'هانیه',
+            'سمیرا', 'سمانه', 'شقایق', 'شیما', 'صبا', 'طاهره', 'عاطفه', 'فرشته', 'فرزانه', 'فهیمه',
+            'کبری', 'گلناز', 'لیلا', 'محبوبه', 'ملیحه', 'منیره', 'مهسا', 'مینا', 'نازنین', 'نسرین',
+            'الهه', 'اکرم', 'افسانه', 'بتول', 'پریسا', 'پروین', 'تکتم', 'حدیث', 'خدیجه', 'رقیه',
+            'زینب', 'سعیده', 'سودابه', 'شادی', 'شبنم', 'شهلا', 'شیرین', 'صدیقه', 'عفت', 'فائزه',
+            'فریده', 'قدسیه', 'کتایون', 'لادن', 'معصومه', 'ملوک', 'مهناز', 'مهوش', 'مینو', 'ناهید',
+            'هما', 'ویدا', 'یاسمن', 'یلدا', 'آزاده', 'آزیتا', 'آرزو', 'آسیه', 'آناهیتا', 'الهام',
+            'بهاره', 'بهناز', 'پرستو', 'پگاه', 'ثریا', 'جمیله', 'حوریه', 'خاطره', 'دنیا', 'رویا',
+            'زری', 'سحر', 'سمیرا', 'سهیلا', 'شهرزاد', 'شیوا', 'صغری', 'طوبی', 'عارفه', 'فرناز',
+            'فروزان', 'فریبا', 'لطیفه', 'مرجان', 'مژگان', 'مستانه', 'منصوره', 'مهتاب', 'مهدیه', 'نرجس',
+            'نوشین', 'هاجر', 'هستی', 'هنگامه', 'پرنیان', 'راضیه', 'زکیه', 'سکینه', 'سمیه', 'شهربانو',
+            'عسل', 'فاطمه‌زهرا', 'کوثر', 'گلبهار', 'نازآفرین', 'نسترن', 'نوش‌آفرین',
+        ];
+        $set = [];
+        foreach ($names as $n) {
+            $k = teacher_name_norm($n);
+            if ($k !== '') $set[$k] = true;
+        }
+        return $set;
+    }
+}
+
+if (!function_exists('teacher_last_name_map')) {
+    /**
+     * V4.211.0 — نگاشت «نام کامل → نام خانوادگیِ ثبت‌شده» با کش درون‌درخواستی.
+     * همان کاری که teacher_family_name قبلاً انجام می‌داد، جدا شده تا چند تابع
+     * مختلف یک کوئری بیشتر اجرا نکنند.
+     */
+    function teacher_last_name_map() {
+        static $map = null;
+        if ($map !== null) return $map;
+        $map = [];
+        try {
+            if (class_exists('DB')) {
+                foreach (DB::fetchAll("SELECT full_name, first_name, last_name FROM teachers WHERE COALESCE(last_name,'')<>''") as $row) {
+                    $key  = teacher_name_norm($row['full_name'] ?? '');
+                    $last = teacher_name_norm($row['last_name'] ?? '');
+                    if ($key !== '' && $last !== '') $map[$key] = $last;
+                }
+            }
+        } catch (Throwable $e) {
+            $map = [];
+        } catch (Exception $e) {
+            $map = [];
+        }
+        return $map;
+    }
+}
+
+if (!function_exists('teacher_name_parts')) {
+    /**
+     * V4.211.0 — تفکیک یکپارچهٔ نام دبیر به «نام» و «نام خانوادگی»، مستقل از
+     * ترتیبی که در سیستم ثبت شده است.
+     *
+     * مشکل واقعی: نام «علیرضا جهان تیغ» در بعضی رکوردها به شکل
+     * «جهان تیغ علیرضا» ذخیره شده بود و منطق قدیمی فقط توکن اول را حذف
+     * می‌کرد، پس در برنامهٔ هفتگی «تیغ علیرضا» نمایش داده می‌شد.
+     *
+     * قاعدهٔ مرجع این نسخه (همه‌جا همین یک شکل):
+     *   • نام کامل: «نام + نام خانوادگی» → علیرضا جهان تیغ
+     *   • در پنل دانش‌آموز/دبیر/ربات: «آقای + نام خانوادگی» → آقای جهان تیغ
+     *
+     * خروجی: honorific · first · family · tokens · reversed · confident · source
+     */
+    function teacher_name_parts($teacher) {
+        $storedFirst = '';
+        $storedLast  = '';
+        $full        = '';
+        if (is_array($teacher)) {
+            $storedFirst = trim((string)($teacher['first_name'] ?? ''));
+            $storedLast  = trim((string)($teacher['last_name'] ?? ''));
+            $full        = trim((string)($teacher['full_name'] ?? ''));
+            if ($full === '') $full = trim($storedFirst . ' ' . $storedLast);
+        } else {
+            $full = trim((string)$teacher);
+        }
+        $out = [
+            'honorific' => '', 'first' => '', 'family' => '',
+            'tokens' => [], 'reversed' => false, 'confident' => false, 'source' => 'empty',
+        ];
+        if ($full === '' && $storedFirst === '' && $storedLast === '') return $out;
+
+        /* ۱) فیلدهای مجزا: اگر هر دو پر باشند مرجع‌اند — مگر این‌که جابه‌جا پر شده باشند. */
+        if ($storedFirst !== '' && $storedLast !== '') {
+            $lex = teacher_first_name_lexicon();
+            $nFirst = teacher_name_norm($storedFirst);
+            $nLast  = teacher_name_norm($storedLast);
+            if (isset($lex[$nLast]) && !isset($lex[$nFirst])) {
+                $tmp = $storedFirst; $storedFirst = $storedLast; $storedLast = $tmp;
+            }
+            $out['first'] = $storedFirst;
+            $out['family'] = $storedLast;
+            $out['confident'] = true;
+            $out['source'] = 'fields';
+            return $out;
+        }
+
+        $fullN  = teacher_name_norm($full);
+        $tokens = $fullN === '' ? [] : explode(' ', $fullN);
+        /* ۲) پیشوند احترام از ابتدای نام جدا می‌شود. */
+        $honor = teacher_honorifics();
+        $keptHonor = [];
+        while ($tokens && in_array(teacher_name_norm($tokens[0]), $honor, true)) {
+            $keptHonor[] = array_shift($tokens);
+        }
+        $out['tokens']    = $tokens;
+        $out['honorific'] = implode(' ', $keptHonor);
+        if (!$tokens) return $out;
+
+        if (count($tokens) === 1) {
+            $out['family'] = $tokens[0];
+            $out['confident'] = true;
+            $out['source'] = 'single-token';
+            return $out;
+        }
+
+        $lex = teacher_first_name_lexicon();
+        $firstKnown = isset($lex[$tokens[0]]);
+        $lastToken  = $tokens[count($tokens) - 1];
+        $lastKnown  = isset($lex[$lastToken]);
+        $reversed   = false;
+        $confident  = false;
+        if (!$firstKnown && $lastKnown) {
+            $reversed = true; $confident = true;          // نام خانوادگی‌اول ثبت شده
+        } elseif ($firstKnown && !$lastKnown) {
+            $reversed = false; $confident = true;         // نام‌اول ثبت شده
+        }
+
+        /* ۳) نام خانوادگیِ ثبت‌شده (اگر در جدول دبیران باشد) جهت را تأیید می‌کند. */
+        $map  = teacher_last_name_map();
+        $hint = $map[$fullN] ?? '';
+        if ($hint === '' && $keptHonor) {
+            $hint = $map[teacher_name_norm(implode(' ', array_merge($keptHonor, $tokens)))] ?? '';
+        }
+        if ($hint !== '') {
+            $hintTokens = explode(' ', $hint);
+            if (!$confident) {
+                $head = implode(' ', array_slice($tokens, 0, count($hintTokens)));
+                $tail = implode(' ', array_slice($tokens, count($tokens) - count($hintTokens)));
+                if ($hint === $head && $hint !== $tail) {
+                    $reversed = true; $confident = true;
+                } elseif ($hint === $tail) {
+                    $reversed = false; $confident = true;
+                }
+            }
+        }
+
+        $work = $tokens;
+        if ($reversed) {
+            $out['first']  = (string)array_pop($work);
+            $out['family'] = implode(' ', $work);
+        } else {
+            $out['first']  = (string)array_shift($work);
+            $out['family'] = implode(' ', $work);
+        }
+        $out['reversed']  = $reversed;
+        $out['confident'] = $confident;
+        $out['source']    = $confident ? 'dictionary' : 'fallback';
+
+        /* ۴) فیلد «نام خانوادگی» فقط وقتی حدس توکنی مطمئن نیست مرجع می‌شود،
+              و تنها اگر خودش نام کوچک نباشد (فیلدِ اشتباه‌پر‌شده). */
+        $storedLastN = teacher_name_norm($storedLast);
+        if ($storedLastN !== '' && isset($lex[$storedLastN])) $storedLastN = '';
+        if ($storedLastN !== '' && !$out['confident']) {
+            $out['family'] = $storedLastN;
+            $out['first']  = $storedFirst !== '' ? $storedFirst : '';
+            if ($out['first'] === '') {
+                foreach ($tokens as $tok) {
+                    if ($tok !== $storedLastN) { $out['first'] = $tok; break; }
+                }
+            }
+            $out['source'] = 'last-name-field';
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('teacher_canonical_full_name')) {
+    /**
+     * V4.211.0 — الگوی مرجعِ «نام کامل دبیر» در همهٔ صفحه‌های مدیریتی:
+     * همیشه «نام + نام خانوادگی» (مثلاً «علیرضا جهان تیغ»)، حتی اگر در
+     * دیتابیس معکوس ذخیره شده باشد.
+     */
+    function teacher_canonical_full_name($teacher) {
+        $p = teacher_name_parts($teacher);
+        $parts = [];
+        foreach (['honorific', 'first', 'family'] as $key) {
+            $val = trim((string)($p[$key] ?? ''));
+            if ($val !== '') $parts[] = $val;
+        }
+        if ($parts) return implode(' ', $parts);
+        $raw = is_array($teacher) ? (string)($teacher['full_name'] ?? '') : (string)$teacher;
+        return teacher_name_norm($raw);
+    }
+}
+
 if (!function_exists('teacher_family_name')) {
     /**
-     * v4.71.0: خارج از پنل مدیریت فقط «نام خانوادگی» دبیر نمایش داده می‌شود.
-     * پیشوندهای احترام (استاد/آقای/خانم/دکتر/مهندس) حفظ می‌شوند و بعد از آن‌ها
-     * فقط نام خانوادگی می‌آید. نام خانوادگی = همه توکن‌ها بعد از اولین توکنِ
-     * نام (تا نام‌های خانوادگی مرکب مثل «حسینی نژاد» سالم بمانند).
+     * V4.211.0 — نام خانوادگی دبیر (همراه با پیشوند احترام اگر ثبت شده باشد).
+     *
+     * برخلاف نسخه‌های قبلی که «توکن اول را حذف کن» بود، این‌جا از
+     * teacher_name_parts استفاده می‌شود؛ پس نام خانوادگیِ چندکلمه‌ای
+     * («جهان تیغ») و رکوردهای نام‌خانوادگی‌اول هر دو درست خوانده می‌شوند.
      */
     function teacher_family_name($fullName) {
-        /* v4.90.0: منبع قطعی = فیلد مجزای last_name در جدول teachers.
-           اگر آرایه دبیر (رکورد DB) داده شود مستقیم از فیلد استفاده می‌شود؛
-           اگر رشته باشد، اول با جدول دبیران تطبیق داده می‌شود (نگاشت
-           full_name → last_name با یک کوئری کش‌شده) و فقط اگر پیدا نشد،
-           به حدس توکنی قدیمی برمی‌گردیم. */
-        if (is_array($fullName)) {
-            $lastF = trim((string)($fullName['last_name'] ?? ''));
-            if ($lastF !== '') return $lastF;
-            $fullName = (string)($fullName['full_name'] ?? '');
-        }
-        $fullName = trim((string)$fullName);
-        if ($fullName === '') return $fullName;
-        static $famMap = null;
-        if ($famMap === null) {
-            $famMap = [];
-            try {
-                if (class_exists('DB')) {
-                    foreach (DB::fetchAll("SELECT full_name, last_name FROM teachers WHERE COALESCE(last_name,'')<>''") as $fr) {
-                        $famMap[trim((string)$fr['full_name'])] = trim((string)$fr['last_name']);
-                    }
-                }
-            } catch (Exception $e) { $famMap = []; }
-        }
-        $prefixes = ['استاد', 'آقای', 'خانم', 'دکتر', 'مهندس', 'حاج', 'سید', 'سیده'];
-        $tokens = preg_split('/\s+/u', $fullName);
-        $kept = [];
-        while (!empty($tokens) && in_array($tokens[0], $prefixes, true)) { $kept[] = array_shift($tokens); }
-        $bare = trim(implode(' ', $tokens));
-        if (isset($famMap[$fullName])) return trim(implode(' ', array_merge($kept, [$famMap[$fullName]])));
-        if ($bare !== '' && isset($famMap[$bare])) return trim(implode(' ', array_merge($kept, [$famMap[$bare]])));
-        if (count($tokens) >= 2) array_shift($tokens); // حدس قدیمی: حذف توکن اول
-        $out = trim(implode(' ', array_merge($kept, $tokens)));
-        return $out !== '' ? $out : $fullName;
+        $p = teacher_name_parts($fullName);
+        $family = trim((string)($p['family'] !== '' ? $p['family'] : $p['first']));
+        $honor  = trim((string)$p['honorific']);
+        $out = trim($honor . (($honor !== '' && $family !== '') ? ' ' : '') . $family);
+        if ($out !== '') return $out;
+        $raw = is_array($fullName) ? (string)($fullName['full_name'] ?? '') : (string)$fullName;
+        return teacher_name_norm($raw);
     }
 }
 
 if (!function_exists('teacher_respectful_name')) {
     /**
-     * v4.89.0: نام محترمانه دبیر برای پیام‌های ربات: «آقای رسولی».
-     * اگر نام از قبل پیشوند احترام (آقای/خانم/استاد/دکتر/مهندس) داشته باشد،
-     * همان حفظ می‌شود؛ در غیر این صورت «آقای» قبل از نام خانوادگی می‌آید.
+     * V4.211.0 — یک الگو برای همهٔ جاهایی که دانش‌آموز/ولی/ربات نام دبیر را
+     * می‌بیند: «آقای + نام خانوادگی» (مثلاً «آقای جهان تیغ»).
+     * اگر در نام ثبت‌شده پیشوند خانم/استاد/دکتر/مهندس باشد، همان حفظ می‌شود و
+     * برای پیشوندهای زنانه «خانم» می‌آید.
      */
     function teacher_respectful_name($fullName) {
-        /* v4.90.0: آرایه رکورد دبیر هم پذیرفته می‌شود (فیلد last_name قطعی). */
-        $fam = function_exists('teacher_family_name') ? teacher_family_name($fullName) : (is_array($fullName) ? trim((string)($fullName['full_name'] ?? '')) : trim((string)$fullName));
-        if ($fam === '') return $fam;
-        $honorifics = ['استاد', 'آقای', 'خانم', 'دکتر', 'مهندس'];
-        $first = preg_split('/\s+/u', $fam)[0] ?? '';
-        if (in_array($first, $honorifics, true)) return $fam;
-        return 'آقای ' . $fam;
+        $p = teacher_name_parts($fullName);
+        $family = trim((string)($p['family'] !== '' ? $p['family'] : $p['first']));
+        if ($family === '') return '';
+        $honor = trim((string)$p['honorific']);
+        $firstHonor = $honor === '' ? '' : (explode(' ', $honor)[0] ?? '');
+        $keep = ['استاد', 'آقای', 'اقای', 'آقا', 'خانم', 'دکتر', 'مهندس', 'جناب', 'سرکار'];
+        if (in_array($firstHonor, $keep, true)) {
+            return trim($honor . ' ' . $family);
+        }
+        $female = ['سیده', 'حاجیه', 'خانم', 'سرکار'];
+        if (in_array($firstHonor, $female, true)) {
+            return 'خانم ' . $family;
+        }
+        return 'آقای ' . $family;
     }
 }
 

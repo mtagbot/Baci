@@ -413,17 +413,22 @@ if (!function_exists('exam_jalali_day_name')) {
 
 if (!function_exists('exam_student_teacher_label')) {
     /**
-     * V4.210.0 — در پنل دانش‌آموز، نام دبیر نمایش داده نمی‌شود؛ فقط
-     * «آقای + نام خانوادگی» (مثل «آقای حسنی»).
+     * V4.210.0 / V4.211.0 — در پنل دانش‌آموز نام دبیر نمایش داده نمی‌شود؛ فقط
+     * «آقای + نام خانوادگی» (مثل «آقای حسنی» و برای نام خانوادگیِ چندکلمه‌ای
+     * «آقای جهان تیغ»).
+     *
+     * V4.211.0: منطق تفکیک نام به includes/functions.php منتقل شد
+     * (teacher_name_parts) تا برنامهٔ هفتگی، برنامهٔ امتحانی، ربات و صفحه‌های
+     * مدیریت همه یک الگو و یک نتیجه بدهند؛ همین‌جا هم فقط همان را صدا می‌زنیم.
      */
     function exam_student_teacher_label($name) {
+        if (function_exists('teacher_respectful_name')) {
+            return trim((string)teacher_respectful_name($name));
+        }
         $family = trim((string)teacher_family_name($name));
-        /* اگر پیشوند احترام از قبل داخل نام ذخیره شده بود، دوباره تکرار نشود
-           («آقای خانم رضایی» نباید ساخته شود). */
         $family = preg_replace('/^(آقای|خانم|استاد|دکتر|مهندس|سید|سیده)\s+/u', '', $family);
         $family = trim((string)$family);
-        if ($family === '') return '';
-        return 'آقای ' . $family;
+        return $family === '' ? '' : 'آقای ' . $family;
     }
 }
 
