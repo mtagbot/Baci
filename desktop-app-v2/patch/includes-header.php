@@ -214,6 +214,9 @@ function mtagToggleSidebar(){
           چیدمانش در «سفارشی‌سازی → منوی سریع هدر» تنظیم می‌شود. */ ?>
     <?php require_once __DIR__ . '/header_tiles.php'; render_header_tiles(); ?>
     <div class="flex items-center gap-4">
+        <?php /* V4.214.0 — تاریخ اول، «کاربری» آخر: در چیدمان راست‌به‌چپ دکمهٔ کاربری
+              چپ‌ترین عنصر هدر می‌شود و تاریخ کنارش می‌نشیند. */ ?>
+        <span class="text-xs font-medium hdr-date" title="تاریخ امروز (شمسی)"><?php echo jdate('l j F Y'); ?></span>
         <div class="user-menu-wrap">
             <button type="button" class="btn btn-secondary user-menu-btn" onclick="document.body.classList.toggle('user-menu-open')"><svg data-ui-icon="user" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2c0-8 16-8 16 0v2"/></svg> کاربری</button>
             <div class="user-menu-dropdown">
@@ -225,8 +228,6 @@ function mtagToggleSidebar(){
                 <?php elseif (function_exists('is_teacher_logged_in') && is_teacher_logged_in()): ?><a href="my-sessions.php" class="badge w-full justify-center text-xs" style="background:#d97706;color:#fff;text-decoration:none;cursor:pointer" title="مشاهده نشست‌های فعال در همه دستگاه‌ها"><?php echo clean(function_exists('teacher_family_name') ? teacher_family_name($_SESSION['teacher_name'] ?? 'دبیر') : ($_SESSION['teacher_name'] ?? 'دبیر')); ?></a><a href="logout.php" class="btn btn-danger w-full text-xs">خروج</a><?php endif; ?>
             </div>
         </div>
-        <?php /* V4.213.0 — تاریخ به کنار دکمهٔ «کاربری» آمد؛ فضای نوار کاشی‌ها بیشتر می‌شود. */ ?>
-        <span class="text-xs font-medium hdr-date" title="تاریخ امروز (شمسی)"><?php echo jdate('l j F Y'); ?></span>
     </div>
 </header>
 

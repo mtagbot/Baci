@@ -5,7 +5,7 @@
  * نه با جست‌وجوی متن در سورس:
  *
  *   ۱) پله‌های وضعیت نمره (۰ تا ۲۰) + نمرهٔ مشکی + راهنمای رنگ‌ها در کارنامه و چاپ
- *   ۲) اعلام سراسری پایه‌ای/کلاسی + مسدودیت فردی و گروهی + نبودن روبیکا
+ *   ۲) اعلام سراسری پایه‌ای/کلاسی + مسدودیت فردی و گروهی + فهرست پلتفرم‌ها
  *   ۳) تصویر دانش‌آموز در ستون پیش از نام (کارنامه‌ها و انضباط)
  *   ۴) «عنوان نوبت» در مدیریت ستونی نمرات (ذخیره، اعمال روی کارنامه‌ها، پیش‌فرض کارنامهٔ تازه)
  *   ۵) «افزودن دانش‌آموز» بدون + و «بازیابی دانش‌آموز» کنار آن؛ حذف از منو و کاشی‌ها
@@ -131,19 +131,21 @@ ok('گسترهٔ «فقط یک پایه» و «فقط یک کلاس» موجود
   bcHtml.includes('فقط یک پایه') && bcHtml.includes('فقط یک کلاس'));
 ok('کارنامهٔ گروهی‌قفل‌شده در پیش‌نمایش «قفل» علامت می‌خورد', bcHtml.includes('قفل — ارسال نمی‌شود'));
 ok('علت قفل گروهی نمایش داده می‌شود', bcHtml.includes('قفل گروهی آزمون V4.213.0'));
-ok('روبیکا در فرم اعلام سراسری نیست',
-  !bcHtml.includes('value="rubika"') && (bcHtml.match(/name="platforms\[\]"/g) || []).length === 2
-  && !patchFile('report-broadcast.php').includes('rubika'));
-ok('هر دو پلتفرم بله و تلگرام هست', bcHtml.includes('value="bale"') && bcHtml.includes('value="telegram"'));
+/* V4.214.0 — روبیکا هم به فهرست اضافه شد؛ این سوئیت فقط می‌سنجد که فهرست
+   همان سه پیام‌رسانِ خودِ سامانه باشد و مقدار ناشناخته به صفحه راه پیدا نکند.
+   رفتار ارسال روبیکا در tests/test-v4.214.0-features.mjs سنجیده می‌شود. */
+ok('فهرست پلتفرم‌ها همان سه پیام‌رسان سامانه است (بله، تلگرام، روبیکا)',
+  ['bale','telegram','rubika'].every(pf => bcHtml.includes('value="' + pf + '"'))
+  && (bcHtml.match(/name="platforms\[\]"/g) || []).length === 3);
 
 /* تلاش برای ارسال با پلتفرم جعلی باید رد شود؛ با یک پلتفرم معتبر اما بدون
    اتصال ربات باید «قفل‌شده: ۱» گزارش شود و هیچ ارسالی رخ ندهد. */
 await run(`<?php @mkdir('/tmp/sess'); ini_set('session.save_path','/tmp/sess'); session_name('BACI_TEST'); session_id('f213adm1'); session_start(); $_SESSION['csrf_token']='f213-token'; echo 'OK';`);
 const badPlatform = await req('ارسال با پلتفرم نامعتبر', {
   file: 'report-broadcast.php', sid: 'f213adm1', method: 'POST',
-  post: { csrf_token: 'f213-token', academic_year: curYear, report_month: 'آذر', scope: 'all', platforms: ['rubika'] },
+  post: { csrf_token: 'f213-token', academic_year: curYear, report_month: 'آذر', scope: 'all', platforms: ['soroush'] },
 });
-ok('پلتفرم ناشناخته (روبیکا) رد می‌شود', (badPlatform.res.flash || {}).type === 'error', JSON.stringify(badPlatform.res.flash || {}));
+ok('پلتفرم ناشناخته (سروش) رد می‌شود', (badPlatform.res.flash || {}).type === 'error', JSON.stringify(badPlatform.res.flash || {}));
 
 const sendTry = await req('ارسال با قفل گروهی', {
   file: 'report-broadcast.php', sid: 'f213adm1', method: 'POST',
@@ -233,8 +235,11 @@ console.log('\n══ ۶) هدر: تاریخ و زیرنویس ══');
 ok('«مورخ:» از هدر حذف شد', !stHtml.includes('مورخ:'));
 ok('«پنل مدیریت سیستم» از کنار نام مدرسه حذف شد', !stHtml.includes('پنل مدیریت سیستم'));
 ok('تاریخ (روز هفته + تاریخ) هنوز نمایش داده می‌شود', /class="text-xs font-medium hdr-date"/.test(stHtml));
-ok('تاریخ بعد از دکمهٔ کاربری آمده تا نوار کاشی‌ها جا باز کند',
-  stHtml.indexOf('user-menu-wrap') < stHtml.indexOf('hdr-date'), 'index(user-menu)=' + stHtml.indexOf('user-menu-wrap') + ' index(date)=' + stHtml.indexOf('hdr-date'));
+/* V4.214.0 — ترتیب برگشت: تاریخ پیش از دکمهٔ «کاربری» در DOM است تا در
+   چیدمان راست‌به‌چپ، «کاربری» چپ‌ترین عنصر هدر شود و تاریخ کنارش بنشیند. */
+ok('تاریخ کنار دکمهٔ کاربری و پیش از آن در DOM است (کاربری چپ‌ترین)',
+  stHtml.indexOf('hdr-date') > 0 && stHtml.indexOf('hdr-date') < stHtml.indexOf('user-menu-wrap'),
+  'index(user-menu)=' + stHtml.indexOf('user-menu-wrap') + ' index(date)=' + stHtml.indexOf('hdr-date'));
 ok('نوار کاشی‌ها همچنان بیرون از گروه کاربری رندر می‌شود',
   /render_header_tiles\(\);\s*\?>\s*<div class="flex items-center gap-4">/.test(patchFile('includes/header.php')));
 

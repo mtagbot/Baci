@@ -664,7 +664,8 @@ else:
             <?php /* V4.213.0 — «افزودن دانش‌آموز» بدون + و «بازیابی دانش‌آموز» کنار آن. */ ?>
             <a href="students.php?action=add" class="btn btn-primary gap-1"><span>افزودن دانش‌آموز</span></a>
             <?php if (has_permission('import_data')): ?>
-                <a href="student-recovery.php" class="btn btn-secondary gap-1" title="ایمپورت دانش‌آموزان و تصاویر از فایل"><span>بازیابی دانش‌آموز</span></a>
+                <?php /* V4.214.0 — هم‌شکل با همین نوار و با «رنگ ثانویهٔ» سایت (Accent Color). */ ?>
+                <a href="student-recovery.php" class="btn btn-warning gap-1" title="ایمپورت دانش‌آموزان و تصاویر از فایل"><span>بازیابی دانش‌آموز</span></a>
             <?php endif; ?>
         </div>
     </div>
@@ -823,15 +824,31 @@ else:
 </div>
 <div id="studentAjaxModal" class="modal-backdrop" style="display:none"><div class="modal-card card"><button type="button" class="btn btn-danger text-xs" style="float:left" onclick="closeStudentModal()">×</button><div id="studentAjaxContent"></div></div></div>
 <div id="studentHoverTooltip" class="student-hover-tooltip" style="display:none"></div>
+<style>
+/* V4.214.0 — پنجرهٔ شناور ردیف زیر لایهٔ مودال‌ها و خاموش تا وقتی پنجره‌ای باز است. */
+.student-hover-tooltip{ z-index: 900 !important; }
+body.student-modal-open .student-hover-tooltip{ display: none !important; }
+</style>
 
 <script>
 
+function hideStudentTooltip(){
+  const t=document.getElementById('studentHoverTooltip');
+  if(t){ t.style.display='none'; t.innerHTML=''; }
+}
 function openStudentModal(type, id){
   const modal=document.getElementById('studentAjaxModal'), content=document.getElementById('studentAjaxContent');
+  hideStudentTooltip();
+  document.body.classList.add('student-modal-open');
+  modal.classList.toggle('modal-disc', type === 'discipline');
   content.innerHTML='در حال بارگذاری...'; modal.style.display='flex';
   fetch('student-modal.php?type='+encodeURIComponent(type)+'&student_id='+id).then(r=>r.json()).then(j=>{content.innerHTML=j.html||'خطا';});
 }
-function closeStudentModal(){document.getElementById('studentAjaxModal').style.display='none';}
+function closeStudentModal(){
+  document.getElementById('studentAjaxModal').style.display='none';
+  document.body.classList.remove('student-modal-open');
+  document.getElementById('studentAjaxModal').classList.remove('modal-disc');
+}
 function saveDisciplineAjax(form){
   const fd=new FormData(form); fetch('student-modal.php',{method:'POST',body:fd}).then(r=>r.json()).then(j=>{document.getElementById('studentAjaxContent').innerHTML=j.html;}); return false;
 }
@@ -845,11 +862,16 @@ document.querySelectorAll('.student-row').forEach(row=>{
     const tip=document.getElementById('studentHoverTooltip');
     const id=row.dataset.studentId;
     clearTimeout(hoverTimer);
+    if(document.body.classList.contains('student-modal-open')) return;
     hoverTimer=setTimeout(()=>{
-      fetch('student-modal.php?type=hover&student_id='+id).then(r=>r.json()).then(j=>{tip.innerHTML=j.html; tip.style.display='block'; positionTip(e,tip);});
+      if(document.body.classList.contains('student-modal-open')) return;
+      fetch('student-modal.php?type=hover&student_id='+id).then(r=>r.json()).then(j=>{
+        if(document.body.classList.contains('student-modal-open')) return;
+        tip.innerHTML=j.html; tip.style.display='block'; positionTip(e,tip);
+      });
     },120);
   });
-  row.addEventListener('mouseleave', ()=>{clearTimeout(hoverTimer); document.getElementById('studentHoverTooltip').style.display='none';});
+  row.addEventListener('mouseleave', ()=>{clearTimeout(hoverTimer); hideStudentTooltip();});
 });
 function positionTip(e,tip){
   const pad=14, w=320, h=230; let x=e.clientX+18, y=e.clientY+18;

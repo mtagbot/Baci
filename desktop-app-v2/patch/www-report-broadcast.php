@@ -17,20 +17,31 @@
  *     (is_report_locked_for_student) — پس قفل فردی و گروهی هر دو مانع
  *     ارسال‌اند و تصمیمِ قفل فقط در یک جا گرفته می‌شود.
  *
- *  ۳) پلتفرم‌ها فقط «بله» و «تلگرام» هستند. روبیکا در این صفحه وجود ندارد
- *     (و اگر کسی مقدار دیگری در POST بگذارد، همان‌جا دور ریخته می‌شود).
+ *  ۳) سه پیام‌رسانِ همین سامانه: «بله»، «تلگرام» و «روبیکا». هر مقداری
+ *     جز این سه در POST همان‌جا دور ریخته می‌شود. ستون چت هر پیام‌رسان از
+ *     bot_chat_column() خوانده می‌شود (bale_chat_id / telegram_chat_id /
+ *     rubika_chat_id) — پیش از این، ستون روبیکا به‌اشتباه بله فرض می‌شد.
  */
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/academic_year_helpers.php';
 require_once __DIR__ . '/includes/bot_helpers.php';
 require_permission('manage_reports');
-ensure_bot_schema('bale');
-ensure_bot_schema('telegram');
+foreach (bot_platforms() as $rbPf) {
+    try { ensure_bot_schema($rbPf); } catch (Throwable $e) { /* نبودِ ربات نباید کل صفحه را بترکاند */ }
+}
 
 if (!function_exists('rb_platforms')) {
-    /** پلتفرم‌های مجاز این صفحه — عمداً همان دو؛ روبیکا اینجا نیست. */
+    /**
+     * پلتفرم‌های مجاز این صفحه: بله، تلگرام و روبیکا — همان‌هایی که
+     * bot_platforms() می‌شناسد و اتصالشان در «اکانت‌های ربات» ثبت می‌شود.
+     */
     function rb_platforms() {
-        return ['bale' => 'بله', 'telegram' => 'تلگرام'];
+        $labels = function_exists('bot_platform_labels') ? bot_platform_labels() : ['bale' => 'بله', 'telegram' => 'تلگرام', 'rubika' => 'روبیکا'];
+        $out = [];
+        foreach (function_exists('bot_platforms') ? bot_platforms() : ['bale', 'telegram', 'rubika'] as $pf) {
+            if (isset($labels[$pf])) $out[$pf] = $labels[$pf];
+        }
+        return $out;
     }
 }
 
@@ -171,7 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset(rb_platforms()[$pf]) && !in_array($pf, $platforms, true)) $platforms[] = $pf;
     }
     if (!$platforms) {
-        set_flash_message('error', 'حداقل یک ربات (بله یا تلگرام) را انتخاب کنید.');
+        set_flash_message('error', 'حداقل یک ربات (بله، تلگرام یا روبیکا) را انتخاب کنید.');
         redirect('report-broadcast.php?' . http_build_query(['academic_year' => $selYear, 'report_month' => $selMonth, 'scope' => $selScope, 'grade_level' => $selGrade, 'class_name' => $selClass]));
     }
 
@@ -183,7 +194,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (is_report_locked_for_student($r, $reason)) { $skipped++; continue; }
         foreach ($platforms as $pf) {
             $table = bot_user_table($pf);
-            $chatCol = $pf === 'telegram' ? 'telegram_chat_id' : 'bale_chat_id';
+            /* V4.214.0 — ستون چت از خودِ پیام‌رسان گرفته می‌شود؛ روبیکا دیگر
+               به‌اشتباه از ستون بله خوانده نمی‌شود. */
+            $chatCol = bot_chat_column($pf);
             $links = DB::fetchAll("SELECT DISTINCT `$chatCol` chat_id FROM `$table` WHERE student_id=?", [$r['student_id']]) ?: [];
             if (!$links) { $noLink++; continue; }
             foreach ($links as $ln) {
@@ -224,6 +237,11 @@ $previewLimit = 25;
             گسترهٔ ارسال را انتخاب کنید؛ پیش از ارسال، همین صفحه نشان می‌دهد چند کارنامه در آن گستره هست و
             چند کارنامه <b>قفل</b> است. کارنامه‌های قفل‌شده — چه قفل فردی و چه قفل گروهی — هرگز ارسال نمی‌شوند.
             برای هر کارنامه ابتدا متن نمرات و سپس تصویر کارنامه همراه دکمه «بررسی شد» فرستاده می‌شود.
+        </p>
+        <p class="text-xs text-muted" style="line-height:2;margin-top:2px">
+            ارسال از سه پیام‌رسان انجام می‌شود: <b>بله</b>، <b>تلگرام</b> و <b>روبیکا</b>.
+            تصویر کارنامهٔ ارسالی، وضعیت هر نمره را با طیف رنگ (از بحرانی تا عالی) نشان می‌دهد و
+            دکمهٔ «دریافت نسخهٔ PDF» همان تصویر را به‌صورت PDF می‌فرستد.
         </p>
     </div>
 
@@ -290,8 +308,9 @@ $previewLimit = 25;
         <input type="hidden" name="class_name" value="<?php echo clean($selScope === 'class' ? $selClass : ''); ?>">
         <div class="rb-platforms">
             <span class="rb-platforms-title">ارسال با:</span>
-            <label class="rb-platform"><input type="checkbox" name="platforms[]" value="bale" checked> <?php echo clean(rb_platforms()['bale']); ?></label>
-            <label class="rb-platform"><input type="checkbox" name="platforms[]" value="telegram" checked> <?php echo clean(rb_platforms()['telegram']); ?></label>
+            <?php foreach (rb_platforms() as $rbPfKey => $rbPfLabel): ?>
+                <label class="rb-platform"><input type="checkbox" name="platforms[]" value="<?php echo clean($rbPfKey); ?>" checked> <?php echo clean($rbPfLabel); ?></label>
+            <?php endforeach; ?>
         </div>
         <div class="rb-actions">
             <button class="btn btn-success" type="submit" <?php echo $sendableCnt ? '' : 'disabled'; ?>>ارسال کارنامه‌های ماه انتخابی</button>

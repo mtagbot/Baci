@@ -182,6 +182,12 @@ $smRecordCount=is_array($records)?count($records):0;
             </div>
             <div class="disc-table-wrap">
                 <table class="disc-table">
+                    <?php /* V4.214.0 — عرض ستون‌ها ثابت و درصدی است تا جدول در عرض
+                          پنجره جا شود و اسکرول افقی هرگز لازم نشود. */ ?>
+                    <colgroup>
+                        <col style="width:20%"><col style="width:11%"><col style="width:7%">
+                        <col style="width:22%"><col style="width:22%"><col style="width:8%"><col style="width:10%">
+                    </colgroup>
                     <thead>
                         <tr>
                             <th>عنوان</th>
@@ -235,11 +241,15 @@ $smRecordCount=is_array($records)?count($records):0;
     </div>
 </div>
 <style>
-/* V4.213.0 — چیدمان دو پنلی مدیریت انضباط داخل مودال */
+/* V4.213.0 — چیدمان دو پنلی مدیریت انضباط داخل مودال
+   V4.214.0 — پنجره بزرگ‌تر شد و جدول با چیدمان ثابت (table-layout:fixed) در
+   همان عرض جا می‌شود؛ ستون‌ها درصدی‌اند، پس دیگر هیچ محتوایی بیرون نمی‌زند
+   و اسکرول افقی لازم نیست. */
 .disc-modal{width:100%;min-width:0}
 #studentAjaxModal .modal-card,.modal-backdrop .modal-card{width:min(1180px,96vw);max-width:calc(100vw - 16px)}
-.disc-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:14px;align-items:start;margin-top:6px}
-@media (max-width:980px){.disc-grid{grid-template-columns:minmax(0,1fr)}}
+#studentAjaxModal.modal-disc .modal-card{width:min(1560px,98vw);max-width:calc(100vw - 10px)}
+.disc-grid{display:grid;grid-template-columns:minmax(300px,.78fr) minmax(0,1.72fr);gap:14px;align-items:start;margin-top:6px}
+@media (max-width:1024px){.disc-grid{grid-template-columns:minmax(0,1fr)}}
 .disc-panel{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;min-width:0;box-shadow:0 1px 2px rgba(15,23,42,.04)}
 .disc-panel-entry{border-top:3px solid #16a34a}
 .disc-panel-list{border-top:3px solid #2563eb}
@@ -254,20 +264,21 @@ $smRecordCount=is_array($records)?count($records):0;
 .disc-checks{display:flex;flex-wrap:wrap;gap:14px}
 .disc-checks label{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#334155}
 .disc-actions{display:flex;justify-content:flex-end}
-.disc-table-wrap{overflow:auto;max-height:56vh;border:1px solid #eef2f7;border-radius:10px}
-.disc-table{width:100%;border-collapse:collapse;font-size:12px}
-.disc-table th{position:sticky;top:0;background:#f8fafc;color:#475569;font-size:11px;text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;z-index:1}
-.disc-table td{padding:6px;border-bottom:1px solid #eef2f7;vertical-align:top}
+.disc-table-wrap{overflow-y:auto;overflow-x:hidden;max-height:56vh;border:1px solid #eef2f7;border-radius:10px}
+.disc-table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
+.disc-table th{position:sticky;top:0;background:#f8fafc;color:#475569;font-size:11px;text-align:right;padding:6px 5px;border-bottom:1px solid #e2e8f0;white-space:normal;line-height:1.5;z-index:1}
+.disc-table td{padding:5px;border-bottom:1px solid #eef2f7;vertical-align:top;overflow-wrap:anywhere;min-width:0}
 .disc-table tr:last-child td{border-bottom:0}
-.disc-col-title{min-width:150px}
-.disc-date{min-width:110px;direction:ltr;text-align:left}
-.disc-note{min-width:150px;resize:vertical}
-.disc-review-note{min-width:130px;resize:vertical;margin-top:4px}
-.disc-col-check,.disc-col-notify{white-space:nowrap;text-align:center}
-.disc-col-actions{white-space:nowrap;text-align:center}
-.disc-col-actions .btn{margin:1px}
-.disc-check{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#334155}
-@media (max-width:980px){.disc-table-wrap{max-height:none}}
+/* هر ورودی دقیقاً به اندازهٔ ستون خودش؛ نه یک پیکسل بیشتر */
+.disc-table .form-input,.disc-table .form-select,.disc-table .form-textarea{width:100%;min-width:0;max-width:100%;box-sizing:border-box;font-size:11px}
+.disc-date{direction:ltr;text-align:left}
+.disc-note,.disc-review-note{resize:vertical}
+.disc-review-note{margin-top:4px}
+.disc-col-check,.disc-col-notify{text-align:center}
+.disc-col-actions{text-align:center}
+.disc-col-actions .btn{display:block;width:100%;margin:0 0 3px}
+.disc-check{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#334155}
+@media (max-width:1024px){.disc-table-wrap{max-height:none}}
 </style>
 <?php endif;
 $html = ob_get_clean();
