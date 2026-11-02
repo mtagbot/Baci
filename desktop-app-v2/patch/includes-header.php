@@ -208,13 +208,12 @@ function mtagToggleSidebar(){
     <div class="flex items-center gap-3">
         <button type="button" class="hamburger-btn" id="sidebarToggleBtn" title="باز و بسته کردن منوی کناری" onclick="mtagToggleSidebar()"><svg data-ui-icon="menu" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 5h18M3 12h18M3 19h18"/></svg></button>
         <?php if (!empty($logoUrl)): ?><img src="<?php echo clean($logoUrl); ?>" alt="نشان مدرسه" class="h-10 w-10 object-contain rounded"><?php endif; ?>
-        <div><h1 class="text-lg font-bold"><?php echo clean($schoolName); ?></h1><span class="text-xs text-muted"><?php echo is_admin_logged_in() ? 'پنل مدیریت سیستم' : (is_student_logged_in() ? 'پنل دانش‌آموزی' : 'پنل دبیران'); ?></span></div>
+        <div><h1 class="text-lg font-bold"><?php echo clean($schoolName); ?></h1><?php /* V4.213.0 — زیرنویس «پنل مدیریت سیستم» حذف شد؛ فقط برای پنل دانش‌آموز و دبیر می‌ماند. */ ?><?php if (is_student_logged_in()): ?><span class="text-xs text-muted">پنل دانش‌آموزی</span><?php elseif (function_exists('is_teacher_logged_in') && is_teacher_logged_in()): ?><span class="text-xs text-muted">پنل دبیران</span><?php endif; ?></div>
     </div>
     <?php /* v4.132.0: منوی کاشی‌ای وسط هدر — فقط برای مدیر، یک ردیف، حداکثر ۸ کاشی.
           چیدمانش در «سفارشی‌سازی → منوی سریع هدر» تنظیم می‌شود. */ ?>
     <?php require_once __DIR__ . '/header_tiles.php'; render_header_tiles(); ?>
     <div class="flex items-center gap-4">
-        <span class="text-sm font-medium hdr-date"><?php echo jdate('l j F Y'); ?></span>
         <div class="user-menu-wrap">
             <button type="button" class="btn btn-secondary user-menu-btn" onclick="document.body.classList.toggle('user-menu-open')"><svg data-ui-icon="user" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2c0-8 16-8 16 0v2"/></svg> کاربری</button>
             <div class="user-menu-dropdown">
@@ -226,6 +225,8 @@ function mtagToggleSidebar(){
                 <?php elseif (function_exists('is_teacher_logged_in') && is_teacher_logged_in()): ?><a href="my-sessions.php" class="badge w-full justify-center text-xs" style="background:#d97706;color:#fff;text-decoration:none;cursor:pointer" title="مشاهده نشست‌های فعال در همه دستگاه‌ها"><?php echo clean(function_exists('teacher_family_name') ? teacher_family_name($_SESSION['teacher_name'] ?? 'دبیر') : ($_SESSION['teacher_name'] ?? 'دبیر')); ?></a><a href="logout.php" class="btn btn-danger w-full text-xs">خروج</a><?php endif; ?>
             </div>
         </div>
+        <?php /* V4.213.0 — تاریخ به کنار دکمهٔ «کاربری» آمد؛ فضای نوار کاشی‌ها بیشتر می‌شود. */ ?>
+        <span class="text-xs font-medium hdr-date" title="تاریخ امروز (شمسی)"><?php echo jdate('l j F Y'); ?></span>
     </div>
 </header>
 
@@ -250,14 +251,12 @@ function mtagToggleSidebar(){
         <?php if (has_permission('manage_reports')): ?>
             <div class="sidebar-section-title">ارزشیابی و امتحانات</div>
             <a href="reports-management.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['reports-management.php','reports.php','import.php','analytics.php']) ? 'active' : ''; ?>">مدیریت کارنامه‌ها</a>
-            <a href="exams.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'exams.php' ? 'active' : ''; ?>">امتحانات حضوری</a>
+            <a href="exams.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'exams.php' ? 'active' : ''; ?>">امتحانات</a>
             <!-- Virtual exams moved under evaluation, below presencial -->
             <a href="online-exams.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['online-exams.php','online-exam-form.php','online-exam-questions.php','online-exam-monitor.php','online-exam-results.php','online-exam-result.php','online-exam-grading.php','online-exam-categories.php','online-question-bank.php']) ? 'active' : ''; ?>">آزمون‌های مجازی (آنلاین)</a>
         <?php endif; ?>
-        <?php if (has_permission('import_data')): ?>
-            <div class="sidebar-section-title">ورود و خروج داده</div>
-            <a href="student-recovery.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['student-recovery.php','import-students.php','import-photos.php']) ? 'active' : ''; ?>">بازیابی دانش‌آموز</a>
-        <?php endif; ?>
+        <?php /* V4.213.0 — «بازیابی دانش‌آموز» از منو برداشته شد؛ دکمه‌اش کنار
+              «افزودن دانش‌آموز» در نوار عملیات صفحهٔ مدیریت دانش‌آموزان است. */ ?>
         <?php if (has_permission('send_sms')): ?>
             <div class="sidebar-section-title">ارتباطات و ربات‌ها</div>
             <a href="messages-management.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['messages-management.php','notifications.php','sms-panel.php']) ? 'active' : ''; ?>">پیامک و اعلان‌ها</a>
@@ -286,7 +285,7 @@ function mtagToggleSidebar(){
     <aside class="sidebar w-64 bg-card border-l border-color p-4 flex flex-col gap-2 shrink-0 shadow-lg">
         <a href="teacher-panel.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'teacher-panel.php' ? 'active' : ''; ?>">پنل دبیر</a>
         <div class="sidebar-section-title">ارزشیابی و امتحانات</div>
-        <a href="teacher-panel.php?tab=exams" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'teacher-panel.php' && ($_GET['tab']??'')=='exams' ? 'active' : ''; ?>">امتحانات حضوری / طراحی تشریحی</a>
+        <a href="teacher-panel.php?tab=exams" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'teacher-panel.php' && ($_GET['tab']??'')=='exams' ? 'active' : ''; ?>">امتحانات / طراحی تشریحی</a>
         <a href="online-exams.php" class="sidebar-item <?php echo in_array(basename($_SERVER['PHP_SELF']), ['online-exams.php','online-exam-form.php','online-exam-questions.php','online-exam-monitor.php','online-exam-results.php','online-exam-grading.php','online-question-bank.php']) ? 'active' : ''; ?>">آزمون‌های مجازی (آنلاین)</a>
         <?php require_once __DIR__ . '/school_roles.php'; ensure_school_roles_schema(); if (teacher_has_deputy($_SESSION['teacher_id'])): ?><a href="deputy-panel.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'deputy-panel.php' ? 'active' : ''; ?>">پنل معاونت</a><a href="attendance.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'attendance.php' ? 'active' : ''; ?>">حضور و غیاب</a><?php endif; if (teacher_has_counselor($_SESSION['teacher_id'])): ?><a href="counselor-panel.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'counselor-panel.php' ? 'active' : ''; ?>">پنل مشاور</a><?php endif; if (teacher_has_executive($_SESSION['teacher_id'])): ?><a href="executive-panel.php" class="sidebar-item <?php echo basename($_SERVER['PHP_SELF']) == 'executive-panel.php' ? 'active' : ''; ?>">معاون اجرایی</a><?php endif; ?>
     </aside>

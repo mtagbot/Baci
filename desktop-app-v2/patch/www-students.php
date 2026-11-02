@@ -661,7 +661,11 @@ else:
         </div>
         <div class="flex gap-2">
             <a href="deputy-panel.php" class="btn btn-warning gap-1"><span>موارد انضباطی</span></a>
-            <a href="students.php?action=add" class="btn btn-primary gap-1"><span>+ افزودن دانش‌آموز جدید</span></a>
+            <?php /* V4.213.0 — «افزودن دانش‌آموز» بدون + و «بازیابی دانش‌آموز» کنار آن. */ ?>
+            <a href="students.php?action=add" class="btn btn-primary gap-1"><span>افزودن دانش‌آموز</span></a>
+            <?php if (has_permission('import_data')): ?>
+                <a href="student-recovery.php" class="btn btn-secondary gap-1" title="ایمپورت دانش‌آموزان و تصاویر از فایل"><span>بازیابی دانش‌آموز</span></a>
+            <?php endif; ?>
         </div>
     </div>
 

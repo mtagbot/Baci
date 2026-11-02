@@ -92,7 +92,7 @@ function drm_visible_students($year, $grade, $class) {
         $where[] = '(' . drm_class_sql('s.class_name') . ' OR EXISTS (SELECT 1 FROM reports cr WHERE cr.student_id=s.id AND cr.academic_year=? AND cr.report_month=? AND ' . drm_class_sql('cr.class_name') . '))';
         $params[] = norm_class_str($class); $params[] = $year; $params[] = (string)($_GET['month'] ?? $_POST['month'] ?? ''); $params[] = norm_class_str($class);
     }
-    $rows = DB::fetchAll('SELECT DISTINCT s.id,s.first_name,s.last_name,s.class_name,s.grade_level FROM students s WHERE '.implode(' AND ',$where).' ORDER BY s.last_name,s.first_name,s.id',$params);
+    $rows = DB::fetchAll('SELECT DISTINCT s.id,s.first_name,s.last_name,s.class_name,s.grade_level,s.photo_url FROM students s WHERE '.implode(' AND ',$where).' ORDER BY s.last_name,s.first_name,s.id',$params);
     if (function_exists('persian_usort_students')) persian_usort_students($rows);
     return $rows;
 }
@@ -195,12 +195,12 @@ require_once __DIR__ . '/includes/header.php';
             <input id="drmRepeatScore" class="form-input drm-repeat-score" type="number" min="0" max="21" step="0.25" placeholder="یک نمره وارد کنید">
             <small class="text-muted">این فیلد فقط نمره را در ورودی‌های دانش‌آموزانِ قابل‌ویرایش قرار می‌دهد و خودش ذخیره نمی‌شود؛ سپس می‌توانید نمرهٔ هر دانش‌آموز را جداگانه تغییر دهید.</small>
         </div>
-        <div class="card table-container drm-table-container"><table id="disciplineReportTable"><thead><tr><th>دانش‌آموز</th><th>موارد انضباطی</th><th>نمرهٔ انضباط</th></tr></thead><tbody>
+        <div class="card table-container drm-table-container"><table id="disciplineReportTable"><thead><tr><?php /* V4.213.0 — ستون تصویر پیش از نام دانش‌آموز. */ ?><th class="text-center">تصویر</th><th>دانش‌آموز</th><th>موارد انضباطی</th><th>نمرهٔ انضباط</th></tr></thead><tbody>
         <?php foreach($studentRows as $s): $sid=(int)$s['id'];$rep=$reportMap[$sid]??null; ?>
-        <tr data-student-id="<?php echo $sid; ?>"><td><b class="drm-student-name"><?php echo clean(trim($s['first_name'].' '.$s['last_name'])); ?></b><span class="drm-student-meta"><span>پایه: <?php echo clean($s['grade_level']??'—'); ?></span><span>کلاس: <?php echo clean($s['class_name']??'—'); ?></span></span></td><td class="drm-items">
+        <tr data-student-id="<?php echo $sid; ?>"><td class="text-center"><?php echo student_row_avatar($s['photo_url'] ?? '', trim((string)$s['first_name'] . ' ' . (string)$s['last_name'])); ?></td><td><b class="drm-student-name"><?php echo clean(trim($s['first_name'].' '.$s['last_name'])); ?></b><span class="drm-student-meta"><span>پایه: <?php echo clean($s['grade_level']??'—'); ?></span><span>کلاس: <?php echo clean($s['class_name']??'—'); ?></span></span></td><td class="drm-items">
             <?php if(!empty($disciplineMap[$sid])): foreach($disciplineMap[$sid] as $item): $internalNote=trim((string)($item['internal_note']??'')); $attendanceEntry=drm_is_attendance_entry($internalNote); ?><div class="drm-item"><small class="text-muted"><?php echo clean(drm_age_label($item['occurred_at_jalali'])); ?></small> — <span><?php echo clean($item['title_text']); ?></span><?php if($internalNote!==''&&!$attendanceEntry): ?> — <span class="drm-internal-note"><?php echo nl2br(clean($internalNote)); ?></span><?php endif; ?></div><?php endforeach; else: ?><span class="text-muted">موردی ثبت نشده است.</span><?php endif; ?>
         </td><td><?php $rowHardLocked = !empty($rep['is_locked']) && !is_report_prelocked($year, $month, $s['class_name'] ?? '', $sid); ?><input class="form-input drm-score" type="number" min="0" max="21" step="0.25" name="scores[<?php echo $sid; ?>]" value="<?php echo clean($rep['discipline_score']??''); ?>" placeholder="—" <?php echo $rowHardLocked?'disabled title="کارنامه قفل است"':''; ?>></td></tr>
-        <?php endforeach; if(!$studentRows): ?><tr><td colspan="3" class="text-center text-muted">دانش‌آموزی با این فیلترها یافت نشد.</td></tr><?php endif; ?>
+        <?php endforeach; if(!$studentRows): ?><tr><td colspan="4" class="text-center text-muted">دانش‌آموزی با این فیلترها یافت نشد.</td></tr><?php endif; ?>
         </tbody></table></div>
         <div class="flex justify-end mt-3"><button class="btn btn-success px-8" type="submit">ثبت</button></div>
     </form>

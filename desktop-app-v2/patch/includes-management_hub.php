@@ -15,7 +15,7 @@ function school_management_hubs() {
             'wizard'=>['ایمپورت Wizard','import.php?embedded=1'],
             'analytics'=>['تحلیل و مقایسه','analytics.php?embedded=1'],
             'grades'=>['مدیریت ثبت نمره','grade-entry-management.php?embedded=1'],
-            'broadcast'=>['اعلام سراسری','report-broadcast.php?embedded=1']]],
+            'broadcast'=>['اعلام سراسری پایه‌ای و کلاسی','report-broadcast.php?embedded=1']]],
         'recovery'=>['title'=>'بازیابی دانش‌آموز','tabs'=>[
             'students'=>['ایمپورت دانش‌آموزان','import-students.php?embedded=1'],
             'photos'=>['آپلود تصاویر ZIP','import-photos.php?embedded=1']]],

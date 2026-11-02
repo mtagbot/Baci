@@ -213,13 +213,15 @@ $subjectScores = [];
                     <tr class="border-b hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                         <td class="border p-3 font-mono text-xs text-center"><?php echo tr_num($idx + 1, 'fa'); ?></td>
                         <td class="border p-3 font-bold"><?php echo clean($g['subject_name']); ?></td>
-                        <td class="border p-3 font-mono text-center font-extrabold text-base <?php echo ((float)$g['score'] == 21.0) ? 'text-amber-600' : ($g['score'] < 10 ? 'text-red-600' : 'text-blue-600 dark:text-blue-400'); ?>">
+                        <?php /* V4.213.0 — نمره همیشه مشکی است؛ رنگ فقط روی «وضعیت» می‌نشیند. */ ?>
+                        <td class="border p-3 font-mono text-center text-base" style="<?php echo report_grade_score_style(); ?>">
                             <?php echo display_score($g['score']); ?>
                         </td>
                         <td class="border p-3 font-mono text-xs text-center"><span class="badge bg-amber-100 text-amber-800 border">#<?php echo tr_num($sClsRank, 'fa'); ?></span></td>
                         <td class="border p-3 font-mono text-xs text-center"><span class="badge bg-green-100 text-green-800 border">#<?php echo tr_num($sGrdRank, 'fa'); ?></span></td>
                         <td class="border p-3 text-center">
-                            <?php echo ((float)$g['score'] == 21.0) ? '<span class="badge badge-warning">غیبت</span>' : ($g['score'] >= 10 ? '<span class="badge bg-green-100 text-green-800 border">قبول ✔</span>' : '<span class="badge bg-red-100 text-red-800 border">مردود ✖</span>'); ?>
+                            <?php /* V4.213.0 — نُه پلهٔ وضعیت، از «کاملا مردود» تا «عالی»؛ مشترک با چاپ و مقایسهٔ ماهانه. */ ?>
+                            <?php echo report_grade_status_badge($g['score'] ?? null); ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -234,6 +236,23 @@ $subjectScores = [];
                 </tfoot>
             </table>
         </div>
+
+        <?php /* V4.213.0 — راهنمای پله‌های وضعیت: رنگ‌ها بدون توضیح، رمزآلود می‌مانند. */ ?>
+        <details class="card mb-6" style="padding:12px 16px">
+            <summary style="cursor:pointer;font-weight:800;font-size:13px">راهنمای وضعیت نمره (۰ تا ۲۰)</summary>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+                <?php foreach (report_grade_status_bands() as $band): ?>
+                    <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;border:1px solid <?php echo $band['border']; ?>;background:<?php echo $band['bg']; ?>;color:<?php echo $band['text']; ?>;font-size:11px;font-weight:800">
+                        <span aria-hidden="true" style="width:7px;height:7px;border-radius:50%;background:<?php echo $band['dot']; ?>;flex:none"></span>
+                        <?php echo clean($band['label']); ?>
+                        <span style="opacity:.75;font-weight:700">(<?php echo tr_num((string)$band['min'], 'fa'); ?>–<?php echo tr_num((string)min(20, $band['max']), 'fa'); ?>)</span>
+                    </span>
+                <?php endforeach; ?>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;border:1px solid #fde68a;background:#fffbeb;color:#92400e;font-size:11px;font-weight:800">
+                    <span aria-hidden="true" style="width:7px;height:7px;border-radius:50%;background:#f59e0b;flex:none"></span>غیبت (۲۱ — بدون اثر در معدل)
+                </span>
+            </div>
+        </details>
 
         <?php if (!empty($report['teacher_comments'])): ?>
         <div class="p-4 rounded-xl bg-amber-50 dark:bg-slate-800 border border-amber-200 text-sm mb-6">

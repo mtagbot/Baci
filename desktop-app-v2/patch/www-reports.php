@@ -451,7 +451,7 @@ else:
     if (!empty($filterMonth)) { $where[] = "r.report_month = ?"; $params[] = $filterMonth; }
 
     $whereSql = implode(' AND ', $where);
-    $reports = DB::fetchAll("SELECT r.*, s.first_name, s.last_name, s.national_id FROM reports r JOIN students s ON r.student_id = s.id WHERE $whereSql ORDER BY r.id DESC LIMIT 100", $params);
+    $reports = DB::fetchAll("SELECT r.*, s.first_name, s.last_name, s.national_id, s.photo_url FROM reports r JOIN students s ON r.student_id = s.id WHERE $whereSql ORDER BY r.id DESC LIMIT 100", $params);
 
     $classSet = [];
     foreach (DB::fetchAll("SELECT DISTINCT name AS class_name FROM classes WHERE name IS NOT NULL AND name <> ''") ?: [] as $cr) {
@@ -645,6 +645,8 @@ else:
                 <thead>
                     <tr>
                         <th>شناسه</th>
+                        <?php /* V4.213.0 — تصویر دانش‌آموز در ستون پیش از نام. */ ?>
+                        <th class="text-center">تصویر</th>
                         <th>دانش‌آموز</th>
                         <th>کلاس</th>
                         <th>نوبت / ماه</th>
@@ -661,6 +663,7 @@ else:
                     ?>
                     <tr>
                         <td class="font-mono text-xs">#<?php echo $rep['id']; ?></td>
+                        <td class="text-center"><?php echo student_row_avatar($rep['photo_url'] ?? '', trim((string)$rep['first_name'] . ' ' . (string)$rep['last_name'])); ?></td>
                         <td class="font-bold"><?php echo clean($rep['first_name'] . ' ' . $rep['last_name']); ?></td>
                         <td><?php echo clean($rep['class_name']); ?></td>
                         <td><?php echo clean($rep['term'] . ' (' . $rep['report_month'] . ')'); ?></td>

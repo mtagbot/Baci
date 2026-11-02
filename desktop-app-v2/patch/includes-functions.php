@@ -980,6 +980,178 @@ if (!function_exists('display_score')) {
     }
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+ * V4.213.0 — پله‌های «وضعیت نمره» در کارنامه (یک منبع حقیقت)
+ * ----------------------------------------------------------------------
+ * خواستهٔ مدیر: کنار هر نمره، وضعیت آن هم دیده شود؛ از «کاملا مردود» تا
+ * سطح عالی. خودِ نمره باید مشکی بماند و فقط همین برچسب رنگ داشته باشد —
+ * پس رنگ‌ها اینجا تعریف می‌شوند، نه در CSS هر صفحه. صفحهٔ کارنامه، نسخهٔ
+ * چاپی، صفحهٔ «مقایسهٔ نمرات ماهانه» و هر جای دیگری که لازم شد از همین
+ * یک تابع می‌خوانند تا سه جا سه متن و سه رنگ نسازند.
+ *
+ * پله‌ها (بازهٔ بسته در پایین، باز در بالا):
+ *   ۰  تا <۲    کاملا مردود     قرمز تیره  →  بحرانی
+ *   ۲  تا <۴    بدون تلاش       قرمز
+ *   ۴  تا <۶    بسیار ضعیف      نارنجی
+ *   ۶  تا <۱۰   تلاش ناکافی     کهربایی
+ *   ۱۰ تا <۱۲   متوسط ضعیف      زرد
+ *   ۱۲ تا <۱۴   متوسط           لیمویی
+ *   ۱۴ تا <۱۶   متوسط خوب       سبز
+ *   ۱۶ تا <۱۸   بسیار خوب       سبز تیره
+ *   ۱۸ تا ۲۰    عالی            زمردی  ← در فهرست مدیر «بسیار خوب» دو بار
+ *                                        تکرار شده بود؛ پلهٔ پایانی «عالی»
+ *                                        گذاشته شد تا از «بسیار خوب» بالاتر باشد.
+ *   ۲۱          غیبت (خارج از دامنهٔ نمره — در معدل هم حساب نمی‌شود)
+ * ══════════════════════════════════════════════════════════════════════ */
+if (!function_exists('report_grade_status_bands')) {
+    /**
+     * @return array<int,array{min:float,max:float,key:string,label:string,dot:string,bg:string,border:string,text:string}>
+     */
+    function report_grade_status_bands() {
+        return [
+            ['min' => 0.0,  'max' => 2.0,  'key' => 'total_fail', 'label' => 'کاملا مردود',
+             'dot' => '#b91c1c', 'bg' => '#fef2f2', 'border' => '#fecaca', 'text' => '#7f1d1d'],
+            ['min' => 2.0,  'max' => 4.0,  'key' => 'no_effort',  'label' => 'بدون تلاش',
+             'dot' => '#dc2626', 'bg' => '#fef2f2', 'border' => '#fecaca', 'text' => '#991b1b'],
+            ['min' => 4.0,  'max' => 6.0,  'key' => 'very_weak',  'label' => 'بسیار ضعیف',
+             'dot' => '#ea580c', 'bg' => '#fff7ed', 'border' => '#fed7aa', 'text' => '#9a3412'],
+            ['min' => 6.0,  'max' => 10.0, 'key' => 'low_effort', 'label' => 'تلاش ناکافی',
+             'dot' => '#d97706', 'bg' => '#fffbeb', 'border' => '#fde68a', 'text' => '#92400e'],
+            ['min' => 10.0, 'max' => 12.0, 'key' => 'weak_avg',   'label' => 'متوسط ضعیف',
+             'dot' => '#ca8a04', 'bg' => '#fefce8', 'border' => '#fef08a', 'text' => '#854d0e'],
+            ['min' => 12.0, 'max' => 14.0, 'key' => 'average',    'label' => 'متوسط',
+             'dot' => '#65a30d', 'bg' => '#f7fee7', 'border' => '#d9f99d', 'text' => '#3f6212'],
+            ['min' => 14.0, 'max' => 16.0, 'key' => 'good_avg',   'label' => 'متوسط خوب',
+             'dot' => '#16a34a', 'bg' => '#f0fdf4', 'border' => '#bbf7d0', 'text' => '#166534'],
+            ['min' => 16.0, 'max' => 18.0, 'key' => 'very_good',  'label' => 'بسیار خوب',
+             'dot' => '#15803d', 'bg' => '#f0fdf4', 'border' => '#86efac', 'text' => '#14532d'],
+            ['min' => 18.0, 'max' => 20.01, 'key' => 'excellent', 'label' => 'عالی',
+             'dot' => '#047857', 'bg' => '#ecfdf5', 'border' => '#a7f3d0', 'text' => '#064e3b'],
+        ];
+    }
+}
+
+if (!function_exists('report_grade_numeric')) {
+    /** نمرهٔ خام را به عدد تبدیل می‌کند؛ '' و «غیبت» و متن ⇒ null. */
+    function report_grade_numeric($score) {
+        if ($score === null) return null;
+        if (is_string($score)) {
+            $score = trim(strtr($score, ['۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4','۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9',
+                                          '٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9',
+                                          '٫'=>'.','،'=>'.','/'=>'.']));
+            if ($score === '') return null;
+        }
+        return is_numeric($score) ? (float)$score : null;
+    }
+}
+
+if (!function_exists('report_grade_is_absence')) {
+    /** ۲۱ در این مدرسه یعنی «غیبت»، نه نمرهٔ بیست‌ویک. */
+    function report_grade_is_absence($score) {
+        $n = report_grade_numeric($score);
+        return $n !== null && abs($n - 21.0) < 0.001;
+    }
+}
+
+if (!function_exists('report_grade_status')) {
+    /**
+     * پلهٔ وضعیتِ یک نمره. برای نمرهٔ خالی، «غیبت» و ورودی نامعتبر null
+     * برمی‌گرداند تا خروجی «ثبت نشده» یا «غیبت» باشد، نه «کاملا مردود».
+     */
+    function report_grade_status($score) {
+        $n = report_grade_numeric($score);
+        if ($n === null || $n < 0 || $n > 20.0001) return null;
+        foreach (report_grade_status_bands() as $band) {
+            if ($n >= $band['min'] && $n < $band['max']) return $band;
+        }
+        return null;
+    }
+}
+
+if (!function_exists('report_grade_status_label')) {
+    function report_grade_status_label($score) {
+        if (report_grade_is_absence($score)) return 'غیبت';
+        $band = report_grade_status($score);
+        return $band ? $band['label'] : 'ثبت نشده';
+    }
+}
+
+if (!function_exists('report_grade_status_badge')) {
+    /**
+     * برچسب آمادهٔ نمایش (HTML) برای ستون «وضعیت ارزشیابی».
+     * خودِ نمره جای دیگری و با رنگ مشکی چاپ می‌شود؛ اینجا فقط وضعیت رنگ دارد.
+     */
+    function report_grade_status_badge($score) {
+        if (report_grade_is_absence($score)) {
+            return '<span class="grade-status grade-status-absence" style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;'
+                 . 'border-radius:999px;border:1px solid #fde68a;background:#fffbeb;color:#92400e;font-size:11px;font-weight:800;white-space:nowrap">'
+                 . '<span aria-hidden="true" style="width:7px;height:7px;border-radius:50%;background:#f59e0b;flex:none"></span>غیبت</span>';
+        }
+        $band = report_grade_status($score);
+        if (!$band) {
+            return '<span class="grade-status grade-status-empty" style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;'
+                 . 'border-radius:999px;border:1px dashed #cbd5e1;background:#f8fafc;color:#64748b;font-size:11px;font-weight:700;white-space:nowrap">'
+                 . 'ثبت نشده</span>';
+        }
+        $range = tr_num((string)$band['min'], 'fa') . ' تا ' . tr_num((string)min(20, $band['max']), 'fa');
+        return '<span class="grade-status grade-status-' . $band['key'] . '" title="بازهٔ ' . $range . '" style="display:inline-flex;align-items:center;gap:5px;'
+             . 'padding:2px 9px;border-radius:999px;border:1px solid ' . $band['border'] . ';background:' . $band['bg'] . ';color:' . $band['text'] . ';'
+             . 'font-size:11px;font-weight:800;white-space:nowrap">'
+             . '<span aria-hidden="true" style="width:7px;height:7px;border-radius:50%;background:' . $band['dot'] . ';flex:none"></span>'
+             . clean($band['label']) . '</span>';
+    }
+}
+
+if (!function_exists('report_grade_status_print')) {
+    /**
+     * همان وضعیت، برای کاغذ: بدون پس‌زمینه و بدون نقطه، فقط متنِ رنگی.
+     * در چاپ سیاه‌وسفید متن خوانا می‌ماند و در چاپ رنگی، پلهٔ وضعیت دیده می‌شود.
+     */
+    function report_grade_status_print($score) {
+        if (report_grade_is_absence($score)) return 'غیبت';
+        $band = report_grade_status($score);
+        if (!$band) return '—';
+        return '<span style="color:' . $band['dot'] . ';font-weight:bold">' . clean($band['label']) . '</span>';
+    }
+}
+
+if (!function_exists('report_grade_score_style')) {
+    /**
+     * استایل «نمرهٔ مشکی» — خواستهٔ مدیر: رنگ نمره عوض نشود، فقط وضعیت رنگ بگیرد.
+     * برنامه در حالت روشن اجرا می‌شود (header.php تم را روشن نگه می‌دارد)، پس
+     * مشکی همیشه خواناست؛ اینجا فقط برای یکدستی، متغیر رنگ تعریف می‌شود.
+     */
+    function report_grade_score_style() {
+        return 'color:#111111;font-weight:800;font-variant-numeric:tabular-nums';
+    }
+}
+
+if (!function_exists('student_row_avatar')) {
+    /**
+     * V4.213.0 — تصویر کوچک دانش‌آموز برای ردیف جدول (ستون «تصویر» پیش از نام).
+     * اگر عکس نباشد، حرف اول نام روی همان پس‌زمینه می‌نشیند تا ردیف خالی نماند.
+     * عمداً inline است تا به فایل CSS تازه و نسخهٔ کش نیاز نباشد.
+     */
+    function student_row_avatar($photoUrl, $name = '', $size = 36) {
+        $size = max(20, min(72, (int)$size));
+        $fontSize = (int)round($size * 0.42);
+        $photoUrl = trim((string)$photoUrl);
+        if ($photoUrl !== '') {
+            $inner = '<img src="' . clean($photoUrl) . '" alt="" loading="lazy" decoding="async" '
+                   . 'style="width:100%;height:100%;object-fit:cover;display:block">';
+        } else {
+            $initial = trim((string)$name);
+            $initial = $initial !== '' ? mb_substr($initial, 0, 1, 'UTF-8') : '';
+            $inner = $initial !== ''
+                ? '<span aria-hidden="true" style="font-size:' . $fontSize . 'px;font-weight:800;color:#64748b;line-height:1">' . clean($initial) . '</span>'
+                : '<span aria-hidden="true" style="font-size:' . $fontSize . 'px;color:#94a3b8;line-height:1">—</span>';
+        }
+        return '<span class="row-avatar" style="display:inline-flex;align-items:center;justify-content:center;width:' . $size . 'px;'
+             . 'height:' . $size . 'px;border-radius:9px;overflow:hidden;background:#eef2f7;border:1px solid #dde5ef;flex:none;vertical-align:middle">'
+             . $inner . '</span>';
+    }
+}
+
 /* =====================================================================
  * v4.131.0 — احراز هویت رمز عبور، بدون شاخهٔ «رمز خام»
  * ---------------------------------------------------------------------

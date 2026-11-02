@@ -30,7 +30,7 @@ const files = [
 ];
 /* فایل‌هایی که در اورلیِ جاری نیستند از اورلیِ نسخهٔ قبل برداشته می‌شوند */
 const overlayPath = rel => {
-  for (const dir of [patchDir, 'update-v4.211.0']) {
+  for (const dir of [patchDir, 'update-v4.212.0', 'update-v4.211.0']) {
     const candidate = `${REPO}/${dir}/${rel}`;
     if (existsSync(candidate)) return candidate;
   }

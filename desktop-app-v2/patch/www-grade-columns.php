@@ -1,5 +1,5 @@
 <?php
-// File: grade-columns.php  (v4.181.0)
+// File: grade-columns.php  (v4.213.0)
 /**
  * «مدیریت ستونی» — کنترل نمرات یک کلاس در یک ماه.
  *
@@ -33,6 +33,31 @@ if (!function_exists('gc_term_for_month')) {
         return in_array((string)$month, $second, true) ? 'نوبت دوم' : 'نوبت اول';
     }
 }
+if (!function_exists('gc_term_title_key')) {
+    /**
+     * V4.213.0 — کلید تنظیم «عنوان نوبت» برای یک سال/ماه.
+     * یک عنوان برای کل ماه، نه برای هر کارنامه؛ همان چیزی که مدیر می‌خواهد
+     * یک‌بار بنویسد و سرصفحهٔ همهٔ کارنامه‌های آن ماه شود.
+     */
+    function gc_term_title_key($year, $month) {
+        return 'report_term_title|' . trim((string)$year) . '|' . trim((string)$month);
+    }
+}
+
+if (!function_exists('gc_saved_term_title')) {
+    /** عنوان ذخیره‌شدهٔ این ماه؛ اگر نبود، عنوان کارنامه‌های موجود؛ وگرنه پیش‌فرض ماه. */
+    function gc_saved_term_title($year, $month) {
+        $saved = trim((string)get_setting(gc_term_title_key($year, $month), ''));
+        if ($saved !== '') return $saved;
+        try {
+            $row = DB::fetch("SELECT term FROM reports WHERE academic_year = ? AND report_month = ? AND term <> '' ORDER BY id DESC LIMIT 1", [$year, $month]);
+            $term = trim((string)($row['term'] ?? ''));
+            if ($term !== '') return $term;
+        } catch (Throwable $e) { /* جدول در دسترس نیست؛ پیش‌فرض کافی است */ }
+        return gc_term_for_month($month);
+    }
+}
+
 if (!function_exists('gc_fa_to_latin')) {
     /** رقم‌های فارسی/عربی، جداکنندهٔ اعشار فارسی و ممیز را یکدست می‌کند. */
     function gc_fa_to_latin($value) {
@@ -228,7 +253,7 @@ if (!function_exists('gc_save_cell')) {
         if (!$report) {
             /* V4.209.4 — قفل گروهی در ستون کپی نمی‌شود (فقط مسدودیت فردی در آن است). */
             DB::execute("INSERT INTO reports (student_id, class_name, academic_year, term, report_month, total_score, gpa, is_locked) VALUES (?,?,?,?,?,0,0,0)",
-                [$studentId, (string)$student['class_name'], $year, gc_term_for_month($month), $month]);
+                [$studentId, (string)$student['class_name'], $year, gc_saved_term_title($year, $month), $month]);
             $report = DB::fetch("SELECT * FROM reports WHERE id = ?", [DB::lastInsertId()]);
         }
         if (!$report) return ['ok' => false, 'message' => 'ساخت کارنامهٔ ماه انجام نشد.'];
@@ -274,6 +299,49 @@ $month = trim((string)($_GET['month'] ?? ''));
 if ($month === '') $month = gc_month_now();
 if (!in_array($month, $GC_MONTHS, true)) $GC_MONTHS[] = $month;
 
+/* ───────── ذخیرهٔ «عنوان نوبت» (فرم معمولی) ───────── */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['gc_action'] ?? '') === 'save_term') {
+    $postYear  = unify_academic_year(trim((string)($_POST['year'] ?? $year)));
+    $postMonth = trim((string)($_POST['month'] ?? $month));
+    $back = 'grade-columns.php?' . http_build_query(array_filter([
+        'embedded' => $embedded ? '1' : null,
+        'year'     => $postYear,
+        'month'    => $postMonth,
+        'class'    => $classRaw,
+    ], static function ($v) { return $v !== null && $v !== ''; }));
+    if (!is_string($_POST['csrf_token'] ?? null) || !verify_csrf($_POST['csrf_token'])) {
+        set_flash_message('error', 'اعتبار فرم منقضی شده است؛ صفحه را تازه کنید.');
+        redirect($back);
+    }
+    if (!in_array($postMonth, $GC_MONTHS, true) || $postMonth === '') {
+        set_flash_message('error', 'ماه انتخاب‌شده معتبر نیست.');
+        redirect($back);
+    }
+    $title = preg_replace('/\s+/u', ' ', trim((string)($_POST['term_title'] ?? '')));
+    $title = trim((string)$title);
+    if ($title === '') {
+        set_flash_message('error', 'عنوان نوبت خالی است؛ چیزی مثل «نوبت اول» یا «میان‌ترم» بنویسید.');
+        redirect($back);
+    }
+    if (mb_strlen($title) > 60) $title = mb_substr($title, 0, 60);
+    $affected = 0;
+    try {
+        set_setting(gc_term_title_key($postYear, $postMonth), $title);
+        $found = DB::fetch("SELECT COUNT(*) AS c FROM reports WHERE academic_year = ? AND report_month = ?", [$postYear, $postMonth]);
+        $affected = (int)($found['c'] ?? 0);
+        if ($affected > 0) {
+            DB::execute("UPDATE reports SET term = ? WHERE academic_year = ? AND report_month = ?", [$title, $postYear, $postMonth]);
+        }
+        log_activity($_SESSION['admin_id'] ?? null, 'عنوان نوبت کارنامه',
+            "{$postYear} / {$postMonth} → «{$title}» — {$affected} کارنامه");
+        set_flash_message('success', 'عنوان نوبت «' . $title . '» ذخیره شد و روی ' . tr_num($affected, 'fa') . ' کارنامهٔ این ماه اعمال شد.');
+    } catch (Throwable $e) {
+        error_log('Grade-columns term title failed: ' . $e->getMessage());
+        set_flash_message('error', 'ذخیرهٔ عنوان نوبت انجام نشد؛ اتصال پایگاه‌داده را بررسی کنید.');
+    }
+    redirect($back);
+}
+
 /* ───────── ذخیره‌سازی سلول (AJAX، پاسخ JSON) ───────── */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['gc_action'] ?? '') === 'save') {
     header('Content-Type: application/json; charset=utf-8');
@@ -309,6 +377,26 @@ require_once __DIR__ . '/includes/header.php';
         می‌ماند. با کلیک روی سرستون هر درس، جدول بر پایهٔ همان درس مرتب می‌شود؛ ترتیب پیش‌فرض الفبایی است.
         با کلید Tab و کلیدهای جهت‌دار (↑ ↓ ← →) بین سلول‌ها جابه‌جا شوید.
     </p>
+
+    <?php /* V4.213.0 — «عنوان نوبت»: یک فیلد که سرصفحهٔ همهٔ کارنامه‌های این ماه را می‌نویسد. */ ?>
+    <?php $gcTermTitle = gc_saved_term_title($year, $month); ?>
+    <form class="card gc-term-card" method="POST" action="grade-columns.php" data-no-ajax="1">
+        <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
+        <input type="hidden" name="gc_action" value="save_term">
+        <input type="hidden" name="year" value="<?php echo clean($year); ?>">
+        <input type="hidden" name="month" value="<?php echo clean($month); ?>">
+        <?php if ($embedded): ?><input type="hidden" name="embedded" value="1"><?php endif; ?>
+        <div class="gc-term-field">
+            <label for="gcTermTitle" class="font-bold text-xs">عنوان نوبت (سرصفحهٔ کارنامه‌های این ماه)</label>
+            <input id="gcTermTitle" name="term_title" class="form-input" maxlength="60" value="<?php echo clean($gcTermTitle); ?>"
+                   placeholder="مثلاً نوبت اول یا میان‌ترم" autocomplete="off">
+        </div>
+        <button class="btn btn-primary text-xs" type="submit">ذخیرهٔ عنوان نوبت</button>
+        <small class="text-muted" style="line-height:1.9">
+            این عنوان روی همهٔ کارنامه‌های <b><?php echo clean($month); ?></b> در سال <b><?php echo clean(tr_num($year, 'fa')); ?></b>
+            اعمال می‌شود (و برای کارنامه‌هایی که بعداً ساخته شوند هم ذخیره می‌ماند).
+        </small>
+    </form>
 
     <form class="card gc-filters" method="GET" action="grade-columns.php">
         <?php if ($embedded): ?><input type="hidden" name="embedded" value="1"><?php endif; ?>
@@ -426,6 +514,11 @@ require_once __DIR__ . '/includes/header.php';
 </div>
 
 <style>
+.gc-term-card{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px}
+.gc-term-card .gc-term-field{flex:1 1 280px;min-width:220px}
+.gc-term-card .gc-term-field label{display:block;margin-bottom:4px;color:#475569}
+.gc-term-card small{flex:1 1 100%;color:#64748b;font-size:11px}
+
 .gc-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
 .gc-filters>div{min-width:150px}
 .gc-status{font-size:12px;padding:2px 6px;border-radius:6px}

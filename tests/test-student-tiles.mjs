@@ -34,7 +34,7 @@ const files = [
 /* فایل‌هایی که در نسخهٔ جاری دست نخورده‌اند از اورلیِ قبلی برداشته می‌شوند
    تا این سوئیت همیشه کل مجموعهٔ پنل دانش‌آموز را روی سایت بگذارد. */
 const overlayPath = rel => {
-  for (const dir of [patchDir, 'update-v4.211.0', 'update-v4.210.0']) {
+  for (const dir of [patchDir, 'update-v4.212.0', 'update-v4.211.0', 'update-v4.210.0']) {
     const candidate = `${REPO}/${dir}/${rel}`;
     if (existsSync(candidate)) return candidate;
   }
@@ -286,7 +286,7 @@ console.log('\n══ ۹) بهداشت نسخه‌ها ══');
 /* V4.211.0: اورلیِ جاری update-v4.211.0 است؛ فایل‌هایی که در این نسخه دست
    نخورده‌اند از اورلیِ قبلی (4.210.0) خوانده می‌شوند تا بررسی همچنان کامل بماند. */
 const shippedDir = rel => {
-  for (const dir of ['update-v4.212.0', 'update-v4.211.0', 'update-v4.210.0']) {
+  for (const dir of ['update-v4.213.0', 'update-v4.212.0', 'update-v4.211.0', 'update-v4.210.0']) {
     const candidate = `${REPO}/${dir}/${rel}`;
     if (existsSync(candidate)) return candidate;
   }
@@ -300,9 +300,9 @@ for (const rel of ['student-panel.php', 'student-schedule.php', 'student-exam-sc
   ok(`نسخهٔ توسعه و منتشرشدهٔ ${rel} یکی است`, dev.equals(shipped));
 }
 for (const rel of ['config/version.php', 'includes/perf.php']) {
-  const a = readFileSync(`${REPO}/update-v4.152.0/${rel}`, 'utf8').includes('4.212.0');
-  const b = readFileSync(shippedDir(rel), 'utf8').includes('4.212.0');
-  ok(`مهر نسخه در ${rel} تازه است (4.212.0)`, a && b);
+  const a = readFileSync(`${REPO}/update-v4.152.0/${rel}`, 'utf8').includes('4.213.0');
+  const b = readFileSync(shippedDir(rel), 'utf8').includes('4.213.0');
+  ok(`مهر نسخه در ${rel} تازه است (4.213.0)`, a && b);
 }
 
 console.log(`\n  سوئیت منوی کاشی دانش‌آموز: ${pass} PASS / ${fail} FAIL`);

@@ -54,9 +54,13 @@ const actionBar = students.slice(
 );
 
 ok('«موارد انضباطی» از سربرگ برداشته شد', !headerBlock.includes('موارد انضباطی'));
-ok('«افزودن دانش‌آموز جدید» از سربرگ برداشته شد', !headerBlock.includes('افزودن دانش‌آموز جدید'));
+ok('«افزودن دانش‌آموز جدید» از سربرگ برداشته شد', !headerBlock.includes('افزودن دانش‌آموز'));
 ok('«موارد انضباطی» در نوار عملیات است', actionBar.includes('موارد انضباطی'));
-ok('«افزودن دانش‌آموز جدید» در نوار عملیات است', actionBar.includes('+ افزودن دانش‌آموز جدید'));
+/* V4.213.0 — مدیر خواست علامت + از این دکمه برداشته شود و «بازیابی دانش‌آموز»
+   (که قبلاً در منوی کناری بود) کنار آن بیاید. */
+ok('«افزودن دانش‌آموز» (بدون +) در نوار عملیات است',
+   actionBar.includes('>افزودن دانش‌آموز</a>') && !actionBar.includes('+ افزودن دانش‌آموز'));
+ok('«بازیابی دانش‌آموز» کنار آن در نوار عملیات است', actionBar.includes('>بازیابی دانش‌آموز</a>') && actionBar.includes('student-recovery.php'));
 ok('«گزارش» هنوز در نوار عملیات است', actionBar.includes('openReportModal()'));
 ok('«انتقال دانش‌آموزان» هنوز در نوار عملیات است', actionBar.includes('openTransferModal()'));
 ok('«حذف انتخاب شده‌ها» هنوز در نوار عملیات است', actionBar.includes('حذف انتخاب شده‌ها'));
@@ -64,10 +68,11 @@ ok('«حذف انتخاب شده‌ها» هنوز در نوار عملیات ا
 ok('لینک موارد انضباطی درست است', actionBar.includes('href="deputy-panel.php"'));
 ok('لینک افزودن دانش‌آموز درست است', actionBar.includes('href="students.php?action=add"'));
 /* ترتیب خواسته‌شده: دو دکمهٔ جدید قبل از گزارش */
-ok('ترتیب دکمه‌ها درست است (انضباطی، افزودن، گزارش، انتقال، حذف)', (() => {
+ok('ترتیب دکمه‌ها درست است (انضباطی، افزودن، بازیابی، گزارش، انتقال، حذف)', (() => {
     const idx = [
         actionBar.indexOf('موارد انضباطی'),
-        actionBar.indexOf('+ افزودن دانش‌آموز جدید'),
+        actionBar.indexOf('>افزودن دانش‌آموز</a>'),
+        actionBar.indexOf('>بازیابی دانش‌آموز</a>'),
         actionBar.indexOf('openReportModal()'),
         actionBar.indexOf('openTransferModal()'),
         actionBar.indexOf('حذف انتخاب شده‌ها')

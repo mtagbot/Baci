@@ -349,7 +349,7 @@ if (!function_exists('exam_month_options_for_year')) {
 
 if (!function_exists('exam_student_month_override')) {
     /**
-     * تنظیم مدیر (پایین صفحهٔ «امتحانات حضوری»):
+     * تنظیم مدیر (پایین صفحهٔ «امتحانات»):
      *   student_exam_month_manual   = ۱ یعنی مدیر خودش ماه را انتخاب کرده است
      *   student_exam_month_selected = نام همان ماه
      * پیش‌فرض خاموش است؛ پس رفتار مدرسه‌هایی که این تنظیم را ندیده‌اند
