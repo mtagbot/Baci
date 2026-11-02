@@ -272,18 +272,17 @@ if (!function_exists('gd_status_pill')) {
         $size = 17;
         foreach ([17, 15, 13] as $try) {
             $size = $try;
-            if (gd_text_measure($text, $try, true) + 36 <= $maxW) break;
+            if (gd_text_measure($text, $try, true) + 28 <= $maxW) break;
         }
         $tw = gd_text_measure($text, $size, true);
-        $pw = (int)min($maxW, $tw + 36);
+        $pw = (int)min($maxW, $tw + 28);
         $ph = 44;
         $x1 = (int)round($cx - $pw / 2); $x2 = $x1 + $pw;
         $y1 = (int)round($cy - $ph / 2); $y2 = $y1 + $ph;
         gd_round_rect($im, $x1, $y1, $x2, $y2, 14, report_image_hex($im, $style['border']));
         gd_round_rect($im, $x1 + 2, $y1 + 2, $x2 - 2, $y2 - 2, 12, report_image_hex($im, $style['bg']));
-        // نقطهٔ رنگی سمت راست (آغاز خواندن در فارسی) و برچسب در سمت چپ آن
-        imagefilledellipse($im, $x2 - 17, (int)round($cy), 13, 13, report_image_hex($im, $style['dot']));
-        gd_text($im, $text, $x2 - 29, (int)round($cy) + 7, $size, report_image_hex($im, $style['text']), true, 'right');
+        /* V4.214.1 — بدون نقطهٔ دایره‌ای: فقط متن وضعیت، وسط قرص. */
+        gd_text($im, $text, (int)round($cx), (int)round($cy) + 7, $size, report_image_hex($im, $style['text']), true, 'center');
         return ['x1' => $x1, 'x2' => $x2, 'w' => $pw, 'size' => $size];
     }
 }
@@ -308,22 +307,6 @@ if (!function_exists('generate_report_card_image')) {
         $gpaStyle = report_image_grade_style($r['gpa'] ?? null);
         $cardY=380; imagefilledrectangle($im,80,$cardY,260,$cardY+92,report_image_hex($im,$gpaStyle['bg'])); imagerectangle($im,80,$cardY,260,$cardY+92,report_image_hex($im,$gpaStyle['dot'])); gd_text($im,'معدل کل',170,$cardY+24,15,$muted,true,'center'); gd_text($im,format_score($r['gpa']),170,$cardY+56,26,report_image_hex($im,$gpaStyle['text']),true,'center'); gd_text($im,$gpaStyle['label'],170,$cardY+80,13,report_image_hex($im,$gpaStyle['text']),true,'center');
         imagefilledrectangle($im,280,$cardY,460,$cardY+92,imagecolorallocate($im,255,251,235)); imagerectangle($im,280,$cardY,460,$cardY+92,$gold); gd_text($im,'انضباط',370,$cardY+30,17,$gold,true,'center'); gd_text($im,($r['discipline_score']!==null && $r['discipline_score']!=='')?format_score($r['discipline_score']):'---',370,$cardY+70,28,$gold,true,'center');
-        /* V4.214.0 — نوار راهنمای طیف رنگ وضعیت: ۰ بحرانی (قرمز) تا ۲۰ عالی (سبز).
-           در فضای خالی سمت چپِ کارت‌های معدل/انضباط، بدون جابه‌جایی جدول. */
-        $lgX2=$w-95; $lgX1=520; $lgW=$lgX2-$lgX1; $lgY=414; $lgH=26;
-        gd_text($im,'راهنمای وضعیت نمره: از بحرانی تا عالی',$lgX2,402,15,$muted,true,'right');
-        $lgCursor=$lgX2;
-        foreach(array_reverse(report_grade_status_bands()) as $lgBand){
-            $span=min(20.0,(float)$lgBand['max'])-max(0.0,(float)$lgBand['min']);
-            $segW=(int)round($lgW*$span/20);
-            if($segW<=0)continue;
-            imagefilledrectangle($im,$lgCursor-$segW,$lgY,$lgCursor,$lgY+$lgH,report_image_hex($im,$lgBand['dot']));
-            $lgCursor-=$segW;
-        }
-        imagerectangle($im,$lgX1,$lgY,$lgX2,$lgY+$lgH,$line);
-        foreach([0,2,4,6,10,12,14,16,18,20] as $lgTick){
-            gd_text($im,(string)$lgTick,(int)round($lgX2-$lgW*$lgTick/20),$lgY+$lgH+20,12,$muted,false,'center');
-        }
         $y=505; imagefilledrectangle($im,80,$y,$w-80,$y+64,$primary); gd_text($im,'درس',$w-95,$y+42,20,$white,true); gd_text($im,'نمره',700,$y+42,20,$white,true,'center'); gd_text($im,'میانگین کلاس',560,$y+42,18,$white,true,'center'); gd_text($im,'رتبه کلاس',430,$y+42,18,$white,true,'center'); gd_text($im,'رتبه پایه',320,$y+42,18,$white,true,'center'); gd_text($im,'وضعیت',165,$y+42,18,$white,true,'center'); $y+=64;
         foreach($grades as $i=>$g){
             $bg=$i%2?$soft:$white; imagefilledrectangle($im,80,$y,$w-80,$y+74,$bg); imageline($im,80,$y+74,$w-80,$y+74,$line);

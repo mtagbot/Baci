@@ -101,8 +101,13 @@ ok('نمره در جدول با رنگ مشکی ($ink) رسم می‌شود، ن
   && !imgSrc.includes('$scoreColor'));
 ok('وضعیت به‌صورت قرص رنگی در ستون خودش رسم می‌شود',
   imgSrc.includes("gd_status_pill($im,165,$y+37,$gStyle['label'],$gStyle,170);"));
-ok('راهنمای طیف رنگ (بحرانی تا عالی) در تصویر هست',
-  imgSrc.includes('راهنمای وضعیت نمره: از بحرانی تا عالی'));
+/* V4.214.1 — نقطهٔ دایره‌ای از قرص وضعیت برداشته شد؛ فقط متن. */
+ok('قرص وضعیت نقطهٔ دایره‌ای ندارد و متنش وسط‌چین است',
+  !/gd_status_pill[\s\S]{0,1200}imagefilledellipse/.test(imgSrc)
+  && /gd_text\(\$im, \$text, \(int\)round\(\$cx\), \(int\)round\(\$cy\) \+ 7, \$size,[\s\S]{0,80}'center'\)/.test(imgSrc));
+/* V4.214.1 — مدیر خواست راهنمای طیف رنگ از تصویر برداشته شود. */
+ok('راهنمای طیف رنگ (بحرانی تا عالی) در تصویر نیست',
+  !imgSrc.includes('راهنمای وضعیت نمره: از بحرانی تا عالی') && !imgSrc.includes('$lgX1'));
 ok('کارت «معدل کل» هم رنگ و برچسب وضعیت را می‌گیرد',
   imgSrc.includes("report_image_grade_style($r['gpa'] ?? null)"));
 const helperSrc = siteFile('includes/bot_helpers.php');
@@ -206,7 +211,10 @@ const modal = await req('مودال انضباط', { file: 'student-modal.php', 
 let mJson = {}; try { mJson = JSON.parse(modal.res.page); } catch (e) {}
 const mHtml = mJson.html || '';
 ok('مودال JSON سالم برمی‌گرداند', mJson.ok === true, (modal.res.page || '').slice(0, 140));
-ok('پنجرهٔ انضباط عرض اختصاصی و بزرگ‌تر دارد', /#studentAjaxModal\.modal-disc \.modal-card\{width:min\(1560px,98vw\)/.test(mHtml));
+/* V4.214.0 عرض ۱۵۶۰ را آورد؛ V4.214.1 آن را تا ۹۸٪ صفحه بزرگ کرد — سنجه «بزرگ‌تر»
+   است، نه عددِ ثابت. */
+const discW = (mHtml.match(/#studentAjaxModal\.modal-disc \.modal-card\{width:min\((\d+)px,98vw\)/) || [])[1];
+ok('پنجرهٔ انضباط عرض اختصاصی و بزرگ‌تر دارد', Number(discW) >= 1560, String(discW));
 ok('جدول چیدمان ثابت دارد (ستون‌ها از عرض بیرون نمی‌زنند)', mHtml.includes('table-layout:fixed'));
 const cols = mHtml.match(/<col style="width:(\d+)%">/g) || [];
 const colSum = cols.reduce((a, c) => a + parseInt(c.match(/(\d+)%/)[1], 10), 0);

@@ -659,13 +659,14 @@ else:
             <h2 class="text-2xl font-bold">مدیریت پرونده دانش‌آموزان</h2>
             <p class="text-sm text-muted">فیلتر پیشرفته، عملیات دسته‌جمعی و گزارش‌گیری اداری</p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 student-list-actions">
             <a href="deputy-panel.php" class="btn btn-warning gap-1"><span>موارد انضباطی</span></a>
             <?php /* V4.213.0 — «افزودن دانش‌آموز» بدون + و «بازیابی دانش‌آموز» کنار آن. */ ?>
             <a href="students.php?action=add" class="btn btn-primary gap-1"><span>افزودن دانش‌آموز</span></a>
             <?php if (has_permission('import_data')): ?>
                 <?php /* V4.214.0 — هم‌شکل با همین نوار و با «رنگ ثانویهٔ» سایت (Accent Color). */ ?>
-                <a href="student-recovery.php" class="btn btn-warning gap-1" title="ایمپورت دانش‌آموزان و تصاویر از فایل"><span>بازیابی دانش‌آموز</span></a>
+                <?php /* V4.214.1 — متن یک‌خطی می‌ماند و دکمه جمع نمی‌شود. */ ?>
+                <a href="student-recovery.php" class="btn btn-warning gap-1" style="white-space:nowrap" title="ایمپورت دانش‌آموزان و تصاویر از فایل"><span>بازیابی دانش‌آموز</span></a>
             <?php endif; ?>
         </div>
     </div>
@@ -828,6 +829,8 @@ else:
 /* V4.214.0 — پنجرهٔ شناور ردیف زیر لایهٔ مودال‌ها و خاموش تا وقتی پنجره‌ای باز است. */
 .student-hover-tooltip{ z-index: 900 !important; }
 body.student-modal-open .student-hover-tooltip{ display: none !important; }
+/* V4.214.1 — دکمه‌های نوار عملیات یک‌خطی می‌مانند. */
+.student-list-actions .btn{ white-space: nowrap; flex: none; }
 </style>
 
 <script>

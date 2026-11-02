@@ -185,8 +185,8 @@ $smRecordCount=is_array($records)?count($records):0;
                     <?php /* V4.214.0 — عرض ستون‌ها ثابت و درصدی است تا جدول در عرض
                           پنجره جا شود و اسکرول افقی هرگز لازم نشود. */ ?>
                     <colgroup>
-                        <col style="width:20%"><col style="width:11%"><col style="width:7%">
-                        <col style="width:22%"><col style="width:22%"><col style="width:8%"><col style="width:10%">
+                        <col style="width:18%"><col style="width:10%"><col style="width:7%">
+                        <col style="width:20%"><col style="width:23%"><col style="width:9%"><col style="width:13%">
                     </colgroup>
                     <thead>
                         <tr>
@@ -244,11 +244,14 @@ $smRecordCount=is_array($records)?count($records):0;
 /* V4.213.0 — چیدمان دو پنلی مدیریت انضباط داخل مودال
    V4.214.0 — پنجره بزرگ‌تر شد و جدول با چیدمان ثابت (table-layout:fixed) در
    همان عرض جا می‌شود؛ ستون‌ها درصدی‌اند، پس دیگر هیچ محتوایی بیرون نمی‌زند
-   و اسکرول افقی لازم نیست. */
+   و اسکرول افقی لازم نیست.
+   V4.214.1 — پنجره تقریباً تمام‌صفحه شد (۹۸٪ عرض دید) و هیچ کلمه‌ای نمی‌شکند:
+   سرستون‌ها، دکمه‌ها، «موجه» و «ارسال شد» همه nowrap هستند. */
 .disc-modal{width:100%;min-width:0}
 #studentAjaxModal .modal-card,.modal-backdrop .modal-card{width:min(1180px,96vw);max-width:calc(100vw - 16px)}
-#studentAjaxModal.modal-disc .modal-card{width:min(1560px,98vw);max-width:calc(100vw - 10px)}
-.disc-grid{display:grid;grid-template-columns:minmax(300px,.78fr) minmax(0,1.72fr);gap:14px;align-items:start;margin-top:6px}
+#studentAjaxModal.modal-disc{padding:8px}
+#studentAjaxModal.modal-disc .modal-card{width:min(2000px,98vw);max-width:calc(100vw - 8px)}
+.disc-grid{display:grid;grid-template-columns:minmax(290px,.72fr) minmax(0,2fr);gap:12px;align-items:start;margin-top:6px}
 @media (max-width:1024px){.disc-grid{grid-template-columns:minmax(0,1fr)}}
 .disc-panel{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;min-width:0;box-shadow:0 1px 2px rgba(15,23,42,.04)}
 .disc-panel-entry{border-top:3px solid #16a34a}
@@ -266,19 +269,22 @@ $smRecordCount=is_array($records)?count($records):0;
 .disc-actions{display:flex;justify-content:flex-end}
 .disc-table-wrap{overflow-y:auto;overflow-x:hidden;max-height:56vh;border:1px solid #eef2f7;border-radius:10px}
 .disc-table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
-.disc-table th{position:sticky;top:0;background:#f8fafc;color:#475569;font-size:11px;text-align:right;padding:6px 5px;border-bottom:1px solid #e2e8f0;white-space:normal;line-height:1.5;z-index:1}
-.disc-table td{padding:5px;border-bottom:1px solid #eef2f7;vertical-align:top;overflow-wrap:anywhere;min-width:0}
+.disc-table th{position:sticky;top:0;background:#f8fafc;color:#475569;font-size:11px;text-align:right;padding:6px 5px;border-bottom:1px solid #e2e8f0;white-space:nowrap;line-height:1.5;z-index:1}
+.disc-table td{padding:5px;border-bottom:1px solid #eef2f7;vertical-align:top;overflow-wrap:normal;word-break:normal;min-width:0}
 .disc-table tr:last-child td{border-bottom:0}
 /* هر ورودی دقیقاً به اندازهٔ ستون خودش؛ نه یک پیکسل بیشتر */
 .disc-table .form-input,.disc-table .form-select,.disc-table .form-textarea{width:100%;min-width:0;max-width:100%;box-sizing:border-box;font-size:11px}
 .disc-date{direction:ltr;text-align:left}
 .disc-note,.disc-review-note{resize:vertical}
 .disc-review-note{margin-top:4px}
-.disc-col-check,.disc-col-notify{text-align:center}
-.disc-col-actions{text-align:center}
-.disc-col-actions .btn{display:block;width:100%;margin:0 0 3px}
-.disc-check{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#334155}
-@media (max-width:1024px){.disc-table-wrap{max-height:none}}
+/* V4.214.1 — هیچ‌کدام از این برچسب‌ها/دکمه‌ها نمی‌شکنند. */
+.disc-col-check,.disc-col-notify{text-align:center;white-space:nowrap}
+.disc-col-actions{text-align:center;white-space:nowrap}
+.disc-col-actions .btn{display:block;width:100%;margin:0 0 3px;white-space:nowrap}
+.disc-col-notify .badge{white-space:nowrap}
+.disc-check{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#334155;white-space:nowrap}
+/* V4.214.1 — روی نمایشگر باریک، جدول به‌جای شکستنِ کلمه‌ها کمی اسکرول افقی می‌گیرد. */
+@media (max-width:1024px){.disc-table-wrap{max-height:none;overflow-x:auto}.disc-table{min-width:780px}}
 </style>
 <?php endif;
 $html = ob_get_clean();

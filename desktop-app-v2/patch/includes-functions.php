@@ -1083,21 +1083,21 @@ if (!function_exists('report_grade_status_badge')) {
      */
     function report_grade_status_badge($score) {
         if (report_grade_is_absence($score)) {
-            return '<span class="grade-status grade-status-absence" style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;'
+            /* V4.214.1 — بدون نقطهٔ دایره‌ای؛ فقط متن وضعیت. */
+            return '<span class="grade-status grade-status-absence" style="display:inline-block;padding:2px 9px;'
                  . 'border-radius:999px;border:1px solid #fde68a;background:#fffbeb;color:#92400e;font-size:11px;font-weight:800;white-space:nowrap">'
-                 . '<span aria-hidden="true" style="width:7px;height:7px;border-radius:50%;background:#f59e0b;flex:none"></span>غیبت</span>';
+                 . 'غیبت</span>';
         }
         $band = report_grade_status($score);
         if (!$band) {
-            return '<span class="grade-status grade-status-empty" style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;'
+            return '<span class="grade-status grade-status-empty" style="display:inline-block;padding:2px 9px;'
                  . 'border-radius:999px;border:1px dashed #cbd5e1;background:#f8fafc;color:#64748b;font-size:11px;font-weight:700;white-space:nowrap">'
                  . 'ثبت نشده</span>';
         }
         $range = tr_num((string)$band['min'], 'fa') . ' تا ' . tr_num((string)min(20, $band['max']), 'fa');
-        return '<span class="grade-status grade-status-' . $band['key'] . '" title="بازهٔ ' . $range . '" style="display:inline-flex;align-items:center;gap:5px;'
+        return '<span class="grade-status grade-status-' . $band['key'] . '" title="بازهٔ ' . $range . '" style="display:inline-block;'
              . 'padding:2px 9px;border-radius:999px;border:1px solid ' . $band['border'] . ';background:' . $band['bg'] . ';color:' . $band['text'] . ';'
              . 'font-size:11px;font-weight:800;white-space:nowrap">'
-             . '<span aria-hidden="true" style="width:7px;height:7px;border-radius:50%;background:' . $band['dot'] . ';flex:none"></span>'
              . clean($band['label']) . '</span>';
     }
 }

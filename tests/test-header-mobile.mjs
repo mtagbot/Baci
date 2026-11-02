@@ -120,8 +120,10 @@ const hdr = readFileSync(resolveFile('includes/header.php'), 'utf8');
    ۲) کلاس hdr-date که زیر ۱۰۲۴px هیچ قاعده‌ای نمی‌گیرد */
 ok('هدر فقط یک نقطهٔ الحاق برای کاشی‌ها دارد',
    (hdr.match(/render_header_tiles/g) || []).length === 1);
+/* V4.214.1 — همین div یک style="gap:6px" گرفت تا تاریخ به «کاربری» بچسبد؛
+   ساختار (جای نوار کاشی و ترتیب فرزندان) دست‌نخورده است. */
 ok('نوار کاشی بیرون از ساختار قبلی هدر قرار دارد (چیدمان قبلی دست‌نخورده)',
-   /<\/div>\s*<\?php\s*\/\*[\s\S]*?render_header_tiles\(\);\s*\?>\s*<div class="flex items-center gap-4">/.test(hdr));
+   /<\/div>\s*<\?php\s*\/\*[\s\S]*?render_header_tiles\(\);\s*\?>\s*(?:<\?php[\s\S]*?\?>\s*)?<div class="flex items-center gap-4"(?: style="gap:6px")?>/.test(hdr));
 ok('هیچ عنصر دیگری از هدر تغییر نکرده',
    hdr.includes('hamburger-btn') && hdr.includes('user-menu-wrap') &&
    hdr.includes('sidebarToggleBtn') && hdr.includes('mtagToggleSidebar'));
