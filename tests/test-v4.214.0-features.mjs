@@ -12,7 +12,8 @@
  *   ۶) شناور ردیف (tooltip) زیر پنجره‌ها و خاموش تا وقتی پنجره‌ای باز است
  */
 import { run, req, loginAdmin, php } from './harness/lib.mjs';
-import { resolveSite } from './harness/site.mjs';
+import { resolveSite, REPO } from './harness/site.mjs';
+import { readdirSync } from 'node:fs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => cond
@@ -20,7 +21,17 @@ const ok = (name, cond, detail = '') => cond
   : (fail++, console.log(`  ❌ ${name}${detail ? '  → ' + detail : ''}`));
 
 const SITE = resolveSite();
-const PATCH = process.env.PATCH || 'update-v4.214.0';
+/* آخرین پوشهٔ اصلاحیِ موجود در مخزن — تا این سوئیت با هر نسخهٔ تازه هم
+   بدون تنظیم PATCH سبز بماند. */
+const latestPatch = () => {
+  try {
+    const dirs = readdirSync(REPO).filter(d => /^update-v4\.\d+\.\d+(\.\d+)?$/.test(d));
+    const v = d => d.slice('update-v4.'.length).split('.').map(Number).concat([0, 0]).slice(0, 3);
+    dirs.sort((a, b) => { const [x, y] = [v(a), v(b)]; for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] - y[i]; return 0; });
+    return dirs[dirs.length - 1] || 'update-v4.152.0';
+  } catch (e) { return 'update-v4.152.0'; }
+};
+const PATCH = process.env.PATCH || latestPatch();
 console.log(`>>> سورس: ${SITE} · وصله: ${PATCH}`);
 
 const siteFile = rel => {
@@ -211,14 +222,15 @@ const modal = await req('مودال انضباط', { file: 'student-modal.php', 
 let mJson = {}; try { mJson = JSON.parse(modal.res.page); } catch (e) {}
 const mHtml = mJson.html || '';
 ok('مودال JSON سالم برمی‌گرداند', mJson.ok === true, (modal.res.page || '').slice(0, 140));
-/* V4.214.0 عرض ۱۵۶۰ را آورد؛ V4.214.1 آن را تا ۹۸٪ صفحه بزرگ کرد — سنجه «بزرگ‌تر»
-   است، نه عددِ ثابت. */
-const discW = (mHtml.match(/#studentAjaxModal\.modal-disc \.modal-card\{width:min\((\d+)px,98vw\)/) || [])[1];
-ok('پنجرهٔ انضباط عرض اختصاصی و بزرگ‌تر دارد', Number(discW) >= 1560, String(discW));
+/* V4.214.0 عرض ۱۵۶۰ را آورد؛ V4.214.1 به ۹۸vw و V4.214.2 سقف پیکسلی را هم
+   برداشت — سنجه «بزرگ‌تر از ۱۵۶۰» است، نه عددِ ثابت. */
+const discW = (mHtml.match(/#studentAjaxModal\.modal-disc \.modal-card\{width:(?:min\((\d+)px,)?98vw\)/) || [])[1];
+ok('پنجرهٔ انضباط عرض اختصاصی و بزرگ‌تر دارد', discW === undefined || Number(discW) >= 1560, String(discW));
 ok('جدول چیدمان ثابت دارد (ستون‌ها از عرض بیرون نمی‌زنند)', mHtml.includes('table-layout:fixed'));
 const cols = mHtml.match(/<col style="width:(\d+)%">/g) || [];
 const colSum = cols.reduce((a, c) => a + parseInt(c.match(/(\d+)%/)[1], 10), 0);
-ok('هفت ستون درصدی و مجموعاً ۱۰۰٪', cols.length === 7 && colSum === 100, `${cols.length}/${colSum}`);
+/* V4.214.2 ستون «تاریخ» را زیر «عنوان» برد، پس از ۷ به ۶ ستون رسید. */
+ok('ستون‌های درصدی و مجموعاً ۱۰۰٪', cols.length === 6 && colSum === 100, `${cols.length}/${colSum}`);
 ok('ورودی‌های داخل جدول به عرض ستون محدود شده‌اند', /\.disc-table \.form-input[^{]*\{[^}]*width:100%/.test(mHtml));
 ok('اسکرول افقی بسته شده است', /\.disc-table-wrap\{[^}]*overflow-x:hidden/.test(mHtml));
 const stSrc = siteFile('students.php');

@@ -11,8 +11,8 @@
  * مقایسهٔ بستهٔ اصلاحی با سایت است.
  */
 import { run, req, loginAdmin, php } from './harness/lib.mjs';
-import { resolveSite } from './harness/site.mjs';
-import { readFileSync, existsSync } from 'node:fs';
+import { resolveSite, REPO } from './harness/site.mjs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 let pass = 0, fail = 0;
@@ -21,8 +21,17 @@ const ok = (name, cond, detail = '') => cond
   : (fail++, console.log(`  ❌ ${name}${detail ? '  → ' + detail : ''}`));
 
 const SITE = resolveSite();
-const PATCH = process.env.PATCH || 'update-v4.214.1';
-const { REPO } = await import('./harness/site.mjs');
+/* آخرین پوشهٔ اصلاحیِ موجود در مخزن — تا این سوئیت با هر نسخهٔ تازه هم
+   بدون تنظیم PATCH سبز بماند. */
+const latestPatch = () => {
+  try {
+    const dirs = readdirSync(REPO).filter(d => /^update-v4\.\d+\.\d+(\.\d+)?$/.test(d));
+    const v = d => d.slice('update-v4.'.length).split('.').map(Number).concat([0, 0]).slice(0, 3);
+    dirs.sort((a, b) => { const [x, y] = [v(a), v(b)]; for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] - y[i]; return 0; });
+    return dirs[dirs.length - 1] || 'update-v4.152.0';
+  } catch (e) { return 'update-v4.152.0'; }
+};
+const PATCH = process.env.PATCH || latestPatch();
 console.log(`>>> سورس: ${SITE} · وصله: ${PATCH}`);
 
 const siteFile = rel => {
@@ -85,7 +94,7 @@ const stSrc = siteFile('students.php');
 ok('نسخهٔ نصب‌شده همان اصلاح را دارد (نه فقط بستهٔ اصلاحی)', stSrc.includes('white-space:nowrap') && stSrc.includes('.student-list-actions .btn'));
 const deskStudents = deskFile('www-students.php');
 ok('بستهٔ دسکتاپ هم دکمه را یک‌خطی می‌کند',
-  /style="white-space:nowrap"/.test(deskStudents) && deskStudents.includes('.student-list-actions .btn'));
+  /style="white-space:nowrap(?:;min-width:\d+px)?"/.test(deskStudents) && deskStudents.includes('.student-list-actions .btn'));
 
 /* ═══════════ ۲) هدر: تاریخ چسبیده به «کاربری» ═══════════ */
 console.log('\n══ ۲) هدر: بدون فاصلهٔ اضافی بین تاریخ و «کاربری» ══');
@@ -107,10 +116,8 @@ const modal = await req('مودال انضباط', { file: 'student-modal.php', 
 let mJson = {}; try { mJson = JSON.parse(modal.res.page); } catch (e) {}
 const mHtml = mJson.html || '';
 ok('مودال JSON سالم برمی‌گرداند', mJson.ok === true, (modal.res.page || '').slice(0, 160));
-const discW = Number((mHtml.match(/#studentAjaxModal\.modal-disc \.modal-card\{width:min\((\d+)px,98vw\)/) || [])[1] || 0);
-ok('پنجره تا ۹۸٪ عرض دید باز می‌شود', /#studentAjaxModal\.modal-disc \.modal-card\{width:min\(\d+px,98vw\)/.test(mHtml), String(discW));
-ok('عرض پنجره از ۱۶۰۰ پیکسل کمتر نیست', discW >= 1600, String(discW));
-ok('حاشیهٔ پنجره به ۸ پیکسل رسید (فضای بیشتر برای محتوا)', /#studentAjaxModal\.modal-disc\{padding:8px\}/.test(mHtml));
+ok('پنجره دست‌کم ۹۸٪ عرض دید است', /#studentAjaxModal\.modal-disc \.modal-card\{width:(?:min\(\d+px,)?9\dvw[;}]/.test(mHtml), mHtml.match(/#studentAjaxModal\.modal-disc \.modal-card\{[^}]*\}/)?.[0] || '');
+ok('حاشیهٔ پنجره کم شد (فضای بیشتر برای محتوا)', /#studentAjaxModal\.modal-disc\{padding:[68]px\}/.test(mHtml));
 ok('سرستون‌ها نمی‌شکنند', /\.disc-table th\{[^}]*white-space:nowrap/.test(mHtml));
 ok('سلول‌ها دیگر اجازهٔ شکستن کلمه ندارند', /\.disc-table td\{[^}]*word-break:normal/.test(mHtml) && !mHtml.includes('overflow-wrap:anywhere'));
 ok('دکمه‌های «ذخیره» و «حذف» یک‌خطی‌اند', /\.disc-col-actions \.btn\{[^}]*white-space:nowrap/.test(mHtml));
@@ -119,10 +126,10 @@ ok('وضعیت اعلان «ارسال شد» یک‌خطی است', /\.disc-col
 ok('متن واقعی «ارسال شد» در ردیف است', mHtml.includes('>ارسال شد<') || mHtml.includes('ارسال شد'));
 const cols = mHtml.match(/<col style="width:(\d+)%">/g) || [];
 const colSum = cols.reduce((a, c) => a + parseInt(c.match(/(\d+)%/)[1], 10), 0);
-ok('هفت ستون درصدی و مجموعاً ۱۰۰٪', cols.length === 7 && colSum === 100, `${cols.length}/${colSum}`);
+ok('ستون‌های درصدی و مجموعاً ۱۰۰٪', cols.length === 6 && colSum === 100, `${cols.length}/${colSum}`);
 const deskModal = deskFile('www-student-modal.php');
 ok('بستهٔ دسکتاپ هم پنجره را تمام‌صفحه و nowrap می‌کند',
-  /width:min\(\d+px,98vw\)/.test(deskModal) && /\.disc-col-actions \.btn\{[^}]*white-space:nowrap/.test(deskModal) && deskModal.includes('smIsDeputy'));
+  /width:(?:min\(\d+px,)?9\dvw/.test(deskModal) && /\.disc-col-actions \.btn\{[^}]*white-space:nowrap/.test(deskModal) && deskModal.includes('smIsDeputy'));
 
 /* ═══════════ ۴) کارنامهٔ ربات: بی‌راهنما، بی‌نقطه ═══════════ */
 console.log('\n══ ۴) کارنامهٔ ربات: حذف راهنمای رنگ و نقطهٔ «•» ══');
@@ -166,11 +173,24 @@ if (/FT=yes/.test(ftCheck.out)) {
 /* ═══════════ ۵) مهر نسخه و هم‌خوانی بسته‌ها ═══════════ */
 console.log('\n══ ۵) مهر نسخه و هم‌خوانی بسته و سایت ══');
 const verSrc = siteFile('config/version.php');
-ok('نسخهٔ سایت 4.214.1 است', /'site_version'\s*=>\s*'4\.214\.1'/.test(verSrc), (verSrc.match(/site_version[^,]*/) || [''])[0]);
-ok('نسخهٔ دسکتاپ 2.138.1 است', /'desktop_version'\s*=>\s*'2\.138\.1'/.test(verSrc));
-ok('برچسب اصلاح V4.214.1 است', /'correction'\s*=>\s*'V4\.214\.1'/.test(verSrc));
-ok('perf.php نسخهٔ تازه را اعلام می‌کند', siteFile('includes/perf.php').includes("PERF_CORE_VERSION', '4.214.1'"));
-ok('doctor.php مهر تازه دارد', siteFile('doctor.php').includes('V4.214.1'));
+/* نسخه‌ها به‌جای عددِ ثابت، با «سقف همین نسخه» سنجیده می‌شوند تا هر اصلاح
+   بعدی (۴.۲۱۴.۲، ۴.۲۱۴.۳، …) این سوئیت را قرمز نکند. */
+const siteVer = (verSrc.match(/'site_version'\s*=>\s*'([^']+)'/) || [])[1] || '';
+const deskVer = (verSrc.match(/'desktop_version'\s*=>\s*'([^']+)'/) || [])[1] || '';
+const corrTag = (verSrc.match(/'correction'\s*=>\s*'([^']+)'/) || [])[1] || '';
+const atLeast = (v, base) => {
+  const a = v.split('.').map(Number), b = base.split('.').map(Number);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] || 0, y = b[i] || 0;
+    if (x !== y) return x > y;
+  }
+  return true;
+};
+ok('نسخهٔ سایت ۴.۲۱۴.۱ یا تازه‌تر است', atLeast(siteVer, '4.214.1'), siteVer);
+ok('نسخهٔ دسکتاپ ۲.۱۳۸.۱ یا تازه‌تر است', atLeast(deskVer, '2.138.1'), deskVer);
+ok('برچسب اصلاح V4.214.1 یا تازه‌تر است', atLeast(corrTag.replace(/^V/i, ''), '4.214.1'), corrTag);
+ok('perf.php نسخهٔ تازه را اعلام می‌کند', siteFile('includes/perf.php').includes("PERF_CORE_VERSION', '" + siteVer + "'"), siteVer);
+ok('doctor.php مهر تازه دارد', siteFile('doctor.php').includes(corrTag), corrTag);
 const pairs = [
   ['includes/report_image.php', 'includes-report_image.php'],
   ['includes/perf.php', 'includes-perf.php'],

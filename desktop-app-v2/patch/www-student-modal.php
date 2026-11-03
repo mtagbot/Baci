@@ -185,13 +185,12 @@ $smRecordCount=is_array($records)?count($records):0;
                     <?php /* V4.214.0 — عرض ستون‌ها ثابت و درصدی است تا جدول در عرض
                           پنجره جا شود و اسکرول افقی هرگز لازم نشود. */ ?>
                     <colgroup>
-                        <col style="width:18%"><col style="width:10%"><col style="width:7%">
-                        <col style="width:20%"><col style="width:23%"><col style="width:9%"><col style="width:13%">
+                        <col style="width:30%"><col style="width:7%">
+                        <col style="width:17%"><col style="width:22%"><col style="width:9%"><col style="width:15%">
                     </colgroup>
                     <thead>
                         <tr>
-                            <th>عنوان</th>
-                            <th>تاریخ</th>
+                            <th>عنوان مورد انضباطی و تاریخ</th>
                             <th>موجه</th>
                             <th>بررسی</th>
                             <th>یادداشت داخلی</th>
@@ -211,9 +210,13 @@ $smRecordCount=is_array($records)?count($records):0;
                                     <input type="hidden" name="student_id" value="<?php echo $studentId; ?>">
                                     <input type="hidden" name="record_id" value="<?php echo $rid; ?>">
                                 </form>
-                                <input form="<?php echo $rfid; ?>" name="title_text" class="form-input text-xs" value="<?php echo clean($r['title_text']); ?>" aria-label="عنوان مورد">
+                                <input form="<?php echo $rfid; ?>" name="title_text" class="form-input text-xs disc-title-input" value="<?php echo clean($r['title_text']); ?>" aria-label="عنوان مورد انضباطی" placeholder="عنوان مورد انضباطی">
+                                <?php /* V4.214.2 — تاریخ زیر عنوان، با همان عرض دقیقِ فیلد عنوان. */ ?>
+                                <div class="disc-date-field">
+                                    <span class="disc-date-cap">تاریخ وقوع</span>
+                                    <input form="<?php echo $rfid; ?>" name="occurred_at_jalali" class="form-input text-xs disc-date" value="<?php echo clean($r['occurred_at_jalali']); ?>" inputmode="numeric" aria-label="تاریخ وقوع" title="تاریخ وقوع (شمسی)">
+                                </div>
                             </td>
-                            <td><input form="<?php echo $rfid; ?>" name="occurred_at_jalali" class="form-input text-xs disc-date" value="<?php echo clean($r['occurred_at_jalali']); ?>" inputmode="numeric" aria-label="تاریخ"></td>
                             <td class="disc-col-check"><label class="disc-check" title="موجه"><input form="<?php echo $rfid; ?>" type="checkbox" name="is_justified" <?php echo !empty($r['is_justified'])?'checked':''; ?>> <span>موجه</span></label></td>
                             <td>
                                 <select form="<?php echo $rfid; ?>" name="review_status" class="form-select text-xs" aria-label="وضعیت بررسی">
@@ -232,7 +235,7 @@ $smRecordCount=is_array($records)?count($records):0;
                         </tr>
                         <?php endforeach; ?>
                         <?php if(!$records): ?>
-                            <tr><td colspan="7" class="text-center text-muted">هنوز موردی برای این دانش‌آموز ثبت نشده است.</td></tr>
+                            <tr><td colspan="6" class="text-center text-muted">هنوز موردی برای این دانش‌آموز ثبت نشده است.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -249,9 +252,11 @@ $smRecordCount=is_array($records)?count($records):0;
    سرستون‌ها، دکمه‌ها، «موجه» و «ارسال شد» همه nowrap هستند. */
 .disc-modal{width:100%;min-width:0}
 #studentAjaxModal .modal-card,.modal-backdrop .modal-card{width:min(1180px,96vw);max-width:calc(100vw - 16px)}
-#studentAjaxModal.modal-disc{padding:8px}
-#studentAjaxModal.modal-disc .modal-card{width:min(2000px,98vw);max-width:calc(100vw - 8px)}
-.disc-grid{display:grid;grid-template-columns:minmax(290px,.72fr) minmax(0,2fr);gap:12px;align-items:start;margin-top:6px}
+#studentAjaxModal.modal-disc{padding:6px}
+/* V4.214.2 — سقف ۲۰۰۰ پیکسلی برداشته شد؛ روی نمایشگرهای بزرگ پنجره به ~۷۸٪
+   صفحه محدود می‌شد. حالا در هر اندازه‌ای ۹۸٪ عرض دید است (بیشتر از ۹۰٪ خواسته‌شده). */
+#studentAjaxModal.modal-disc .modal-card{width:98vw;max-width:calc(100vw - 6px)}
+.disc-grid{display:grid;grid-template-columns:minmax(280px,.6fr) minmax(0,2.4fr);gap:12px;align-items:start;margin-top:6px}
 @media (max-width:1024px){.disc-grid{grid-template-columns:minmax(0,1fr)}}
 .disc-panel{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;min-width:0;box-shadow:0 1px 2px rgba(15,23,42,.04)}
 .disc-panel-entry{border-top:3px solid #16a34a}
@@ -275,6 +280,10 @@ $smRecordCount=is_array($records)?count($records):0;
 /* هر ورودی دقیقاً به اندازهٔ ستون خودش؛ نه یک پیکسل بیشتر */
 .disc-table .form-input,.disc-table .form-select,.disc-table .form-textarea{width:100%;min-width:0;max-width:100%;box-sizing:border-box;font-size:11px}
 .disc-date{direction:ltr;text-align:left}
+/* V4.214.2 — تاریخ زیر عنوان و دقیقاً هم‌عرض آن. */
+.disc-date-field{margin-top:5px}
+.disc-date-cap{display:block;font-size:10px;font-weight:800;color:#64748b;margin-bottom:3px;white-space:nowrap}
+.disc-title-input,.disc-date-field .disc-date{width:100%;box-sizing:border-box}
 .disc-note,.disc-review-note{resize:vertical}
 .disc-review-note{margin-top:4px}
 /* V4.214.1 — هیچ‌کدام از این برچسب‌ها/دکمه‌ها نمی‌شکنند. */

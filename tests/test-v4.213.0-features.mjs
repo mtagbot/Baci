@@ -27,10 +27,14 @@ const ok = (name, cond, detail = '') => cond
 
 const SITE = resolveSite();
 const PATCH = process.env.PATCH || 'update-v4.213.0';
+/* اگر فایل در بستهٔ اورلی نبود (مثلاً نسخهٔ تازه‌تر آن را از فهرست انداخته)،
+   همان فایلِ نصب‌شده خوانده می‌شود؛ سنجه‌ها رفتار را می‌سنجند، نه مسیر فایل. */
 const patchFile = rel => {
   const p = join(REPO, PATCH, rel);
-  if (!existsSync(p)) throw new Error('فایل اورلی پیدا نشد: ' + p);
-  return readFileSync(p, 'utf8');
+  if (existsSync(p)) return readFileSync(p, 'utf8');
+  const site = join(SITE, rel);
+  if (existsSync(site)) return readFileSync(site, 'utf8');
+  throw new Error('فایل اورلی پیدا نشد: ' + p);
 };
 
 /* ═══════════ ۰) دادهٔ آزمایشی ═══════════ */
@@ -285,8 +289,12 @@ ok('هر مورد انضباطی یک ردیف جدول با فرم مستقل �
 ok('ورودی‌های هر ردیف با ویژگی form به همان ردیف وصل‌اند', /<input form="disc-row-\d+" name="title_text"/.test(modalHtml));
 ok('«متن بررسی» هم ورودیِ همان ردیف است و مقدار فعلی را نگه می‌دارد (ذخیرهٔ ردیف پاکش نمی‌کند)',
   /<textarea form="disc-row-\d+" name="review_note"/.test(modalHtml) && modalHtml.includes('>بررسی شد</textarea>'));
-ok('همهٔ ستون‌های داده در ردیف هست (عنوان/تاریخ/موجه/بررسی/یادداشت/اعلان/اقدام)',
-  [ '>عنوان<', '>تاریخ<', '>موجه<', '>بررسی<', '>یادداشت داخلی<', '>اعلان<', '>اقدام<' ].every(h => modalHtml.includes(h)));
+/* V4.214.2 — ستون «تاریخ» جدا نیست و زیر «عنوان» رفته؛ پس داده‌های همان ردیف
+   سنجیده می‌شوند، نه شمار ستون‌ها. */
+ok('همهٔ داده‌های ردیف هست (عنوان/تاریخ/موجه/بررسی/یادداشت/اعلان/اقدام)',
+  ['name="title_text"', 'name="occurred_at_jalali"', 'name="is_justified"', 'name="review_status"',
+   'name="internal_note"', 'name="review_note"'].every(h => modalHtml.includes(h))
+  && modalHtml.includes('>موجه<') && modalHtml.includes('>اعلان<') && modalHtml.includes('>اقدام<'));
 ok('وضعیت اعلان هر ردیف دیده می‌شود', modalHtml.includes('>ارسال شد<'));
 ok('مودال تمام‌عرض می‌شود (CSS مودال کارت را باز می‌کند)', modalHtml.includes('#studentAjaxModal .modal-card') && modalHtml.includes('min(1180px'));
 

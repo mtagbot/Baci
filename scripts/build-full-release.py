@@ -22,9 +22,9 @@ SITE_CORRECTIVE_PREFIX = 'site-update-v4.152.0/'
 # through the whole corrective chain up to 4.177.1/2.100.0, so a fresh install
 # could not tell what it actually contained. config/version.php now carries the
 # code version for existing installs too; release.php keeps describing the bundle.
-RELEASE_NAME = 'Release_V1.6'
-SITE_VERSION = '4.214.1'
-DESKTOP_VERSION = '2.138.1'
+RELEASE_NAME = 'Release_V1.7'
+SITE_VERSION = '4.214.2'
+DESKTOP_VERSION = '2.138.2'
 # Correctives published after the V1.0 rebuild, in installation order. From
 # v4.170.0 on, packages are version-numbered instead of feature-slugged, and
 # V4.170.0 / v2.92.0 are cumulative for v4.161..v4.169.
@@ -79,6 +79,7 @@ VERSIONED_CORRECTIVES = [
     ('MODIFIED-FILES-V4.213.0.zip', 'SchoolDesk-FIX-v2.137.0.zip'),
     ('MODIFIED-FILES-V4.214.0.zip', 'SchoolDesk-FIX-v2.138.0.zip'),
     ('MODIFIED-FILES-V4.214.1.zip', 'SchoolDesk-FIX-v2.138.1.zip'),
+    ('MODIFIED-FILES-V4.214.2.zip', 'SchoolDesk-FIX-v2.138.2.zip'),
 ]
 def sha(b): return hashlib.sha256(b).hexdigest()
 def run(*args): return subprocess.check_output(args, text=True)

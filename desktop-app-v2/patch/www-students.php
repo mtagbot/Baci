@@ -666,7 +666,7 @@ else:
             <?php if (has_permission('import_data')): ?>
                 <?php /* V4.214.0 — هم‌شکل با همین نوار و با «رنگ ثانویهٔ» سایت (Accent Color). */ ?>
                 <?php /* V4.214.1 — متن یک‌خطی می‌ماند و دکمه جمع نمی‌شود. */ ?>
-                <a href="student-recovery.php" class="btn btn-warning gap-1" style="white-space:nowrap" title="ایمپورت دانش‌آموزان و تصاویر از فایل"><span>بازیابی دانش‌آموز</span></a>
+                <a href="student-recovery.php" class="btn btn-warning gap-1" style="white-space:nowrap;min-width:120px" title="ایمپورت دانش‌آموزان و تصاویر از فایل"><span>بازیابی دانش‌آموز</span></a>
             <?php endif; ?>
         </div>
     </div>
@@ -830,7 +830,7 @@ else:
 .student-hover-tooltip{ z-index: 900 !important; }
 body.student-modal-open .student-hover-tooltip{ display: none !important; }
 /* V4.214.1 — دکمه‌های نوار عملیات یک‌خطی می‌مانند. */
-.student-list-actions .btn{ white-space: nowrap; flex: none; }
+.student-list-actions .btn{ white-space: nowrap; flex: none; min-width: 120px; }
 </style>
 
 <script>
