@@ -88,6 +88,22 @@ function bot_webhook_answer_callback($platform, $callbackId) {
     }
 }
 
+/** Mark a report reviewed only after a linked parent successfully requests/views it. */
+function bot_webhook_mark_report_reviewed($reportId, $platform, $chatId) {
+    $platform = bot_valid_platform($platform);
+    $reportId = (int)$reportId;
+    $chatId = (string)$chatId;
+    if ($reportId < 1 || $chatId === '') return false;
+    $users = bot_user_table($platform);
+    $chatCol = bot_chat_column($platform);
+    $owned = DB::fetch("SELECT r.id FROM reports r JOIN `$users` b ON b.student_id=r.student_id WHERE r.id=? AND b.`$chatCol`=?", [$reportId, $chatId]);
+    if (!$owned) return false;
+    DB::execute("CREATE TABLE IF NOT EXISTS report_parent_reviews (id int(11) NOT NULL AUTO_INCREMENT, report_id int(11) NOT NULL, platform enum('bale','telegram','soroush','rubika') NOT NULL, chat_id varchar(80) NOT NULL, reviewed_at_jalali varchar(30) NOT NULL, PRIMARY KEY(id), UNIQUE KEY uniq_review (report_id, platform, chat_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    if (function_exists('bot_migrate_platform_enum')) bot_migrate_platform_enum('report_parent_reviews', 'platform', "enum('bale','telegram','soroush','rubika') NOT NULL");
+    DB::execute("INSERT INTO report_parent_reviews (report_id, platform, chat_id, reviewed_at_jalali) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE reviewed_at_jalali=VALUES(reviewed_at_jalali)", [$reportId, $platform, $chatId, jalali_now()]);
+    return true;
+}
+
 $callbackQuery = $update['callback_query'] ?? null;
 $message = $update['message'] ?? null;
 
@@ -120,9 +136,7 @@ if ($callbackQuery) {
 
     if ($chatId !== '' && strpos($data, 'ack_rep_') === 0) {
         $repId = (int)substr($data, 8);
-        DB::execute("CREATE TABLE IF NOT EXISTS report_parent_reviews (id int(11) NOT NULL AUTO_INCREMENT, report_id int(11) NOT NULL, platform enum('bale','telegram','soroush','rubika') NOT NULL, chat_id varchar(80) NOT NULL, reviewed_at_jalali varchar(30) NOT NULL, PRIMARY KEY(id), UNIQUE KEY uniq_review (report_id, platform, chat_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-        if (function_exists('bot_migrate_platform_enum')) bot_migrate_platform_enum('report_parent_reviews', 'platform', "enum('bale','telegram','soroush','rubika') NOT NULL");
-        DB::execute("INSERT INTO report_parent_reviews (report_id, platform, chat_id, reviewed_at_jalali) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE reviewed_at_jalali=VALUES(reviewed_at_jalali)", [$repId, $platform, $chatId, jalali_now()]);
+        bot_webhook_mark_report_reviewed($repId, $platform, $chatId);
         bot_webhook_safe_send($platform, $chatId, '✅ بررسی کارنامه ثبت شد.');
     }
     if ($chatId !== '' && strpos($data, 'ack_disc_') === 0) {
@@ -222,6 +236,10 @@ if ($callbackQuery) {
                         foreach ($grades as $gg) $txt .= "\n▪️ " . $gg['subject_name'] . ': ' . display_score($gg['score']);
                         bot_webhook_safe_send($platform, $chatId, $txt);
                         bot_send_report_image_to_chat($platform, $chatId, $repId);
+                        // Choosing the glass report-month button and successfully
+                        // receiving its image is itself an acknowledgement. The
+                        // unique report/platform/chat key keeps this idempotent.
+                        bot_webhook_mark_report_reviewed($repId, $platform, $chatId);
                     } catch (Exception $e) {
                         bot_webhook_safe_send($platform, $chatId, 'ارسال تصویر کارنامه با خطا روبه‌رو شد: ' . $e->getMessage(), bot_main_keyboard($platform));
                     }

@@ -3,7 +3,7 @@
 import hashlib, importlib.util, json, re, sqlite3, struct, unittest, zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-SPEC=importlib.util.spec_from_file_location('full_builder',ROOT/'scripts/build-full-release.py')
+SPEC=importlib.util.spec_from_file_location('full_builder',ROOT/'scripts/build-full-release-v1.8.py')
 BUILDER=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(BUILDER)
 class FullRelease(unittest.TestCase):
     @classmethod
