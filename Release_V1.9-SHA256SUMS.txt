@@ -1,0 +1,2 @@
+d52857f1eb2945ad9b5c8491e6e94ccbed663d9070a95beb4fb466c67d8aad4b  Release_V1.9-Site.zip
+6f449dd182f04678dd6ec8dc6dfcb1693079c02b4444a6861da1f4a90566863d  Release_V1.9-Desktop.zip

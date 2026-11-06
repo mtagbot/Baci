@@ -1,0 +1,311 @@
+/* School workspace. Progressive screen layer; physical print geometry is not restyled. */
+.school-icon{display:inline-block;width:1.25em;height:1.25em;min-width:1em;vertical-align:-.22em;flex-shrink:0;pointer-events:none;overflow:visible}
+.ui-sr{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.ui-skip{position:fixed;top:-100px;right:16px;z-index:10000;padding:12px 20px;background:#fff;color:#172554;border:3px solid #172554;border-radius:8px}.ui-skip:focus{top:12px}
+.ui-drawer-shade[hidden],.ui-drawer-close[hidden]{display:none!important}
+@media screen{
+html.school-shell{height:auto!important;min-height:100%;overflow-y:auto!important;overflow-x:visible!important;scroll-padding-top:90px}
+body.school-app{height:auto!important;max-height:none!important;min-height:100vh;overflow:visible!important;background:#f3f6fa;color:#14213a;line-height:1.85}
+.school-app *{box-sizing:border-box}
+.school-app .navbar{display:flex!important;flex-wrap:wrap!important;position:sticky!important;top:0;z-index:1000;min-height:72px;height:auto!important;max-height:none!important;padding:12px 24px!important;background:#fff;border-bottom:1px solid #dce4ef;box-shadow:0 3px 16px rgba(25,48,80,.045);backdrop-filter:none;-webkit-backdrop-filter:none}
+.school-app .navbar h1{line-height:1.6;letter-spacing:0;font-size:1.15rem}
+.school-app .navbar>.flex{min-width:0}
+.school-app>.flex.flex-1{height:auto!important;overflow:visible!important;min-height:0;align-items:stretch;flex:1 0 auto}
+.school-app main.flex-1{height:auto!important;min-height:60vh;min-width:0;width:auto!important;max-width:100%;overflow:visible!important;padding:24px!important;flex:1}
+.school-app .sidebar{position:sticky;top:72px;top:var(--ui-header-height,72px);height:calc(100vh - 72px);height:calc(100vh - var(--ui-header-height,72px));width:248px!important;max-height:none;flex:0 0 248px;background:#fff;border-left:1px solid #dce4ef;box-shadow:none;padding:16px 12px!important}
+.school-app .sidebar-scroll{height:100%;min-height:0;overflow-y:auto;overflow-x:hidden;display:block;padding-bottom:20px}
+.school-app .sidebar-item{display:flex;align-items:center;min-height:44px;white-space:normal;padding:10px 12px;margin:3px 0;border:1px solid transparent;border-radius:10px;font-size:13px;color:#334155;transition:background-color .12s}
+.school-app .sidebar-item .school-icon{margin-left:10px}
+.school-app .sidebar-item.active{background:#eaf0fc;background:var(--primary-soft,#eaf0fc);color:#172554;border-color:#ccd9ed;border-right:3px solid #2563eb;border-right-color:var(--primary,#2563eb);font-weight:700}
+.school-app .sidebar-item:hover{background:#f1f5fa}
+.school-app .sidebar-section-title{display:flex;font-size:11px;color:#526177;letter-spacing:0;margin:22px 10px 8px;border-bottom:none}
+.school-app.sidebar-collapsed .sidebar{display:none!important}
+.school-app .card{min-width:0;background:#fff;border:1px solid #dde5ef;border-radius:16px;box-shadow:0 4px 18px rgba(25,48,80,.035)}
+.school-app .page-hero{border:1px solid #dbe5f2;background:#fff;border-right:4px solid #2563eb;border-right-color:var(--primary,#2563eb);border-radius:16px;padding:20px 24px;margin-bottom:20px;box-shadow:none;flex-wrap:wrap}
+.school-app .page-hero h1,.school-app .page-hero h2{color:#14213a;line-height:1.7}
+.school-app .text-muted{color:#475569}
+.school-app main h1,.school-app main h2,.school-app main h3{line-height:1.7;overflow-wrap:break-word}
+.school-app .btn,.school-app button,.school-app input[type=submit]{min-height:40px;max-width:100%;border-radius:9px;line-height:1.6;white-space:normal;touch-action:manipulation}
+.school-app .btn .school-icon{margin-left:6px}
+.school-app .form-input,.school-app .form-select,.school-app textarea{min-height:44px;background:#fff;border:1px solid #93a4ba;border-radius:9px;color:#17243b;max-width:100%}
+.school-app input::placeholder,.school-app textarea::placeholder{color:#58677a;opacity:1}
+.school-app input[type=checkbox],.school-app input[type=radio]{width:20px;height:20px;vertical-align:middle;accent-color:#1d4ed8;accent-color:var(--primary,#1d4ed8)}
+.school-app button:focus,.school-app a:focus,.school-app input:focus,.school-app select:focus,.school-app textarea:focus,.ui-table-scroll:focus{outline:3px solid #172554!important;outline-offset:3px;box-shadow:none!important}
+.school-app .auth-wrap{width:100%;max-width:1100px;margin:30px auto}
+.school-app .auth-card{border:1px solid #dbe4ef;box-shadow:0 16px 48px rgba(25,48,80,.08);border-radius:22px;overflow:hidden}
+.school-app .auth-brand{background:#173a65;color:#fff;padding:36px}
+.school-app .auth-brand-title,.school-app .auth-brand-sub{color:#fff}
+.school-app .auth-feature{color:#fff;background:rgba(255,255,255,.08)}
+.school-app .auth-form-side{background:#fff;padding:32px}
+.school-app .auth-logo{background:rgba(255,255,255,.12);color:#fff;box-shadow:none}
+.school-app .auth-icon{color:#475569}
+.school-app .auth-eye{min-width:44px;min-height:44px}
+.school-app .flash-message{box-shadow:none!important;white-space:normal!important}
+.school-app .flash-message button{min-width:36px}
+.school-app .grid{display:block}
+.school-app .grid>*{min-width:0;margin-bottom:12px}
+@supports(display:grid){.school-app .grid{display:grid}.school-app .grid>*{margin-bottom:0}}
+.ui-table-scroll,
+.school-app .table-container{width:100%;max-width:100%;overflow-x:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;border:1px solid #dbe4ef;border-radius:12px;margin:12px 0;overscroll-behavior-x:contain}
+.school-app .ui-table-scroll table,
+.school-app .table-container table{margin:0;width:100%;border-collapse:separate;border-spacing:0}
+.school-app .ui-table-scroll th,
+.school-app .table-container th{background:#eef3f9;color:#23344d;white-space:nowrap;padding:13px 14px;border-bottom:1px solid #c8d4e3}
+.school-app .ui-table-scroll td,
+.school-app .table-container td{padding:12px 14px;border-bottom:1px solid #e6ecf3;vertical-align:middle;line-height:1.8}
+.school-app .ui-table-scroll tr:last-child td,
+.school-app .table-container tr:last-child td{border-bottom:0}
+.school-app .ui-table-scroll tbody tr:hover,
+.school-app .table-container tbody tr:hover{background:#f4f7fb}
+.school-app .ui-table-scroll .btn,
+.school-app .table-container .btn{min-width:36px}
+.school-app .modal-content,.school-app .modal-card{max-width:calc(100vw - 24px);max-height:calc(100vh - 32px);overflow-y:auto}
+.school-footer{flex-shrink:0;width:100%;padding:22px 28px;background:#fff;border-top:1px solid #dce4ef;margin-top:auto;color:#475569}
+.school-footer-inner{max-width:1600px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.school-footer-brand{display:flex;align-items:center;padding:6px 0}.school-footer-mark{display:flex;align-items:center;justify-content:center;width:42px;height:42px;margin-left:12px;border:1px solid #dce4ef;border-radius:12px;color:#173a65;background:#f3f6fa}
+.school-footer strong{display:block;font-size:13px;color:#23344d}.school-footer small{font-size:11px;line-height:1.9}.school-footer-links{display:flex;flex-wrap:wrap;align-items:center}.school-footer a{min-height:44px;display:inline-flex;align-items:center;padding:10px 12px;border-radius:8px;font-size:12px}.school-footer a:hover{background:#edf2f8}.school-footer-credit{font-size:11px;border-top:1px solid #edf1f5;margin-top:12px;padding-top:12px}
+.ui-paper-scroll{width:100%;max-width:100%;overflow:auto;-webkit-overflow-scrolling:touch}
+.ui-drawer-shade{position:fixed;top:0;right:0;bottom:0;left:0;z-index:2999;border:0;background:rgba(15,23,42,.45);border-radius:0!important;max-width:none!important}
+.ui-drawer-close{width:100%;flex-shrink:0;background:#edf2f8;border:1px solid #c8d4e3;color:#172554;margin:0 0 12px}
+.ui-compat-note{background:#fff6d8;color:#573500;padding:12px;border:1px solid #b58b25;font-size:13px}
+@media(min-width:1600px){.school-app main.flex-1{padding:28px 36px!important}.school-app .sidebar{width:264px!important;flex-basis:264px}}
+@media(min-width:901px) and (max-width:1199px){.school-app .sidebar{width:208px!important;flex-basis:208px}.school-app main.flex-1{padding:18px!important}.school-app .navbar{padding:10px 18px!important}.school-app .grid-cols-3,.school-app .grid-cols-4{grid-template-columns:repeat(2,minmax(0,1fr))}.school-app .hdr-date{display:none}}
+@media(max-width:900px){
+.school-app .navbar{min-height:64px;padding:10px 16px!important;flex-direction:row;flex-wrap:wrap;align-items:center!important}
+.school-app .sidebar,.school-app.sidebar-collapsed .sidebar{display:flex!important;flex-direction:column;position:fixed!important;top:0;right:0;bottom:0;left:auto;width:300px!important;max-width:86vw;height:100vh!important;max-height:none;z-index:3000;transform:translateX(105%);visibility:hidden;padding:16px!important;transition:transform .18s}
+.school-app.sidebar-open .sidebar{transform:translateX(0);visibility:visible;box-shadow:-12px 0 40px rgba(15,23,42,.16)}
+.school-app.sidebar-open:after{display:none}.school-app.sidebar-open{overflow:hidden!important}
+.school-app .sidebar-scroll{height:auto;flex:1;display:block;overflow-y:auto;overflow-x:hidden}
+.school-app main.flex-1{width:100%!important;min-height:60vh;height:auto!important;padding:16px!important}
+.school-app .page-hero{padding:16px;align-items:flex-start;gap:12px}
+.school-app .school-footer{padding:18px 20px}
+.school-app .auth-brand{padding:24px}.school-app .auth-form-side{padding:24px}
+.toolbar,.seat-toolbar{flex-wrap:wrap;max-width:100%;box-sizing:border-box}
+.noprint{max-width:100%;box-sizing:border-box}
+}
+@media(max-width:640px){
+.school-app .navbar{display:flex!important;flex-direction:row;flex-wrap:nowrap;gap:8px;min-height:64px;padding:8px 12px!important;overflow:visible!important}
+.school-app .navbar>.flex:first-child{flex:1}.school-app .navbar>.flex:last-child{flex:0 0 auto;gap:4px}
+.school-app .navbar h1{font-size:14px!important;max-width:calc(100vw - 160px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.school-app .hdr-date,.school-app .hdr-tiles{display:none!important}
+.school-app .user-menu-btn{font-size:12px;padding:8px;min-height:44px}
+.school-app .hamburger-btn{display:inline-flex!important;align-items:center;justify-content:center;min-width:44px;min-height:44px;flex-shrink:0}
+.school-app main.flex-1{padding:12px!important}.school-app .grid{grid-template-columns:minmax(0,1fr)!important}
+.school-app .page-hero{border-radius:12px;padding:14px}.school-app .page-hero h1{font-size:19px!important}
+.school-app .btn,.school-app button,.school-app .form-input,.school-app .form-select{min-height:44px}
+.school-app main form>.flex,.school-app .filters-line,.school-app .page-hero>.flex{flex-wrap:wrap!important;min-width:0;max-width:100%}
+.school-app .auth-wrap{margin:10px auto}.school-app .auth-brand{padding:22px}.school-app .auth-form-side{padding:22px 18px}.school-app .auth-brand-features{display:none}
+.school-app .card{border-radius:12px}.school-app .school-footer{padding:18px 16px}.school-footer-inner{display:block}.school-footer-links{border-top:1px solid #edf1f5;margin-top:12px;padding-top:8px}.school-footer a{padding:10px 0;margin-left:22px}.school-footer-credit{font-size:10px;line-height:2}
+.school-app .ui-table-scroll td,.school-app .ui-table-scroll th,
+.school-app .table-container td,.school-app .table-container th{padding:10px;white-space:nowrap}.school-app .ui-table-scroll td .btn,.school-app .table-container td .btn{white-space:nowrap}
+}
+@media(hover:none){.school-app .card:hover,.school-app .btn:hover{transform:none!important;box-shadow:none!important}}
+@media(prefers-reduced-motion:reduce){.school-app *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+@media(forced-colors:active){.school-app .card,.school-app .btn,.school-app .sidebar-item.active{border:1px solid CanvasText}.school-icon{forced-color-adjust:auto}.school-app button:focus,.school-app a:focus{outline:3px solid Highlight!important}}
+}
+@media print{.ui-skip,.ui-drawer-shade,.ui-drawer-close,.school-footer,.ui-compat-note{display:none!important}.ui-paper-scroll,.ui-table-scroll{display:block;overflow:visible;max-width:none;border:0;margin:0;padding:0}}
+.school-app .navbar .user-menu-btn::before{content:none!important;display:none!important}
+@media screen{body.school-app.embedded-mode .navbar,body.school-app.embedded-mode .sidebar,body.school-app.embedded-mode .school-footer{display:none!important}body.school-app.embedded-mode main.flex-1{height:auto!important;min-height:100vh;width:100%!important;padding:12px!important}}
+@media screen and (max-width:640px){body.ui-docs{padding:12px!important}.ui-docs .card{padding:16px!important}.ui-docs h1{font-size:22px}.ui-docs code{max-width:100%;word-break:break-all}}
+@media screen{
+.school-app .hdr-tile-t{color:#334155!important;font-size:10px!important}
+.school-app .sidebar-item.active{background:#eaf0fc!important;background:var(--primary-soft,#eaf0fc)!important;color:#172554!important;box-shadow:none!important}
+.school-app .sidebar-section-title{color:#475569!important}
+.school-app .btn,.school-app button{font-size:13px}
+.school-app .filter-more summary{color:#172554!important;min-height:44px;line-height:44px}
+.school-app a.text-primary{color:#173a65!important}
+.school-app .auth-tab[aria-selected=true]{border-bottom:3px solid currentColor}
+}
+@media screen{
+.school-app .badge-info{color:#173a65!important}.school-app #tileFull{color:#78350f!important}
+.school-app main pre{max-width:100%;overflow:auto;white-space:pre-wrap;word-wrap:break-word}
+.ui-scanner .main{grid-template-columns:minmax(0,1fr) minmax(0,300px)}
+.ui-scanner .main>*,.ui-scanner .manual input{min-width:0}
+.ui-scanner .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ui-scanner .stat b{font-size:18px;overflow-wrap:break-word}.ui-scanner .hdr{flex-wrap:wrap;gap:8px}
+.ui-scanner .manual button{min-height:44px;padding:6px 10px}
+#pagesRoot.ui-paper-scroll{box-sizing:border-box;width:100%;max-width:100vw}
+#pagesRoot.ui-paper-scroll .page{margin-left:auto;margin-right:auto}
+@media(max-width:860px){.ui-scanner .main{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:640px){.ui-scanner .hdr .rules{width:100%;text-align:right}.ui-scanner .camwrap{min-height:260px}.toolbar .tb-group{max-width:100%;box-sizing:border-box;flex-wrap:wrap}}
+}
+@media screen and (min-width:901px){.ui-drawer-close{display:none!important}}
+
+@media screen{.school-app .navbar .user-menu-btn{font-size:13px!important;display:inline-flex;align-items:center;justify-content:center;gap:6px}.school-app .navbar>.flex:first-of-type{flex:1;min-width:0}.school-app .navbar>.flex:last-child{flex-shrink:0}}
+@media screen and (max-width:640px){.school-app main .flex.justify-between{flex-wrap:wrap!important;gap:10px}.school-app main .flex.justify-between>.flex{flex-wrap:wrap!important;max-width:100%}}
+/* Symmetric desktop slots: the quick tiles align with the viewport centre, not the date. */
+@media screen and (min-width:901px){
+.school-app .navbar{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:12px!important}
+.school-app .navbar>.flex:first-of-type{grid-column:1;grid-row:1;justify-self:start;max-width:100%}
+.school-app .navbar>.flex:last-child{grid-column:2;grid-row:1;justify-self:end;max-width:100%}
+.school-app .navbar .hdr-tiles{display:grid!important;grid-column:1 / -1;grid-row:2;justify-self:center;flex:none;width:max-content;max-width:100%;margin:0!important}
+}
+@media screen and (min-width:1320px){.school-app .navbar{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important}.school-app .navbar .hdr-tiles{grid-column:2;grid-row:1}.school-app .navbar>.flex:last-child{grid-column:3}}
+
+@media screen{
+/* Stable first paint: no entry motion, invisible rows, or width transition at startup. */
+.school-app main>*:not(script):not(style),.school-app .auth-card,.school-app .auth-panel{animation:none!important}
+.school-app .sidebar,.school-app main.flex-1{transition:none!important}
+.school-app .sidebar-item{position:relative;padding-right:42px!important}
+.school-app .sidebar-item::before{display:none}
+.school-app .sidebar-item .school-icon{position:absolute;right:13px;margin:0;width:18px;height:18px}
+.school-app .auth-feedback{border:1px solid #b8c9de;border-right:3px solid #345879;border-radius:10px;padding:12px 14px;margin:0 0 18px;color:#23344d;background:#f1f5fa;font-size:13px;line-height:1.9;white-space:normal}
+.school-app .auth-feedback-error{border-color:#e3b7b7;border-right-color:#b91c1c;background:#fff5f5;color:#851d1d}
+.school-app .auth-feedback strong{display:block;margin-bottom:3px;font-size:13px}.school-app .auth-feedback p{margin:0}
+.school-app .auth-feedback:focus{outline:2px solid #b91c1c;outline-offset:3px}
+.school-app .auth-panel [aria-invalid="true"]{border-color:#b91c1c!important}
+/* Compact editorial footer: one quiet strip, no repeated navigation panel. */
+.school-app .school-footer{padding:6px 24px;background:#f8fafc;border-top:1px solid #d8e1ec;min-height:56px}
+.school-footer .school-footer-inner{max-width:1600px;display:flex;align-items:center;justify-content:space-between;gap:8px 24px;min-height:42px}
+.school-footer .school-footer-brand{padding:0;min-width:0;gap:9px;flex:1}
+.school-footer .school-footer-brand:before{content:"";width:4px;height:22px;border-radius:2px;background:var(--primary,#2563eb);flex:none}
+.school-footer .school-footer-brand strong{font-size:12px;font-weight:700;line-height:1.8}
+.school-footer .school-footer-version{flex:none;font-size:10px;line-height:1.8;color:#64748b;background:#eef2f7;border:1px solid #dbe3ee;border-radius:999px;padding:1px 8px;white-space:nowrap;direction:ltr}
+.school-footer .school-footer-credit{border:0;padding:0;margin:0;font-size:11px;line-height:1.8}
+.school-footer .school-footer-links{border:0;padding:0;margin:0;flex:none}
+.school-footer .school-footer-links a{padding:8px 12px;margin:0;font-size:11px;min-height:44px;text-decoration:none;color:#334155}
+@media(max-width:640px){.school-app .school-footer{padding:8px 14px}.school-footer .school-footer-inner{gap:2px 12px;flex-wrap:wrap}.school-footer .school-footer-credit{order:3;width:100%;font-size:10px}.school-footer .school-footer-links a{padding:8px 4px}.school-footer .school-footer-brand strong{font-size:11px}}
+
+}
+/* Desktop only: reserve the status strip at first layout, never cover the last form/table row. */
+@media screen{
+ body.school-app.desk-runtime{padding-bottom:66px}
+ .desk-runtime .school-footer.has-desk-state{position:fixed;bottom:0;left:0;z-index:100;width:100%;box-shadow:0 -2px 10px rgba(24,45,70,.04)}
+ .school-footer .desk-connection{position:relative;flex:0 0 238px;width:238px;max-width:100%;border:1px solid #cfdae7;border-radius:22px;background:#fff;color:#385270;min-height:44px;font-size:11px}
+ .school-footer .desk-connection summary{list-style:none;display:flex;align-items:center;gap:9px;height:42px;padding:0 13px;cursor:pointer;outline-offset:3px}
+ .desk-connection summary::-webkit-details-marker{display:none}
+ .desk-connection-ring{display:inline-block;box-sizing:border-box;width:15px;height:15px;border:2px solid currentColor;border-radius:50%;flex:none}
+ .desk-connection-more{margin-right:auto}
+ .desk-connection[data-state="synced"]{color:#176342;border-color:#b9d5c8}
+ .desk-connection[data-state="synced"] .desk-connection-ring{background:#218454;border-color:#218454;box-shadow:inset 0 0 0 3px #fff}
+ .desk-connection[data-state="retrying"],.desk-connection[data-state="error"],.desk-connection[data-state="warning"]{color:#875011;border-color:#e4cfac}
+ .desk-connection[data-state="checking"] .desk-connection-ring,.desk-connection[data-state="syncing"] .desk-connection-ring{border-left-color:transparent;animation:desk-connect-spin 1s linear infinite}
+ .desk-connection[data-state="offline"],.desk-connection[data-state="disabled"],.desk-connection[data-state="signed-out"]{color:#5c6979}
+ .desk-connection-panel{position:absolute;left:0;bottom:calc(100% + 12px);width:320px;max-width:calc(100vw - 28px);background:#fff;border:1px solid #d2dce8;border-radius:14px;box-shadow:0 10px 32px rgba(25,45,70,.16);padding:18px;color:#334155;line-height:1.9;font-size:12px}
+ .desk-connection:not([open]) .desk-connection-panel{display:none}
+ .school-footer .desk-connection-panel strong{font-size:14px;color:#172f4c}
+ .desk-connection-panel p{margin:8px 0}.desk-connection-panel small{display:block;font-size:11px;color:#536176;border-top:1px solid #e8edf3;padding-top:10px}
+ .school-footer .desk-connection-panel a{display:flex;padding:10px 0 0;color:#174c83;font-size:12px;margin:0}
+ .desk-connection.is-paused .desk-connection-ring{animation-play-state:paused}
+ @keyframes desk-connect-spin{to{transform:rotate(360deg)}}
+ @media(max-width:1000px){.desk-runtime .school-footer-credit{display:none}}
+ @media(max-width:640px){body.school-app.desk-runtime{padding-bottom:116px}.desk-runtime .school-footer .school-footer-inner{gap:2px 12px}.school-footer .desk-connection{flex-basis:100%;width:100%}.desk-connection-panel{width:100%}}
+ @media(prefers-reduced-motion:reduce){.desk-connection-ring{animation:none!important}}
+}
+@media print{.desk-connection{display:none!important}.school-app.desk-runtime{padding-bottom:0!important}}
+
+@media screen{
+.school-app .auth-input-wrap .form-input{padding-left:44px!important}
+/* Identity rows and action cells must not wrap into taller rows while the selected font loads. */
+.school-app #studentsTable td{white-space:nowrap}
+.school-app #studentsTable td:last-child>.flex{flex-wrap:nowrap!important}
+.school-app #studentsTable .btn{line-height:1.6}
+@media(min-width:901px){.school-app .navbar .hdr-tiles{width:calc(var(--hdr-tiles-count,8) * 68px + 11px);max-width:100%}.school-app .hdr-tile-t{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+/* Stable column geometry; long names can wrap without truncation or omitted data. */
+.school-app #studentsTable{table-layout:fixed;min-width:1144px}
+.school-app #studentsTable td{height:68px;line-height:1.5}
+.school-app #studentsTable th{white-space:normal;line-height:1.6}
+.school-app #studentsTable td:nth-child(3),.school-app #studentsTable td:nth-child(4),.school-app #studentsTable td:nth-child(5),.school-app #studentsTable td:nth-child(6){white-space:normal;word-wrap:break-word}
+.school-app .navbar .user-menu-btn{width:92px;flex-shrink:0}
+@media(min-width:1200px){.school-app .navbar .hdr-date{width:180px;flex:0 0 180px}}
+.school-app #studentsTable th{height:68px}
+.school-app .dashboard-actions{flex-wrap:wrap}.school-app .dashboard-actions>.btn{width:190px;flex:none}
+.school-app .student-list-actions>.btn{width:150px;flex:none}
+.school-app .student-list-actions>.btn:nth-child(2){width:190px}
+.school-app .student-list-actions>.btn:nth-child(3){width:80px}
+@media(max-width:640px){.school-app .student-list-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.school-app .student-list-actions>.btn,.school-app .student-list-actions>.btn:nth-child(2),.school-app .student-list-actions>.btn:nth-child(3){width:100%}.school-app .dashboard-actions>.btn{width:100%}}
+
+}
+
+/* v4.179.0 — نوار فیلتر «مدیریت دانش‌آموزان» (بازطراحی)
+   grid به‌جای flex: ستون‌ها دقیقاً سر جای خودشان می‌نشینند و هیچ فضای مرده‌ای
+   نمی‌ماند. ستون‌ها: جستجو | سال | پایه | کلاس | گزینه‌ها | دکمه‌ها.
+   جستجو بزرگ‌ترین است (پرکاربردترین)، کلاس دوم، و سال/پایه جمع‌وجور — چون
+   مقدارهایشان کوتاه‌اند. همهٔ کنترل‌ها هم‌ارتفاع (--sf-h) و هم‌گوشه. */
+.school-app .students-filters-card{padding:14px 16px}
+.school-app .students-filters{
+  --sf-h:38px; --sf-r:11px; --sf-fs:13.5px; --sf-gap:10px;
+  --sf-line:#dbe3ee; --sf-bg:#fbfcfe; --sf-txt:#41506b; --sf-lbl:#5b6b82;
+  --sf-acc:#7c5cff; --sf-acc-ring:rgba(124,92,255,.14);
+  display:grid;
+  grid-template-columns:minmax(210px,1.8fr) 142px 108px minmax(150px,1.3fr) auto auto;
+  gap:var(--sf-gap);align-items:end;
+}
+.school-app .students-filters .sf-field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.school-app .students-filters .sf-field>label{
+  margin:0;font-size:11px;line-height:1.3;font-weight:700;color:var(--sf-lbl);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.school-app .students-filters .sf-field .form-input,
+.school-app .students-filters .sf-field .form-select{
+  height:var(--sf-h);min-height:var(--sf-h);width:100%;min-width:0;box-sizing:border-box;
+  padding:0 12px;font-size:var(--sf-fs);border-radius:var(--sf-r);
+  border:1.5px solid var(--sf-line);background:var(--sf-bg);
+  transition:border-color .15s,box-shadow .15s,background .15s;
+}
+.school-app .students-filters .sf-field .form-input:hover,
+.school-app .students-filters .sf-field .form-select:hover{border-color:#b9c5d6}
+.school-app .students-filters .sf-field .form-input:focus,
+.school-app .students-filters .sf-field .form-select:focus{
+  border-color:var(--sf-acc);box-shadow:0 0 0 3px var(--sf-acc-ring);background:#fff;outline:none;
+}
+/* جستجو با آیکون داخلی */
+.school-app .students-filters .sf-search{position:relative}
+.school-app .students-filters .sf-search .form-input{padding-inline-start:38px}
+.school-app .students-filters .sf-search .sf-ico{
+  position:absolute;inset-inline-start:12px;bottom:12px;display:flex;color:#8a97ab;pointer-events:none;
+}
+/* دکمه‌ها هم‌ارتفاع با فیلدها */
+.school-app .students-filters .sf-actions{display:flex;gap:8px;align-items:center}
+.school-app .students-filters .sf-actions .btn{
+  height:var(--sf-h);min-height:var(--sf-h);padding:0 16px;font-size:var(--sf-fs);
+  border-radius:var(--sf-r);white-space:nowrap;
+}
+.school-app .students-filters .sf-actions .btn-ghost{background:#eef1f6;color:var(--sf-txt)}
+.school-app .students-filters .sf-actions .btn-ghost:hover{background:#e2e7ef}
+/* «گزینه‌های بیشتر» به‌صورت popover زیر کلیدش */
+.school-app .students-filters .sf-more{position:relative}
+.school-app .students-filters .sf-more>summary{
+  list-style:none;cursor:pointer;user-select:none;height:var(--sf-h);min-height:var(--sf-h);
+  display:inline-flex;align-items:center;gap:6px;padding:0 14px;box-sizing:border-box;
+  border:1.5px solid var(--sf-line);border-radius:var(--sf-r);background:var(--sf-bg);
+  font-size:var(--sf-fs);font-weight:600;color:var(--sf-txt);white-space:nowrap;
+}
+.school-app .students-filters .sf-more>summary::-webkit-details-marker{display:none}
+.school-app .students-filters .sf-more>summary:hover{background:#f2f5f9}
+.school-app .students-filters .sf-more>summary .sf-chev{transition:transform .18s}
+.school-app .students-filters .sf-more[open]>summary .sf-chev{transform:rotate(180deg)}
+.school-app .students-filters .sf-more-panel{
+  position:absolute;top:calc(100% + 8px);inset-inline-end:0;z-index:60;
+  width:min(680px,88vw);background:#fff;border:1px solid #e2e8f0;border-radius:14px;
+  box-shadow:0 12px 32px rgba(23,36,59,.14);padding:14px;
+}
+.school-app .students-filters .sf-more-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.school-app .students-filters .sf-more-grid>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.school-app .students-filters .sf-more-grid label{
+  margin:0;font-size:11px;line-height:1.3;font-weight:700;color:var(--sf-lbl);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.school-app .students-filters .sf-more-grid .form-select,
+.school-app .students-filters .sf-more-grid .form-input{
+  height:var(--sf-h);min-height:var(--sf-h);width:100%;min-width:0;box-sizing:border-box;
+  padding:0 10px;font-size:13px;border-radius:9px;border:1.5px solid var(--sf-line);background:var(--sf-bg);
+}
+.school-app .students-filters .sf-gpa{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+/* ناحیهٔ نتایج — حالت بارگذاری برای به‌روزرسانی درجا */
+.school-app #studentsResults{transition:opacity .12s ease}
+.school-app #studentsResults.sf-loading{opacity:.45;pointer-events:none}
+@media(max-width:1150px){
+.school-app .students-filters{grid-template-columns:minmax(180px,1.6fr) 130px 100px minmax(140px,1.2fr) auto auto}
+}
+@media(max-width:980px){
+.school-app .students-filters{grid-template-columns:1fr 1fr}
+.school-app .students-filters .sf-search{grid-column:1 / -1}
+.school-app .students-filters .sf-actions{grid-column:1 / -1;justify-content:flex-end}
+}
+@media(max-width:640px){
+.school-app .students-filters{--sf-h:44px;grid-template-columns:1fr}
+.school-app .students-filters .sf-actions{justify-content:stretch}
+.school-app .students-filters .sf-actions .btn{flex:1 1 auto}
+.school-app .students-filters .sf-more-grid{grid-template-columns:1fr 1fr}
+}

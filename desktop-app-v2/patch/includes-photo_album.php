@@ -160,7 +160,7 @@ body{font-family:'BTitr',Tahoma,sans-serif}
   <div class="hdr">
     <div class="side"><?php echo htmlspecialchars($schoolName, ENT_QUOTES, 'UTF-8'); ?><?php if ($year !== ''): ?><br>سال تحصیلی <?php echo htmlspecialchars(function_exists('tr_num') ? tr_num($year, 'fa') : $year, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?></div>
     <div class="ttl">آلبوم عکس — کلاس <?php echo htmlspecialchars($className, ENT_QUOTES, 'UTF-8'); ?></div>
-    <div class="side"><?php if ($grade !== ''): ?>پایهٔ <?php echo htmlspecialchars($grade, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?><br>تاریخ تهیه: <?php echo htmlspecialchars(function_exists('tr_num') ? tr_num($today, 'fa') : $today, ENT_QUOTES, 'UTF-8'); ?></div>
+    <div class="side"><?php if ($grade !== ''): ?>پایهٔ <?php echo htmlspecialchars($grade, ENT_QUOTES, 'UTF-8'); ?><?php endif; ?></div>
   </div>
   <div class="cols">
   <?php

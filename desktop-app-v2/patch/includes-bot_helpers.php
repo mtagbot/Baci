@@ -300,7 +300,7 @@ if (!function_exists('bot_report_lock_list_message')) {
             $seen[$key] = true;
             $label = trim($term . ($term !== '' && $month !== '' ? ' — ' : '') . $month);
             if ($label === '') $label = 'کارنامه';
-            $lines[] = '• ' . $label . ":\n   " . $reason;
+            $lines[] = '• ' . $label . ":\n   مسدود شده.\n   علت مسدودیت: " . $reason;
         }
         $count = count($lines);
         if ($count > 8) {
@@ -624,7 +624,16 @@ if (!function_exists('bot_target_recipients')) {
             if (function_exists('persian_usort_by')) persian_usort_by($out, ['display_name']);
             return $out;
         }
-        if ($scope === 'grade') {
+        if ($scope === 'unreviewed_reports') {
+            $parts = explode('|', (string)$value, 2);
+            $year = trim((string)($parts[0] ?? '')); $month = trim((string)($parts[1] ?? ''));
+            if ($year === '' || $month === '') return [];
+            DB::execute("CREATE TABLE IF NOT EXISTS report_parent_reviews (id int(11) NOT NULL AUTO_INCREMENT, report_id int(11) NOT NULL, platform enum('bale','telegram','soroush','rubika') NOT NULL, chat_id varchar(80) NOT NULL, reviewed_at_jalali varchar(30) NOT NULL, PRIMARY KEY(id), UNIQUE KEY uniq_review (report_id, platform, chat_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            $rows = DB::fetchAll($base . " AND EXISTS (SELECT 1 FROM reports r WHERE r.student_id=s.id AND r.academic_year=? AND r.report_month=? AND NOT EXISTS (SELECT 1 FROM report_parent_reviews rv WHERE rv.report_id=r.id))", [$year, $month]);
+        } elseif ($scope === 'unreviewed_discipline') {
+            if (function_exists('ensure_school_roles_schema')) ensure_school_roles_schema();
+            $rows = DB::fetchAll($base . " AND EXISTS (SELECT 1 FROM student_discipline_records d WHERE d.student_id=s.id AND COALESCE(d.review_status,'pending')='pending')");
+        } elseif ($scope === 'grade') {
             $rows = DB::fetchAll($base . " AND s.grade_level = ?", [$value]);
         } elseif ($scope === 'class') {
             $rows = DB::fetchAll($base . " AND s.class_name = ?", [$value]);

@@ -15,6 +15,7 @@ if (!function_exists('bot_admin_platform_title')) {
 }
 
 if (!function_exists('bot_admin_webhook_file')) {
+    /** هر پیام‌رسان فایل وبهوک خودش را دارد: <platform>-webhook.php */
     function bot_admin_webhook_file($platform) {
         return bot_valid_platform($platform) . '-webhook.php';
     }
@@ -39,6 +40,15 @@ if (!function_exists('bot_admin_handle_request')) {
                 redirect($page);
             }
 
+            if (isset($_POST['retry_bot_outbox'])) {
+                bot_outbox_schema();
+                bot_outbox_sql("UPDATE bot_outbox SET next_try=0 WHERE platform=? AND state IN ('pending','relayed')",[$platform]);
+                // Keep provider rate limits and live leases intact. Never retry a sent job.
+                set_setting('desk_bot_outbox_next','0');
+                set_flash_message('success','صف برای تلاش مجدد آماده شد؛ ارسال توسط worker انجام می‌شود.');
+                redirect($page);
+            }
+
             if (isset($_POST['save_bot_token'])) {
                 set_setting(bot_token_key($platform), trim($_POST['bot_token'] ?? ''));
                 /* v4.84.0: optional relay base URL for Telegram — for hosts that
@@ -56,9 +66,13 @@ if (!function_exists('bot_admin_handle_request')) {
 
             if (isset($_POST['send_targeted_message'])) {
                 $scope = $_POST['target_scope'] ?? 'all';
-                $allowed = ['all', 'grade', 'class', 'student', 'teachers', 'teacher'];
+                $allowed = ['all', 'grade', 'class', 'student', 'teachers', 'teacher', 'unreviewed_reports', 'unreviewed_discipline'];
                 if (!in_array($scope, $allowed, true)) $scope = 'all';
                 $value = trim($_POST['target_value_' . $scope] ?? '');
+                if ($scope === 'unreviewed_reports' && (strpos($value, '|') === false || trim(substr($value, 0, strpos($value, '|'))) === '' || trim(substr($value, strpos($value, '|') + 1)) === '')) {
+                    set_flash_message('error', 'برای ارسال به دارندگان کارنامهٔ بررسی‌نشده، ماه کارنامه را انتخاب کنید.');
+                    redirect($page);
+                }
                 $message = trim($_POST['target_message'] ?? '');
 
                 // v4.47.0: optional file attachment (photo or document).
@@ -113,7 +127,8 @@ if (!function_exists('bot_admin_handle_request')) {
                             $result = bot_send_targeted_text($platform, $scope, $value, $message);
                             log_activity($_SESSION['admin_id'] ?? null, 'ارسال هدفمند ربات ' . $title, "scope=$scope value=$value sent={$result['sent']} failed={$result['failed']}");
                         }
-                        set_flash_message($result['failed'] ? 'warning' : 'success', "ارسال انجام شد. کل گیرندگان: {$result['total']}، موفق: {$result['sent']}، ناموفق: {$result['failed']}.");
+                        $queued=(int)($result['queued']??0);
+                        set_flash_message($result['failed'] ? 'warning' : 'success', "کل گیرندگان: {$result['total']}، ارسال تأییدشده: {$result['sent']}، در صف: {$queued}، ناموفق: {$result['failed']}.");
                     } catch (Exception $e) {
                         set_flash_message('error', 'خطا در ارسال پیام: ' . $e->getMessage());
                     }
@@ -164,6 +179,9 @@ if (!function_exists('bot_admin_handle_request')) {
             $webhookUrl = $protocol . $host . $base . '/' . bot_admin_webhook_file($platform);
             try {
                 if ($platform === 'rubika') {
+                    // Rubika Bot API v3 uses updateBotEndpoints (not setWebhook).
+                    // Its receiveUpdate and receiveInlineMessage callbacks are
+                    // separate endpoint types, both normalized by this script.
                     $res = bot_api_request($platform, 'updateBotEndpoints', ['url' => $webhookUrl, 'type' => 'ReceiveUpdate']);
                     $inlineRes = bot_api_request($platform, 'updateBotEndpoints', ['url' => $webhookUrl, 'type' => 'ReceiveInlineMessage']);
                     log_activity($_SESSION['admin_id'] ?? null, 'تنظیم endpoint ربات ' . $title, json_encode([$res, $inlineRes], JSON_UNESCAPED_UNICODE));
@@ -256,6 +274,7 @@ if (!function_exists('bot_admin_render_page')) {
         $classes = get_unified_class_options($_GET['year'] ?? get_setting('current_academic_year', '1404/1405'));
         $students = DB::fetchAll("SELECT id, first_name, last_name, national_id, class_name, grade_level FROM students WHERE status = 'active'", []);
         persian_usort_students($students);
+        $reportMonthTargets = DB::fetchAll("SELECT DISTINCT academic_year, report_month FROM reports WHERE COALESCE(report_month,'')<>'' ORDER BY academic_year DESC, report_month DESC") ?: [];
         /* v4.89.0: مخاطبان دبیر — فقط دبیرانی که چت فعال کارکنان در همین پیام‌رسان دارند */
         $teacherTargets = [];
         try {
@@ -277,7 +296,7 @@ if (!function_exists('bot_admin_render_page')) {
 <div class="space-y-6 bot-admin-page">
     <div class="page-hero flex justify-between items-center">
         <div>
-            <h2 class="text-2xl font-bold">🤖 مدیریت ربات <?php echo clean($title); ?></h2>
+            <h2 class="text-2xl font-bold"><svg data-ui-icon="bot" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="7" width="18" height="14" rx="4"/><path d="M12 7V2M10 2h4M7 12v2m10-2v2m-9 3h8"/></svg> مدیریت ربات <?php echo clean($title); ?></h2>
             <p class="text-sm text-muted">احراز هویت اولیا، دریافت کارنامه تصویری، ارسال هدفمند و سفارشی‌سازی متن‌ها/دکمه‌ها</p>
         </div>
         <div class="flex gap-2">
@@ -301,7 +320,7 @@ if (!function_exists('bot_admin_render_page')) {
                 <input type="text" name="telegram_api_base" class="form-input dir-ltr text-left font-mono text-xs" placeholder="https://my-relay.workers.dev" value="<?php echo clean(get_setting('telegram_api_base', '')); ?>">
                 <p class="text-xs text-muted">اگر هاست شما دسترسی به سایت‌های خارج را بسته است (خطای Connection timed out)، یک واسط بسازید و آدرسش را اینجا وارد کنید. راهنمای کامل پایین همین صفحه است. خالی = اتصال مستقیم.</p>
                 <?php endif; ?>
-                <button class="btn btn-primary w-full text-xs" type="submit">💾 ذخیره توکن</button>
+                <button class="btn btn-primary w-full text-xs" type="submit"><svg data-ui-icon="save" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3h15l3 3v15H3Zm4 0v7h10V3M7 21v-7h10v7"/></svg> ذخیره توکن</button>
             </form>
             <?php if ($platform === 'telegram'): ?>
             <details class="soft-panel text-xs">
@@ -335,15 +354,16 @@ if (!function_exists('bot_admin_render_page')) {
             <details class="soft-panel text-xs">
                 <summary class="font-bold cursor-pointer">راهنما: ساخت ربات روبیکا</summary>
                 <div class="space-y-2 mt-2">
-                    <p>در روبیکا، BotFather@ را باز کنید، ربات بسازید و توکن دریافتی را بدون پیشوند اضافی همین‌جا ذخیره کنید.</p>
-                    <p>روبیکا از Bot API نسخهٔ ۳ در <code class="dir-ltr">botapi.rubika.ir/v3</code> استفاده می‌کند. ثبت خودکار دو endpoint رسمی <code class="dir-ltr">ReceiveUpdate</code> و <code class="dir-ltr">ReceiveInlineMessage</code> را تنظیم می‌کند. <code class="dir-ltr">getChat</code> پشتیبانی می‌شود؛ <code class="dir-ltr">leaveChat</code> در API نیست.</p>
+                    <p>در روبیکا، BotFather@ را باز کنید، ربات بسازید و توکن دریافتی را بدون پیشوند اضافی در فیلد «توکن ربات» ذخیره کنید.</p>
+                    <p>روبیکا از Bot API نسخهٔ ۳ در <code class="dir-ltr">botapi.rubika.ir/v3</code> استفاده می‌کند. دکمهٔ ثبت، دو endpoint رسمی <code class="dir-ltr">ReceiveUpdate</code> و <code class="dir-ltr">ReceiveInlineMessage</code> را ثبت می‌کند؛ این API با setWebhook تلگرام/بله متفاوت است. سرور باید با HTTPS از اینترنت عمومی در دسترس باشد.</p>
+                    <p class="text-muted">روبیکا getChat را دارد اما متد رسمی leaveChat در فهرست API نیست؛ پس تازه‌سازی و افزودن دستی پشتیبانی می‌شوند ولی خروج از گفتگو غیرفعال است.</p>
                 </div>
             </details>
             <?php endif; ?>
             <div class="soft-panel text-xs space-y-2">
                 <b>آدرس Webhook:</b>
                 <code class="block dir-ltr text-left break-all"><?php echo clean(bot_admin_webhook_file($platform)); ?></code>
-                <a class="btn btn-success w-full text-xs" href="<?php echo clean($page); ?>?action=set_webhook&amp;csrf_token=<?php echo urlencode(csrf_token()); ?>">⚡ ثبت خودکار Webhook</a>
+                <a class="btn btn-success w-full text-xs" href="<?php echo clean($page); ?>?action=set_webhook&amp;csrf_token=<?php echo urlencode(csrf_token()); ?>"><svg data-ui-icon="bolt" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m14 2-11 12h8l-1 8 11-12h-8Z"/></svg> ثبت خودکار Webhook</a>
             </div>
             <?php if ($platform === 'telegram'):
                 $tgMode = get_setting('telegram_receive_mode', 'webhook');
@@ -358,7 +378,7 @@ if (!function_exists('bot_admin_render_page')) {
                 <p class="text-muted">اگر در getWebhookInfo خطای <code class="dir-ltr">Connection timed out</code> از سمت تلگرام می‌بینید، یعنی هاست شما ترافیک ورودی خارجی را هم بسته و تلگرام نمی‌تواند پیام‌ها را به سایت برساند. در این حالت «دریافت با Cron» را فعال کنید: سایت خودش هر دقیقه پیام‌ها را از تلگرام (از طریق واسط) می‌کشد.</p>
                 <p>وضعیت فعلی: <b><?php echo $tgMode === 'polling' ? '🔄 دریافت با Cron فعال است' : '🌐 وبهوک (پیش‌فرض)'; ?></b></p>
                 <?php if ($tgMode !== 'polling'): ?>
-                <a class="btn btn-warning w-full text-xs" href="<?php echo clean($page); ?>?action=enable_polling&amp;csrf_token=<?php echo urlencode(csrf_token()); ?>" onclick="return confirm('وبهوک تلگرام حذف و حالت دریافت با Cron فعال می‌شود. ادامه می‌دهید؟');">🔄 فعال‌سازی دریافت با Cron</a>
+                <a class="btn btn-warning w-full text-xs" href="<?php echo clean($page); ?>?action=enable_polling&amp;csrf_token=<?php echo urlencode(csrf_token()); ?>" onclick="return confirm('وبهوک تلگرام حذف و حالت دریافت با Cron فعال می‌شود. ادامه می‌دهید؟');"><svg data-ui-icon="refresh" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 3v6h-6M3 21v-6h6M20 9a8 8 0 0 0-14-4M4 15a8 8 0 0 0 14 4"/></svg> فعال‌سازی دریافت با Cron</a>
                 <?php else: ?>
                 <p><b>گام بعدی:</b> در پنل هاست (cPanel/DirectAdmin) یک Cron Job با اجرای «هر ۱ دقیقه» بسازید که این آدرس را صدا بزند:</p>
                 <code class="block dir-ltr text-left break-all"><?php echo clean($tgPollUrl); ?></code>
@@ -379,7 +399,7 @@ if (!function_exists('bot_admin_render_page')) {
         </section>
 
         <section class="card col-span-2 shadow-lg space-y-4">
-            <h3 class="font-bold text-primary border-b pb-2">📢 ارسال پیام هدفمند</h3>
+            <h3 class="font-bold text-primary border-b pb-2"><svg data-ui-icon="message" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3h18v14H9l-6 5ZM7 8h10M7 12h7"/></svg> ارسال پیام هدفمند</h3>
             <form method="POST" class="space-y-4" id="targetForm" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
                 <input type="hidden" name="send_targeted_message" value="1">
@@ -390,6 +410,8 @@ if (!function_exists('bot_admin_render_page')) {
                     <label class="target-card"><input type="radio" name="target_scope" value="student"> دانش‌آموز</label>
                     <label class="target-card"><input type="radio" name="target_scope" value="teachers"> همه دبیران</label>
                     <label class="target-card"><input type="radio" name="target_scope" value="teacher"> یک دبیر</label>
+                    <label class="target-card"><input type="radio" name="target_scope" value="unreviewed_reports"> دانش‌آموزان با کارنامهٔ بررسی‌نشده</label>
+                    <label class="target-card"><input type="radio" name="target_scope" value="unreviewed_discipline"> دانش‌آموزان با مورد انضباطی بررسی‌نشده</label>
                 </div>
                 <div class="grid grid-cols-3 gap-3">
                     <select name="target_value_grade" class="form-select target-value" data-scope="grade">
@@ -400,6 +422,12 @@ if (!function_exists('bot_admin_render_page')) {
                     </select>
                     <select name="target_value_student" class="form-select target-value" data-scope="student">
                         <?php foreach ($students as $s): ?><option value="<?php echo (int)$s['id']; ?>"><?php echo clean($s['first_name'] . ' ' . $s['last_name'] . ' - ' . $s['class_name'] . ' - ' . $s['national_id']); ?></option><?php endforeach; ?>
+                    </select>
+                    <select name="target_value_unreviewed_reports" class="form-select target-value" data-scope="unreviewed_reports" aria-label="ماه کارنامه‌های بررسی‌نشده">
+                        <option value="">ماه کارنامه را انتخاب کنید</option>
+                        <?php foreach ($reportMonthTargets as $rm): $rmValue=(string)$rm['academic_year'].'|'.(string)$rm['report_month']; ?>
+                            <option value="<?php echo clean($rmValue); ?>"><?php echo clean($rm['report_month'].' — '.$rm['academic_year']); ?></option>
+                        <?php endforeach; ?>
                     </select>
                     <select name="target_value_teacher" class="form-select target-value" data-scope="teacher">
                         <?php if (empty($teacherTargets)): ?><option value="0">— هیچ دبیری به ربات متصل نیست —</option><?php endif; ?>
@@ -412,7 +440,7 @@ if (!function_exists('bot_admin_render_page')) {
                 <!-- v4.48.0: messenger-style live composer/preview -->
                 <div class="tgsim" dir="rtl">
                     <div class="tgsim-header">
-                        <div class="tgsim-avatar" id="tgsimAvatar">👥</div>
+                        <div class="tgsim-avatar" id="tgsimAvatar"><svg data-ui-icon="users" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="7" r="3"/><path d="M2 21v-3c0-6 14-6 14 0v3M16 4c5 0 5 6 1 6M19 14c3 1 3 4 3 7"/></svg></div>
                         <div class="tgsim-headtxt">
                             <b id="tgsimTitle">همه کاربران متصل</b>
                             <span id="tgsimSub">پیش‌نمایش زنده — دقیقاً همان چیزی که در ربات دیده می‌شود</span>
@@ -441,7 +469,7 @@ if (!function_exists('bot_admin_render_page')) {
                     </div>
                     <div class="tgsim-attachbar" id="tgsimAttachBar" style="display:none">
                         <span class="tgsim-chip">
-                            <span class="tgsim-chip-ic" id="tgsimChipIc">📄</span>
+                            <span class="tgsim-chip-ic" id="tgsimChipIc"><svg data-ui-icon="report" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 2H5v20h14V7Zm0 0v5h5M8 17v-3m4 3v-6m4 6v-4"/></svg></span>
                             <span class="tgsim-chip-name" id="tgsimChipName"></span>
                             <span class="tgsim-chip-size" id="tgsimChipSize"></span>
                             <button type="button" class="tgsim-chip-x" id="tgsimRemoveFile" title="حذف پیوست">&times;</button>
@@ -451,7 +479,7 @@ if (!function_exists('bot_admin_render_page')) {
                         <button type="button" class="tgsim-iconbtn" id="tgsimAttachBtn" title="پیوست فایل">
                             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21.44 11.05l-8.49 8.49a6 6 0 0 1-8.49-8.49l8.49-8.49a4 4 0 0 1 5.66 5.66l-8.49 8.48a2 2 0 0 1-2.83-2.83l7.78-7.78"/></svg>
                         </button>
-                        <button type="button" class="tgsim-iconbtn" id="tgsimEmojiBtn" title="ایموجی">
+                        <button type="button" class="tgsim-iconbtn" id="tgsimEmojiBtn" title="افزودن ایموجی" aria-label="افزودن ایموجی به پیام">
                             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c.9 1.2 2.1 1.8 3.5 1.8s2.6-.6 3.5-1.8"/><circle cx="9" cy="9.6" r="0.6" fill="currentColor"/><circle cx="15" cy="9.6" r="0.6" fill="currentColor"/></svg>
                         </button>
                         <textarea name="target_message" id="tgsimInput" rows="1" class="tgsim-input" placeholder="پیام"></textarea>
@@ -471,7 +499,7 @@ if (!function_exists('bot_admin_render_page')) {
     </div>
 
     <section class="card shadow-lg space-y-5">
-        <h3 class="font-bold text-primary border-b pb-2">✏️ شخصی‌سازی پیام‌های ثابت و دکمه‌های ربات</h3>
+        <h3 class="font-bold text-primary border-b pb-2"><svg data-ui-icon="edit" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m14 5 5 5M3 21l5-1L21 7c2-2-2-6-4-4L4 16Z"/></svg> شخصی‌سازی پیام‌های ثابت و دکمه‌های ربات</h3>
         <form method="POST" class="space-y-6">
             <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
             <input type="hidden" name="save_templates" value="1">
@@ -499,12 +527,12 @@ if (!function_exists('bot_admin_render_page')) {
                     </tbody>
                 </table>
             </div>
-            <button type="submit" class="btn btn-success px-8">💾 ذخیره متن‌ها و دکمه‌ها</button>
+            <button type="submit" class="btn btn-success px-8"><svg data-ui-icon="save" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 3h15l3 3v15H3Zm4 0v7h10V3M7 21v-7h10v7"/></svg> ذخیره متن‌ها و دکمه‌ها</button>
         </form>
     </section>
 
     <section class="card shadow-lg">
-        <h3 class="font-bold text-primary mb-3">👥 کاربران متصل به ربات <?php echo clean($title); ?>
+        <h3 class="font-bold text-primary mb-3"><svg data-ui-icon="users" class="school-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="7" r="3"/><path d="M2 21v-3c0-6 14-6 14 0v3M16 4c5 0 5 6 1 6M19 14c3 1 3 4 3 7"/></svg> کاربران متصل به ربات <?php echo clean($title); ?>
             <span class="text-muted" style="font-size:.75rem;font-weight:400">
                 — مجموع <?php echo tr_num($connectedTotal, 'fa'); ?> کاربر ·
                 این صفحه <?php echo tr_num(($usersOffset + 1) . '-' . min($connectedTotal, $usersOffset + $usersPerPage), 'fa'); ?>
@@ -616,7 +644,9 @@ if (!function_exists('bot_admin_render_page')) {
     class:    { icon: '🏫', title: (v) => 'کلاس ' + v },
     student:  { icon: '👤', title: (v) => v },
     teachers: { icon: '👨‍🏫', title: () => 'همه دبیران متصل' },
-    teacher:  { icon: '👨‍🏫', title: (v) => v }
+    teacher:  { icon: '👨‍🏫', title: (v) => v },
+    unreviewed_reports: { icon: '📊', title: (v) => 'کارنامه‌های بررسی‌نشده — ' + v },
+    unreviewed_discipline: { icon: '⚠️', title: () => 'موارد انضباطی بررسی‌نشده' }
   };
   const refresh = () => {
     const scope = form.querySelector('input[name="target_scope"]:checked')?.value || 'all';
@@ -756,15 +786,13 @@ if (!function_exists('bot_admin_render_page')) {
   const attachBtn = document.getElementById('tgsimAttachBtn');
   if (attachBtn) attachBtn.addEventListener('click', () => fileInput.click());
 
-  /* ---- v4.49.0: emoji picker (Telegram-style, categorized) ---- */
+  /* v4.215.0: انتخاب‌گر واقعی ایموجی؛ نویسهٔ ایموجی داخل متن درج می‌شود. */
   const EMOJI_CATS = [
-    ['😀', 'شکلک‌ها', ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','😘','🥰','😗','🙂','🤗','🤩','🤔','🫡','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😴','😫','🥱','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🫠','😲','☹️','🙁','😖','😞','😟','😤','😢','😭','😦','😧','😨','😩','🤯','😬','😰','😱','🥵','🥶','😳','🤪','😵','🥴','😠','😡','🤬','😷','🤒','🤕','🤢','🤮','🤧','😇','🥳','🥺','🤠','🤡','🤥','🤫','🤭','🧐','🤓','😈','👻','💀','👽','🤖','💩','😺','😸','😹','😻','😼','😽']],
-    ['👋', 'دست‌ها و افراد', ['👋','🤚','🖐','✋','🖖','👌','🤌','🤏','✌️','🤞','🫰','🤟','🤘','🤙','👈','👉','👆','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','🫶','👐','🤲','🤝','🙏','💪','🦾','✍️','💅','🤳','👶','🧒','👦','👧','🧑','👨','👩','🧑‍🎓','👨‍🎓','👩‍🎓','🧑‍🏫','👨‍🏫','👩‍🏫','👨‍👩‍👧','👨‍👩‍👦','🗣','👥','🫂']],
-    ['📚', 'مدرسه و آموزش', ['📚','📖','📕','📗','📘','📙','📓','📒','📃','📄','📑','📊','📈','📉','🗒','📝','✏️','✒️','🖊','🖍','📏','📐','✂️','🖇','📎','📌','📍','🗂','📁','📂','🗄','📋','🧮','🔬','🔭','🧪','🧫','🧬','🌡','🏫','🎒','🎓','🏆','🥇','🥈','🥉','🏅','🎖','⏰','⏱','⏲','🕰','📅','📆','🗓','🔔','🔕','📢','📣','💡','🔍','🔎','🧠','⚗️','🖥','💻','🖨','⌨️','🖱','💾','💿','📱','☎️','📞']],
-    ['❤️', 'قلب‌ها و نمادها', ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟','☮️','✝️','☪️','🕉','⭐️','🌟','✨','⚡️','💥','🔥','🌈','☀️','🌤','⛅️','🌧','⛈','❄️','☃️','💧','💦','🌊','✅','☑️','✔️','❌','❎','➕','➖','➗','✖️','💯','🔞','⚠️','🚸','🔱','⚜️','🔰','♻️','💠','🌀','➡️','⬅️','⬆️','⬇️','↗️','↘️','🔄','🔃','🔝','🔚','🔙','🆕','🆗','🆙','🆒','🆓','🆖','🈵','🚫','❓','❔','❗️','‼️','⁉️','💤']],
-    ['🎉', 'جشن و فعالیت', ['🎉','🎊','🎈','🎂','🍰','🧁','🎁','🎗','🎟','🎫','🎪','🎭','🎨','🎬','🎤','🎧','🎼','🎵','🎶','🥁','🎹','🎸','🎺','🎻','🏀','⚽️','🏈','⚾️','🎾','🏐','🏓','🏸','🥅','⛳️','🏹','🎣','🥊','🥋','⛸','🎿','🏂','🏋️','🤸','🤾','⛹️','🏊','🚴','🚵','🏇','🧘','🎮','🕹','🎲','♟','🧩','🪁','🛝']],
-    ['🍎', 'خوراکی و طبیعت', ['🍎','🍏','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🥑','🥦','🥕','🌽','🍞','🥖','🧀','🥚','🍳','🥞','🧇','🍗','🍔','🍟','🍕','🌭','🥪','🌮','🍝','🍜','🍲','🍛','🍣','🍙','🍚','🍦','🍩','🍪','🍫','🍬','🍭','☕️','🍵','🥤','🧃','🌹','🌺','🌸','🌼','🌻','🌷','🪷','🌱','🌲','🌳','🌴','🌵','🍀','🍁','🍂','🍃','🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🦅','🦋','🐝','🐞','🐢','🐬','🐳']],
-    ['🚗', 'اشیا و مکان‌ها', ['🚗','🚕','🚙','🚌','🚎','🏎','🚓','🚑','🚒','🚐','🚚','🚛','🚜','🛵','🏍','🚲','🛴','🚨','🚔','🚖','🚡','🚠','🚟','🚃','🚋','🚝','🚄','🚅','🚈','🚂','✈️','🛫','🛬','🚀','🛸','🚁','⛵️','🚤','🛳','⚓️','⛽️','🚏','🗺','🗿','🗽','🗼','🏰','🏯','🏟','🎡','🎢','🎠','⛲️','🏖','🏝','🏔','⛰','🌋','🗻','🏕','⛺️','🏠','🏡','🏢','🏣','🏥','🏦','🏨','🏪','🏬','🏭','💒','⛪️','🕌','🕍','🛕','⌚️','🔋','🔌','🕯','🪔','🧯','🛢','💸','💵','💰','💳','💎','⚖️','🧰','🔧','🔨','⚙️','🧲','🔫','💣','🔪','🛡','🚬','⚰️','🔮','📿','💈','⚗️','🔑','🗝','🚪','🪑','🛏','🛋','🚽','🚿','🛁','🧴','🧷','🧹','🧺','🧻','🧼','🪥','🧽','🛒']]
+    ['😀','صورتک‌ها','😀 😃 😄 😁 😆 😅 😂 🙂 🙃 😉 😊 😍 🥰 😎 🤔 😴 😢 😡 🤗 🥳'],
+    ['👋','افراد','👋 🙏 👍 👎 👏 💪 🤝 👨‍🏫 👩‍🏫 👨‍🎓 👩‍🎓 👨‍👩‍👧‍👦'],
+    ['🎓','آموزش','🎓 📚 📖 ✏️ 📝 📐 🔬 🧪 🏫 📊 🏆 🥇'],
+    ['❤️','نمادها','❤️ 💙 💚 💛 ⭐ ✨ ✅ ❌ ⚠️ ❗ ❓ 🔔 📢'],
+    ['🎉','مناسبت‌ها','🎉 🎊 🎈 🎁 🎂 🌹 🌷 ☀️ 🌙']
   ];
   const emojiBtn = document.getElementById('tgsimEmojiBtn');
   const emojiPanel = document.getElementById('tgsimEmojiPanel');
@@ -773,26 +801,20 @@ if (!function_exists('bot_admin_render_page')) {
   let emojiBuilt = false, emojiCat = 0;
   function buildEmojiTabs() {
     EMOJI_CATS.forEach((cat, i) => {
-      const b = document.createElement('button');
-      b.type = 'button';
+      const b = document.createElement('button'); b.type = 'button';
       b.className = 'tgsim-emoji-tab' + (i === emojiCat ? ' tgsim-tab-on' : '');
-      b.textContent = cat[0];
-      b.title = cat[1];
+      b.textContent = cat[0]; b.title = cat[1]; b.setAttribute('aria-label', cat[1]);
       b.addEventListener('click', () => { emojiCat = i; renderEmojiGrid(); syncTabs(); });
       emojiTabs.appendChild(b);
     });
   }
-  function syncTabs() {
-    emojiTabs.querySelectorAll('.tgsim-emoji-tab').forEach((b, i) => b.classList.toggle('tgsim-tab-on', i === emojiCat));
-  }
+  function syncTabs() { emojiTabs.querySelectorAll('.tgsim-emoji-tab').forEach((b, i) => b.classList.toggle('tgsim-tab-on', i === emojiCat)); }
   function renderEmojiGrid() {
     emojiGrid.innerHTML = '';
-    EMOJI_CATS[emojiCat][2].forEach(em => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = em;
-      b.addEventListener('click', () => insertEmoji(em));
-      emojiGrid.appendChild(b);
+    EMOJI_CATS[emojiCat][2].split(' ').filter(Boolean).forEach(em => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = em;
+      b.title = em; b.setAttribute('aria-label', em);
+      b.addEventListener('click', () => insertEmoji(em + ' ')); emojiGrid.appendChild(b);
     });
     emojiGrid.scrollTop = 0;
   }
@@ -800,9 +822,7 @@ if (!function_exists('bot_admin_render_page')) {
     const start = input.selectionStart ?? input.value.length;
     const end = input.selectionEnd ?? input.value.length;
     input.value = input.value.slice(0, start) + em + input.value.slice(end);
-    const pos = start + em.length;
-    input.focus();
-    input.setSelectionRange(pos, pos);
+    const pos = start + em.length; input.focus(); input.setSelectionRange(pos, pos);
     input.dispatchEvent(new Event('input'));
   }
   if (emojiBtn && emojiPanel) {

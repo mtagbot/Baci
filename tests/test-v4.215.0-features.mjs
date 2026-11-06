@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+const R = new URL('..', import.meta.url);
+const read = p => readFileSync(new URL(p, R), 'utf8');
+const ui=read('update-v4.215.0/includes/bot_admin_ui.php');
+const helpers=read('update-v4.215.0/includes/bot_helpers.php');
+const image=read('update-v4.215.0/includes/report_image.php');
+const css=read('update-v4.215.0/assets/css/school-ui.css');
+const album=read('update-v4.215.0/includes/photo_album.php');
+const blocked=helpers.slice(helpers.indexOf('function bot_report_lock_list_message'),helpers.indexOf('if (!function_exists(\'bot_buttons_map\')'));
+const recipients=helpers.slice(helpers.indexOf('function bot_target_recipients'),helpers.indexOf('if (!function_exists(\'bot_send_targeted_text\')'));
+
+assert.match(ui,/value="unreviewed_reports"/, 'targeted audience for unreviewed report cards exists');
+assert.match(ui,/target_value_unreviewed_reports[\s\S]*?\$reportMonthTargets/, 'report month selector is wired');
+assert.match(ui,/academic_year, report_month/, 'selector differentiates months by academic year');
+assert.match(ui,/value="unreviewed_discipline"/, 'targeted audience for pending discipline items exists');
+assert.match(ui,/scope === 'unreviewed_reports'[\s\S]*?ماه کارنامه را انتخاب کنید/, 'month is required before sending');
+assert.match(recipients,/r\.academic_year=\? AND r\.report_month=\?[\s\S]*?NOT EXISTS \(SELECT 1 FROM report_parent_reviews/, 'report audience selects only exact month/year reports without any review');
+assert.match(recipients,/student_discipline_records d[\s\S]*?COALESCE\(d\.review_status,'pending'\)='pending'/, 'discipline audience requires a pending item');
+assert.match(ui,/const EMOJI_CATS = \[[\s\S]*?😀[\s\S]*?🎓/, 'picker offers real emoji characters');
+assert.match(ui,/b\.textContent = em[\s\S]*?insertEmoji\(em \+ ' '\)/, 'click inserts actual emoji in the message textarea');
+assert.match(image,/\$disciplineInk=imagecolorallocate\(\$im,15,23,42\)/, 'report discipline ink is fixed near-black');
+assert.doesNotMatch(image,/gd_text\(\$im,'انضباط',[^;]*\$gold/, 'discipline label no longer uses accent color');
+assert.match(css,/\.sf-more-panel\{\s*position:absolute;top:calc\(100% \+ 8px\);inset-inline-end:0/, 'RTL popover is anchored to open inward/right');
+assert.doesNotMatch(album,/تاریخ تهیه/, 'class photo album no longer prints generated date');
+assert.match(blocked,/مسدود شده\.[\s\S]*?علت مسدودیت:/, 'blocked report list explicitly labels status and reason');
+console.log('✅ V4.215.0: 12 targeted checks passed.');
