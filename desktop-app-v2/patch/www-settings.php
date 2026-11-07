@@ -27,6 +27,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
         }
     }
 
+    // Logo and browser icon are uploaded as image files; users never enter host paths.
+    $uploadedBrandAssets = [];
+    foreach (['logo_file' => ['logo_url', 'logo'], 'favicon_file' => ['favicon_url', 'favicon']] as $field => [$settingKey, $prefix]) {
+        if (!isset($_FILES[$field]) || ($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) continue;
+        $upload = $_FILES[$field];
+        $failUpload = static function ($message) {
+            set_flash_message('error', $message . ' تنظیمات قبلی حفظ شد.');
+            redirect('settings.php');
+        };
+        if (($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($upload['tmp_name'] ?? '')
+            || (int)($upload['size'] ?? 0) < 1 || (int)$upload['size'] > 5 * 1024 * 1024) {
+            $failUpload('بارگذاری تصویر انجام نشد یا حجم آن بیش از ۵ مگابایت است.');
+        }
+        $imageInfo = @getimagesize($upload['tmp_name']);
+        $finfo = function_exists('finfo_open') ? @finfo_open(FILEINFO_MIME_TYPE) : false;
+        $detectedMime = $finfo ? strtolower((string)@finfo_file($finfo, $upload['tmp_name'])) : '';
+        if ($finfo) @finfo_close($finfo);
+        $imageMime = strtolower((string)($imageInfo['mime'] ?? ''));
+        $allowedImages = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp'];
+        $width = (int)($imageInfo[0] ?? 0); $height = (int)($imageInfo[1] ?? 0);
+        if (!$imageInfo || !isset($allowedImages[$imageMime]) || $detectedMime !== $imageMime
+            || $width < 1 || $height < 1 || $width > 4096 || $height > 4096 || $width * $height > 16777216
+            || ($prefix === 'favicon' && ($width !== $height || $width > 2048))) {
+            $failUpload($prefix === 'favicon'
+                ? 'فاویکون باید تصویر PNG، JPG یا WebP مربعی و حداکثر ۲۰۴۸×۲۰۴۸ باشد.'
+                : 'لوگو باید تصویر معتبر PNG، JPG یا WebP و حداکثر ۴۰۹۶×۴۰۹۶ باشد.');
+        }
+        $brandDir = __DIR__ . '/uploads/branding';
+        if ((!is_dir($brandDir) && !@mkdir($brandDir, 0755, true)) || !is_writable($brandDir)) {
+            $failUpload('پوشهٔ بارگذاری تصویر روی هاست قابل نوشتن نیست.');
+        }
+        try { $fileName = $prefix . '_' . bin2hex(random_bytes(16)) . '.' . $allowedImages[$imageMime]; }
+        catch (Throwable $e) { $failUpload('ساخت نام امن برای فایل انجام نشد.'); }
+        $relativePath = 'uploads/branding/' . $fileName;
+        if (!@move_uploaded_file($upload['tmp_name'], __DIR__ . '/' . $relativePath)) {
+            $failUpload('ذخیرهٔ تصویر روی هاست ناموفق بود.');
+        }
+        $uploadedBrandAssets[$settingKey] = $relativePath;
+    }
+
     set_setting('school_name', trim($_POST['school_name'] ?? ''));
     set_setting('school_phone', trim($_POST['school_phone'] ?? ''));
     set_setting('school_address', trim($_POST['school_address'] ?? ''));
@@ -77,13 +117,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     require_once __DIR__ . '/includes/header_tiles.php';
     set_setting('header_tiles', header_tiles_sanitize_post($_POST['header_tiles'] ?? []));
     set_setting('header_tiles_enabled', isset($_POST['header_tiles_enabled']) ? '1' : '0');
-    $logoInput = trim($_POST['logo_url'] ?? '');
-    $faviconInput = trim($_POST['favicon_url'] ?? '');
-    // Production rule: only self-hosted/local asset paths are accepted; external CDN/URL values are discarded.
-    if (preg_match('/^https?:\/\//i', $logoInput)) $logoInput = '';
-    if (preg_match('/^https?:\/\//i', $faviconInput)) $faviconInput = '';
-    set_setting('logo_url', $logoInput);
-    set_setting('favicon_url', $faviconInput);
+    // No free-form paths are accepted. If no new file was selected, keep the active image.
+    foreach ($uploadedBrandAssets as $settingKey => $relativePath) set_setting($settingKey, $relativePath);
 
     if($uploadedFont!==null){set_setting('custom_font_url',$uploadedFont);set_setting('font_family','CustomUploadedFont');set_setting('heading_font_family','CustomUploadedFont');}
 
@@ -284,14 +319,18 @@ $class_exam_design_enabled = get_setting('class_exam_design_enabled', '1') !== '
                     <?php endif; ?>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2">
+                <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-semibold mb-1">مسیر محلی لوگو در هاست</label>
-                        <input type="text" name="logo_url" class="form-input dir-ltr text-left text-xs" placeholder="uploads/logo.png" value="<?php echo clean($s_logo); ?>">
+                        <label class="block text-xs font-semibold mb-1">بارگذاری لوگوی آموزشگاه</label>
+                        <input type="file" name="logo_file" class="form-input p-1.5 text-xs" accept="image/png,image/jpeg,image/webp">
+                        <small class="block text-[11px] text-muted mt-1">PNG، JPG یا WebP؛ حداکثر ۵ مگابایت. پس از ذخیره، سیستم فایل را در هاست نگه می‌دارد و خودکار در سربرگ نمایش می‌دهد.</small>
+                        <?php if ($s_logo): ?><div class="mt-2 flex items-center gap-2"><img src="<?php echo clean($s_logo); ?>" alt="لوگوی فعلی" class="h-12 w-12 object-contain rounded border"><span class="text-[11px] text-green-600">لوگوی فعلی ذخیره و فعال است</span></div><?php else: ?><small class="block text-[11px] text-muted mt-2">هنوز لوگویی بارگذاری نشده است.</small><?php endif; ?>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold mb-1">مسیر محلی آیکون مرورگر</label>
-                        <input type="text" name="favicon_url" class="form-input dir-ltr text-left text-xs" placeholder="uploads/favicon.ico" value="<?php echo clean($s_fav); ?>">
+                        <label class="block text-xs font-semibold mb-1">بارگذاری فاویکون مرورگر</label>
+                        <input type="file" name="favicon_file" class="form-input p-1.5 text-xs" accept="image/png,image/jpeg,image/webp">
+                        <small class="block text-[11px] text-muted mt-1">تصویر مربعی PNG، JPG یا WebP؛ حداکثر ۵ مگابایت (۲۰۴۸×۲۰۴۸). پس از ذخیره، فاویکون خودکار به مرورگر معرفی می‌شود.</small>
+                        <?php if ($s_fav): ?><div class="mt-2 flex items-center gap-2"><img src="<?php echo clean($s_fav); ?>" alt="فاویکون فعلی" class="h-12 w-12 object-contain rounded border"><span class="text-[11px] text-green-600">فاویکون فعلی ذخیره و فعال است</span></div><?php else: ?><small class="block text-[11px] text-muted mt-2">هنوز فاویکونی بارگذاری نشده است.</small><?php endif; ?>
                     </div>
                 </div>
             </div>

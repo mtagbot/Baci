@@ -67,6 +67,37 @@ $tSize      = get_setting('table_font_size', '13px');
 $tBg        = get_setting('table_header_bg', '');
 $customFont = get_setting('custom_font_url', '');
 $logoUrl    = get_setting('logo_url', '');
+/* V4.216.0 — «مسیر محلی آیکون مرورگر» قبلاً ذخیره می‌شد، اما هیچ <link rel=icon>
+   در head چاپ نمی‌شد. فقط فایل محلی داخل ریشهٔ برنامه پذیرفته می‌شود تا
+   traversal/URL خارجی نداشته باشیم و برای برنامهٔ نصب‌شده در زیردایرکتوری
+   هم مسیر درست ساخته شود. mtime، کش قدیمی favicon را می‌شکند. */
+$faviconHref = ''; $faviconMime = '';
+$faviconInput = trim((string)get_setting('favicon_url', ''));
+$faviconInput = str_replace('\\', '/', $faviconInput);
+if ($faviconInput !== '' && !preg_match('#^(?:[a-z][a-z0-9+.-]*:|//)#i', $faviconInput)
+    && strpos($faviconInput, chr(0)) === false && strpos($faviconInput, '?') === false
+    && strpos($faviconInput, '#') === false && strpos($faviconInput, '..') === false) {
+    $appFsRoot = realpath(dirname(__DIR__));
+    $faviconRel = ltrim($faviconInput, '/');
+    $faviconFs = $appFsRoot ? realpath($appFsRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $faviconRel)) : false;
+    if ($appFsRoot && $faviconFs && is_file($faviconFs)
+        && strpos($faviconFs, rtrim($appFsRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR) === 0) {
+        $faviconExt = strtolower(pathinfo($faviconFs, PATHINFO_EXTENSION));
+        $faviconMime = ['ico'=>'image/x-icon','png'=>'image/png','jpg'=>'image/jpeg','jpeg'=>'image/jpeg','svg'=>'image/svg+xml','webp'=>'image/webp'][$faviconExt] ?? '';
+        if ($faviconMime !== '') {
+            $scriptName = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '/'));
+            $scriptUrlPath = parse_url($scriptName, PHP_URL_PATH) ?: '/';
+            $scriptFs = realpath((string)($_SERVER['SCRIPT_FILENAME'] ?? ''));
+            $scriptRel = ($scriptFs && strpos($scriptFs, rtrim($appFsRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR) === 0)
+                ? str_replace('\\', '/', substr($scriptFs, strlen(rtrim($appFsRoot, DIRECTORY_SEPARATOR)) + 1)) : '';
+            $scriptRelUrl = implode('/', array_map('rawurlencode', explode('/', $scriptRel)));
+            $appUrlBase = $scriptRelUrl !== '' && substr($scriptUrlPath, -strlen($scriptRelUrl)) === $scriptRelUrl
+                ? substr($scriptUrlPath, 0, -strlen($scriptRelUrl)) : rtrim(dirname($scriptUrlPath), '/');
+            $faviconUrlPath = implode('/', array_map('rawurlencode', explode('/', $faviconRel)));
+            $faviconHref = rtrim($appUrlBase, '/') . '/' . $faviconUrlPath . '?v=' . (int)@filemtime($faviconFs);
+        }
+    }
+}
 $isEmbedded = isset($_GET['embedded']) && $_GET['embedded'] === '1';
 $headerRelease=is_file(dirname(__DIR__).'/config/release.php')?require dirname(__DIR__).'/config/release.php':[];
 $isDeskRuntime=($headerRelease['distribution']??(PHP_SAPI==='cli-server'?'desktop':'site'))==='desktop';
@@ -98,6 +129,9 @@ if ($isDeskRuntime && (PHP_SAPI === 'cli-server' || !empty($_SERVER['SDP_ENFORCE
     <title><?php echo clean($schoolName); ?> - پنل مدیریت و کارنامه</title>
     <script>try{localStorage.setItem('theme','light');document.documentElement.classList.remove('dark');}catch(e){}</script>
     <meta name="theme-color" content="<?php echo clean($themeColor); ?>"><!-- v4.30.0 -->
+    <?php if ($faviconHref !== ''): ?>
+    <link rel="icon" type="<?php echo clean($faviconMime); ?>" href="<?php echo clean($faviconHref); ?>">
+    <?php endif; ?>
     <?php if ($isDeskRuntime): /* Desktop: NOTHING may open in a new window (design, print,
            previews, debug). window.open() is re-routed to the app window and
            target="_blank" links navigate in place; the launcher has
