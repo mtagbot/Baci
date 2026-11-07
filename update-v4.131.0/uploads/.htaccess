@@ -19,7 +19,6 @@
   php_flag engine off
 </IfModule>
 
-Options -ExecCGI -Indexes
 
 # هندلرهای اجرایی را بردار (وقتی PHP به‌صورت CGI/FPM سوار است)
 RemoveHandler .php .php3 .php4 .php5 .php7 .php8 .phtml .phar .pl .py .cgi .asp .aspx .sh

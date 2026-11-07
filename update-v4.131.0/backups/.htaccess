@@ -12,5 +12,3 @@
   Order allow,deny
   Deny from all
 </IfModule>
-
-Options -ExecCGI -Indexes
