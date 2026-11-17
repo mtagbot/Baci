@@ -429,7 +429,7 @@ if ($text === $btnExamSchedule) {
         $studentName = trim($st['first_name'] . ' ' . $st['last_name']);
         if (!$items) { bot_webhook_safe_send($platform, $chatId, bot_text($platform, 'exam_schedule_empty', ['student_name'=>$studentName]), bot_main_keyboard($platform)); continue; }
         $scheduleTitle = bot_text($platform, 'exam_schedule_title', ['student_name'=>$studentName]);
-        $msg = bot_format_student_exam_schedule($studentName, $items, $scheduleTitle);
+        $msg = bot_format_student_exam_schedule($studentName, $items, $scheduleTitle, $selection['month'] ?? '');
         // Also include online exams for latest year (virtual exams)
         try {
             ensure_online_exams_schema();

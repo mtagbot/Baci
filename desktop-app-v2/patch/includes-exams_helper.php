@@ -347,6 +347,29 @@ if (!function_exists('exam_month_options_for_year')) {
     }
 }
 
+if (!function_exists('exam_teacher_schedule_month_selection')) {
+    /**
+     * نمایش آزمون‌های دبیر: انتخاب دستی، همهٔ ماه‌ها، یا جدیدترین ماه.
+     * ترتیب جدیدترین ماه از همان رتبه‌بندیِ برنامهٔ دانش‌آموز استفاده می‌کند.
+     */
+    function exam_teacher_schedule_month_selection(array $rows, $manual = false, $selected = '', $showAll = false) {
+        $mode = $showAll ? 'all' : 'auto';
+        $month = '';
+        if ($manual && trim((string)$selected) !== '') {
+            $mode = 'manual';
+            $month = trim((string)$selected);
+        } elseif (!$showAll) {
+            $months = exam_schedule_months($rows);
+            if ($months) $month = (string)$months[0]['month'];
+        }
+        if ($mode === 'all' || $month === '') return ['rows' => $rows, 'month' => $month, 'mode' => $mode];
+        $filtered = array_values(array_filter($rows, function ($row) use ($month) {
+            return exam_schedule_month_label($row) === $month;
+        }));
+        return ['rows' => $filtered, 'month' => $month, 'mode' => $mode];
+    }
+}
+
 if (!function_exists('exam_student_month_override')) {
     /**
      * تنظیم مدیر (پایین صفحهٔ «امتحانات»):

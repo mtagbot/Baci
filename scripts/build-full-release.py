@@ -22,9 +22,9 @@ SITE_CORRECTIVE_PREFIX = 'site-update-v4.152.0/'
 # through the whole corrective chain up to 4.177.1/2.100.0, so a fresh install
 # could not tell what it actually contained. config/version.php now carries the
 # code version for existing installs too; release.php keeps describing the bundle.
-RELEASE_NAME = 'Release_V1.13'
-SITE_VERSION = '4.219.0'
-DESKTOP_VERSION = '2.143.0'
+RELEASE_NAME = 'Release_V1.14'
+SITE_VERSION = '4.220.0'
+DESKTOP_VERSION = '2.144.0'
 # Correctives published after the V1.0 rebuild, in installation order. From
 # v4.170.0 on, packages are version-numbered instead of feature-slugged, and
 # V4.170.0 / v2.92.0 are cumulative for v4.161..v4.169.
@@ -86,6 +86,7 @@ VERSIONED_CORRECTIVES = [
     ('MODIFIED-FILES-V4.217.0.zip', None),
     ('MODIFIED-FILES-V4.218.0.zip', 'SchoolDesk-FIX-v2.142.0.zip'),
     ('MODIFIED-FILES-V4.219.0.zip', 'SchoolDesk-FIX-v2.143.0.zip'),
+    ('MODIFIED-FILES-V4.220.0.zip', 'SchoolDesk-FIX-v2.144.0.zip'),
 ]
 def sha(b): return hashlib.sha256(b).hexdigest()
 def run(*args): return subprocess.check_output(args, text=True)
@@ -262,7 +263,7 @@ def assemble():
         # Copied verbatim from the shipped patch — NOT regenerated here, because
         # test-full-release-packaging.py asserts a fresh install is byte-identical
         # to what the corrective chain would produce.
-        version_source = ROOT / 'update-v4.219.0' / 'config' / 'version.php'
+        version_source = ROOT / 'update-v4.220.0' / 'config' / 'version.php'
         if not version_source.is_file():
             raise SystemExit('Missing version stamp source: ' + str(version_source))
         stamp = {}
