@@ -6,6 +6,7 @@
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/academic_year_helpers.php';
 require_once __DIR__ . '/includes/class_exam_groups.php';
+require_once __DIR__ . '/includes/exams_helper.php';
 require_once __DIR__ . '/includes/school_roles.php';
 ensure_school_roles_schema();
 $classDeputyOnly=!is_admin_logged_in() && !current_teacher_is_executive() && !empty($_SESSION['teacher_id']) && teacher_has_deputy((int)$_SESSION['teacher_id']);
@@ -28,7 +29,17 @@ if (!function_exists('exams_teacher_label')) {
 } $year=resolve_academic_year_request($_GET['year']??get_current_academic_year()); // v4.38.0 unified
 if ($_SERVER['REQUEST_METHOD']==='POST') {
  if(!verify_csrf($_POST['csrf_token']??'')){set_flash_message('error','خطای CSRF');redirect('exams.php');}
-  if(isset($_POST['save_student_exam_month'])){
+  if(isset($_POST['save_teacher_exam_month'])){
+  $tenabled = isset($_POST['teacher_exam_month_enabled']) ? '1' : '0';
+  $tmonth = trim((string)($_POST['teacher_exam_month_selected'] ?? ''));
+  $tvalid = function_exists('exam_month_rank') ? exam_month_rank($tmonth) > 0 : $tmonth !== '';
+  if ($tenabled === '1' && !$tvalid) { $tenabled='0'; $tmonth=''; }
+  set_setting('teacher_exam_month_manual', $tenabled);
+  set_setting('teacher_exam_month_selected', $tenabled === '1' ? $tmonth : '');
+  set_flash_message('success', $tenabled === '1' ? 'ماه آزمون پنل دبیران روی «'.$tmonth.'» تنظیم شد.' : 'نمایش آزمون‌های پنل دبیران به حالت همهٔ ماه‌ها برگشت.');
+  redirect('exams.php?tab=schedule&year='.urlencode($year));
+ }
+ if(isset($_POST['save_student_exam_month'])){
   /* V4.210.0 — تنظیم مدیر برای «کدام ماه در برنامهٔ امتحانی پنل دانش‌آموز دیده شود».
      خاموش = خودکار (جدیدترین ماهِ تعریف‌شده). روشن = همان ماهِ انتخابی مدیر،
      حتی اگر قدیمی‌تر از ماه‌های دیگر باشد. این تنظیم فقط نمایشِ پنل دانش‌آموز
@@ -198,6 +209,13 @@ if(isset($_GET['delete'])){
 require_once __DIR__ . '/includes/header.php';
 echo '<style>tr.exam-no-design{background:#f1f5f9!important;color:#64748b!important;opacity:.68}</style>';
 $exams=DB::fetchAll("SELECT es.*, COALESCE(t.full_name, es.teacher_name) t_name, (SELECT MAX(ed.updated_at_jalali) FROM exam_designs ed WHERE ed.exam_id=es.id) AS design_updated_at FROM exam_schedules es LEFT JOIN teachers t ON t.id=es.teacher_id WHERE es.academic_year=? AND COALESCE(es.exam_kind,'official') NOT IN ('class','class_deleted') ORDER BY es.exam_date_jalali, es.start_time",[$year]);
+$examTableMonth = trim((string)($_GET['table_month'] ?? '')); $examTableGrade = trim((string)($_GET['table_grade'] ?? '')); $examTableClass = trim((string)($_GET['table_class'] ?? ''));
+$exams = array_values(array_filter($exams, function($e) use ($examTableMonth,$examTableGrade,$examTableClass) {
+  if ($examTableMonth !== '' && function_exists('exam_schedule_month_label') && exam_schedule_month_label($e) !== $examTableMonth) return false;
+  if ($examTableGrade !== '' && trim((string)($e['grade_level'] ?? '')) !== $examTableGrade) return false;
+  if ($examTableClass !== '' && trim((string)($e['class_name'] ?? '')) !== $examTableClass) return false;
+  return true;
+}));
 $classes=get_unified_class_options($year); $grades=get_unified_grade_options($year); $teachers=DB::fetchAll('SELECT id,full_name FROM teachers WHERE status=1'); usort($teachers, fn($a,$b)=>persian_compare($a['full_name'],$b['full_name']));
 $edit=isset($_GET['edit'])?DB::fetch('SELECT * FROM exam_schedules WHERE id=?',[(int)$_GET['edit']]):null; $selectedExam=(int)($_GET['exam_id']??($exams[0]['id']??0));
 /* v4.95.0: ماه آزمون و تاریخ آخرین فعال‌سازی ۱ روز در کوکی می‌ماند تا ثبت آزمون بعدی راحت باشد */
@@ -226,6 +244,8 @@ $gradeClasses = array_values(array_filter($classes, fn($c)=>$selectedGrade==='' 
     <button class="btn btn-success mt-3">فعال‌سازی آزمون‌های انتخاب‌شده</button>
   </form>
 </div>
+<?php $tableMonths = function_exists('exam_month_options_for_year') ? exam_month_options_for_year($year) : []; ?>
+<div class="card mb-3"><h3 class="font-bold mb-2">فیلتر جدول امتحانات</h3><form method="GET" class="grid grid-cols-2 md:grid-cols-5 gap-2 items-end"><input type="hidden" name="tab" value="schedule"><label class="text-xs">سال تحصیلی<select name="year" class="form-select" onchange="this.form.submit()"><?php foreach(get_academic_years_for_filter() as $yy): ?><option value="<?php echo clean($yy['academic_year']); ?>" <?php echo $year===$yy['academic_year']?'selected':''; ?>><?php echo clean($yy['academic_year']); ?></option><?php endforeach; ?></select></label><label class="text-xs">ماه<select name="table_month" class="form-select"><option value="">همه ماه‌ها</option><?php foreach($tableMonths as $tm): ?><option value="<?php echo clean($tm['month']); ?>" <?php echo $examTableMonth===$tm['month']?'selected':''; ?>><?php echo clean($tm['month']); ?></option><?php endforeach; ?></select></label><label class="text-xs">پایه<select name="table_grade" class="form-select"><option value="">همه پایه‌ها</option><?php foreach($grades as $g): ?><option value="<?php echo clean($g['grade_level']); ?>" <?php echo $examTableGrade===$g['grade_level']?'selected':''; ?>><?php echo clean($g['grade_level']); ?></option><?php endforeach; ?></select></label><label class="text-xs">کلاس<select name="table_class" class="form-select"><option value="">همه کلاس‌ها</option><?php foreach($classes as $c): ?><option value="<?php echo clean($c['class_name']); ?>" <?php echo $examTableClass===$c['class_name']?'selected':''; ?>><?php echo clean($c['class_name']); ?></option><?php endforeach; ?></select></label><button class="btn btn-primary">اعمال فیلتر</button></form></div>
 <div class="grid grid-cols-3 gap-6"><div class="card"><h3 class="font-bold mb-3"><?php echo $edit?'ویرایش امتحان':'تعریف امتحان تکی/اصلاحی'; ?></h3><form method="POST" enctype="multipart/form-data" class="space-y-3"><input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>"><input type="hidden" name="save_exam" value="1"><input type="hidden" name="exam_id" value="<?php echo (int)($edit['id']??0); ?>"><input type="hidden" name="existing_question_file" value="<?php echo clean($edit['question_file']??''); ?>"><select name="academic_year" class="form-select font-bold">
                         <option value="">انتخاب سال تحصیلی...</option>
                         <?php foreach(get_academic_years_for_filter() as $yy): ?>
@@ -238,6 +258,7 @@ $semOverride = function_exists('exam_student_month_override') ? exam_student_mon
 $semMonths   = function_exists('exam_month_options_for_year') ? exam_month_options_for_year($year) : [];
 $semAuto     = $semMonths ? $semMonths[0]['month'] : '';
 ?>
+<div class="card mt-6" id="teacherExamMonthCard"><?php $teacherMonthOverride=['enabled'=>get_setting('teacher_exam_month_manual','0')==='1','month'=>trim((string)get_setting('teacher_exam_month_selected',''))]; $teacherMonths=function_exists('exam_month_options_for_year')?exam_month_options_for_year($year):[]; ?><h3 class="font-bold text-primary mb-2">👨‍🏫 نمایش ماه آزمون در پنل و ربات دبیران</h3><p class="text-xs text-muted mb-3">با انتخاب دستی، جدول آزمون‌های ماهانهٔ پنل و ربات دبیران فقط همان ماه را نشان می‌دهد. در حالت خودکار همهٔ ماه‌های فعال نمایش داده می‌شوند.</p><form method="POST" class="grid grid-cols-3 gap-3 items-end"><input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>"><input type="hidden" name="save_teacher_exam_month" value="1"><label class="flex items-center gap-2 text-sm font-bold" style="grid-column:span 3"><input type="checkbox" name="teacher_exam_month_enabled" value="1" <?php echo $teacherMonthOverride['enabled']?'checked':''; ?>> انتخاب دستی ماه</label><label class="text-xs">ماه آزمون<select name="teacher_exam_month_selected" class="form-select" <?php echo $teacherMonthOverride['enabled']?'':'disabled'; ?>><option value="">انتخاب ماه</option><?php foreach($teacherMonths as $tm): ?><option value="<?php echo clean($tm['month']); ?>" <?php echo $teacherMonthOverride['month']===$tm['month']?'selected':''; ?>><?php echo clean($tm['month']); ?></option><?php endforeach; ?></select></label><button class="btn btn-success">ذخیره تنظیم دبیران</button></form><script>(function(){var c=document.querySelector("#teacherExamMonthCard input[name=teacher_exam_month_enabled]"),s=document.querySelector("#teacherExamMonthCard select[name=teacher_exam_month_selected]");if(c&&s)c.addEventListener("change",function(){s.disabled=!c.checked;});})();</script></div>
 <div class="card mt-6" id="studentExamMonthCard">
   <div class="flex flex-wrap justify-between items-center border-b pb-2 mb-3 gap-2">
     <h3 class="font-bold text-primary">🎓 نمایش برنامه امتحانی در پنل دانش‌آموز</h3>

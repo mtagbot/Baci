@@ -22,9 +22,9 @@ SITE_CORRECTIVE_PREFIX = 'site-update-v4.152.0/'
 # through the whole corrective chain up to 4.177.1/2.100.0, so a fresh install
 # could not tell what it actually contained. config/version.php now carries the
 # code version for existing installs too; release.php keeps describing the bundle.
-RELEASE_NAME = 'Release_V1.7'
-SITE_VERSION = '4.214.2'
-DESKTOP_VERSION = '2.138.2'
+RELEASE_NAME = 'Release_V1.13'
+SITE_VERSION = '4.219.0'
+DESKTOP_VERSION = '2.143.0'
 # Correctives published after the V1.0 rebuild, in installation order. From
 # v4.170.0 on, packages are version-numbered instead of feature-slugged, and
 # V4.170.0 / v2.92.0 are cumulative for v4.161..v4.169.
@@ -80,6 +80,12 @@ VERSIONED_CORRECTIVES = [
     ('MODIFIED-FILES-V4.214.0.zip', 'SchoolDesk-FIX-v2.138.0.zip'),
     ('MODIFIED-FILES-V4.214.1.zip', 'SchoolDesk-FIX-v2.138.1.zip'),
     ('MODIFIED-FILES-V4.214.2.zip', 'SchoolDesk-FIX-v2.138.2.zip'),
+    ('MODIFIED-FILES-V4.214.3.zip', 'SchoolDesk-FIX-v2.138.3.zip'),
+    ('MODIFIED-FILES-V4.215.0.zip', 'SchoolDesk-FIX-v2.139.0.zip'),
+    ('MODIFIED-FILES-V4.216.0.zip', None),
+    ('MODIFIED-FILES-V4.217.0.zip', None),
+    ('MODIFIED-FILES-V4.218.0.zip', 'SchoolDesk-FIX-v2.142.0.zip'),
+    ('MODIFIED-FILES-V4.219.0.zip', 'SchoolDesk-FIX-v2.143.0.zip'),
 ]
 def sha(b): return hashlib.sha256(b).hexdigest()
 def run(*args): return subprocess.check_output(args, text=True)
@@ -179,8 +185,10 @@ def corrective_payload(platform):
                 rel=n
                 if rel.startswith('README') and rel.endswith('.txt'):continue
                 if platform=='site':
-                    if not rel.startswith(SITE_CORRECTIVE_PREFIX):raise ValueError(f'{name}: unexpected entry {n}')
-                    rel=rel[len(SITE_CORRECTIVE_PREFIX):]
+                    if rel.startswith(SITE_CORRECTIVE_PREFIX):
+                        rel=rel[len(SITE_CORRECTIVE_PREFIX):]
+                    elif name not in {x for pair in VERSIONED_CORRECTIVES for x in pair if x}:
+                        raise ValueError(f'{name}: unexpected entry {n}')
                 else:
                     parts=rel.split('/')
                     if parts[0]!='SchoolDeskPro':raise ValueError(f'{name}: unexpected entry {n}')
@@ -254,7 +262,7 @@ def assemble():
         # Copied verbatim from the shipped patch — NOT regenerated here, because
         # test-full-release-packaging.py asserts a fresh install is byte-identical
         # to what the corrective chain would produce.
-        version_source = ROOT / 'update-v4.152.0' / 'config' / 'version.php'
+        version_source = ROOT / 'update-v4.219.0' / 'config' / 'version.php'
         if not version_source.is_file():
             raise SystemExit('Missing version stamp source: ' + str(version_source))
         stamp = {}
@@ -352,5 +360,9 @@ if __name__=='__main__':
     site,desktop=assemble()
     if not args.stage_only:
         outputs=[archive(site,RELEASE_NAME+'-Site.zip'),archive(desktop,RELEASE_NAME+'-Desktop.zip','SchoolDeskPro/')]
-        (ROOT/(RELEASE_NAME+'-SHA256SUMS.txt')).write_text(''.join(x['sha256']+'  '+x['file']+'\n' for x in outputs));print(json.dumps(outputs,indent=2))
+        sums=list(outputs)
+        for filename in [name for pair in VERSIONED_CORRECTIVES for name in pair if name]:
+            path=ROOT/filename
+            sums.append({'file':filename,'sha256':sha(path.read_bytes())})
+        (ROOT/(RELEASE_NAME+'-SHA256SUMS.txt')).write_text(''.join(x['sha256']+'  '+x['file']+'\n' for x in sums));print(json.dumps(outputs,indent=2))
     print('Stage:',STAGE)

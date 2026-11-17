@@ -424,7 +424,8 @@ if ($text === $btnExamSchedule) {
     foreach ($links as $st) {
         $latestSt = get_latest_student_by_id($st['id']);
         $effectiveId = $latestSt ? $latestSt['id'] : $st['id'];
-        $items = exam_student_schedule($effectiveId);
+        $selection = exam_student_schedule_selection($effectiveId);
+        $items = $selection['rows'];
         $studentName = trim($st['first_name'] . ' ' . $st['last_name']);
         if (!$items) { bot_webhook_safe_send($platform, $chatId, bot_text($platform, 'exam_schedule_empty', ['student_name'=>$studentName]), bot_main_keyboard($platform)); continue; }
         $scheduleTitle = bot_text($platform, 'exam_schedule_title', ['student_name'=>$studentName]);

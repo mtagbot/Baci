@@ -161,6 +161,7 @@ if (!function_exists('bot_teacher_exams_text')) {
         if (function_exists('ensure_exams_schema')) ensure_exams_schema();
         $year = get_setting('current_academic_year', '1404/1405');
         $rows = DB::fetchAll("SELECT * FROM exam_schedules WHERE academic_year=? AND is_active=1 AND (teacher_id=? OR (COALESCE(teacher_id,0)=0 AND teacher_name<>'' AND teacher_name=?)) ORDER BY exam_date_jalali, start_time", [$year, (int)$teacherId, (string)$teacherName]);
+        if (get_setting('teacher_exam_month_manual','0') === '1') { $selectedMonth=trim((string)get_setting('teacher_exam_month_selected','')); if ($selectedMonth !== '' && function_exists('exam_schedule_month_label')) $rows=array_values(array_filter($rows,function($e) use ($selectedMonth) { return exam_schedule_month_label($e)===$selectedMonth; })); }
         if (!$rows) return '📝 در سال ' . tr_num($year, 'fa') . ' برنامه امتحانی برای دروس شما ثبت نشده است.';
         $msg = '📝 برنامه امتحانی دروس شما — سال ' . tr_num($year, 'fa') . "\n";
         foreach ($rows as $e) {

@@ -4,6 +4,7 @@
  */
 
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/exams_helper.php';
 require_once __DIR__ . '/includes/school_roles.php';
 require_once __DIR__ . '/includes/grade_permissions.php';
 ensure_school_roles_schema();
@@ -274,6 +275,8 @@ $tab = $_GET['tab'] ?? 'schedule';
          * قرار بگیرند تا خانه مشترک «طراحی پایه‌ای» با rowspan روی همه ردیف‌های
          * گروه بنشیند. */
         $teacherExams = DB::fetchAll("SELECT * FROM exam_schedules WHERE teacher_id = ? AND is_active = 1 AND COALESCE(exam_kind,'official') NOT IN ('class','class_deleted') AND TRIM(COALESCE(academic_year,''))<>'' AND TRIM(COALESCE(subject_name,''))<>'' AND TRIM(COALESCE(exam_date_jalali,''))<>'' AND TRIM(COALESCE(start_time,''))<>'' AND duration_minutes>0 ORDER BY academic_year DESC, exam_month ASC, grade_level ASC, subject_name ASC, class_name ASC, exam_date_jalali ASC, start_time ASC", [$teacherId]);
+        $teacherMonthManual = get_setting('teacher_exam_month_manual','0') === '1'; $teacherMonthSelected = trim((string)get_setting('teacher_exam_month_selected',''));
+        if ($teacherMonthManual && $teacherMonthSelected !== '' && function_exists('exam_schedule_month_label')) $teacherExams = array_values(array_filter($teacherExams, function($e) use ($teacherMonthSelected) { return exam_schedule_month_label($e) === $teacherMonthSelected; }));
         // This UI gate intentionally does not use the manager/deputy bypass in the design helper.
         $classExamDesignEnabled = get_setting('class_exam_design_enabled', '1') !== '0';
         // شمارش اعضای هر گروه: سال|ماه|پایه|درس
