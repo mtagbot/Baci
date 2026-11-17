@@ -6,10 +6,18 @@
  */
 
 require_once __DIR__ . '/functions.php';
-require_once __DIR__ . '/report_image.php';
+/* V4.209.2 — این دو فایل روی نصب‌های قدیمی می‌توانند نباشند (از بسته‌های
+   اصلاحی جدا آمده‌اند). require بی‌قید یعنی صفحهٔ سفید؛ پس فقط اگر هستند
+   بارگذاری می‌شوند و کدِ مربوط به ربات خودش با function_exists محافظت دارد. */
+if (is_file(__DIR__ . '/report_image.php')) require_once __DIR__ . '/report_image.php';
+if (is_file(__DIR__ . '/bot_outbox.php')) require_once __DIR__ . '/bot_outbox.php';
 
 if (!function_exists('bot_platforms')) {
-    /** v4.186.0: پیام‌رسان‌های پشتیبانی‌شده — نسخهٔ دسکتاپ. */
+    /**
+     * v4.186.0: فهرست پیام‌رسان‌های پشتیبانی‌شده.
+     * افزودن پیام‌رسان تازه فقط از همین‌جا + یک فایل وب‌هوک/صفحه انجام می‌شود؛
+     * هیچ‌کدام از توابع پایین «اگر تلگرام نبود یعنی بله» فرض نمی‌کنند.
+     */
     function bot_platforms() {
         return ['bale', 'telegram', 'rubika'];
     }
@@ -47,6 +55,7 @@ if (!function_exists('bot_state_table')) {
 }
 
 if (!function_exists('bot_chat_column')) {
+    /** نام ستون چت در جدول‌های هر پیام‌رسان (bale_chat_id / telegram_chat_id / rubika_chat_id). */
     function bot_chat_column($platform) {
         return bot_valid_platform($platform) . '_chat_id';
     }
@@ -59,7 +68,15 @@ if (!function_exists('bot_username_column')) {
 }
 
 if (!function_exists('bot_migrate_platform_enum')) {
-    /** MySQL-only; SQLite enum ندارد. */
+    /**
+     * v4.186.0: نصب‌های قدیمی، ستون platform را با enum('bale','telegram')
+     * ساخته‌اند و MySQL مقدار تازهٔ «rubika» را در آن رد می‌کند.
+     * این تابع فقط روی MySQL و فقط وقتی ستون هنوز روبیکا را ندارد ALTER می‌زند.
+     * SQLite اساساً enum ندارد، پس بی‌خطر رد می‌شود.
+     *
+     * @param string $definition تعریف کامل ستون بعد از MODIFY، مثل
+     *               "enum('bale','telegram','soroush','rubika') NOT NULL"
+     */
     function bot_migrate_platform_enum($table, $column, $definition) {
         try {
             $pdo = DB::getInstance()->getPdo();
@@ -81,6 +98,25 @@ if (!function_exists('bot_token_key')) {
 
 if (!function_exists('ensure_bot_schema')) {
     function ensure_bot_schema($platform = 'bale') {
+        $platform = bot_valid_platform($platform);
+        /* V4.209.0 — کل این تابع (۵ CREATE + ۱ ALTER + ۳ بررسی enum + seed)
+           پیش از این در هر بازدیدِ هر صفحهٔ ربات اجرا می‌شد. حالا یک‌بار در هر
+           نسخه برای هر پیام‌رسان؛ نتیجه همان است و فقط کوئری‌های تکراری حذف
+           می‌شوند. */
+        if (function_exists('perf_schema_once')) {
+            static $ran = [];
+            $key = 'bot_schema_' . $platform . '_v1';
+            if (isset($ran[$key])) return;
+            $ran[$key] = true;
+            perf_schema_once($key, function () use ($platform) { ensure_bot_schema_work($platform); });
+            return;
+        }
+        ensure_bot_schema_work($platform);
+    }
+}
+
+if (!function_exists('ensure_bot_schema_work')) {
+    function ensure_bot_schema_work($platform) {
         $platform = bot_valid_platform($platform);
         $userTable = bot_user_table($platform);
         $stateTable = bot_state_table($platform);
@@ -145,6 +181,7 @@ if (!function_exists('ensure_bot_schema')) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
         try { DB::execute("ALTER TABLE `$stateTable` ADD COLUMN temp_payload text DEFAULT NULL"); } catch (Exception $e) {}
+
         /* v4.186.0: enumهای قدیمی ('bale','telegram') روبیکا را نمی‌پذیرند. */
         static $enumMigrated = false;
         if (!$enumMigrated) {
@@ -153,6 +190,7 @@ if (!function_exists('ensure_bot_schema')) {
                 bot_migrate_platform_enum($tbl, 'platform', "enum('bale','telegram','soroush','rubika') NOT NULL");
             }
         }
+
         bot_seed_templates($platform);
     }
 }
@@ -204,17 +242,20 @@ if (!function_exists('bot_default_buttons')) {
 if (!function_exists('bot_seed_templates')) {
     function bot_seed_templates($platform) {
         $platform = bot_valid_platform($platform);
+        /* V4.209.0 — پیش از این برای هر پیام و هر دکمه یک SELECT جدا اجرا می‌شد
+           (حدود ۲۵ کوئری برای هر پیام‌رسان در هر بازدید صفحهٔ ربات‌ها). حالا
+           کلیدهای موجود با یک کوئری خوانده می‌شوند و فقط کلیدهای تازه درج
+           می‌شوند؛ نتیجهٔ نهایی دقیقاً همان قبلی است. */
+        $haveMsg = []; $haveBtn = [];
+        try { foreach (DB::fetchAll("SELECT template_key FROM bot_message_templates WHERE platform = ?", [$platform]) as $r) $haveMsg[(string)$r['template_key']] = true; } catch (Throwable $e) {}
+        try { foreach (DB::fetchAll("SELECT button_key FROM bot_button_templates WHERE platform = ?", [$platform]) as $r) $haveBtn[(string)$r['button_key']] = true; } catch (Throwable $e) {}
         foreach (bot_default_messages() as $key => $text) {
-            $exists = DB::fetch("SELECT id FROM bot_message_templates WHERE platform = ? AND template_key = ?", [$platform, $key]);
-            if (!$exists) {
-                DB::execute("INSERT INTO bot_message_templates (platform, template_key, template_text) VALUES (?, ?, ?)", [$platform, $key, $text]);
-            }
+            if (isset($haveMsg[(string)$key])) continue;
+            try { DB::execute("INSERT INTO bot_message_templates (platform, template_key, template_text) VALUES (?, ?, ?)", [$platform, $key, $text]); } catch (Throwable $e) {}
         }
         foreach (bot_default_buttons() as $b) {
-            $exists = DB::fetch("SELECT id FROM bot_button_templates WHERE platform = ? AND button_key = ?", [$platform, $b[0]]);
-            if (!$exists) {
-                DB::execute("INSERT INTO bot_button_templates (platform, button_key, button_text, sort_order, row_no, is_active) VALUES (?, ?, ?, ?, ?, 1)", [$platform, $b[0], $b[1], $b[2], $b[3]]);
-            }
+            if (isset($haveBtn[(string)$b[0]])) continue;
+            try { DB::execute("INSERT INTO bot_button_templates (platform, button_key, button_text, sort_order, row_no, is_active) VALUES (?, ?, ?, ?, ?, 1)", [$platform, $b[0], $b[1], $b[2], $b[3]]); } catch (Throwable $e) {}
         }
     }
 }
@@ -234,7 +275,9 @@ if (!function_exists('bot_format_student_exam_schedule')) {
             $msg .= "\n📚 " . tr_num((string)($index + 1), 'fa') . '. ' . $subject . "\n";
             $dayName = trim((string)($ex['exam_day_name'] ?? ''));
             if ($dayName === '' && function_exists('exam_jalali_day_name')) $dayName = exam_jalali_day_name($ex['exam_date_jalali'] ?? '');
-            $msg .= "   :: روز: " . ($dayName !== '' ? $dayName : '—') . "\n";
+            $dayEmoji = ['شنبه'=>'🟡','یکشنبه'=>'🔵','دوشنبه'=>'🟢','سه‌شنبه'=>'🟠','چهارشنبه'=>'🟣','پنجشنبه'=>'🔴','جمعه'=>'🌙'];
+            $dayIcon = '📆'; foreach ($dayEmoji as $name => $icon) if ($dayName !== '' && mb_strpos($dayName, $name, 0, 'UTF-8') !== false) { $dayIcon = $icon; break; }
+            $msg .= "   " . $dayIcon . " روز: " . ($dayName !== '' ? $dayName : '—') . "\n";
             $msg .= "   📅 تاریخ: " . tr_num((string)($ex['exam_date_jalali'] ?? ''), 'fa') . "\n";
             $msg .= "   🕗 ساعت: " . tr_num((string)($ex['start_time'] ?? ''), 'fa') . "\n";
             if ($className !== '') $msg .= "   🏫 کلاس: {$className}\n";
@@ -351,6 +394,32 @@ if (!function_exists('bot_buttons_map')) {
     }
 }
 
+if (!function_exists('bot_site_base_url')) {
+    /**
+     * v4.174.0: آدرس پایهٔ سایت — همان منطقی که school_roles.php در
+     * bot_create_login_url() دارد. برای فرستادن لینک صفحهٔ ورود پنل از ربات.
+     */
+    function bot_site_base_url() {
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $base = rtrim(str_replace('\\', '/', dirname($_SERVER['PHP_SELF'] ?? '')), '/');
+        if ($base === '.') $base = '';
+        return $protocol . $host . $base;
+    }
+}
+
+if (!function_exists('bot_panel_login_url')) {
+    /**
+     * v4.174.0: لینک مستقیم صفحهٔ ورود پنل برای هر نقش. دبیری که در گفتگوی ربات
+     * این لینک را بگیرد، مستقیم روی «تب دبیران» می‌افتد و با «کد ملی + کد پرسنلی»
+     * وارد می‌شود — بدون گشتن در صفحه.
+     */
+    function bot_panel_login_url($role = 'student') {
+        $role = in_array($role, ['student', 'teacher', 'inquiry'], true) ? $role : 'student';
+        return bot_site_base_url() . '/index.php?view=login&tab=' . $role;
+    }
+}
+
 if (!function_exists('bot_main_keyboard')) {
     function bot_main_keyboard($platform) {
         ensure_bot_schema($platform);
@@ -381,7 +450,10 @@ if (!function_exists('bot_api_endpoint')) {
             if ($base === '') $base = 'https://api.telegram.org';
             return $base . "/bot{$token}/{$method}";
         }
-        if ($platform === 'rubika') return "https://botapi.rubika.ir/v3/{$token}/{$method}";
+        if ($platform === 'rubika') {
+            /* Rubika Bot API v3: https://botapi.rubika.ir/v3/{token}/{method}. */
+            return "https://botapi.rubika.ir/v3/{$token}/{$method}";
+        }
         return "https://tapi.bale.ai/bot{$token}/{$method}";
     }
 }
@@ -498,8 +570,11 @@ if (!function_exists('bot_rubika_upload_and_send')) {
 if (!function_exists('bot_api_request')) {
     function bot_api_request($platform, $method, $data = [], $multipart = false) {
         if ($platform === 'rubika' && $multipart) return bot_rubika_upload_and_send($data);
+        unset($GLOBALS['bot_outbox_last']);
         $url = bot_api_endpoint($platform, $method);
-        if ($platform === 'rubika' && !$multipart && is_array($data)) $data = bot_rubika_normalize_payload($method, $data);
+        if ($platform === 'rubika' && !$multipart && is_array($data)) {
+            $data = bot_rubika_normalize_payload($method, $data);
+        }
         /* v2.11.0 (desktop only): offline circuit-breaker.
            The desktop runs the whole app on ONE PHP worker — a bot call with
            8s connect + 20s total timeout while the internet is down froze
@@ -543,9 +618,10 @@ if (!function_exists('bot_api_request')) {
             throw new RuntimeException('پاسخ ناموفق API: HTTP ' . $code . ' - ' . $res);
         }
         if ($platform === 'rubika' && strtoupper((string)($json['status'] ?? '')) === 'OK') {
-            $json['ok'] = true; $d = $json['data'] ?? [];
-            if (is_array($d) && isset($d['chat']) && is_array($d['chat'])) $d = $d['chat'];
-            $json['result'] = $d;
+            $json['ok'] = true;
+            $rubikaData = $json['data'] ?? [];
+            if (is_array($rubikaData) && isset($rubikaData['chat']) && is_array($rubikaData['chat'])) $rubikaData = $rubikaData['chat'];
+            $json['result'] = $rubikaData;
         }
         return $json;
     }
@@ -555,7 +631,7 @@ if (!function_exists('bot_send_message')) {
     function bot_send_message($platform, $chatId, $text, $keyboard = null) {
         $payload = ['chat_id' => (string)$chatId, 'text' => (string)$text];
         if ($keyboard) $payload['reply_markup'] = $keyboard;
-        return bot_api_request($platform, 'sendMessage', $payload, false);
+        return bot_outbox_enqueue(bot_valid_platform($platform), $payload);
     }
 }
 
@@ -615,6 +691,11 @@ if (!function_exists('bot_send_voice')) {
 
 if (!function_exists('bot_log_send')) {
     function bot_log_send($platform, $chatId, $studentId, $type, $message, $status, $response = '') {
+        $last=$GLOBALS['bot_outbox_last']??null;
+        if($last && $last['platform']===bot_valid_platform($platform) && $last['chat_id']===(string)$chatId) {
+            $status=$last['state']==='sent'?'sent':'queued';$response='outbox:'.$last['id'];
+            unset($GLOBALS['bot_outbox_last']);
+        }
         try {
             DB::execute("INSERT INTO bot_message_logs (platform, chat_id, student_id, message_type, message, status, response) VALUES (?, ?, ?, ?, ?, ?, ?)", [bot_valid_platform($platform), (string)$chatId, $studentId ?: null, $type, $message, $status, mb_substr((string)$response, 0, 4000, 'UTF-8')]);
         } catch (Exception $e) {}
@@ -653,7 +734,8 @@ if (!function_exists('bot_target_recipients')) {
         }
         if ($scope === 'unreviewed_reports') {
             $parts = explode('|', (string)$value, 2);
-            $year = trim((string)($parts[0] ?? '')); $month = trim((string)($parts[1] ?? ''));
+            $year = trim((string)($parts[0] ?? ''));
+            $month = trim((string)($parts[1] ?? ''));
             if ($year === '' || $month === '') return [];
             DB::execute("CREATE TABLE IF NOT EXISTS report_parent_reviews (id int(11) NOT NULL AUTO_INCREMENT, report_id int(11) NOT NULL, platform enum('bale','telegram','soroush','rubika') NOT NULL, chat_id varchar(80) NOT NULL, reviewed_at_jalali varchar(30) NOT NULL, PRIMARY KEY(id), UNIQUE KEY uniq_review (report_id, platform, chat_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
             $rows = DB::fetchAll($base . " AND EXISTS (SELECT 1 FROM reports r WHERE r.student_id=s.id AND r.academic_year=? AND r.report_month=? AND NOT EXISTS (SELECT 1 FROM report_parent_reviews rv WHERE rv.report_id=r.id))", [$year, $month]);
@@ -661,6 +743,7 @@ if (!function_exists('bot_target_recipients')) {
             if (function_exists('ensure_school_roles_schema')) ensure_school_roles_schema();
             $rows = DB::fetchAll($base . " AND EXISTS (SELECT 1 FROM student_discipline_records d WHERE d.student_id=s.id AND COALESCE(d.review_status,'pending')='pending')");
         } elseif ($scope === 'grade') {
+
             $rows = DB::fetchAll($base . " AND s.grade_level = ?", [$value]);
         } elseif ($scope === 'class') {
             $rows = DB::fetchAll($base . " AND s.class_name = ?", [$value]);
@@ -677,20 +760,20 @@ if (!function_exists('bot_target_recipients')) {
 if (!function_exists('bot_send_targeted_text')) {
     function bot_send_targeted_text($platform, $scope, $value, $message) {
         $recipients = bot_target_recipients($platform, $scope, $value);
-        $sent = 0; $failed = 0;
+        $sent = 0; $failed = 0; $queued = 0;
         foreach ($recipients as $r) {
             $rcptName = !empty($r['is_teacher']) ? (string)($r['display_name'] ?? '') : trim($r['first_name'] . ' ' . $r['last_name']);
             $text = bot_text($platform, 'broadcast_prefix', ['message' => $message, 'student_name' => $rcptName]);
             try {
-                bot_send_message($platform, $r['chat_id'], $text);
+                $delivery=bot_send_message($platform, $r['chat_id'], $text);
                 bot_log_send($platform, $r['chat_id'], $r['student_id'], 'targeted_text', $message, 'sent', 'ok');
-                $sent++;
+                if(!empty($delivery['queued']))$queued++;else $sent++;
             } catch (Exception $e) {
                 bot_log_send($platform, $r['chat_id'], $r['student_id'], 'targeted_text', $message, 'failed', $e->getMessage());
                 $failed++;
             }
         }
-        return ['total' => count($recipients), 'sent' => $sent, 'failed' => $failed];
+        return ['total' => count($recipients), 'sent' => $sent, 'failed' => $failed, 'queued' => $queued];
     }
 }
 
@@ -1133,7 +1216,7 @@ if (!function_exists('counseling_notify_counselors')) {
     /** پیام کوتاه برای مشاوران فعال در ربات — از همان مسیر صف (bot_send_message). */
     function counseling_notify_counselors($requestId, $text) {
         try {
-            ensure_bot_schema('bale');
+            foreach (bot_platforms() as $pf) ensure_bot_schema($pf);
             $counselors = DB::fetchAll("SELECT id FROM teachers WHERE is_counselor=1 AND status=1");
             foreach ($counselors as $c) {
                 foreach (bot_platforms() as $platform) {

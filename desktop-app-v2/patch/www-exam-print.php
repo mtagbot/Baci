@@ -107,14 +107,15 @@ if ($type === 'seatcards') {
 @page{size:A4;margin:var(--pageMargin,7mm)} <?php echo app_font_face_rule('Vazirmatn', '400', false, 'print'); ?>*{box-sizing:border-box}body{font-family:Vazirmatn,Tahoma,sans-serif;margin:0;background:#e5e7eb}.seat-toolbar{position:fixed;top:0;inset-inline:0;background:#111827;color:#fff;z-index:20;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px;font-size:12px}.seat-toolbar input,.seat-toolbar select{width:80px}.sheet{--cols:2;--gap:3mm;--cardH:53mm;--photo:27mm;--font:11px;--seatFont:25px;display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:var(--gap);padding:var(--pageMargin,7mm);margin:52px auto 0;background:#fff;width:210mm;min-height:297mm}.card{border:1.8px solid #000;border-radius:5px;padding:3mm;display:grid;grid-template-columns:1fr var(--photo);gap:3mm;min-height:var(--cardH);page-break-inside:avoid;font-size:var(--font);cursor:move}.info{line-height:2}.seatbox{border:2px solid #000;display:flex;align-items:center;justify-content:center;font-size:var(--seatFont);font-weight:900;min-height:18mm;margin-top:2mm}.photo{width:var(--photo);height:calc(var(--photo) * 4 / 3);border:1px solid #333;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:9px}.photo img{width:100%;height:100%;object-fit:cover}.empty-seat{border-style:dashed;opacity:.6}@media print{.seat-toolbar{display:none}.sheet{margin:0;break-after:page}.card{cursor:default}}
 </style><?php echo app_appearance_head(); ?><?php $__css = function_exists('perf_bundle_url') ? perf_bundle_url(perf_css_app_files(), 'css') : ''; $__js = function_exists('perf_bundle_url') ? perf_bundle_url(perf_js_core_files(), 'js') : ''; ?>
 <?php if ($__css): ?><link rel="stylesheet" href="<?php echo clean($__css); ?>"><?php else: ?><link rel=stylesheet href=assets/css/school-ui.css?v20260917d><?php endif; ?><?php if ($__js): ?><script defer src="<?php echo clean($__js); ?>"></script><?php else: ?><script defer src=assets/js/school-icons.js?v20260917d></script><script defer src=assets/js/school-ui.js?v20260917d></script><?php endif; ?></head><body data-school-return="preview">
-<div class="seat-toolbar">تعداد کارت <input type="range" min="4" max="12" value="10" oninput="setCardsPerPage(this.value)"> ستون <input type="range" min="1" max="3" value="2" oninput="setSeatVar('--cols',this.value)"> فاصله <input type="range" min="1" max="8" value="3" oninput="setSeatVar('--gap',this.value+'mm')"> ارتفاع کارت <input type="range" min="35" max="80" value="53" oninput="setSeatVar('--cardH',this.value+'mm')"> عکس <input type="range" min="16" max="38" value="27" oninput="setSeatVar('--photo',this.value+'mm')"> فونت <input type="range" min="8" max="16" value="11" oninput="setSeatVar('--font',this.value+'px')"> شماره <input type="range" min="18" max="42" value="25" oninput="setSeatVar('--seatFont',this.value+'px')"> حاشیه <input type="range" min="0" max="15" value="7" oninput="setSeatVar('--pageMargin',this.value+'mm')"><select id="gradeMix" onchange="filterSeatCards()"><option value="all">همه پایه‌ها</option><option value="هفتم">هفتم</option><option value="هشتم">هشتم</option><option value="نهم">نهم</option><option value="هفتم,هشتم">هفتم+هشتم</option><option value="هشتم,نهم">هشتم+نهم</option><option value="نهم,هفتم">نهم+هفتم</option></select><button onclick="addEmptySeat()">صندلی خالی</button><button onclick="appPrint()">چاپ نهایی</button></div>
+<div class="seat-toolbar">چینش <select id="seatLayout" onchange="setSeatLayout(this.value)"><option value="row">افقی</option><option value="column">عمودی</option></select> تعداد کارت <input type="range" min="4" max="12" value="10" oninput="setCardsPerPage(this.value)"> ستون <input type="range" min="1" max="3" value="2" oninput="setSeatVar('--cols',this.value)"> فاصله <input type="range" min="1" max="8" value="3" oninput="setSeatVar('--gap',this.value+'mm')"> ارتفاع کارت <input type="range" min="35" max="80" value="53" oninput="setSeatVar('--cardH',this.value+'mm')"> عکس <input type="range" min="16" max="38" value="27" oninput="setSeatVar('--photo',this.value+'mm')"> فونت <input type="range" min="8" max="16" value="11" oninput="setSeatVar('--font',this.value+'px')"> شماره <input type="range" min="18" max="42" value="25" oninput="setSeatVar('--seatFont',this.value+'px')"> حاشیه <input type="range" min="0" max="15" value="7" oninput="setSeatVar('--pageMargin',this.value+'mm')"><select id="gradeMix" onchange="filterSeatCards()"><option value="all">همه پایه‌ها</option><option value="هفتم">هفتم</option><option value="هشتم">هشتم</option><option value="نهم">نهم</option><option value="هفتم,هشتم">هفتم+هشتم</option><option value="هشتم,نهم">هشتم+نهم</option><option value="نهم,هفتم">نهم+هفتم</option></select><button onclick="addEmptySeat()">صندلی خالی</button><button onclick="appPrint()">چاپ نهایی</button></div>
 <div class="sheet" id="seatSheet">
 <?php foreach($rows as $r): ?>
   <div class="card" draggable="true" data-grade="<?php echo clean($r['grade_level']); ?>"><div class="info"><b>نام دانش‌آموز:</b> <?php echo clean($r['first_name'].' '.$r['last_name']); ?><br><b>کلاس دانش‌آموز:</b> <?php echo clean($r['class_name']); ?><br><b>کلاس امتحانی:</b> <?php echo clean($r['exam_room']); ?><div class="seatbox"><?php echo tr_num($r['seat_number'],'fa'); ?></div></div><div><div class="photo"><?php if(!empty($r['photo_url'])): ?><img src="<?php echo clean($r['photo_url']); ?>"><?php else: ?>عکس<?php endif; ?></div></div></div>
 <?php endforeach; ?>
 </div><script>
-function setSeatVar(k,v){document.getElementById('seatSheet').style.setProperty(k,v)}
-function setCardsPerPage(n){let cols=Math.ceil(Math.sqrt(n/1.4)); setSeatVar('--cols',cols)}
+function setSeatVar(k,v){document.getElementById('seatSheet').style.setProperty(k,v);if(k==='--cols'&&document.getElementById('seatLayout').value==='column')setSeatLayout('column')}
+function setSeatLayout(layout){const sheet=document.getElementById('seatSheet');sheet.style.gridAutoFlow=layout;sheet.style.gridTemplateRows=layout==='column'?'repeat('+Math.max(1,Math.ceil(sheet.querySelectorAll('.card').length/(parseInt(getComputedStyle(sheet).getPropertyValue('--cols'))||2)))+',minmax(0,auto))':'';}
+function setCardsPerPage(n){let cols=Math.ceil(Math.sqrt(n/1.4)); setSeatVar('--cols',cols);setSeatLayout(document.getElementById('seatLayout').value)}
 function filterSeatCards(){const v=document.getElementById('gradeMix').value.split(',');document.querySelectorAll('.card').forEach(c=>{c.style.display=(v[0]==='all'||v.includes(c.dataset.grade))?'grid':'none'})}
 function addEmptySeat(){document.getElementById('seatSheet').insertAdjacentHTML('beforeend','<div class="card empty-seat" draggable="true"><div class="info"><b>صندلی خالی</b><div class="seatbox">—</div></div><div class="photo">خالی</div></div>'); enableDrag();}
 function enableDrag(){document.querySelectorAll('.card').forEach(card=>{card.ondragstart=e=>{card.classList.add('dragging')};card.ondragend=()=>card.classList.remove('dragging');card.ondragover=e=>e.preventDefault();card.ondrop=e=>{e.preventDefault();const d=document.querySelector('.dragging');if(d&&d!==card)card.parentNode.insertBefore(d,card.nextSibling)}})} enableDrag();
@@ -193,9 +194,20 @@ if (is_student_logged_in()) {
         $marks = implode(',',array_fill(0,count($ownedClasses),'?'));
         $students = DB::fetchAll("SELECT s.id,s.first_name,s.last_name,s.class_name,s.grade_level,s.photo_url FROM students s WHERE s.status='active' AND s.class_name IN ($marks) AND $exySql",array_merge($ownedClasses,$exyParams));
     } elseif ($gradeAll && $targetGrade !== '') {
-        // Grade-wide printing: use the saved design for all students in the same grade,
-        // independent of class teacher or original class of the design.
-        $students = DB::fetchAll("SELECT s.id,s.first_name,s.last_name,s.class_name,s.grade_level,s.photo_url FROM students s WHERE s.status='active' AND (s.grade_level=? OR s.class_name LIKE ?) AND $exySql", array_merge([$targetGrade, $targetGrade . '%'], $exyParams));
+        // Grade design uses only the checked classes passed by the teacher modal.
+        $selectedGradeClasses = $_GET['grade_classes'] ?? null;
+        if ($selectedGradeClasses !== null) {
+            if (!is_array($selectedGradeClasses)) app_page_error('فهرست کلاس‌های طراحی نامعتبر است.');
+            $availableGradeClasses = function_exists('ceg_grade_class_options') ? ceg_grade_class_options($exam['academic_year'],$targetGrade,(int)$exam['teacher_id'],$exam['subject_name']) : [];
+            $allowedGradeClasses = [];foreach($availableGradeClasses as $row)$allowedGradeClasses[norm_class_str($row['class_name'])]=$row['class_name'];
+            $chosenGradeClasses=[];foreach($selectedGradeClasses as $className){if(!is_string($className) || !isset($allowedGradeClasses[norm_class_str($className)]))app_page_error('کلاس انتخاب‌شده برای این پایه معتبر نیست.');$chosenGradeClasses[norm_class_str($className)]=$allowedGradeClasses[norm_class_str($className)];}
+            if(!$chosenGradeClasses)app_page_error('حداقل یک کلاس را برای طراحی پایه انتخاب کنید.');
+            $marks=implode(',',array_fill(0,count($chosenGradeClasses),'?'));
+            $students=DB::fetchAll("SELECT s.id,s.first_name,s.last_name,s.class_name,s.grade_level,s.photo_url FROM students s WHERE s.status='active' AND s.class_name IN ($marks) AND $exySql",array_merge(array_values($chosenGradeClasses),$exyParams));
+        } else {
+            // Backward-compatible legacy links still print the whole grade.
+            $students = DB::fetchAll("SELECT s.id,s.first_name,s.last_name,s.class_name,s.grade_level,s.photo_url FROM students s WHERE s.status='active' AND (s.grade_level=? OR s.class_name LIKE ?) AND $exySql", array_merge([$targetGrade, $targetGrade . '%'], $exyParams));
+        }
     } else {
         $students = DB::fetchAll("SELECT s.id,s.first_name,s.last_name,s.class_name,s.grade_level,s.photo_url FROM students s WHERE s.status='active' AND (?='' OR s.class_name=?) AND (?='' OR s.grade_level=?) AND $exySql", array_merge([$exam['class_name'],$exam['class_name'],$exam['grade_level'],$exam['grade_level']], $exyParams));
     }
@@ -504,7 +516,6 @@ body.modal-open{overflow:hidden}
     <input id="bankSearch" placeholder="جستجوی متن/درس">
     <?php /* v4.96.0: فیلترهای سال/ماه/طراح انتخابی — مشترک بین سوالات بانک و آزمون‌های ذخیره‌شده */ ?>
     <select id="bankYear"><option value="">همه سال‌ها</option></select>
-    <select id="bankMonth"><option value="">همه ماه‌ها</option></select>
     <select id="bankType"><option value="">همه انواع</option><option value="text">تشریحی</option><option value="mcq">چندگزینه‌ای</option><option value="blank">جای خالی</option><option value="tf">صحیح/غلط</option></select>
     <select id="bankDesigner"><option value="">همه طراحان</option></select>
     <button class="tb-primary" style="border-radius:8px" onclick="loadBank()">اعمال فیلتر</button>
@@ -676,6 +687,7 @@ setTimeout(syncToolbarOffset,1200);
 const studentsData=<?php echo json_encode($studentsData, JSON_UNESCAPED_UNICODE); ?>;
 const examData=<?php echo json_encode($examData, JSON_UNESCAPED_UNICODE); ?>;
 const examId=<?php echo (int)$examId; ?>;
+const examMonth=<?php echo json_encode((string)($exam['exam_month']??''),JSON_UNESCAPED_UNICODE); ?>;
 const isClassExam=<?php echo ($exam['exam_kind']??'')==='class'?'true':'false'; ?>;
 const classGroupMember=<?php echo (int)($_GET['class_only']??0); ?>;
 const classGroupScope=<?php echo json_encode($groupScope); ?>;
@@ -688,7 +700,7 @@ let headerFields=[{key:'studentName',label:'نام',source:'name',on:true},{key:
 /* v4.93.0: در طرح‌های ذخیره‌شده قدیمی، سربرگ کوتاه‌تر از ۳۹mm به ۳۹ ارتقا می‌یابد
    (فونت‌های جدید جای بیشتری می‌خواهند)؛ اسلایدر همچنان آزاد است. */
 function fixLoadedHeaderH(st){if(st&&st['--headerH']){const n=parseFloat(st['--headerH']); if(!isNaN(n)&&n<39) st['--headerH']='39mm';} return st;}
-function fixHeaderFieldOrder(list){if(!Array.isArray(list))return list; const si=list.findIndex(f=>f&&f.key==='seat'), ti=list.findIndex(f=>f&&f.key==='teacher'); if(si>-1&&ti>-1&&si<ti){const t=list[si]; list[si]=list[ti]; list[ti]=t;} 
+function fixHeaderFieldOrder(list){if(!Array.isArray(list))return list; const si=list.findIndex(f=>f&&f.key==='seat'), ti=list.findIndex(f=>f&&f.key==='teacher'); if(si>-1&&ti>-1&&si<ti){const t=list[si]; list[si]=list[ti]; list[ti]=t;}
 /* v4.95.0: نام دبیر همیشه از سرور می‌آید (فقط «آقای + نام خانوادگی») —
    مقدار ذخیره‌شده قدیمی که نام کوچک داشت هرگز نمایش داده نمی‌شود. */
 list.forEach(f=>{if(f&&f.key==='teacher') f.value=examData.teacher;});
@@ -1304,7 +1316,7 @@ function deferBankCatalog(){
   if(window.requestIdleCallback) window.requestIdleCallback(run,{timeout:1200}); else setTimeout(run,350);
 }
 function bankCatalogUrl(options,part){
-  const q=document.getElementById('bankSearch').value||'', y=document.getElementById('bankYear').value||'', m=document.getElementById('bankMonth').value||'', t=document.getElementById('bankType').value||'', d=document.getElementById('bankDesigner').value||'';
+  const q=document.getElementById('bankSearch').value||'', y=document.getElementById('bankYear').value||'', m=examMonth, t=document.getElementById('bankType').value||'', d=document.getElementById('bankDesigner').value||'';
   const requestedBankPage=Math.max(1,Number(options.bankPage||1)), requestedDesignPage=Math.max(1,Number(options.designPage||1));
   return 'exam-design-api.php?group_member='+classGroupMember+'&action=load&catalog=bank&exam_id='+examId+'&dt='+encodeURIComponent(designToken)+'&subject='+encodeURIComponent(q)+'&year='+encodeURIComponent(y)+'&month='+encodeURIComponent(m)+'&type='+encodeURIComponent(t)+'&designer='+encodeURIComponent(d)+'&bank_page='+requestedBankPage+'&design_page='+requestedDesignPage+'&part='+part;
 }
@@ -1383,7 +1395,7 @@ function renderBankPage(){
 /* v4.97.0: نشان درس جاری روی پنل بانک — یادآوری اینکه فقط محتوای هم‌درس نمایش داده می‌شود */
 function showBankSubject(subj,grade){const el=document.getElementById('bankSubjectBadge'); if(!el)return; const g=grade?(' — پایه '+grade):''; if(subj){el.textContent='درس: '+subj+g; el.style.display='inline-block';} else {el.style.display='none';}}
 /* v4.96.0: پرکردن لیست‌های بازشونده فیلتر بانک (سال/ماه/طراح) با حفظ انتخاب فعلی */
-function populateBankFilters(f){if(!f)return; const fill=(id,items,valKey,labKey)=>{const el=document.getElementById(id); if(!el)return; const cur=el.value; while(el.options.length>1)el.remove(1); (items||[]).forEach(it=>{const v=valKey?it[valKey]:it, lab=labKey?it[labKey]:it; const o=document.createElement('option'); o.value=v; o.textContent=lab; el.appendChild(o);}); el.value=cur; if(el.value!==cur)el.value='';}; fill('bankYear',f.years); fill('bankMonth',f.months); fill('bankDesigner',f.designers,'v','label');}
+function populateBankFilters(f){if(!f)return; const fill=(id,items,valKey,labKey)=>{const el=document.getElementById(id); if(!el)return; const cur=el.value; while(el.options.length>1)el.remove(1); (items||[]).forEach(it=>{const v=valKey?it[valKey]:it, lab=labKey?it[labKey]:it; const o=document.createElement('option'); o.value=v; o.textContent=lab; el.appendChild(o);}); el.value=cur; if(el.value!==cur)el.value='';}; fill('bankYear',f.years); fill('bankDesigner',f.designers,'v','label');}
 /* v4.96.0: نمای صفحات آزمون ذخیره‌شده با تنظیمات اولین طراحی (چینش، برش، روشنایی، کنتراست، حذف پس‌زمینه، اندازه) — فایل اصلی دست نمی‌خورد، فقط نمایش/درج با تنظیمات است */
 function bankPageViews(x,thumbs){const pages=x.pages||[]; const th=(thumbs&&thumbs.length)?thumbs:null; const order=(x.order&&x.order.length)?x.order:pages.map((_,i)=>i+1); const out=[]; order.forEach((srcIdx,i)=>{const src=pages[srcIdx-1]; if(!src)return; const lite=(th&&th[srcIdx-1])?th[srcIdx-1]:src; const c=(x.crops&&x.crops[i+1])||{}; const t=+c.t||0,r=+c.r||0,b=+c.b||0,l=+c.l||0,w=+c.w||100,ct=+c.contrast||100,br=+c.brightness||100; const blend=(+ (c.bg||0)>0)?'multiply':'normal'; out.push({src:lite,style:`width:${w}%;clip-path:inset(${t}% ${r}% ${b}% ${l}%);filter:contrast(${ct}%) brightness(${br}%);mix-blend-mode:${blend}`});}); return out;}
 /* v4.95.0: آزمون‌های کامل ذخیره‌شده در بانک — بندانگشتی صفحات + نام طراح + ماه/سال، زوم شناور، درج در ویرایشگر، حذف */

@@ -90,10 +90,12 @@ function exam_catalog_data_version() {
     $parts[] = 'grade:' . (exam_design_bank_has_grade_column() ? '1' : '0');
     return implode('|', $parts);
 }
+function exam_catalog_current_month() { global $exam; return trim((string)($exam['exam_month'] ?? '')); }
+function exam_catalog_current_year() { global $exam; return trim((string)($exam['academic_year'] ?? '')); }
 function exam_catalog_filter_key($curSubject, $curGrade) {
     return md5((string)json_encode([
         's' => trim((string)($_GET['subject'] ?? '')), 'y' => trim((string)($_GET['year'] ?? '')),
-        'm' => trim((string)($_GET['month'] ?? '')), 't' => trim((string)($_GET['type'] ?? '')),
+        'm' => exam_catalog_current_month(), 'ey' => exam_catalog_current_year(), 't' => trim((string)($_GET['type'] ?? '')),
         'd' => trim((string)($_GET['designer'] ?? '')), 'cs' => $curSubject, 'cg' => $curGrade,
     ], JSON_UNESCAPED_UNICODE));
 }
@@ -285,28 +287,29 @@ function exam_catalog_bank_scan_compute($curSubject, $curGrade) {
         $params[] = '%' . trim($_GET['subject']) . '%';
         $params[] = '%' . trim($_GET['subject']) . '%';
     }
-    if (!empty($_GET['year'])) { $where[] = 'academic_year=?'; $params[] = trim($_GET['year']); }
-    if (!empty($_GET['month'])) { $where[] = 'exam_month=?'; $params[] = trim($_GET['month']); }
+    $where[] = 'academic_year=?'; $params[] = exam_catalog_current_year();
+    $where[] = 'exam_month=?'; $params[] = exam_catalog_current_month();
     if (!empty($_GET['type'])) { $where[] = 'question_type=?'; $params[] = trim($_GET['type']); }
     if (!empty($_GET['designer'])) { $where[] = 'designer_name=?'; $params[] = trim($_GET['designer']); }
     $gradeColumn = exam_design_bank_has_grade_column();
-    $gradeSelect = $gradeColumn ? ', grade_level' : '';
+    $gradeSelect = $gradeColumn ? ', grade_level' : ', NULL AS grade_level';
     $bankMeta = DB::fetchAll(
         'SELECT id, source_exam_id, academic_year, exam_month, subject_name, teacher_id, designer_name, question_type, score, created_at_jalali, updated_at_jalali' . $gradeSelect .
         ' FROM exam_question_bank WHERE ' . implode(' AND ', $where) . ' ORDER BY id DESC LIMIT 1000',
         $params
     );
+    $sourceIds=[];foreach($bankMeta as $row)if((int)($row['source_exam_id']??0)>0)$sourceIds[(int)$row['source_exam_id']]=true;
+    $sourceGrades=[];if($sourceIds){$ids=array_keys($sourceIds);$marks=implode(',',array_fill(0,count($ids),'?'));foreach(DB::fetchAll("SELECT id,grade_level FROM exam_schedules WHERE id IN ($marks)",$ids) as $sourceRow)$sourceGrades[(int)$sourceRow['id']]=trim((string)($sourceRow['grade_level']??''));}
+    foreach($bankMeta as &$row)if(trim((string)($row['grade_level']??''))==='')$row['grade_level']=$sourceGrades[(int)($row['source_exam_id']??0)]??'';unset($row);
     if ($curSubject !== '') {
         $bankMeta = array_values(array_filter($bankMeta, function ($row) use ($curSubject) {
             return exam_subject_matches($row['subject_name'] ?? '', $curSubject);
         }));
     }
-    if ($curGrade !== '' && $gradeColumn) {
-        $bankMeta = array_values(array_filter($bankMeta, function ($row) use ($curGrade) {
-            $grade = trim((string)($row['grade_level'] ?? ''));
-            return $grade === '' || $grade === $curGrade;
-        }));
-    }
+    if ($curGrade === '') $bankMeta = [];
+    else $bankMeta = array_values(array_filter($bankMeta, function ($row) use ($curGrade) {
+        return trim((string)($row['grade_level'] ?? '')) === $curGrade;
+    }));
     usort($bankMeta, function ($a, $b) {
         $score = exam_design_score_value($a['score'] ?? '') <=> exam_design_score_value($b['score'] ?? '');
         return $score !== 0 ? $score : ((int)($b['id'] ?? 0) <=> (int)($a['id'] ?? 0));
@@ -333,7 +336,7 @@ function exam_catalog_bank_scan_compute($curSubject, $curGrade) {
     $fDesigners = array_map(function ($designer) { return ['v'=>$designer, 'label'=>teacher_respectful_name($designer)]; }, $fDesigners);
     return [
         'bankMeta' => $bankMeta,
-        'filters' => ['years'=>$fYears, 'months'=>$fMonths, 'designers'=>$fDesigners],
+        'filters' => ['years'=>$fYears, 'designers'=>$fDesigners],
     ];
 }
 /* v4.163.0: نیمهٔ سنگین: ردیف‌های طراحی ذخیره‌شده + اثرانگشت صفحات (دیسک). */
@@ -343,8 +346,9 @@ function exam_catalog_design_scan_compute($examId, $curSubject, $curGrade) {
        the cache and are versioned when a page is actually returned. */
     $dWhere = ["COALESCE(es.exam_kind,'official')<>'class_deleted'"];
     $dParams = [];
-    if (!empty($_GET['year'])) { $dWhere[] = 'es.academic_year=?'; $dParams[] = trim($_GET['year']); }
-    if (!empty($_GET['month'])) { $dWhere[] = 'es.exam_month=?'; $dParams[] = trim($_GET['month']); }
+    $dWhere[] = 'es.academic_year=?'; $dParams[] = exam_catalog_current_year();
+    $dWhere[] = 'es.exam_month=?'; $dParams[] = exam_catalog_current_month();
+    if ($curGrade !== '') { $dWhere[] = 'es.grade_level=?'; $dParams[] = $curGrade; } else $dWhere[] = '1=0';
     if (!empty($_GET['designer'])) { $dWhere[] = 'ed.designer_name=?'; $dParams[] = trim($_GET['designer']); }
     if (!empty($_GET['subject'])) { $dWhere[] = 'es.subject_name LIKE ?'; $dParams[] = '%' . trim($_GET['subject']) . '%'; }
     $designRows = DB::fetchAll(
@@ -386,7 +390,8 @@ function exam_catalog_design_scan_compute($examId, $curSubject, $curGrade) {
     }
     $archWhere = ['1=1']; $archParams = [];
     if (!empty($_GET['year'])) { $archWhere[] = 'academic_year=?'; $archParams[] = trim($_GET['year']); }
-    if (!empty($_GET['month'])) { $archWhere[] = 'exam_month=?'; $archParams[] = trim($_GET['month']); }
+    $archWhere[] = 'exam_month=?'; $archParams[] = exam_catalog_current_month();
+    if ($curGrade !== '') { $archWhere[] = 'grade_level=?'; $archParams[] = $curGrade; } else $archWhere[] = '1=0';
     if (!empty($_GET['designer'])) { $archWhere[] = 'designer_name=?'; $archParams[] = trim($_GET['designer']); }
     foreach (DB::fetchAll(
         'SELECT id, exam_id, designer_name, subject_name, exam_month, academic_year, grade_level, class_name, created_at_jalali' .
@@ -432,7 +437,7 @@ if ($action === 'load') {
         ]);
     }
     if ($catalogMode === 'bank') {
-        $curGrade = trim((string)($exam['grade_level'] ?? ''));
+        $curGrade = trim((string)($exam['grade_level'] ?? '')) ?: (function_exists('infer_grade_from_class_name') ? infer_grade_from_class_name($exam['class_name'] ?? '') : '');
         $bankPage = exam_design_catalog_page('bank_page');
         $designBankPage = exam_design_catalog_page('design_page');
         $pageSize = 5;
@@ -501,31 +506,31 @@ if ($action === 'load') {
     $curSubject = trim((string)($exam['subject_name'] ?? ''));
     /* v4.111.0: grade_level is optional on pre-v4.111 databases. The bank
        page migrates it once; this read path must never run DDL per request. */
-    $curGrade = trim((string)($exam['grade_level'] ?? ''));
+    $curGrade = trim((string)($exam['grade_level'] ?? '')) ?: (function_exists('infer_grade_from_class_name') ? infer_grade_from_class_name($exam['class_name'] ?? '') : '');
     $params = [];
     $where = ["1=1"];
     if (!empty($_GET['subject'])) { $where[] = "(subject_name LIKE ? OR question_html LIKE ?)"; $params[] = '%' . trim($_GET['subject']) . '%'; $params[] = '%' . trim($_GET['subject']) . '%'; }
-    if (!empty($_GET['year'])) { $where[] = "academic_year=?"; $params[] = trim($_GET['year']); }
-    if (!empty($_GET['month'])) { $where[] = "exam_month=?"; $params[] = trim($_GET['month']); }
+    $where[] = "academic_year=?"; $params[] = exam_catalog_current_year();
+    $where[] = "exam_month=?"; $params[] = exam_catalog_current_month();
     if (!empty($_GET['type'])) { $where[] = "question_type=?"; $params[] = trim($_GET['type']); }
     if (!empty($_GET['designer'])) { $where[] = "designer_name=?"; $params[] = trim($_GET['designer']); } /* v4.96.0: فیلتر انتخابی دقیق */
     $bank = DB::fetchAll("SELECT * FROM exam_question_bank WHERE " . implode(' AND ', $where) . " ORDER BY id DESC LIMIT 1000", $params);
+    $sourceIds=[];foreach($bank as $row)if((int)($row['source_exam_id']??0)>0)$sourceIds[(int)$row['source_exam_id']]=true;
+    $sourceGrades=[];if($sourceIds){$ids=array_keys($sourceIds);$marks=implode(',',array_fill(0,count($ids),'?'));foreach(DB::fetchAll("SELECT id,grade_level FROM exam_schedules WHERE id IN ($marks)",$ids) as $sourceRow)$sourceGrades[(int)$sourceRow['id']]=trim((string)($sourceRow['grade_level']??''));}
+    foreach($bank as &$row)if(trim((string)($row['grade_level']??''))==='')$row['grade_level']=$sourceGrades[(int)($row['source_exam_id']??0)]??'';unset($row);
     /* v4.97.0: فقط سوالات هم‌درس با آزمون در حال طراحی */
     if ($curSubject !== '') {
         $bank = array_values(array_filter($bank, function ($b0) use ($curSubject) { return exam_subject_matches($b0['subject_name'] ?? '', $curSubject); }));
     }
-    /* v4.111.0: فیلتر پایه تحصیلی — سوال هم‌پایه یا بدون پایه ثبت‌شده */
-    if ($curGrade !== '') {
-        $bank = array_values(array_filter($bank, function ($b0) use ($curGrade) {
-            $g = trim((string)($b0['grade_level'] ?? ''));
-            return $g === '' || $g === $curGrade;
-        }));
-    }
+    /* طراحی هر آزمون فقط از بانک دقیق همان پایه استفاده می‌کند؛ پایهٔ خالی legacy رد می‌شود. */
+    if ($curGrade !== '') $bank = array_values(array_filter($bank, function ($b0) use ($curGrade) { return trim((string)($b0['grade_level'] ?? '')) === $curGrade; }));
+    else $bank = [];
     if (count($bank) > 300) $bank = array_slice($bank, 0, 300);
     /* v4.95.0: آزمون‌های طراحی‌شده (با فایل منبع تصویری) هم در بانک نمایش داده می‌شوند */
     $dWhere = ["COALESCE(es.exam_kind,'official')<>'class_deleted'"]; $dParams = [];
-    if (!empty($_GET['year']))     { $dWhere[] = "es.academic_year=?";  $dParams[] = trim($_GET['year']); }
-    if (!empty($_GET['month']))    { $dWhere[] = "es.exam_month=?";     $dParams[] = trim($_GET['month']); }
+    $dWhere[] = "es.academic_year=?"; $dParams[] = exam_catalog_current_year();
+    $dWhere[] = "es.exam_month=?"; $dParams[] = exam_catalog_current_month();
+    if ($curGrade !== '') { $dWhere[] = "es.grade_level=?"; $dParams[] = $curGrade; } else $dWhere[] = '1=0';
     if (!empty($_GET['designer'])) { $dWhere[] = "ed.designer_name=?"; $dParams[] = trim($_GET['designer']); }
     if (!empty($_GET['subject']))  { $dWhere[] = "es.subject_name LIKE ?";  $dParams[] = '%' . trim($_GET['subject']) . '%'; }
     $designRows = DB::fetchAll("SELECT ed.exam_id, ed.design_json, ed.designer_name, ed.updated_at_jalali, es.subject_name, es.exam_month, es.academic_year, es.grade_level, es.class_name, es.question_file FROM exam_designs ed JOIN exam_schedules es ON es.id=ed.exam_id WHERE " . implode(' AND ', $dWhere) . " ORDER BY ed.id ASC LIMIT 400", $dParams);
@@ -572,8 +577,9 @@ if ($action === 'load') {
     /* v4.99.0: نسخه‌های بایگانی‌شده (طراحی‌های قبلی که منبع‌شان عوض شده) —
        مستقل و برای همیشه در بانک می‌مانند. */
     $archWhere = ["1=1"]; $archParams = [];
-    if (!empty($_GET['year']))     { $archWhere[] = "academic_year=?"; $archParams[] = trim($_GET['year']); }
-    if (!empty($_GET['month']))    { $archWhere[] = "exam_month=?";    $archParams[] = trim($_GET['month']); }
+    $archWhere[] = "academic_year=?"; $archParams[] = exam_catalog_current_year();
+    $archWhere[] = "exam_month=?"; $archParams[] = exam_catalog_current_month();
+    if ($curGrade !== '') { $archWhere[] = "grade_level=?"; $archParams[] = $curGrade; } else $archWhere[] = '1=0';
     if (!empty($_GET['designer'])) { $archWhere[] = "designer_name=?"; $archParams[] = trim($_GET['designer']); }
     foreach (DB::fetchAll("SELECT * FROM exam_design_archive WHERE " . implode(' AND ', $archWhere) . " ORDER BY id ASC LIMIT 400", $archParams) as $ar) {
         if ($curSubject !== '' && !exam_subject_matches($ar['subject_name'] ?? '', $curSubject)) continue;
@@ -730,13 +736,17 @@ if ($action === 'save') {
             DB::execute("UPDATE exam_question_bank SET question_html=?, score=?, question_type=?, meta_json=?, updated_at_jalali=? WHERE id=?", [$qhtml,$q['score']??'', $q['qtype']??'text', json_encode($q,JSON_UNESCAPED_UNICODE), jalali_now(), (int)$qid]);
         } elseif (!$qid) {
             $hash = $normalizeQuestion($qhtml);
-            $candidates = DB::fetchAll("SELECT id, question_html FROM exam_question_bank WHERE subject_name=? AND question_type=? AND COALESCE(score,'')=? ORDER BY id DESC LIMIT 500", [$exam['subject_name'], $q['qtype']??'text', $q['score']??'']);
-            $duplicateId = null;
+            $gradeColumn = exam_design_bank_has_grade_column();
+            $gradeExpr = $gradeColumn ? "COALESCE(NULLIF(q.grade_level,''),src.grade_level)" : 'src.grade_level';
+            $candidates = DB::fetchAll("SELECT q.id,q.question_html,$gradeExpr AS resolved_grade FROM exam_question_bank q LEFT JOIN exam_schedules src ON src.id=q.source_exam_id WHERE q.subject_name=? AND q.academic_year=? AND q.exam_month=? AND q.question_type=? AND COALESCE(q.score,'')=? ORDER BY q.id DESC LIMIT 500", [$exam['subject_name'],$exam['academic_year'],$exam['exam_month'],$q['qtype']??'text',$q['score']??'']);
+            $duplicateId = null; $currentGrade=trim((string)($exam['grade_level']??'')) ?: infer_grade_from_class_name($exam['class_name']??'');
             foreach ($candidates as $cand) {
+                if (trim((string)($cand['resolved_grade']??'')) !== $currentGrade) continue;
                 if ($normalizeQuestion($cand['question_html']) === $hash) { $duplicateId = (int)$cand['id']; break; }
             }
             if (!$duplicateId) {
-                DB::execute("INSERT INTO exam_question_bank (source_exam_id, academic_year, exam_month, subject_name, teacher_id, designer_name, question_type, question_html, score, meta_json, created_at_jalali) VALUES (?,?,?,?,?,?,?,?,?,?,?)", [$examId,$exam['academic_year'],$exam['exam_month'],$exam['subject_name'],$designerTeacherId,$designerName,$q['qtype']??'text',$qhtml,$q['score']??'',json_encode($q,JSON_UNESCAPED_UNICODE),jalali_now()]);
+                if ($gradeColumn) DB::execute("INSERT INTO exam_question_bank (source_exam_id, academic_year, exam_month, subject_name, teacher_id, designer_name, question_type, question_html, score, meta_json, created_at_jalali, grade_level) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", [$examId,$exam['academic_year'],$exam['exam_month'],$exam['subject_name'],$designerTeacherId,$designerName,$q['qtype']??'text',$qhtml,$q['score']??'',json_encode($q,JSON_UNESCAPED_UNICODE),jalali_now(),$currentGrade]);
+                else DB::execute("INSERT INTO exam_question_bank (source_exam_id, academic_year, exam_month, subject_name, teacher_id, designer_name, question_type, question_html, score, meta_json, created_at_jalali) VALUES (?,?,?,?,?,?,?,?,?,?,?)", [$examId,$exam['academic_year'],$exam['exam_month'],$exam['subject_name'],$designerTeacherId,$designerName,$q['qtype']??'text',$qhtml,$q['score']??'',json_encode($q,JSON_UNESCAPED_UNICODE),jalali_now()]);
             }
         }
     }

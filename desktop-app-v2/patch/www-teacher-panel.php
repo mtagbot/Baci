@@ -300,6 +300,13 @@ $tab = $_GET['tab'] ?? 'schedule';
             if (!isset($classRows[$key])) $classRows[$key] = ['class_name'=>$ce['class_name'],'subject_name'=>$ce['subject_name'],'academic_year'=>$ce['academic_year'],'grade_level'=>$ce['grade_level'],'assigned'=>false,'exams'=>[]];
             $classRows[$key]['exams'][] = $ce;
         }
+        foreach (DB::fetchAll("SELECT m.class_name, e.subject_name, e.academic_year, e.grade_level, e.id, e.exam_month, e.is_active, m.excluded, m.detached_exam_id FROM class_exam_group_members m JOIN class_exam_groups g ON g.id=m.group_id JOIN exam_schedules base ON base.id=g.design_exam_id LEFT JOIN exam_schedules e ON e.id=CASE WHEN m.excluded=1 AND m.detached_exam_id IS NOT NULL THEN m.detached_exam_id ELSE m.exam_id END WHERE g.teacher_id=? AND g.academic_year=? AND base.exam_kind='class' ORDER BY e.id DESC",[$teacherId,$teacherYear]) as $gm) {
+            if (empty($gm['id'])) continue;
+            $key=json_encode([norm_class_str($gm['class_name']),$gm['subject_name']]);
+            if(!isset($classRows[$key]))$classRows[$key]=['class_name'=>$gm['class_name'],'subject_name'=>$gm['subject_name'],'academic_year'=>$gm['academic_year'],'grade_level'=>$gm['grade_level'],'assigned'=>false,'exams'=>[]];
+            $found=false;foreach($classRows[$key]['exams'] as $oldExam)if((int)$oldExam['id']===(int)$gm['id'])$found=true;
+            if(!$found)$classRows[$key]['exams'][]=$gm;
+        }
         }
 
     ?>
@@ -309,28 +316,33 @@ $tab = $_GET['tab'] ?? 'schedule';
             <?php if(teacher_has_deputy($teacherId) || current_teacher_is_executive()): ?><a class="btn btn-outline" href="exams.php?tab=class&amp;year=<?php echo urlencode($teacherYear); ?>">آزمون‌های کلاسی دبیران — مشاهده، چاپ و حذف</a><?php endif; ?>
             <?php include __DIR__.'/includes/teacher_class_exams.php'; ?>
         <?php endif; ?>
-        <h3 class="font-bold mt-4 mb-3">آزمون‌های ماهانه فعال‌شده توسط مدرسه</h3>
-        <div class="table-container"><table id="teacherMonthlyExams"><thead><tr><th>کلاس/پایه</th><th>طراحی</th><th>طراحی پایه‌ای (مشترک کلاس‌های پایه)</th><th>تاریخ</th><th>درس</th><th>سال/ماه</th><th>ساعت</th></tr></thead><tbody>
+        <style>.ceg-modal[hidden]{display:none!important}.ceg-modal{position:fixed;inset:0;background:rgba(15,23,42,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px}.ceg-dialog{max-width:680px;width:100%;max-height:90vh;overflow:auto}.ceg-dialog form{margin-top:12px}.ceg-dialog button{margin:8px 0 0 8px}</style>
+<h3 class="font-bold mt-4 mb-3">آزمون‌های ماهانه فعال‌شده توسط مدرسه</h3>
+        <div class="table-container"><table id="teacherMonthlyExams"><thead><tr><th>کلاس/پایه</th><th>طراحی کلاسی</th><th>طراحی پایه</th><th>تاریخ</th></tr></thead><tbody>
         <?php foreach($teacherExams as $ex):
             $gk = $ex['academic_year'] . '|' . $ex['exam_month'] . '|' . trim($ex['grade_level'] ?? '') . '|' . trim($ex['subject_name'] ?? '');
             $gCount = $tpGroupCounts[$gk] ?? 1;
             $gFirst = empty($tpSeenGroups[$gk]); $tpSeenGroups[$gk] = true;
             $exGrade = trim($ex['grade_level'] ?? '') ?: infer_grade_from_class_name($ex['class_name'] ?? '');
-        ?><tr><td><?php echo clean($ex['grade_level'].' '.$ex['class_name']); ?></td><td><a class="btn btn-primary text-xs" target="_blank" href="exam-print.php?type=questions&exam_id=<?php echo $ex['id']; ?>&dt=<?php echo urlencode(make_exam_design_token($ex['id'], 'teacher', $teacherId)); ?>">ویرایش آزمون ماهانه</a></td>
-        <?php if ($gFirst): /* v4.70.0: یک خانه مشترک با rowspan برای همه کلاس‌های پایه/درس یکسان */ ?>
+            $monthlyGroupModal = 'monthly-grade-' . substr(sha1($gk),0,12);
+            $monthlyGradeClasses = $gFirst && $exGrade !== '' ? ceg_grade_class_options($ex['academic_year'],$exGrade,$teacherId,$ex['subject_name']) : [];
+        ?><tr><td><b><?php echo clean($ex['subject_name']); ?></b><br><?php echo clean(trim($ex['grade_level'].' '.$ex['class_name'])); ?></td><td><a class="btn btn-primary text-xs" target="_blank" href="exam-print.php?type=questions&amp;exam_id=<?php echo (int)$ex['id']; ?>&amp;dt=<?php echo urlencode(make_exam_design_token($ex['id'], 'teacher', $teacherId)); ?>">طراحی کلاسی</a></td>
+        <?php if ($gFirst): ?>
             <td rowspan="<?php echo (int)$gCount; ?>" class="text-center align-middle" style="background:rgba(16,185,129,.06);vertical-align:middle">
-                <?php if ($gCount > 1 && $exGrade !== ''): ?>
-                    <a class="btn btn-success text-xs" target="_blank" title="یک طراحی مشترک برای هر <?php echo tr_num($gCount,'fa'); ?> کلاس پایه <?php echo clean($exGrade); ?> — چاپ برای تمام دانش‌آموزان پایه" href="exam-print.php?type=questions&exam_id=<?php echo $ex['id']; ?>&grade_all=1&dt=<?php echo urlencode(make_exam_design_token($ex['id'], 'teacher', $teacherId)); ?>">طراحی پایه‌ای <?php echo clean($exGrade); ?><br><span class="text-[10px] font-normal">(<?php echo tr_num($gCount,'fa'); ?> کلاس)</span></a>
-                <?php elseif ($exGrade !== ''): ?>
-                    <a class="btn btn-outline text-xs" target="_blank" title="این درس در این پایه فقط یک کلاس دارد — طراحی برای کل پایه" href="exam-print.php?type=questions&exam_id=<?php echo $ex['id']; ?>&grade_all=1&dt=<?php echo urlencode(make_exam_design_token($ex['id'], 'teacher', $teacherId)); ?>">طراحی پایه‌ای</a>
+                <?php if ($exGrade !== ''): ?>
+                    <button type="button" class="btn btn-success text-xs" onclick="document.getElementById('<?php echo $monthlyGroupModal; ?>').hidden=false">طراحی پایه</button>
+                    <div id="<?php echo $monthlyGroupModal; ?>" class="ceg-modal" hidden role="dialog" aria-modal="true" aria-label="انتخاب کلاس‌های طراحی پایه"><div class="card ceg-dialog"><h3 class="font-bold">طراحی پایهٔ <?php echo clean($exGrade.' — '.$ex['subject_name']); ?></h3><p>کلاس‌هایی را که این آزمون پایه برایشان طراحی شود تیک بزنید. کلاس‌های بدون تدریس شما نیز قابل انتخاب‌اند.</p><form method="GET" action="exam-print.php" target="_blank" onsubmit="if(!this.querySelector('input[name="grade_classes[]"]:checked')){alert('حداقل یک کلاس را انتخاب کنید.');return false;}this.closest('.ceg-modal').hidden=true;">
+                        <input type="hidden" name="type" value="questions"><input type="hidden" name="exam_id" value="<?php echo (int)$ex['id']; ?>"><input type="hidden" name="grade_all" value="1"><input type="hidden" name="dt" value="<?php echo clean(make_exam_design_token($ex['id'],'teacher',$teacherId)); ?>">
+                        <div class="ceg-class-list" style="max-height:260px;overflow:auto;border:1px solid #cbd5e1;border-radius:8px;padding:8px;margin:10px 0"><?php foreach($monthlyGradeClasses as $mClass): ?><label style="display:flex;justify-content:space-between;gap:12px;padding:6px;border-bottom:1px solid #e2e8f0"><span><input type="checkbox" name="grade_classes[]" value="<?php echo clean($mClass['class_name']); ?>" <?php echo $mClass['teaches']?'checked':''; ?>> <?php echo clean($mClass['class_name']); ?></span><small><?php echo $mClass['teaches']?'تدریس دارید':'تدریس ندارید'; ?></small></label><?php endforeach; ?><?php if(!$monthlyGradeClasses): ?><p class="text-muted">کلاسی در این پایه پیدا نشد.</p><?php endif; ?></div>
+                        <button type="submit" class="btn btn-success">ادامهٔ طراحی برای کلاس‌های انتخابی</button><button type="button" class="btn btn-outline" onclick="this.closest('.ceg-modal').hidden=true">انصراف</button></form></div></div>
                 <?php else: ?><span class="text-xs text-muted">—</span><?php endif; ?>
             </td>
         <?php endif; ?>
-        <td><?php echo tr_num($ex['exam_date_jalali'],'fa'); ?></td><td class="font-bold"><?php echo clean($ex['subject_name']); ?></td><td><?php echo clean($ex['academic_year'].' / '.$ex['exam_month']); ?></td><td><?php echo tr_num($ex['start_time'],'fa'); ?></td>
-        </tr><?php endforeach; if(!$teacherExams): ?><tr><td colspan="7" class="text-center text-muted">آزمون فعالی برای شما ثبت نشده است.</td></tr><?php endif; ?>
+        <td><b>(<?php echo clean($ex['exam_month']); ?>)</b><br><?php echo tr_num($ex['exam_date_jalali'],'fa'); ?></td>
+        </tr><?php endforeach; if(!$teacherExams): ?><tr><td colspan="4" class="text-center text-muted">آزمون فعالی برای شما ثبت نشده است.</td></tr><?php endif; ?>
         </tbody></table></div>
 
-        <p class="text-xs text-muted mt-2">ستون «طراحی پایه‌ای»: برای درس‌های یکسان با پایه همسان، یک خانه مشترک بین همه ردیف‌های آن گروه است — طراحی یک‌بار انجام می‌شود و برای تمام دانش‌آموزان همه کلاس‌های آن پایه تکثیر و چاپ می‌گردد.</p>
+        <p class="text-xs text-muted mt-2">در «طراحی پایه» کلاس‌های موردنظر را انتخاب کنید؛ فقط دانش‌آموزان کلاس‌های تیک‌خورده برگهٔ طراحی‌شده را دریافت می‌کنند.</p>
     </div>
 
     <script>

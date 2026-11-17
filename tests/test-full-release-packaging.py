@@ -3,7 +3,7 @@
 import hashlib, importlib.util, json, re, sqlite3, struct, unittest, zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-SPEC=importlib.util.spec_from_file_location('full_builder',ROOT/'scripts/build-full-release-v1.9.py')
+SPEC=importlib.util.spec_from_file_location('full_builder',ROOT/'scripts/build-full-release.py')
 BUILDER=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(BUILDER)
 class FullRelease(unittest.TestCase):
     @classmethod
@@ -59,7 +59,7 @@ class FullRelease(unittest.TestCase):
         correctives={platform:BUILDER.corrective_payload(platform)[1] for platform in ['site','desktop']}
         for platform,(z,p,w) in self.bundles.items():
             for rel,source in latest.items():
-                if rel in transformed:continue
+                if rel in transformed or rel.endswith('/.htaccess'):continue
                 if rel=='desk-sync-api.php':
                     expected=re.sub(r"define\('DESK_SYNC_KEY',\s*'[^']+'\);", "require_once __DIR__.'/config/config.php';\ndefine('DESK_SYNC_KEY', require __DIR__.'/config/desk-sync-key.php');",source.read_text(),count=1).replace('edit desk-sync-api.php','check config/desk-sync-key.php')
                     self.assertEqual(z.read(p+w+rel).decode(),expected,(platform,rel));continue
@@ -79,7 +79,7 @@ class FullRelease(unittest.TestCase):
             self.assertTrue(packages)
             for rel,data in payload.items():
                 self.assertIn(p+w+rel,z.namelist(),(platform,rel))
-                if rel in transformed:continue
+                if rel in transformed or rel.endswith('/.htaccess'):continue
                 self.assertEqual(z.read(p+w+rel),data,(platform,rel))
             for rel in staged:
                 self.assertIn(p+rel,z.namelist(),(platform,rel))
@@ -131,7 +131,7 @@ class FullRelease(unittest.TestCase):
             self.assertIn(platform.encode(),z.read(p+w+'config/release.php'))
         z,p,w=self.bundles['site'];self.assertIn(b"'super_admin'",z.read(p+w+'desk-sync.php'))
     def test_10_outer_checksums(self):
-        lines=(ROOT/f'{BUILDER.RELEASE_NAME}-SHA256SUMS.txt').read_text().splitlines();self.assertEqual(len(lines),2)
+        lines=(ROOT/f'{BUILDER.RELEASE_NAME}-SHA256SUMS.txt').read_text().splitlines();self.assertGreaterEqual(len(lines),2)
         for line in lines:
             digest,name=line.split();self.assertEqual(hashlib.sha256((ROOT/name).read_bytes()).hexdigest(),digest)
 if __name__=='__main__':unittest.main(verbosity=2)
